@@ -1481,206 +1481,203 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </h4>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Modul</span>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Stundenplan & meisterwerke</span>
-                  </div>
-                  {activePlatform === 'secretary' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {campusRequestSent && (
-                        <span style={{ 
-                          background: '#fffbeb', 
-                          color: '#b45309', 
-                          border: '1px solid #fde68a', 
-                          padding: '4px 8px', 
-                          borderRadius: '8px', 
-                          fontSize: '0.65rem', 
-                          fontWeight: 800,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  {/* Campus-Modul */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus</span>
+                    {activePlatform === 'secretary' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {campusRequestSent && (
+                          <span style={{ 
+                            background: '#fffbeb', 
+                            color: '#b45309', 
+                            border: '1px solid #fde68a', 
+                            padding: '2px 4px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.6rem', 
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }} title="Freischaltungsanfrage liegt vor">
+                            ⏳
+                          </span>
+                        )}
+                        <div style={{ 
+                          background: '#f1f5f9', 
+                          padding: '2px', 
+                          borderRadius: '100px', 
+                          display: 'inline-flex', 
+                          border: '1px solid #e2e8f0' 
                         }}>
-                          ⏳ Anfrage!
-                        </span>
-                      )}
-                      <div style={{ 
-                        background: '#f1f5f9', 
-                        padding: '3px', 
-                        borderRadius: '100px', 
-                        display: 'inline-flex', 
-                        border: '1px solid #e2e8f0' 
-                      }}>
-                        <button
-                          onClick={() => handleToggleCampus(false)}
-                          style={{
-                            background: !isCampusActive ? 'white' : 'transparent',
-                            color: !isCampusActive ? '#64748b' : '#94a3b8',
-                            border: 'none',
-                            borderRadius: '100px',
-                            padding: '4px 10px',
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: !isCampusActive ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                          }}
-                        >
-                          Aus
-                        </button>
-                        <button
-                          onClick={() => handleToggleCampus(true)}
-                          style={{
-                            background: isCampusActive ? '#22c55e' : 'transparent',
-                            color: isCampusActive ? 'white' : '#64748b',
-                            border: 'none',
-                            borderRadius: '100px',
-                            padding: '4px 10px',
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: isCampusActive ? '0 2px 6px rgba(34, 197, 94, 0.3)' : 'none'
-                          }}
-                        >
-                          Ein
-                        </button>
+                          <button
+                            onClick={() => handleToggleCampus(false)}
+                            style={{
+                              background: !isCampusActive ? 'white' : 'transparent',
+                              color: !isCampusActive ? '#64748b' : '#94a3b8',
+                              border: 'none',
+                              borderRadius: '100px',
+                              padding: '2px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: !isCampusActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
+                            }}
+                          >
+                            Aus
+                          </button>
+                          <button
+                            onClick={() => handleToggleCampus(true)}
+                            style={{
+                              background: isCampusActive ? '#22c55e' : 'transparent',
+                              color: isCampusActive ? 'white' : '#64748b',
+                              border: 'none',
+                              borderRadius: '100px',
+                              padding: '2px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: isCampusActive ? '0 1px 4px rgba(34, 197, 94, 0.3)' : 'none'
+                            }}
+                          >
+                            Ein
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : isCampusActive ? (
-                    <span style={{ background: '#e6f4ea', color: '#137333', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      Aktiv
-                    </span>
-                  ) : campusRequestSent ? (
-                    <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      ⏳ Anfrage gesendet
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        localStorage.setItem(`req_campus_${student.id}`, 'true');
-                        setCampusRequestSent(true);
-                        alert(`Freischaltungsanfrage für Campus (${student.first_name}) wurde an die Verwaltung gesendet!`);
-                      }}
-                      style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.color = '#22c55e'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
-                    >
-                      🔒 Freischaltung anfragen
-                    </button>
-                  )}
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>GrooveLab-Modul</span>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Songbooks, Bands & üben</span>
-                  </div>
-                  {activePlatform === 'secretary' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {groovelabRequestSent && (
-                        <span style={{ 
-                          background: '#fffbeb', 
-                          color: '#b45309', 
-                          border: '1px solid #fde68a', 
-                          padding: '4px 8px', 
-                          borderRadius: '8px', 
-                          fontSize: '0.65rem', 
+                    ) : isCampusActive ? (
+                      <span style={{ background: '#e6f4ea', color: '#137333', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                        Aktiv
+                      </span>
+                    ) : campusRequestSent ? (
+                      <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                        ⏳ Angefragt
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          localStorage.setItem(`req_campus_${student.id}`, 'true');
+                          setCampusRequestSent(true);
+                          alert(`Freischaltungsanfrage für Campus (${student.first_name}) wurde an die Verwaltung gesendet!`);
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          fontSize: '0.7rem',
                           fontWeight: 800,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.color = '#22c55e'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
+                      >
+                        🔒 Anfragen
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Vertikaler Trenner zwischen Campus und GrooveLab */}
+                  <div style={{ width: '1px', height: '18px', background: '#f1f5f9' }} />
+
+                  {/* GrooveLab-Modul */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>GrooveLab</span>
+                    {activePlatform === 'secretary' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {groovelabRequestSent && (
+                          <span style={{ 
+                            background: '#fffbeb', 
+                            color: '#b45309', 
+                            border: '1px solid #fde68a', 
+                            padding: '2px 4px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.6rem', 
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }} title="Freischaltungsanfrage liegt vor">
+                            ⏳
+                          </span>
+                        )}
+                        <div style={{ 
+                          background: '#f1f5f9', 
+                          padding: '2px', 
+                          borderRadius: '100px', 
+                          display: 'inline-flex', 
+                          border: '1px solid #e2e8f0' 
                         }}>
-                          ⏳ Anfrage!
-                        </span>
-                      )}
-                      <div style={{ 
-                        background: '#f1f5f9', 
-                        padding: '3px', 
-                        borderRadius: '100px', 
-                        display: 'inline-flex', 
-                        border: '1px solid #e2e8f0' 
-                      }}>
-                        <button
-                          onClick={() => handleToggleGroovelab(false)}
-                          style={{
-                            background: !isGroovelabActive ? 'white' : 'transparent',
-                            color: !isGroovelabActive ? '#64748b' : '#94a3b8',
-                            border: 'none',
-                            borderRadius: '100px',
-                            padding: '4px 10px',
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: !isGroovelabActive ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                          }}
-                        >
-                          Aus
-                        </button>
-                        <button
-                          onClick={() => handleToggleGroovelab(true)}
-                          style={{
-                            background: isGroovelabActive ? '#007aff' : 'transparent',
-                            color: isGroovelabActive ? 'white' : '#64748b',
-                            border: 'none',
-                            borderRadius: '100px',
-                            padding: '4px 10px',
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: isGroovelabActive ? '0 2px 6px rgba(0, 122, 255, 0.3)' : 'none'
-                          }}
-                        >
-                          Ein
-                        </button>
+                          <button
+                            onClick={() => handleToggleGroovelab(false)}
+                            style={{
+                              background: !isGroovelabActive ? 'white' : 'transparent',
+                              color: !isGroovelabActive ? '#64748b' : '#94a3b8',
+                              border: 'none',
+                              borderRadius: '100px',
+                              padding: '2px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
+                            }}
+                          >
+                            Aus
+                          </button>
+                          <button
+                            onClick={() => handleToggleGroovelab(true)}
+                            style={{
+                              background: isGroovelabActive ? '#007aff' : 'transparent',
+                              color: isGroovelabActive ? 'white' : '#64748b',
+                              border: 'none',
+                              borderRadius: '100px',
+                              padding: '2px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: isGroovelabActive ? '0 1px 4px rgba(0, 122, 255, 0.3)' : 'none'
+                            }}
+                          >
+                            Ein
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : isGroovelabActive ? (
-                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      Aktiv
-                    </span>
-                  ) : groovelabRequestSent ? (
-                    <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      ⏳ Anfrage gesendet
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        localStorage.setItem(`req_groovelab_${student.id}`, 'true');
-                        setGroovelabRequestSent(true);
-                        alert(`Freischaltungsanfrage für GrooveLab (${student.first_name}) wurde an die Verwaltung gesendet!`);
-                      }}
-                      style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.borderColor = '#007aff'; e.currentTarget.style.color = '#007aff'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
-                    >
-                      🔒 Freischaltung anfragen
-                    </button>
-                  )}
+                    ) : isGroovelabActive ? (
+                      <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                        Aktiv
+                      </span>
+                    ) : groovelabRequestSent ? (
+                      <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                        ⏳ Angefragt
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          localStorage.setItem(`req_groovelab_${student.id}`, 'true');
+                          setGroovelabRequestSent(true);
+                          alert(`Freischaltungsanfrage für GrooveLab (${student.first_name}) wurde an die Verwaltung gesendet!`);
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#007aff'; e.currentTarget.style.color = '#007aff'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
+                      >
+                        🔒 Anfragen
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
