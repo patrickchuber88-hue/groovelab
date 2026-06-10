@@ -5962,31 +5962,52 @@ function App() {
           left: '16px',
           right: '16px',
           margin: '0 auto',
-          maxWidth: '480px',
-          background: 'rgba(255, 255, 255, 0.9)',
+          maxWidth: '420px',
+          background: 'rgba(255, 255, 255, 0.85)',
           backdropFilter: 'blur(20px) saturate(190%)',
           WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
-          borderRadius: '16px',
-          padding: '8px 12px 8px 16px',
-          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          borderRadius: '20px',
+          padding: '12px 16px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02)',
           zIndex: 99999,
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          justifyContent: 'space-between',
           animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
           pointerEvents: 'auto',
           boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>🎓</span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {/* App Icon (Apple style rounded rect) */}
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '9px',
+            background: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '1.4rem',
+            boxShadow: '0 4px 10px rgba(34, 197, 94, 0.15)',
+            flexShrink: 0
+          }}>
+            🎓
+          </div>
+
+          {/* 2-line Text content */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 750, color: '#1e293b' }}>
+              Campus App
+            </span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 550, color: '#64748b', lineHeight: 1.25 }}>
               {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream 
                 ? 'Teilen-Symbol tippen & "Zum Home-Bildschirm"'
-                : 'Campus App auf Startbildschirm hinzufügen'}
+                : 'Auf Startbildschirm hinzufügen'}
             </span>
           </div>
+
+          {/* Action & Close buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {(!/iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).MSStream) && deferredPrompt && (
               <button 
@@ -5995,17 +6016,17 @@ function App() {
                   background: '#16a34a',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
+                  borderRadius: '100px',
+                  padding: '6px 14px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
-                  minHeight: '32px'
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
+                  minHeight: '30px'
                 }}
                 className="hover-scale"
               >
-                Hinzufügen
+                Laden
               </button>
             )}
             <button 
@@ -6014,14 +6035,14 @@ function App() {
                 background: 'rgba(0,0,0,0.04)',
                 border: 'none',
                 color: '#64748b',
-                width: '32px',
-                height: '32px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.88rem',
+                fontSize: '0.85rem',
                 fontWeight: 700
               }}
               title="Schließen"
