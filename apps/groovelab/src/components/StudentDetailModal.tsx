@@ -1739,6 +1739,43 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </div>
             </section>
 
+            {/* Action button for managers to regenerate QR Code (Placed above cards as requested) */}
+            {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+              <button
+                onClick={handleRegenerateQrToken}
+                className="google-btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 850,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: '#fff1f2',
+                  border: '1.5px solid #fecdd3',
+                  color: '#e11d48',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                  boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
+                  transition: 'all 0.2s',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ffe4e6';
+                  e.currentTarget.style.borderColor = '#fda4af';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#fff1f2';
+                  e.currentTarget.style.borderColor = '#fecdd3';
+                }}
+              >
+                <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
+              </button>
+            )}
+
             {isPlatformCampus ? (
               /* Wallet Pass (Green ID Card) - Forest green obsidian gradient, luxurious gold outlines and accents */
               <div className="hover-scale" style={{ 
@@ -1933,43 +1970,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   background: `linear-gradient(90deg, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'}, #1e293b, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'})` 
                 }} />
               </div>
-            )}
-
-            {/* Action button for managers to regenerate QR Code */}
-            {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-              <button
-                onClick={handleRegenerateQrToken}
-                className="google-btn-secondary"
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  fontSize: '0.8rem',
-                  fontWeight: 850,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  background: '#fff1f2',
-                  border: '1.5px solid #fecdd3',
-                  color: '#e11d48',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  marginTop: '20px',
-                  boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
-                  transition: 'all 0.2s',
-                  zIndex: 10
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#ffe4e6';
-                  e.currentTarget.style.borderColor = '#fda4af';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#fff1f2';
-                  e.currentTarget.style.borderColor = '#fecdd3';
-                }}
-              >
-                <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
-              </button>
             )}
 
           </aside>
