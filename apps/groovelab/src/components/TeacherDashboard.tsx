@@ -2055,6 +2055,7 @@ export function TeacherDashboard({
   }, [rawBriefingData, isTodayHoliday]);
 
   const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [myChangedAppointments, setMyChangedAppointments] = useState<any[]>([]);
 
   // Helper to check if today is student's birthday
   const isStudentBirthdayToday = (student: any): boolean => {
@@ -2214,18 +2215,13 @@ export function TeacherDashboard({
           };
         });
 
-        const combinedBookings = [
-          ...allBookings,
-          ...mappedOccurs
-        ];
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
         const twoWeeksLater = new Date(today);
         twoWeeksLater.setDate(today.getDate() + 14);
 
-        const filtered = combinedBookings.filter((b: any) => {
+        const filteredBookings = allBookings.filter((b: any) => {
           if (b.teacherId !== userId) return false;
           if (!b.date) return false;
           const bDate = new Date(b.date);
@@ -2233,14 +2229,29 @@ export function TeacherDashboard({
           return bDate >= today && bDate <= twoWeeksLater;
         });
 
-        // Sort by date then start time
-        filtered.sort((a: any, b: any) => {
+        const filteredOccurs = mappedOccurs.filter((b: any) => {
+          if (b.teacherId !== userId) return false;
+          if (!b.date) return false;
+          const bDate = new Date(b.date);
+          bDate.setHours(0, 0, 0, 0);
+          return bDate >= today && bDate <= twoWeeksLater;
+        });
+
+        // Sort both by date then start time
+        filteredBookings.sort((a: any, b: any) => {
           const dateDiff = a.date.localeCompare(b.date);
           if (dateDiff !== 0) return dateDiff;
           return a.startTime.localeCompare(b.startTime);
         });
 
-        setMyBookings(filtered);
+        filteredOccurs.sort((a: any, b: any) => {
+          const dateDiff = a.date.localeCompare(b.date);
+          if (dateDiff !== 0) return dateDiff;
+          return a.startTime.localeCompare(b.startTime);
+        });
+
+        setMyBookings(filteredBookings);
+        setMyChangedAppointments(filteredOccurs);
       } catch (err) {
         console.error('Failed to load my bookings:', err);
       }
@@ -5935,17 +5946,17 @@ export function TeacherDashboard({
                               { type: 'quote', text: "Wo man singt, da lass dich ruhig nieder, böse Menschen haben keine Lieder.", author: "Johann Gottfried Seume" },
                               { type: 'quote', text: "Die Musik ist die Sprache der Leidenschaft.", author: "Richard Wagner" },
                               
-                              // Jokes (10)
-                              { type: 'joke', text: "Was ist der Unterschied zwischen einer Geige und einer Bratsche? Die Bratsche brennt länger.", author: "Bratschisten-Witz" },
-                              { type: 'joke', text: "Wie nennt man jemanden, der gerne mit Musikern abhängt? Einen Schlagzeuger.", author: "Schlagzeuger-Witz" },
-                              { type: 'joke', text: "Warum sind Dirigenten-Partituren immer so groß? Damit sie sich dahinter verstecken können.", author: "Dirigenten-Witz" },
-                              { type: 'joke', text: "Wie bringt man einen Gitarristen dazu, leiser zu spielen? Leg ihm ein Notenblatt vor.", author: "Gitarristen-Witz" },
-                              { type: 'joke', text: "Wie viele Tenöre braucht man, um eine Glühbirne einzuschrauben? Fünf. Einer schraubt, und vier sagen, dass sie es höher gekonnt hätten.", author: "Sänger-Witz" },
-                              { type: 'joke', text: "Was ist das Erste, was ein Bassist lernt? Wie man das Instrument wieder einpackt.", author: "Bassisten-Witz" },
-                              { type: 'joke', text: "Warum spielt ein Keyboarder so gerne Klavier? Weil er da keine Kabel suchen muss.", author: "Keyboarder-Witz" },
-                              { type: 'joke', text: "Wie nennt man eine wunderschöne Frau am Arm eines Posaunisten? Ein Tattoo.", author: "Posaunisten-Witz" },
-                              { type: 'joke', text: "Was haben ein Triangelspieler und ein Blitz gemeinsam? Beide treffen selten zweimal dieselbe Stelle.", author: "Orchester-Witz" },
-                              { type: 'joke', text: "Warum klopft der Schlagzeuger immer an die Tür? Weil er nicht weiß, wann er einsetzen soll.", author: "Schlagzeuger-Witz" }
+                              // Facts (10)
+                              { type: 'fact', text: "Wusstest du, dass die tiefste jemals gemessene Orgelpfeife einen Ton von 8 Hz erzeugt? Dieser ist für den Menschen unhörbar, kann aber als Vibration wahrgenommen werden.", author: "Orgel-Fakt" },
+                              { type: 'fact', text: "Wolfgang Amadeus Mozart vollendete in seinem kurzen Leben von 35 Jahren über 600 Kompositionen – das entspricht etwa 240 Stunden reiner Musik.", author: "Mozart-Fakt" },
+                              { type: 'fact', text: "In der Barockmusik galt die Quarte (Intervall von vier Tonschritten) in zweistimmigen Sätzen noch als Dissonanz und musste regelgerecht aufgelöst werden.", author: "Musiktheorie-Fakt" },
+                              { type: 'fact', text: "Der Tritonus-Akkord wurde im Mittelalter wegen seiner extremen Dissonanz als 'Diabolus in Musica' (Teufel in der Musik) bezeichnet und streng vermieden.", author: "Musikgeschichte-Fakt" },
+                              { type: 'fact', text: "Das älteste spielbare Musikinstrument der Welt ist eine Knochenflöte aus einer Höhle in Slowenien. Ihr Alter wird auf rund 43.000 Jahre geschätzt.", author: "Archäologie-Fakt" },
+                              { type: 'fact', text: "Ludwig van Beethoven komponierte seine berühmte 9. Sinfonie, einschließlich der weltbekannten 'Ode an die Freude', als er bereits vollständig gehörlos war.", author: "Beethoven-Fakt" },
+                              { type: 'fact', text: "Das 'Wohltemperierte Klavier' von J. S. Bach bewies, dass man dank der wohltemperierten Stimmung in allen 24 Dur- und Molltonarten wohlklingend spielen kann.", author: "Musiktheorie-Fakt" },
+                              { type: 'fact', text: "Das Wort 'Klavier' leitet sich vom lateinischen 'clavis' (Schlüssel) ab und bezeichnete ursprünglich ganz allgemein die Tasten eines Tasteninstruments.", author: "Etymologie-Fakt" },
+                              { type: 'fact', text: "Pjotr Iljitsch Tschaikowski vertonte den Sieg über Napoleon in seiner 'Ouvertüre 1812' unter Einsatz von echten Kanonenschüssen als Rhythmusinstrument.", author: "Musikgeschichte-Fakt" },
+                              { type: 'fact', text: "Der Begriff 'A cappella' bedeutete ursprünglich 'nach Kapellart' und bezeichnete Gesangsstücke, die ohne eigenständige Instrumentenbegleitung aufgeführt wurden.", author: "Musikgeschichte-Fakt" }
                             ];
 
                             const today = new Date();
@@ -6142,15 +6153,23 @@ export function TeacherDashboard({
                                       fontWeight: 700
                                     }}>
                                       <span style={{ 
-                                        background: dailyItem.type === 'joke' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.08)',
-                                        color: dailyItem.type === 'joke' ? '#ef4444' : '#4f46e5',
+                                        background: dailyItem.type === 'joke' 
+                                          ? 'rgba(239, 68, 68, 0.08)' 
+                                          : dailyItem.type === 'fact'
+                                            ? 'rgba(16, 185, 129, 0.08)'
+                                            : 'rgba(99, 102, 241, 0.08)',
+                                        color: dailyItem.type === 'joke' 
+                                          ? '#ef4444' 
+                                          : dailyItem.type === 'fact'
+                                            ? '#10b981'
+                                            : '#4f46e5',
                                         padding: '2px 8px',
                                         borderRadius: '100px',
                                         fontSize: '0.65rem',
                                         textTransform: 'uppercase',
                                         letterSpacing: '0.04em'
                                       }}>
-                                        {dailyItem.type === 'joke' ? 'Witz' : 'Zitat'}
+                                        {dailyItem.type === 'joke' ? 'Witz' : dailyItem.type === 'fact' ? 'Fakt' : 'Zitat'}
                                       </span>
                                       <span>— {dailyItem.author}</span>
                                     </div>
@@ -7209,12 +7228,193 @@ export function TeacherDashboard({
 
 
 
+              {myChangedAppointments.length > 0 && (
+                <div style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '24px', 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <AlertCircle size={18} color="#eab308" />
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Terminänderungen</h3>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {myChangedAppointments.map((b: any) => {
+                      const dateObj = new Date(b.date);
+                      const isCancelled = b.status === 'cancelled';
+                      const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
+                      const isPending = b.status === 'pending';
+
+                      // Determine colors and labels based on status
+                      let cardBg = 'rgba(16, 185, 129, 0.06)'; // default scheduled
+                      let dateHeaderBg = '#10b981';
+                      let dateHeaderTextColor = '#ffffff';
+                      let label = 'Gebucht';
+                      let labelBg = '#000000';
+                      let labelTextColor = '#ffffff';
+                      let textColor = '#1e293b';
+                      let subTextColor = '#64748b';
+                      let commentButtonBg = 'rgba(16, 185, 129, 0.08)';
+                      let commentButtonColor = '#10b981';
+
+                      if (isCancelled) {
+                        cardBg = 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
+                        dateHeaderBg = '#ef4444';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Ausfall';
+                        labelBg = '#000000';
+                        labelTextColor = '#ffffff';
+                        textColor = '#ffffff';
+                        subTextColor = 'rgba(255, 255, 255, 0.9)';
+                        commentButtonBg = 'rgba(255, 255, 255, 0.2)';
+                        commentButtonColor = '#ffffff';
+                      } else if (isRescheduled) {
+                        cardBg = 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)';
+                        dateHeaderBg = '#eab308';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Verschoben';
+                        labelBg = '#000000';
+                        labelTextColor = '#ffffff';
+                        textColor = '#78350f';
+                        subTextColor = 'rgba(120, 53, 15, 0.95)';
+                        commentButtonBg = 'rgba(120, 53, 15, 0.12)';
+                        commentButtonColor = '#78350f';
+                      } else if (isPending) {
+                        cardBg = 'rgba(139, 92, 246, 0.06)';
+                        dateHeaderBg = '#8b5cf6';
+                        dateHeaderTextColor = '#ffffff';
+                        label = 'Reserviert';
+                        labelBg = 'rgba(139, 92, 246, 0.12)';
+                        labelTextColor = '#7c3aed';
+                        textColor = '#0f172a';
+                        subTextColor = '#475569';
+                        commentButtonBg = 'rgba(139, 92, 246, 0.08)';
+                        commentButtonColor = '#8b5cf6';
+                      }
+
+                      return (
+                        <div key={b.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                          {/* Calendar date card */}
+                          <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
+                            <div style={{ background: dateHeaderBg, color: dateHeaderTextColor, fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>
+                              {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
+                            </div>
+                            <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>
+                              {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
+                            </div>
+                          </div>
+
+                          {/* Event details block */}
+                          <div 
+                            onClick={() => handleBookingClick(b)}
+                            style={{ 
+                              flex: 1, 
+                              background: cardBg,
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              cursor: 'pointer',
+                              boxShadow: isCancelled || isRescheduled ? '0 4px 10px rgba(0, 0, 0, 0.1)' : 'none',
+                              transition: 'all 0.2s ease',
+                              minWidth: 0,
+                              boxSizing: 'border-box'
+                            }}
+                            className="hover-scale"
+                          >
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
+                                <span style={{ whiteSpace: 'nowrap' }}>{dateObj.toLocaleDateString('de-DE', { weekday: 'short' })}</span>
+                                <span style={{ 
+                                  fontSize: '0.58rem', 
+                                  fontWeight: 900, 
+                                  background: labelBg, 
+                                  color: labelTextColor, 
+                                  padding: '2px 7px', 
+                                  borderRadius: '6px', 
+                                  textTransform: 'uppercase',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {label}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', marginTop: '1px' }}>
+                                {b.startTime} Uhr • <strong>{b.roomName || b.rooms?.name || 'Raum'}</strong>
+                              </div>
+                              {b.studentName && (
+                                <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 800, marginTop: '2px' }}>
+                                  {(() => {
+                                    if (b.studentName.includes('&')) {
+                                      const parts = b.studentName.split('&');
+                                      const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
+                                      return firstNames.join(' & ');
+                                    }
+                                    return b.studentName;
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Shoutbox chat button - integrated inside the colored card */}
+                            {b.isSchedule && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (b.teacherId) {
+                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                    const dayLabel = DAYS_DE[dateObj.getDay()];
+                                    const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                                    const chatLabel = `${dayLabel} (${formattedDate}), ${b.startTime} Uhr (${label})`;
+                                    
+                                    if ((window as any).openShoutbox) {
+                                      (window as any).openShoutbox({
+                                        teacherId: b.teacherId,
+                                        date: b.date,
+                                        start_time: b.startTime,
+                                        label: chatLabel,
+                                        occurrenceId: b.id
+                                      });
+                                    }
+                                  }
+                                }}
+                                title="Shoutbox öffnen"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: commentButtonBg,
+                                  color: commentButtonColor,
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <MessageSquare size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {myBookings.length > 0 && (
                 <div style={{ 
                   background: '#ffffff', 
                   borderRadius: '24px', 
                   padding: '24px', 
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  marginBottom: '20px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                     <Calendar size={18} color="#8b5cf6" />
