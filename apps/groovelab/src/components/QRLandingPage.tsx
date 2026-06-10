@@ -67,12 +67,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
 
       try {
+        // Token temporär setzen, damit der supabase custom-fetch-wrapper ihn als Header mitschickt
+        sessionStorage.setItem('groovelab_qr_token', token);
+
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('id, first_name, last_name, school_id')
           .eq('qr_token', token)
           .single();
+
+        // Token direkt wieder aufräumen
+        sessionStorage.removeItem('groovelab_qr_token');
 
         if (userError || !userData) {
           setErrorMsg('Dieser QR-Code ist ungültig oder gehört keinem Nutzer.');
