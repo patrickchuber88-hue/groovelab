@@ -2578,12 +2578,22 @@ function App() {
   // we immediately redirect/correct them to 'briefing' to keep the modules strictly isolated.
   useEffect(() => {
     if (user && user.role?.toLowerCase() === 'student') {
-      if (activePlatform === 'campus' && !['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'messages', 'settings'].includes(activeStudentTab)) {
-        console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
-        setActiveStudentTab('briefing');
-        localStorage.setItem('campus_active_tab', 'briefing');
+        const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
+        const showLeaderboard = campusSettings.show_leaderboard !== false;
+        const showDetailedStats = campusSettings.show_detailed_stats !== false;
+        const flamesActive = campusSettings.flames_active !== false;
+        
+        const allowedTabs = ['briefing', 'mediathek', 'events', 'profile', 'all_appointments', 'messages', 'settings'];
+        if (flamesActive) allowedTabs.push('practice_board');
+        if (showLeaderboard) allowedTabs.push('campus_cup');
+        if (showDetailedStats) allowedTabs.push('flashback');
+
+        if (!allowedTabs.includes(activeStudentTab)) {
+          console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
+          setActiveStudentTab('briefing');
+          localStorage.setItem('campus_active_tab', 'briefing');
+        }
       }
-    }
   }, [user, activePlatform, activeStudentTab]);
   const { width, height } = useWindowSize();
 
@@ -6486,51 +6496,64 @@ function App() {
 
         <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {user.role?.toLowerCase() === 'student' ? (
-            activePlatform === 'campus' ? (
-              <>
-                <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
-                  <Monitor size={20} /> Briefing
-                </button>
-                <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
-                  <Zap size={20} /> Übe-Pfad
-                </button>
-                <button onClick={() => setActiveStudentTab('mediathek')} className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}>
-                  <Library size={20} /> Mediathek
-                </button>
-                <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
-                  <Calendar size={20} /> Termine
-                </button>
-                <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
-                  <Trophy size={20} /> Performance & Highlights
-                </button>
-                <button onClick={() => setActiveStudentTab('flashback')} className={`sidebar-item ${activeStudentTab === 'flashback' ? `active ${activePlatform}` : ''}`}>
-                  <Clock size={20} /> Flashback
-                </button>
-                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
-                  <Mail size={20} /> Nachrichten
-                  {campusUnreadCount > 0 && (
-                    <div style={{ 
-                      background: '#ef4444', 
-                      color: 'white', 
-                      borderRadius: '50%', 
-                      minWidth: '18px', 
-                      height: '18px', 
-                      padding: '0 5px',
-                      fontSize: '0.65rem', 
-                      fontWeight: 900, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      marginLeft: 'auto',
-                      boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-                    }}>{campusUnreadCount}</div>
+            activePlatform === 'campus' ? (() => {
+              const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
+              const showLeaderboard = campusSettings.show_leaderboard !== false;
+              const showDetailedStats = campusSettings.show_detailed_stats !== false;
+              const flamesActive = campusSettings.flames_active !== false;
+              return (
+                <>
+                  <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
+                    <Monitor size={20} /> Briefing
+                  </button>
+                  {flamesActive && (
+                    <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
+                      <Zap size={20} /> Übe-Pfad
+                    </button>
                   )}
-                </button>
-                <button onClick={() => setActiveStudentTab('settings')} className={`sidebar-item ${activeStudentTab === 'settings' ? `active ${activePlatform}` : ''}`}>
-                  <Settings size={20} /> Einstellungen
-                </button>
-              </>
-            ) : activePlatform === 'ensembles' ? (
+                  <button onClick={() => setActiveStudentTab('mediathek')} className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}>
+                    <Library size={20} /> Mediathek
+                  </button>
+                  <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
+                    <Calendar size={20} /> Termine
+                  </button>
+                  {showLeaderboard && (
+                    <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
+                      <Trophy size={20} /> Performance & Highlights
+                    </button>
+                  )}
+                  {showDetailedStats && (
+                    <button onClick={() => setActiveStudentTab('flashback')} className={`sidebar-item ${activeStudentTab === 'flashback' ? `active ${activePlatform}` : ''}`}>
+                      <Clock size={20} /> Flashback
+                    </button>
+                  )}
+                  <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
+                    <Mail size={20} /> Nachrichten
+                    {campusUnreadCount > 0 && (
+                      <div style={{ 
+                        background: '#ef4444', 
+                        color: 'white', 
+                        borderRadius: '50%', 
+                        minWidth: '18px', 
+                        height: '18px', 
+                        padding: '0 5px',
+                        fontSize: '0.65rem', 
+                        fontWeight: 900, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        marginLeft: 'auto',
+                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                      }}>{campusUnreadCount}</div>
+                    )}
+                  </button>
+                  <button onClick={() => setActiveStudentTab('settings')} className={`sidebar-item ${activeStudentTab === 'settings' ? `active ${activePlatform}` : ''}`}>
+                    <Settings size={20} /> Einstellungen
+                  </button>
+                </>
+              );
+            })()
+            : activePlatform === 'ensembles' ? (
               <>
                 <button onClick={() => setActiveStudentTab('overview')} className={`sidebar-item ${activeStudentTab === 'overview' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Ensembles & Bands
@@ -6638,7 +6661,7 @@ function App() {
                   <Trophy size={20} /> Performance & Highlights
                 </button>
                 <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
-                  <Settings size={20} /> Setup
+                  <Settings size={20} /> Einstellungen
                 </button>
               </>
             ) : activePlatform === 'ensembles' ? (
@@ -7148,7 +7171,7 @@ function App() {
         flexDirection: 'column', 
         height: activeStudentTab === 'live' ? '100%' : 'auto',
         paddingLeft: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : '20px',
-        paddingRight: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : (activePlatform === 'campus' ? '0px' : '20px'),
+        paddingRight: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : '20px',
         minWidth: 0
       }}>
         {/* Ensemble & Bands Platform View */}
@@ -8604,6 +8627,7 @@ function App() {
                   onMarkAsRead={handleMarkCampusMessagesAsRead}
                   selectedRecipient={selectedCampusRecipient}
                   setSelectedRecipient={setSelectedCampusRecipient}
+                  studentToTeacherChat={user?.schools?.opening_hours?.campus_settings?.student_to_teacher_chat !== false}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -11728,34 +11752,48 @@ function App() {
             }}
           >
             {user?.role?.toLowerCase() === 'student' ? (
-              activePlatform === 'campus' ? (
-                <>
-                  <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
-                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
-                    <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Pfad</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
-                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Termine">
-                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Termine</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Performance & Highlights">
-                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('flashback')} style={getMobileButtonStyle('flashback', 'campus')} className="hover-scale" title="Flashback">
-                    <Clock size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Flashback</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
-                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('settings')} style={getMobileButtonStyle('settings', 'campus')} className="hover-scale" title="Einstellungen">
-                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
-                  </button>
-                </>
-              ) : (
+              activePlatform === 'campus' ? (() => {
+                const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
+                const showLeaderboard = campusSettings.show_leaderboard !== false;
+                const showDetailedStats = campusSettings.show_detailed_stats !== false;
+                const flamesActive = campusSettings.flames_active !== false;
+
+                return (
+                  <>
+                    <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
+                      <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
+                    </button>
+                    {flamesActive && (
+                      <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
+                        <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Pfad</span>}
+                      </button>
+                    )}
+                    <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
+                      <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
+                    </button>
+                    <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Termine">
+                      <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Termine</span>}
+                    </button>
+                    {showLeaderboard && (
+                      <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Performance & Highlights">
+                        <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
+                      </button>
+                    )}
+                    {showDetailedStats && (
+                      <button onClick={() => setActiveStudentTab('flashback')} style={getMobileButtonStyle('flashback', 'campus')} className="hover-scale" title="Flashback">
+                        <Clock size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Flashback</span>}
+                      </button>
+                    )}
+                    <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
+                      <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                    </button>
+                    <button onClick={() => setActiveStudentTab('settings')} style={getMobileButtonStyle('settings', 'campus')} className="hover-scale" title="Einstellungen">
+                      <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
+                    </button>
+                  </>
+                );
+              })()
+              : (
                 <>
                   <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
                     <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Live Lab</span>}

@@ -176,6 +176,15 @@ const toLocalYYYYMMDD = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const getDaysBetweenLocal = (dateStr1: string, dateStr2: string) => {
+  const [y1, m1, d1] = dateStr1.split('-').map(Number);
+  const [y2, m2, d2] = dateStr2.split('-').map(Number);
+  const dt1 = new Date(y1, m1 - 1, d1, 12, 0, 0);
+  const dt2 = new Date(y2, m2 - 1, d2, 12, 0, 0);
+  const diffTime = dt2.getTime() - dt1.getTime();
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+};
+
 const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string => {
   let date: Date;
   if (!dateInput) {
@@ -284,6 +293,9 @@ interface MobileBriefingViewProps {
   getISOWeek: (date?: string | Date) => string;
   handleTabChangeLocal: (tab: string) => void;
   campusFeedAnnouncements: any[];
+  songStats: { assignedCount: number; masteredCount: number };
+  occurrencesWithMessages: string[];
+  setShowRulesModal: (show: boolean) => void;
 }
 
 function MobileBriefingView({
@@ -302,8 +314,15 @@ function MobileBriefingView({
   handleAcknowledgeCancellation,
   getISOWeek,
   handleTabChangeLocal,
-  campusFeedAnnouncements
+  campusFeedAnnouncements,
+  songStats,
+  occurrencesWithMessages,
+  setShowRulesModal
 }: MobileBriefingViewProps) {
+  const campusSettings = studentUser?.schools?.opening_hours?.campus_settings || {};
+  const flamesActive = campusSettings.flames_active !== false;
+  const xpActive = campusSettings.xp_active !== false;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '12px 0px' }}>
       
@@ -352,34 +371,39 @@ function MobileBriefingView({
                 })()}</span>
               </div>
 
-              {teacherId && (
-                <button 
-                  onClick={() => {
-                    setAppointmentChatData({
-                      teacherId,
-                      date: targetDateStr,
-                      start_time: timeLabel,
-                      label,
-                      occurrenceId: finalOccurId
-                    });
-                    setShowAppointmentChat(true);
-                  }}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    background: '#dbeafe', 
-                    color: '#1e40af', 
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <MessageSquare size={18} />
-                </button>
-              )}
+              {teacherId && (() => {
+                const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                return (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAppointmentChatData({
+                        teacherId,
+                        date: targetDateStr,
+                        start_time: timeLabel,
+                        label,
+                        occurrenceId: finalOccurId
+                      });
+                      setShowAppointmentChat(true);
+                    }}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      background: hasMessage ? '#fef3c7' : '#dbeafe', 
+                      color: hasMessage ? '#d97706' : '#1e40af', 
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <MessageSquare size={18} fill={hasMessage ? 'currentColor' : 'none'} />
+                  </button>
+                );
+              })()}
             </div>
           );
         })() : (
@@ -393,13 +417,15 @@ function MobileBriefingView({
       {/* RESPONSIVE GRID FOR KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', padding: '0 12px' }}>
         {/* XP Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>XP</span>
-            <Star size={15} fill="currentColor" />
+        {xpActive && (
+          <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>XP</span>
+              <Star size={15} fill="currentColor" />
+            </div>
+            <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{currentXp || 0} XP</span>
-        </div>
+        )}
         
         {/* Songs Kachel */}
         <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)' }}>
@@ -407,7 +433,7 @@ function MobileBriefingView({
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Songs</span>
             <Award size={15} />
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{wrappedData?.monthlyFlashback?.masteredSongsCount || 0} / 3</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{songStats.masteredCount} / {songStats.assignedCount}</span>
         </div>
 
         {/* Fokus Kachel */}
@@ -420,13 +446,15 @@ function MobileBriefingView({
         </div>
 
         {/* Streak Kachel */}
-        <div style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Streak</span>
-            <Flame size={15} />
+        {flamesActive && (
+          <div style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Streak</span>
+              <Flame size={15} />
+            </div>
+            <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.streak_flame || 0} Tage</span>
-        </div>
+        )}
       </div>
 
       {/* RESPONSIVE PRACTICE HUB FOR MOBILE & TABLETS */}
@@ -611,96 +639,110 @@ function MobileBriefingView({
         </div>
 
         {/* Widget 2: Tägliche Übezeit */}
-        <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={14} fill="currentColor" />
+        {flamesActive && (
+          <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={14} fill="currentColor" />
+                </div>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dein tägliches Ritual</span>
               </div>
-              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dein tägliches Ritual</span>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>Tägliche Übezeit</div>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, margin: '4px 0 0 0' }}>
+                  Schön, dass du da bist! Lass uns gemeinsam Musik machen. Jede Minute, die du heute übst, stärkt deine Superkräfte am Instrument und bringt dich deinen Zielen ein Stück näher. 🎸✨
+                </p>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>Tägliche Übezeit</div>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, margin: '4px 0 0 0' }}>
-                Schön, dass du da bist! Lass uns gemeinsam Musik machen. Jede Minute, die du heute übst, stärkt deine Superkräfte am Instrument und bringt dich deinen Zielen ein Stück näher. 🎸✨
-              </p>
-            </div>
+            <button 
+              onClick={() => setActiveTab('practice_board')}
+              style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
+              🚀 Üben starten
+            </button>
           </div>
-          <button 
-            onClick={() => setActiveTab('practice_board')}
-            style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
-            🚀 Üben starten
-          </button>
-        </div>
+        )}
 
         {/* Widget 3: Flammen-Pfad */}
-        <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {(() => {
-            const streak = avatar?.streak_flame || 0;
-            return (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Flame size={16} color="#ea580c" />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Flammen-Pfad</span>
-                  </div>
-                  <div style={{ 
-                    background: streak === 0 ? '#fee2e2' : '#ffedd5', 
-                    color: streak === 0 ? '#ffffff' : '#ea580c', 
-                    fontSize: '0.68rem', 
-                    fontWeight: 800, 
-                    padding: '2px 8px', 
-                    borderRadius: '100px' 
-                  }}>
-                    {streak} {streak === 1 ? 'Tag' : 'Tage'}
-                  </div>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', flex: 1, alignItems: 'center' }}>
-                  {/* Kleine Flamme */}
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
-                    <div style={{ color: streak >= 3 ? '#eab308' : '#cbd5e1' }}><Flame size={16} fill={streak >= 3 ? 'currentColor' : 'none'} /></div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 3 ? '#854d0e' : '#64748b' }}>Kleine</div>
-                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>3 Min</div>
-                  </div>
-                  {/* Mittlere Flamme */}
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
-                    <div style={{ color: streak >= 6 ? '#f97316' : '#cbd5e1' }}><Flame size={16} fill={streak >= 6 ? 'currentColor' : 'none'} /></div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 6 ? '#9a3412' : '#64748b' }}>Mittlere</div>
-                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>5 Min</div>
-                  </div>
-                  {/* Helden-Feuer */}
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
-                    <div style={{ color: streak >= 9 ? '#ef4444' : '#cbd5e1' }}><Flame size={16} fill={streak >= 9 ? 'currentColor' : 'none'} /></div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 9 ? '#991b1b' : '#64748b' }}>Helden</div>
-                    <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>10 Min</div>
-                  </div>
-                </div>
-                {/* Joker indicator */}
-                {(() => {
-                  const currentWeek = getISOWeek(new Date());
-                  const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                  const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-                  
-                  return (
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
-                      <span style={{ color: '#64748b', fontWeight: 650 }}>Wöchentlicher Joker:</span>
-                      <span style={{ 
-                        color: isJokerAvailable ? '#10b981' : '#ef4444', 
-                        fontWeight: 800,
-                        background: isJokerAvailable ? '#ecfdf5' : '#fef2f2',
-                        padding: '2px 8px',
-                        borderRadius: '100px'
-                      }}>
-                        {isJokerAvailable ? '👍 Bereit' : '❌ Verbraucht'}
-                      </span>
+        {flamesActive && (
+          <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {(() => {
+              const streak = avatar?.streak_flame || 0;
+              const level = avatar?.evolution_level || 1;
+              return (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Flame size={16} color="#ea580c" />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Flammen-Pfad</span>
+                      <button 
+                        onClick={() => setShowRulesModal(true)}
+                        style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.2s' }}
+                        onMouseOver={e => e.currentTarget.style.color = '#ea580c'}
+                        onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                        title="Spielregeln anzeigen"
+                      >
+                        <HelpCircle size={13} />
+                      </button>
                     </div>
-                  );
-                })()}
-              </>
-            );
-          })()}
-        </div>
+                    <div style={{ 
+                      background: streak === 0 ? '#fee2e2' : '#ffedd5', 
+                      color: streak === 0 ? '#ef4444' : '#ea580c', 
+                      fontSize: '0.68rem', 
+                      fontWeight: 800, 
+                      padding: '2px 8px', 
+                      borderRadius: '100px' 
+                    }}>
+                      {streak} {streak === 1 ? 'Tag' : 'Tage'}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', flex: 1, alignItems: 'center' }}>
+                    {/* Kleine Flamme */}
+                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                      <div style={{ color: streak >= 1 ? '#eab308' : '#cbd5e1' }}><Flame size={16} fill={streak >= 1 ? 'currentColor' : 'none'} /></div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 1 ? '#854d0e' : '#64748b' }}>Kleine</div>
+                      <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{level === 3 ? 10 : level === 2 ? 5 : 3} Min</div>
+                    </div>
+                    {/* Mittlere Flamme */}
+                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                      <div style={{ color: streak >= 4 ? '#f97316' : '#cbd5e1' }}><Flame size={16} fill={streak >= 4 ? 'currentColor' : 'none'} /></div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 4 ? '#9a3412' : '#64748b' }}>Mittlere</div>
+                      <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{level === 3 ? 15 : level === 2 ? 10 : 5} Min</div>
+                    </div>
+                    {/* Helden-Feuer */}
+                    <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '70px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.02)' }}>
+                      <div style={{ color: streak >= 9 ? '#ef4444' : '#cbd5e1' }}><Flame size={16} fill={streak >= 9 ? 'currentColor' : 'none'} /></div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: streak >= 9 ? '#991b1b' : '#64748b' }}>Helden</div>
+                      <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{level === 3 ? 20 : level === 2 ? 15 : 10} Min</div>
+                    </div>
+                  </div>
+                  {/* Joker indicator */}
+                  {(() => {
+                    const currentWeek = getISOWeek(new Date());
+                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                    
+                    return (
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                        <span style={{ color: '#64748b', fontWeight: 650 }}>Wöchentlicher Joker:</span>
+                        <span style={{ 
+                          color: isJokerAvailable ? '#10b981' : '#ef4444', 
+                          fontWeight: 800,
+                          background: isJokerAvailable ? '#ecfdf5' : '#fef2f2',
+                          padding: '2px 8px',
+                          borderRadius: '100px'
+                        }}>
+                          {isJokerAvailable ? '👍 Bereit' : '❌ Verbraucht'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* NÄCHSTE TERMINE TIMELINE */}
@@ -772,8 +814,8 @@ function MobileBriefingView({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: 'rgba(255, 255, 255, 0.2)',
-                            color: '#ffffff',
+                            background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)',
+                            color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#ffffff',
                             width: '32px',
                             height: '32px',
                             borderRadius: '50%',
@@ -782,10 +824,10 @@ function MobileBriefingView({
                             transition: 'all 0.2s',
                             flexShrink: 0
                           }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                          onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
                         >
-                          <MessageSquare size={14} />
+                          <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                         </button>
                       </div>
                     </div>
@@ -841,8 +883,8 @@ function MobileBriefingView({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: 'rgba(120, 53, 15, 0.12)',
-                            color: '#78350f',
+                            background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)',
+                            color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#ffffff' : '#78350f',
                             width: '44px',
                             height: '44px',
                             borderRadius: '50%',
@@ -851,10 +893,10 @@ function MobileBriefingView({
                             transition: 'all 0.2s',
                             flexShrink: 0
                           }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                          onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
                         >
-                          <MessageSquare size={18} />
+                          <MessageSquare size={18} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                         </button>
                       </div>
                     </div>
@@ -893,8 +935,8 @@ function MobileBriefingView({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: '#f1f5f9',
-                        color: '#475569',
+                        background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9',
+                        color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569',
                         width: '44px',
                         height: '44px',
                         borderRadius: '50%',
@@ -905,15 +947,15 @@ function MobileBriefingView({
                         flexShrink: 0
                       }}
                       onMouseOver={e => {
-                        e.currentTarget.style.background = '#e2e8f0';
-                        e.currentTarget.style.color = '#0b57d0';
+                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#e2e8f0';
+                        e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#0b57d0';
                       }}
                       onMouseOut={e => {
-                        e.currentTarget.style.background = '#f1f5f9';
-                        e.currentTarget.style.color = '#475569';
+                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9';
+                        e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569';
                       }}
                     >
-                      <MessageSquare size={18} />
+                      <MessageSquare size={18} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                     </button>
                   </div>
                 );
@@ -1084,6 +1126,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [studentUser, setStudentUser] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
+  const campusSettings = useMemo(() => {
+    return studentUser?.schools?.opening_hours?.campus_settings || {};
+  }, [studentUser]);
+
+  const flamesActive = campusSettings.flames_active !== false;
+  const xpActive = campusSettings.xp_active !== false;
+  const showLeaderboard = campusSettings.show_leaderboard !== false;
+  const showDetailedStats = campusSettings.show_detailed_stats !== false;
+  const studentToTeacherChat = campusSettings.student_to_teacher_chat !== false;
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -1152,12 +1204,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   // Daily Briefing State
   const [rawBriefingData, setRawBriefingData] = useState<any>(null);
+  const [occurrencesWithMessages, setOccurrencesWithMessages] = useState<string[]>([]);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [rawSchoolYearOccurrences, setRawSchoolYearOccurrences] = useState<any[]>([]);
   const [loadingSchoolYearSchedule, setLoadingSchoolYearSchedule] = useState(false);
   const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [loadingContributions, setLoadingContributions] = useState(false);
+  const [contributionsModalData, setContributionsModalData] = useState<{
+    goalTitle: string;
+    targetMinutes: number;
+    contributions: { name: string; minutes: number }[];
+  } | null>(null);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
 
@@ -1434,6 +1494,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       });
       if (error) throw error;
       
+      if (appointmentChatData.occurrenceId) {
+        const occId = appointmentChatData.occurrenceId;
+        setOccurrencesWithMessages(prev => prev.includes(occId) ? prev : [...prev, occId]);
+      }
+      
       await fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId);
     } catch (err) {
       console.error('Error sending quick chat message:', err);
@@ -1459,6 +1524,94 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       console.error(err);
     } finally {
       setLoadingSchedule(false);
+    }
+  };
+
+  const fetchOccurrencesWithMessages = async () => {
+    if (!studentId) return;
+    try {
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('occurrence_id')
+        .or(`sender_id.eq.${studentId},recipient_id.eq.${studentId}`);
+      if (!error && data) {
+        const ids = Array.from(new Set(data.map((m: any) => m.occurrence_id).filter(Boolean)));
+        setOccurrencesWithMessages(ids);
+      }
+    } catch (err) {
+      console.error('Error fetching occurrences with messages:', err);
+    }
+  };
+
+  const handleOpenContributions = async (goalTitle: string, targetMinutes: number) => {
+    setLoadingContributions(true);
+    setContributionsModalData({
+      goalTitle,
+      targetMinutes,
+      contributions: []
+    });
+
+    try {
+      const teacherId = studentUser?.teacher_id;
+      const schoolId = studentUser?.school_id;
+      if (!teacherId || !schoolId) {
+        setLoadingContributions(false);
+        return;
+      }
+
+      const { data: classmates, error: classmatesErr } = await supabase
+        .from('users')
+        .select('id, first_name, last_name')
+        .eq('teacher_id', teacherId)
+        .eq('school_id', schoolId);
+
+      if (classmatesErr) throw classmatesErr;
+
+      if (classmates && classmates.length > 0) {
+        const now = new Date();
+        const monday = new Date(now);
+        const day = now.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        monday.setDate(now.getDate() + diff);
+        monday.setHours(0, 0, 0, 0);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        const classmateIds = classmates.map((c: any) => c.id);
+
+        const { data: practiceData, error: practiceErr } = await supabase
+          .from('practice_sessions')
+          .select('student_id, duration_minutes')
+          .in('student_id', classmateIds)
+          .gte('created_at', monday.toISOString())
+          .lte('created_at', sunday.toISOString());
+
+        if (practiceErr) throw practiceErr;
+
+        const list = classmates.map((student: any) => {
+          const mins = (practiceData || [])
+            .filter((s: any) => s.student_id === student.id)
+            .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+          return {
+            name: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
+            minutes: mins
+          };
+        })
+        .filter(item => item.minutes > 0)
+        .sort((a, b) => b.minutes - a.minutes);
+
+        setContributionsModalData({
+          goalTitle,
+          targetMinutes,
+          contributions: list
+        });
+      }
+    } catch (err) {
+      console.error('Error loading goal contributions:', err);
+    } finally {
+      setLoadingContributions(false);
     }
   };
 
@@ -1569,6 +1722,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     fetchSchedule();
     fetchSchoolYearSchedule();
+    fetchOccurrencesWithMessages();
 
     if (!studentId) return;
 
@@ -1589,8 +1743,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       )
       .subscribe();
 
+    const msgChannel = supabase
+      .channel(`realtime_student_messages_${studentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'campus_direct_messages'
+        },
+        () => {
+          fetchOccurrencesWithMessages();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(msgChannel);
     };
   }, [studentId]);
 
@@ -1656,27 +1826,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const handleConfirmReschedule = async (occId: string) => {
     try {
+      // Optimistic update
+      setRawScheduleOccurrences(prev => 
+        prev.map(occ => occ.id == occId ? { ...occ, status: 'rescheduled_confirmed', student_acknowledged: true } : occ)
+      );
+
       const { error } = await supabase
         .from('schedule_occurrences')
         .update({ status: 'rescheduled_confirmed', student_acknowledged: true })
         .eq('id', occId);
       if (error) throw error;
-      fetchSchedule();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error confirming reschedule:', err);
+      fetchSchedule();
     }
   };
 
   const handleAcknowledgeCancellation = async (occId: string) => {
     try {
+      // Optimistic update
+      setRawScheduleOccurrences(prev => 
+        prev.map(occ => occ.id == occId ? { ...occ, student_acknowledged: true } : occ)
+      );
+
       const { error } = await supabase
         .from('schedule_occurrences')
         .update({ student_acknowledged: true })
         .eq('id', occId);
       if (error) throw error;
-      fetchSchedule();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error acknowledging cancellation:', err);
+      fetchSchedule();
     }
   };
 
@@ -1736,6 +1916,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const originalDate = occ.original_date || occ.date;
       const originalStartTime = occ.original_start_time || occ.start_time;
 
+      // Optimistic update
+      setRawScheduleOccurrences(prev => 
+        prev.map(o => o.id == occ.id ? { ...o, date: originalDate, start_time: originalStartTime, status: 'cancelled', student_acknowledged: false } : o)
+      );
+
       // 1. Reset occurrence back to original date/time and set status to cancelled
       const { error: updateErr } = await supabase
         .from('schedule_occurrences')
@@ -1764,10 +1949,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         type: 'Verschiebung abgelehnt',
         message: `❌ ${studentName} hat den Verschiebungstermin am ${formattedDate} abgelehnt. Der Termin wurde auf den Originaltermin zurückgesetzt und für diese Woche abgesagt.`
       });
-
-      fetchSchedule();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error rejecting reschedule:', err);
+      fetchSchedule();
     }
   };
   
@@ -1845,13 +2029,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const checkAndAutoApplyJoker = async (groupedList: any[]) => {
     if (!studentId || !studentUser || !avatar) return;
 
-    const currentWeek = getISOWeek(new Date());
     const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-
-    if (!isJokerAvailable) return;
-
     let firstMissedDayGroup: any = null;
+    let foundJokerDate: Date | null = null;
+
     for (let i = groupedList.length - 1; i >= 0; i--) {
       const group = groupedList[i];
       if (group.isPlaceholder && !group.isToday) {
@@ -1860,26 +2041,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         const month = parseInt(parts[1], 10) - 1;
         const year = 2000 + parseInt(parts[2], 10);
         const d = new Date(year, month, day);
+        const weekOfD = getISOWeek(d);
         
-        if (getISOWeek(d) === currentWeek) {
+        if (!lastJokerWeek || weekOfD > lastJokerWeek) {
           firstMissedDayGroup = group;
+          foundJokerDate = new Date(year, month, day, 12, 0, 0);
           break;
         }
       }
     }
 
-    if (firstMissedDayGroup) {
+    if (firstMissedDayGroup && foundJokerDate) {
       console.log('Automatically applying joker to save streak for date:', firstMissedDayGroup.date);
       try {
-        const parts = firstMissedDayGroup.date.split('.');
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = 2000 + parseInt(parts[2], 10);
-        const jokerDate = new Date(year, month, day, 12, 0, 0);
-
         const { error: userErr } = await supabase
           .from('users')
-          .update({ joker_used_at: jokerDate.toISOString() })
+          .update({ joker_used_at: foundJokerDate.toISOString() })
           .eq('id', studentId);
 
         if (userErr) throw userErr;
@@ -1931,15 +2108,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
 
   const getTargetMinutes = (streak: number) => {
-    if (streak >= 9) return 10;
-    if (streak >= 6) return 5;
-    return 3;
+    const level = avatar?.evolution_level || 1;
+    if (level === 3) {
+      if (streak >= 9) return 20;
+      if (streak >= 4) return 15;
+      return 10;
+    } else if (level === 2) {
+      if (streak >= 9) return 15;
+      if (streak >= 4) return 10;
+      return 5;
+    } else {
+      if (streak >= 9) return 10;
+      if (streak >= 4) return 5;
+      return 3;
+    }
   };
 
   const getFlameLevelName = (streak: number) => {
     if (streak >= 9) return 'Helden-Feuer';
-    if (streak >= 6) return 'Mittlere Flamme';
-    return 'Kleine Flamme';
+    if (streak >= 4) return 'Mittlere Flamme';
+    if (streak >= 1) return 'Kleine Flamme';
+    return 'Keine Flamme';
   };
 
   const fetchFokusLogs = async () => {
@@ -2108,7 +2297,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   useEffect(() => {
     fetchStudentAndAvatar();
-  }, [studentId, activeTab]);
+  }, [studentId]);
 
   useEffect(() => {
     if (activeTab === 'profile' && studentId) {
@@ -2139,6 +2328,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [classmateIds, setClassmateIds] = useState<string[]>([]);
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
+  const songStats = useMemo(() => {
+    const assigned = songs.filter(song => {
+      const isAssigned = progressItems.some(item => 
+        item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+        item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+      );
+      return song.is_campus_active && isAssigned;
+    });
+
+    const mastered = assigned.filter(song => {
+      const progressItem = progressItems.find(item => 
+        item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+        item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+      );
+      return progressItem?.status === 'MASTERED';
+    });
+
+    return {
+      assignedCount: assigned.length,
+      masteredCount: mastered.length
+    };
+  }, [songs, progressItems]);
   const [songSearch, setSongSearch] = useState('');
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
@@ -2308,7 +2519,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       supabase.removeChannel(channel);
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
     };
-  }, [studentId, activeTab]);
+  }, [studentId]);
 
   useEffect(() => {
     if (!studentUser?.school_id) return;
@@ -2575,20 +2786,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           streakFlame += 1;
         } else if (lastPracticeDate === todayStr) {
           // Keep same streak
-        } else {
-          // Check if we can use a joker (1 per week)
+        } else if (lastPracticeDate) {
+          const diffDays = getDaysBetweenLocal(lastPracticeDate, todayStr);
+          const totalMissedDays = diffDays - 1;
+          
           const currentWeek = getISOWeek(new Date());
           const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
           const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
 
-          if (lastPracticeDate === dayBeforeYesterdayStr && isJokerAvailable) {
-            streakFlame = streak + 1; // Preserve streak and add today's practice
+          let unprotectedMissedDays = totalMissedDays;
+          if (isJokerAvailable) {
+            unprotectedMissedDays = totalMissedDays - 1;
             usedJokerThisSession = true;
-          } else {
-            streakFlame = 1;
           }
+
+          const decayedStreak = Math.max(0, streak - unprotectedMissedDays);
+          streakFlame = decayedStreak + 1;
+        } else {
+          streakFlame = 1;
         }
       }
+
+      const activeFlameLevel = (sessionCompletedTarget || hasCompletedTargetToday)
+        ? getFlameLevelName(streakFlame)
+        : getFlameLevelName(streak);
 
       // 1. Save focus log for focus time
       if (focusSeconds > 0) {
@@ -2597,7 +2818,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           duration_minutes: focusMinutes,
           duration_seconds: focusSeconds,
           is_extra: false,
-          flame_level: flameLevelName,
+          flame_level: activeFlameLevel,
           created_at: new Date().toISOString()
         });
       }
@@ -2609,7 +2830,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           duration_minutes: extraMinutes,
           duration_seconds: extraSeconds,
           is_extra: true,
-          flame_level: flameLevelName,
+          flame_level: activeFlameLevel,
           created_at: new Date().toISOString()
         });
       }
@@ -2648,7 +2869,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .eq('id', studentId);
       }
 
-      let successMsg = `Klasse geübt! Du hast +${totalMinutes * 10} XP erhalten! ⚡`;
+      let successMsg = xpActive 
+        ? `Klasse geübt! Du hast +${totalMinutes * 10} XP erhalten! ⚡`
+        : `Klasse geübt! Du hast erfolgreich geübt! ⚡`;
       if (sessionCompletedTarget) {
         if (usedJokerThisSession) {
           successMsg += ` 🎯 Dein wöchentlicher Joker wurde eingesetzt, um deinen Streak von ${streak} Tagen zu retten! Dein Streak liegt jetzt bei ${streakFlame} Flammen! 🔥`;
@@ -2987,14 +3210,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setBriefingLoading(true);
       setError(null);
 
-      // 1. Fetch student user profile with premium state
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('id', studentId)
-        .single();
+      // Stage 1: Fetch user, avatar, stats, and briefing API in parallel
+      const [userRes, avatarRes, statsRes, briefingRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*, schools(*)')
+          .eq('id', studentId)
+          .single(),
+        supabase
+          .from('avatars')
+          .select('avatar_style, instrument_type, evolution_level, xp, asset_path, streak_flame, last_focus_date, id')
+          .eq('user_id', studentId)
+          .maybeSingle(),
+        supabase
+          .from('student_stats')
+          .select('monthly_focus_minutes, total_focus_minutes')
+          .eq('student_id', studentId)
+          .maybeSingle(),
+        fetch(`/api/briefing/student?userId=${studentId}`).catch(err => {
+          console.warn('Briefing API offline or failed, falling back:', err);
+          return null;
+        })
+      ]);
 
-      if (userErr) throw userErr;
+      if (userRes.error) throw userRes.error;
+      const user = userRes.data;
       if (!user) return;
 
       let resolvedInst = user.instrument;
@@ -3018,14 +3258,56 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setPushNotifHomework(user.push_notif_homework ?? false);
       setPushNotifAllFeatures(user.push_notif_all_features ?? false);
 
-      // 2. Fetch avatar records
-      const { data: avatarRecord, error: avatarErr } = await supabase
-        .from('avatars')
-        .select('avatar_style, instrument_type, evolution_level, xp, asset_path, streak_flame')
-        .eq('user_id', studentId)
-        .maybeSingle();
+      const avatarRecord = avatarRes.data;
+      if (avatarRes.error) throw avatarRes.error;
 
-      if (avatarErr) throw avatarErr;
+      let activeStreak = avatarRecord?.streak_flame || 0;
+      const lastFocusDateStr = avatarRecord?.last_focus_date;
+      if (lastFocusDateStr && activeStreak > 0) {
+        const todayStr = toLocalYYYYMMDD(new Date());
+        const diffDays = getDaysBetweenLocal(lastFocusDateStr, todayStr);
+        if (diffDays > 1) {
+          let tempDate = new Date(lastFocusDateStr);
+          let currentDecayedStreak = activeStreak;
+          const initialJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
+          let lastJokerWeek = initialJokerWeek;
+          
+          let latestJokerDate: Date | null = null;
+          let streakChanged = false;
+          let jokerChanged = false;
+
+          for (let i = 1; i < diffDays; i++) {
+            const missedDate = new Date(tempDate.getTime());
+            missedDate.setDate(tempDate.getDate() + i);
+            const weekOfMissed = getISOWeek(missedDate);
+            
+            if (!lastJokerWeek || weekOfMissed > lastJokerWeek) {
+              lastJokerWeek = weekOfMissed;
+              latestJokerDate = new Date(missedDate.getFullYear(), missedDate.getMonth(), missedDate.getDate(), 12, 0, 0);
+              jokerChanged = true;
+            } else {
+              const oldStreak = currentDecayedStreak;
+              currentDecayedStreak = Math.max(0, currentDecayedStreak - 1);
+              if (currentDecayedStreak !== oldStreak) {
+                streakChanged = true;
+              }
+            }
+          }
+
+          if (streakChanged || jokerChanged) {
+            if (streakChanged && avatarRecord) {
+              avatarRecord.streak_flame = currentDecayedStreak;
+              activeStreak = currentDecayedStreak;
+              await supabase.from('avatars').update({ streak_flame: currentDecayedStreak }).eq('user_id', studentId);
+              await supabase.from('student_stats').update({ streak_flame: currentDecayedStreak }).eq('student_id', studentId);
+            }
+            if (jokerChanged && latestJokerDate) {
+              await supabase.from('users').update({ joker_used_at: latestJokerDate.toISOString() }).eq('id', studentId);
+              user.joker_used_at = latestJokerDate.toISOString();
+            }
+          }
+        }
+      }
 
       if (!avatarRecord && user.is_app_user) {
         setShowSelector(true);
@@ -3033,29 +3315,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         setAvatar(avatarRecord);
       }
 
-      // Fetch student stats for Campus Cup
-      const { data: statsData } = await supabase
-        .from('student_stats')
-        .select('monthly_focus_minutes, total_focus_minutes')
-        .eq('student_id', studentId)
-        .maybeSingle();
+      const statsData = statsRes.data;
       setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
       setTotalFocusMinutes(statsData?.total_focus_minutes || 0);
 
+      // Stage 2: Fetch announcements and highlights in parallel
+      const promises: Promise<any>[] = [];
       if (user.school_id) {
-        fetchClassHighlights(user.school_id, user.teacher_id);
+        promises.push(fetchClassHighlights(user.school_id, user.teacher_id));
+        promises.push(
+          supabase
+            .from('campus_announcements')
+            .select('*, users(first_name, last_name, photo_url)')
+            .eq('school_id', user.school_id)
+            .order('created_at', { ascending: false }) as any
+        );
       }
 
-      // Fetch announcements matching student's school_id
-      try {
-        const { data: annData, error: annErr } = await supabase
-          .from('campus_announcements')
-          .select('*, users(first_name, last_name, photo_url)')
-          .eq('school_id', user.school_id)
-          .order('created_at', { ascending: false });
-
-        if (!annErr && annData) {
-          const parsed = annData.map(ann => ({
+      const results = await Promise.all(promises);
+      if (user.school_id && results[1]) {
+        const annRes = results[1];
+        if (!annRes.error && annRes.data) {
+          const parsed = annRes.data.map((ann: any) => ({
             id: ann.id,
             title: ann.title,
             content: ann.message,
@@ -3063,26 +3344,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             created_at: ann.created_at,
             user: ann.users
           }));
-          setCampusFeedAnnouncements(parsed.filter(ann => ann.target_type === 'all' || ann.target_type === 'students'));
+          setCampusFeedAnnouncements(parsed.filter((ann: any) => ann.target_type === 'all' || ann.target_type === 'students'));
         } else {
           setCampusFeedAnnouncements([]);
         }
-      } catch (aErr) {
-        console.error('Error fetching student announcements:', aErr);
       }
 
-      // 3. Fetch daily briefing
-      try {
-        const resp = await fetch(`/api/briefing/student?userId=${studentId}`);
-        if (resp.ok) {
-          const bd = await resp.json();
+      // Stage 3: Read briefing response from Stage 1
+      let briefingJsonLoaded = false;
+      if (briefingRes && briefingRes.ok) {
+        try {
+          const bd = await briefingRes.json();
           if (bd && bd.success) {
             setRawBriefingData(bd);
+            briefingJsonLoaded = true;
           }
-        } else {
-          throw new Error('API offline');
+        } catch (e) {
+          console.error('Error parsing briefing JSON:', e);
         }
-      } catch (e) {
+      }
+
+      if (!briefingJsonLoaded) {
         // Fallback local query
         try {
           const schoolId = user.school_id || (user as any).school_id;
@@ -3161,9 +3443,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         } catch (err) {
           console.error('Error in student briefing fallback:', err);
         }
-      } finally {
-        setBriefingLoading(false);
       }
+      setBriefingLoading(false);
 
       // 4. Fetch Übe-Ziele (class practice goals from teacher's school opening_hours)
       try {
@@ -3784,40 +4065,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px' }}>
               
               {/* Card 1: XP */}
-              <div style={{ 
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
-                borderRadius: '20px', 
-                color: 'white', 
-                padding: '16px', 
-                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesammelte XP</span>
-                  <Star size={16} fill="currentColor" />
+              {xpActive && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                  borderRadius: '20px', 
+                  color: 'white', 
+                  padding: '16px', 
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesammelte XP</span>
+                    <Star size={16} fill="currentColor" />
+                  </div>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.xp || 0} XP</span>
                 </div>
-                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{avatar?.xp || 0} XP</span>
-              </div>
+              )}
 
               {/* Card 2: Practice Minutes */}
-              <div style={{ 
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                borderRadius: '20px', 
-                color: 'white', 
-                padding: '16px', 
-                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Übeminuten</span>
-                  <Clock size={16} />
+              {flamesActive && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                  borderRadius: '20px', 
+                  color: 'white', 
+                  padding: '16px', 
+                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Übeminuten</span>
+                    <Clock size={16} />
+                  </div>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{totalFocusMinutes || 0} Min.</span>
                 </div>
-                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{totalFocusMinutes || 0} Min.</span>
-              </div>
+              )}
 
               {/* Card 3: Focus Time Today */}
               <div style={{ 
@@ -3846,78 +4131,80 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
               {/* Card 4: Streak-Pfad & Joker */}
-              <div style={{ 
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                borderRadius: '20px', 
-                color: 'white', 
-                padding: '16px', 
-                boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '100px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Streak-Pfad</span>
-                  <Flame size={16} fill="currentColor" />
-                </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
-                      {avatar?.streak_flame || 0} Tage
-                    </span>
+              {flamesActive && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
+                  borderRadius: '20px', 
+                  color: 'white', 
+                  padding: '16px', 
+                  boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: '100px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Streak-Pfad</span>
+                    <Flame size={16} fill="currentColor" />
                   </div>
                   
-                  {(() => {
-                    const currentWeek = getISOWeek(new Date());
-                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-                    
-                    return (
-                      <span style={{ 
-                        fontSize: '0.62rem', 
-                        fontWeight: 800, 
-                        background: isJokerAvailable 
-                          ? 'rgba(255, 255, 255, 0.16)' 
-                          : 'rgba(0, 0, 0, 0.2)',
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        border: isJokerAvailable 
-                          ? '1px solid rgba(255, 255, 255, 0.4)' 
-                          : '1px solid rgba(255, 255, 255, 0.08)',
-                        color: isJokerAvailable ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
-                        padding: '6px 10px', 
-                        borderRadius: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        lineHeight: '1.2',
-                        textAlign: 'center',
-                        boxShadow: isJokerAvailable 
-                          ? '0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
-                          : 'none',
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
-                        flexShrink: 0
-                      }} title="1 Joker pro Woche verfügbar">
-                        {isJokerAvailable ? (
-                          <>
-                            <span style={{ opacity: 0.8 }}>Joker</span>
-                            <span style={{ fontWeight: 900 }}>Bereit</span>
-                          </>
-                        ) : (
-                          <>
-                            <span style={{ opacity: 0.6 }}>Joker</span>
-                            <span style={{ fontWeight: 900, opacity: 0.8 }}>Verbraucht</span>
-                          </>
-                        )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }}>
+                        {avatar?.streak_flame || 0} Tage
                       </span>
-                    );
-                  })()}
+                    </div>
+                    
+                    {(() => {
+                      const currentWeek = getISOWeek(new Date());
+                      const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                      const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                      
+                      return (
+                        <span style={{ 
+                          fontSize: '0.62rem', 
+                          fontWeight: 800, 
+                          background: isJokerAvailable 
+                            ? 'rgba(255, 255, 255, 0.16)' 
+                            : 'rgba(0, 0, 0, 0.2)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          border: isJokerAvailable 
+                            ? '1px solid rgba(255, 255, 255, 0.4)' 
+                            : '1px solid rgba(255, 255, 255, 0.08)',
+                          color: isJokerAvailable ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
+                          padding: '6px 10px', 
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          lineHeight: '1.2',
+                          textAlign: 'center',
+                          boxShadow: isJokerAvailable 
+                            ? '0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
+                            : 'none',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          flexShrink: 0
+                        }} title="1 Joker pro Woche verfügbar">
+                          {isJokerAvailable ? (
+                            <>
+                              <span style={{ opacity: 0.8 }}>Joker</span>
+                              <span style={{ fontWeight: 900 }}>Bereit</span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ opacity: 0.6 }}>Joker</span>
+                              <span style={{ fontWeight: 900, opacity: 0.8 }}>Verbraucht</span>
+                            </>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
@@ -4617,7 +4904,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         {/* Collapsible Content */}
                         {isExpanded && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', paddingLeft: '8px' }}>
                             {month.entries.map((group, idx) => {
                               const now = new Date();
                               const todayDd = String(now.getDate()).padStart(2, '0');
@@ -4638,9 +4925,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               const isJokerDay = jokerDateStr === group.date;
                               
                               const getTargetSeconds = (flame: string) => {
-                                if (flame === 'Helden-Feuer') return 10 * 60;
-                                if (flame === 'Mittlere Flamme') return 5 * 60;
-                                return 3 * 60;
+                                const level = avatar?.evolution_level || 1;
+                                if (level === 3) {
+                                  if (flame === 'Helden-Feuer') return 20 * 60;
+                                  if (flame === 'Mittlere Flamme') return 15 * 60;
+                                  return 10 * 60;
+                                } else if (level === 2) {
+                                  if (flame === 'Helden-Feuer') return 15 * 60;
+                                  if (flame === 'Mittlere Flamme') return 10 * 60;
+                                  return 5 * 60;
+                                } else {
+                                  if (flame === 'Helden-Feuer') return 10 * 60;
+                                  if (flame === 'Mittlere Flamme') return 5 * 60;
+                                  return 3 * 60;
+                                }
                               };
                               
                               const getFlameIconSize = (flame: string) => {
@@ -4664,190 +4962,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 borderLeftColor = '#ef4444'; // Red (Not practiced / target not reached)
                               }
 
-                              if (group.isPlaceholder) {
-                                if (isToday) {
-                                  return (
-                                    <div 
-                                      key={idx}
-                                      style={{ 
-                                        background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
-                                        border: '1px dashed rgba(234, 179, 8, 0.25)', 
-                                        borderRadius: '16px', 
-                                        padding: '12px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        borderLeft: `4px solid ${borderLeftColor}`,
-                                        boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
-                                          {group.date}
-                                        </span>
-                                        <span style={{ 
-                                          fontSize: '0.58rem', 
-                                          fontWeight: 900, 
-                                          background: 'rgba(234, 179, 8, 0.08)', 
-                                          color: '#ca8a04', 
-                                          padding: '1px 6px', 
-                                          borderRadius: '100px', 
-                                          letterSpacing: '0.04em', 
-                                          textTransform: 'uppercase' 
-                                        }}>
-                                          Aktiv
-                                        </span>
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                                          - Sichere dir deinen Übe-Streak!
-                                        </span>
-                                      </div>
-                                      
-                                      {timeUntilMidnight && (
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                          <span style={{ 
-                                            fontSize: '0.68rem', 
-                                            fontWeight: 800, 
-                                            color: '#a16207', 
-                                            background: '#fef9c3',
-                                            padding: '2px 6px',
-                                            borderRadius: '6px',
-                                            display: 'inline-flex', 
-                                            alignItems: 'center', 
-                                            gap: '3px', 
-                                            fontFamily: 'monospace' 
-                                          }}>
-                                            ⏳ {timeUntilMidnight}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                } else if (isJokerDay) {
-                                  return (
-                                    <div 
-                                      key={idx}
-                                      style={{ 
-                                        background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
-                                        border: '1px solid #c2410c', 
-                                        borderRadius: '16px', 
-                                        padding: '12px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
-                                          {group.date}
-                                        </span>
-                                        <span style={{ 
-                                          fontSize: '0.58rem', 
-                                          fontWeight: 900, 
-                                          background: 'rgba(255, 255, 255, 0.22)', 
-                                          color: '#ffffff', 
-                                          padding: '1px 6px', 
-                                          borderRadius: '100px', 
-                                          letterSpacing: '0.04em', 
-                                          textTransform: 'uppercase' 
-                                        }}>
-                                          Joker eingesetzt
-                                        </span>
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#ffedd5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          - Streak gerettet! 🎯
-                                        </span>
-                                      </div>
-                                      
-                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                        <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                                          Joker
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                } else {
-                                  const currentWeek = getISOWeek(new Date());
-                                  const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                                  const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-
-                                  return (
-                                    <div 
-                                      key={idx}
-                                      style={{ 
-                                        background: '#ffffff', 
-                                        border: '1px dashed rgba(239, 68, 68, 0.25)', 
-                                        borderRadius: '16px', 
-                                        padding: '12px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        borderLeft: `4px solid ${borderLeftColor}`,
-                                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
-                                          {group.date}
-                                        </span>
-                                        <span style={{ 
-                                          fontSize: '0.58rem', 
-                                          fontWeight: 900, 
-                                          background: 'rgba(239, 68, 68, 0.08)', 
-                                          color: '#ef4444', 
-                                          padding: '1px 6px', 
-                                          borderRadius: '100px', 
-                                          letterSpacing: '0.04em', 
-                                          textTransform: 'uppercase' 
-                                        }}>
-                                          Nicht geübt
-                                        </span>
-                                      </div>
-                                      
-                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                                        {isJokerAvailable && (
-                                          <button 
-                                            onClick={() => handleUseJoker(group.date)}
-                                            style={{
-                                              background: '#8b5cf6',
-                                              color: '#ffffff',
-                                              border: 'none',
-                                              padding: '10px 16px',
-                                              borderRadius: '12px',
-                                              fontSize: '0.82rem',
-                                              fontWeight: 800,
-                                              cursor: 'pointer',
-                                              boxShadow: '0 4px 10px rgba(139, 92, 246, 0.25)',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              minHeight: '44px',
-                                              gap: '4px',
-                                              transition: 'all 0.2s'
-                                            }}
-                                            onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
-                                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf6'}
-                                          >
-                                            🎯 Joker einsetzen
-                                          </button>
-                                        )}
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                          <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ef4444' }}>
-                                            Kleine Flamme
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-                              }
+                              const timeUntilMidnight = (() => {
+                                if (!isToday) return null;
+                                const midnight = new Date();
+                                midnight.setHours(24, 0, 0, 0);
+                                const diff = midnight.getTime() - now.getTime();
+                                const hrs = Math.floor(diff / (1000 * 60 * 60));
+                                const mins = Math.floor((diff / (1000 * 60)) % 60);
+                                const secs = Math.floor((diff / 1000) % 60);
+                                return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                              })();
 
                               const focusMins = Math.round(group.focusSeconds / 60);
                               const extraMins = Math.floor(group.extraSeconds / 60);
@@ -4862,13 +4986,237 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }
                               const statusText = textParts.join(' - ');
 
-                              if (hasMastered) {
+                              const cardElement = (() => {
+                                if (group.isPlaceholder) {
+                                  if (isToday) {
+                                    return (
+                                      <div 
+                                        style={{ 
+                                          background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
+                                          border: '1px dashed rgba(234, 179, 8, 0.25)', 
+                                          borderRadius: '16px', 
+                                          padding: '12px 14px',
+                                          display: 'flex',
+                                          flexDirection: 'row',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          borderLeft: `4px solid ${borderLeftColor}`,
+                                          boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
+                                            {group.date}
+                                          </span>
+                                          <span style={{ 
+                                            fontSize: '0.58rem', 
+                                            fontWeight: 900, 
+                                            background: 'rgba(234, 179, 8, 0.08)', 
+                                            color: '#ca8a04', 
+                                            padding: '1px 6px', 
+                                            borderRadius: '100px', 
+                                            letterSpacing: '0.04em', 
+                                            textTransform: 'uppercase' 
+                                          }}>
+                                            Aktiv
+                                          </span>
+                                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                                            - Sichere dir deinen Übe-Streak!
+                                          </span>
+                                        </div>
+                                        
+                                        {timeUntilMidnight && (
+                                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                            <span style={{ 
+                                              fontSize: '0.68rem', 
+                                              fontWeight: 800, 
+                                              color: '#a16207', 
+                                              background: '#fef9c3',
+                                              padding: '2px 6px',
+                                              borderRadius: '6px',
+                                              display: 'inline-flex', 
+                                              alignItems: 'center', 
+                                              gap: '3px', 
+                                              fontFamily: 'monospace' 
+                                            }}>
+                                              ⏳ {timeUntilMidnight}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  } else if (isJokerDay) {
+                                    return (
+                                      <div 
+                                        style={{ 
+                                          background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
+                                          border: '1px solid #c2410c', 
+                                          borderRadius: '16px', 
+                                          padding: '12px 14px',
+                                          display: 'flex',
+                                          flexDirection: 'row',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
+                                            {group.date}
+                                          </span>
+                                          <span style={{ 
+                                            fontSize: '0.58rem', 
+                                            fontWeight: 900, 
+                                            background: 'rgba(255, 255, 255, 0.22)', 
+                                            color: '#ffffff', 
+                                            padding: '1px 6px', 
+                                            borderRadius: '100px', 
+                                            letterSpacing: '0.04em', 
+                                            textTransform: 'uppercase' 
+                                          }}>
+                                            Joker eingesetzt
+                                          </span>
+                                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#ffedd5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            - Streak gerettet! 🎯
+                                          </span>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                          <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                                            Joker
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  } else {
+                                    const currentWeek = getISOWeek(new Date());
+                                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
+                                    return (
+                                      <div 
+                                        style={{ 
+                                          background: '#ffffff', 
+                                          border: '1px dashed rgba(239, 68, 68, 0.25)', 
+                                          borderRadius: '16px', 
+                                          padding: '12px 14px',
+                                          display: 'flex',
+                                          flexDirection: 'row',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          borderLeft: `4px solid ${borderLeftColor}`,
+                                          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
+                                            {group.date}
+                                          </span>
+                                          <span style={{ 
+                                            fontSize: '0.58rem', 
+                                            fontWeight: 900, 
+                                            background: 'rgba(239, 68, 68, 0.08)', 
+                                            color: '#ef4444', 
+                                            padding: '1px 6px', 
+                                            borderRadius: '100px', 
+                                            letterSpacing: '0.04em', 
+                                            textTransform: 'uppercase' 
+                                          }}>
+                                            Nicht geübt
+                                          </span>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                                          {isJokerAvailable && (
+                                            <button 
+                                              onClick={() => handleUseJoker(group.date)}
+                                              style={{
+                                                background: '#8b5cf6',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                padding: '10px 16px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.82rem',
+                                                fontWeight: 800,
+                                                cursor: 'pointer',
+                                                boxShadow: '0 4px 10px rgba(139, 92, 246, 0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                minHeight: '44px',
+                                                gap: '4px',
+                                                transition: 'all 0.2s'
+                                              }}
+                                              onMouseOver={(e) => e.currentTarget.style.background = '#7c3aed'}
+                                              onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf6'}
+                                            >
+                                              🎯 Joker einsetzen
+                                            </button>
+                                          )}
+                                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                            <Flame 
+                                              size={iconSize} 
+                                              fill={group.flameLevel === 'Keine Flamme' ? 'none' : '#ef4444'} 
+                                              color={group.flameLevel === 'Keine Flamme' ? '#94a3b8' : '#ef4444'} 
+                                            />
+                                            <span style={{ 
+                                              fontSize: '0.7rem', 
+                                              fontWeight: 800, 
+                                              color: group.flameLevel === 'Keine Flamme' ? '#94a3b8' : '#ef4444' 
+                                            }}>
+                                              {group.flameLevel}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                } else if (hasMastered) {
+                                  return (
+                                    <div 
+                                      style={{ 
+                                        background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
+                                        border: '1px solid #047857', 
+                                        borderRadius: '16px', 
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
+                                          {group.date}
+                                        </span>
+                                        {statusText && (
+                                          <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#d1fae5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            - {statusText}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                                        <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                                          {group.flameLevel}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
                                 return (
                                   <div 
-                                    key={idx}
                                     style={{ 
-                                      background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', 
-                                      border: '1px solid #047857', 
+                                      background: '#f8fafc', 
+                                      border: '1px solid #e2e8f0', 
                                       borderRadius: '16px', 
                                       padding: '12px 14px',
                                       display: 'flex',
@@ -4876,62 +5224,71 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
                                       gap: '12px',
-                                      boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
+                                      borderLeft: `4px solid ${borderLeftColor}`
                                     }}
                                   >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
                                         {group.date}
                                       </span>
                                       {statusText && (
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#d1fae5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                           - {statusText}
                                         </span>
                                       )}
                                     </div>
                                     
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                      <Flame size={iconSize} fill="#ef4444" color="#ef4444" />
-                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                                      <Flame size={iconSize} fill={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} />
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444' }}>
                                         {group.flameLevel}
                                       </span>
                                     </div>
                                   </div>
                                 );
-                              }
+                              })();
+
+                              const getFlameColor = (flame: string) => {
+                                if (flame === 'Helden-Feuer') return '#ef4444';
+                                if (flame === 'Mittlere Flamme') return '#f97316';
+                                if (flame === 'Kleine Flamme') return '#eab308';
+                                return '#cbd5e1';
+                              };
+                              const activeColor = getFlameColor(group.flameLevel);
+                              const isStreakActive = group.flameLevel !== 'Keine Flamme';
+
+
 
                               return (
-                                <div 
-                                  key={idx}
-                                  style={{ 
-                                    background: '#f8fafc', 
-                                    border: '1px solid #e2e8f0', 
-                                    borderRadius: '16px', 
-                                    padding: '12px 14px',
-                                    display: 'flex',
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    borderLeft: `4px solid ${borderLeftColor}`
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
-                                      {group.date}
-                                    </span>
-                                    {statusText && (
-                                      <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        - {statusText}
-                                      </span>
+                                <div key={idx} style={{ display: 'flex', gap: '12px', position: 'relative' }}>
+                                  {/* Left side timeline column */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px', position: 'relative', flexShrink: 0 }}>
+                                    {/* Dot/Node */}
+                                    <div style={{
+                                      width: '10px',
+                                      height: '10px',
+                                      borderRadius: '50%',
+                                      background: isStreakActive ? activeColor : '#cbd5e1',
+                                      boxShadow: isStreakActive ? `0 0 6px ${activeColor}` : 'none',
+                                      border: '2px solid #ffffff',
+                                      zIndex: 2,
+                                      marginTop: '18px'
+                                    }} />
+                                    {/* Connector line to the next item */}
+                                    {idx < month.entries.length - 1 && (
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '25px',
+                                        bottom: '-20px',
+                                        width: '2px',
+                                        borderLeft: isStreakActive ? `2px solid ${activeColor}` : '2px dashed #cbd5e1',
+                                        zIndex: 1
+                                      }} />
                                     )}
                                   </div>
-                                  
-                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                    <Flame size={iconSize} fill={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444'} />
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#10b981' : isToday ? '#eab308' : '#ef4444' }}>
-                                      {group.flameLevel}
-                                    </span>
+                                  {/* Right side card */}
+                                  <div style={{ flex: 1, minWidth: 0, paddingBottom: idx === month.entries.length - 1 ? '0' : '8px' }}>
+                                    {cardElement}
                                   </div>
                                 </div>
                               );
@@ -5661,16 +6018,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               const isAchieved = targetPercent >= 100;
 
                               return (
-                                <div key={target.id} style={{
-                                  position: 'relative',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  background: '#10b981',
-                                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
-                                  borderRadius: '16px',
-                                  padding: '12px 14px',
-                                  gap: '8px'
-                                }}>
+                                <div 
+                                  key={target.id} 
+                                  onClick={() => handleOpenContributions(target.title || 'Übe-Ziel der Klasse', target.minutes)}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.22)';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.transform = 'none';
+                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.12)';
+                                  }}
+                                  style={{
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    background: '#10b981',
+                                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                                    borderRadius: '16px',
+                                    padding: '12px 14px',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}
+                                >
                                   {/* Row 1: Title, Deadline on left & Percentage on right */}
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -5997,6 +6368,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             getISOWeek={getISOWeek}
             handleTabChangeLocal={handleTabChangeLocal}
             campusFeedAnnouncements={campusFeedAnnouncements}
+            songStats={songStats}
+            occurrencesWithMessages={occurrencesWithMessages}
+            setShowRulesModal={setShowRulesModal}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -6007,31 +6381,33 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             {/* LEFT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {/* TOP 4 KPIs ROW - SLEEK GAMIFIED TILES */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${[xpActive, true, flamesActive, flamesActive].filter(Boolean).length}, 1fr)`, gap: '16px' }}>
                 
                 {/* KPI 1: XP */}
-                <div style={{ 
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Level XP</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Star size={14} color="white" fill="white" />
+                {xpActive && (
+                  <div style={{ 
+                    position: 'relative', overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Level XP</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <Star size={14} color="white" fill="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        {currentXp || 0}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>XP</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                      {currentXp || 0}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>XP</span>
-                  </div>
-                </div>
+                )}
 
                 {/* KPI 2: Songs */}
                 <div style={{ 
@@ -6051,59 +6427,63 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                     <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                      {wrappedData?.monthlyFlashback?.masteredSongsCount || 0}/3
+                      {songStats.masteredCount}/{songStats.assignedCount}
                     </span>
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Songs</span>
                   </div>
                 </div>
 
                 {/* KPI 3: Fokus */}
-                <div style={{ 
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Übeminuten</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Clock size={14} color="white" />
+                {flamesActive && (
+                  <div style={{ 
+                    position: 'relative', overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Übeminuten</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <Clock size={14} color="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        {wrappedData?.monthlyFlashback?.focusMinutes || 0}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                      {wrappedData?.monthlyFlashback?.focusMinutes || 0}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min</span>
-                  </div>
-                </div>
+                )}
 
                 {/* KPI 4: Streak */}
-                <div style={{ 
-                  position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-                  borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
-                  padding: '16px', boxSizing: 'border-box',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} className="hover-scale">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tagesserie</span>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                      <Flame size={14} color="white" fill="white" />
+                {flamesActive && (
+                  <div style={{ 
+                    position: 'relative', overflow: 'hidden',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                    borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                    padding: '16px', boxSizing: 'border-box',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }} className="hover-scale">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tagesserie</span>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                        <Flame size={14} color="white" fill="white" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        {avatar?.streak_flame || 0}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                      {avatar?.streak_flame || 0}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
-                  </div>
-                </div>
+                )}
 
               </div>
 
@@ -6221,7 +6601,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </h3>
                   
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
-                    Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!
+                    {flamesActive 
+                      ? 'Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!'
+                      : 'Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele!'}
                   </p>
 
                   {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
@@ -6267,40 +6649,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           })()}</span>
                         </div>
   
-                        {teacherId && (
-                          <button 
-                            onClick={() => {
-                              setAppointmentChatData({
-                                teacherId,
-                                date: targetDateStr,
-                                start_time: timeLabel,
-                                label,
-                                occurrenceId: finalOccurId
-                              });
-                              setShowAppointmentChat(true);
-                            }}
-                            title="Shoutbox öffnen"
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              background: '#e0e7ff', 
-                              color: '#4f46e5', 
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '50%',
-                              border: 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              flexShrink: 0,
-                              boxShadow: '0 4px 10px rgba(79, 70, 229, 0.1)'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.background = '#c7d2fe'}
-                            onMouseOut={e => e.currentTarget.style.background = '#e0e7ff'}
-                          >
-                            <MessageSquare size={14} />
-                          </button>
-                        )}
+                        {teacherId && (() => {
+                          const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                          return (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAppointmentChatData({
+                                  teacherId,
+                                  date: targetDateStr,
+                                  start_time: timeLabel,
+                                  label,
+                                  occurrenceId: finalOccurId
+                                });
+                                setShowAppointmentChat(true);
+                              }}
+                              title="Shoutbox öffnen"
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                background: hasMessage ? '#fef3c7' : '#e0e7ff', 
+                                color: hasMessage ? '#d97706' : '#4f46e5', 
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flexShrink: 0,
+                                boxShadow: hasMessage ? '0 4px 10px rgba(217, 119, 6, 0.1)' : '0 4px 10px rgba(79, 70, 229, 0.1)'
+                              }}
+                              onMouseOver={e => e.currentTarget.style.background = hasMessage ? '#fde68a' : '#c7d2fe'}
+                              onMouseOut={e => e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#e0e7ff'}
+                            >
+                              <MessageSquare size={14} fill={hasMessage ? 'currentColor' : 'none'} />
+                            </button>
+                          );
+                        })()}
                       </div>
                     );
                   })() : (
@@ -6630,7 +7016,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 })()}
 
                 {/* Spalte 2: Tägliche Übezeit (Tun & Erleben) */}
-                {(() => {
+                {flamesActive && (() => {
                   const streak = avatar?.streak_flame || 0;
                   const requiredMins = streak >= 6 ? 10 : streak >= 3 ? 5 : 3;
                   return (
@@ -6715,12 +7101,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   );
                 })()}
 
-                {/* Spalte 3: Flammen-Pfad (Reflektieren & Belohnen) */}
-                {(() => {
+                {flamesActive && (() => {
                   const streak = avatar?.streak_flame || 0;
+                  const level = avatar?.evolution_level || 1;
                   
-                  const isTier1Unlocked = streak >= 3;
-                  const isTier2Unlocked = streak >= 6;
+                  const isTier1Unlocked = streak >= 1;
+                  const isTier2Unlocked = streak >= 4;
                   const isTier3Unlocked = streak >= 9;
 
                   return (
@@ -6735,9 +7121,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       gap: '16px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          🔥 Flammen-Pfad
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🔥 Flammen-Pfad
+                          </span>
+                          <button 
+                            onClick={() => setShowRulesModal(true)}
+                            style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.2s' }}
+                            onMouseOver={e => e.currentTarget.style.color = '#ea580c'}
+                            onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                            title="Spielregeln anzeigen"
+                          >
+                            <HelpCircle size={14} />
+                          </button>
+                        </div>
                         <span style={{ 
                           background: streak === 0 
                             ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
@@ -6772,7 +7169,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           position: 'absolute',
                           left: '17px',
                           top: '20px',
-                          height: streak >= 9 ? '100%' : streak >= 6 ? '50%' : streak >= 3 ? '0%' : '0%',
+                          height: streak >= 9 ? '100%' : streak >= 4 ? '50%' : '0%',
                           width: '2px',
                           background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)',
                           zIndex: 1,
@@ -6810,11 +7207,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 Kleine Flamme
                               </span>
                               <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier1Unlocked ? '#854d0e' : '#94a3b8', flexShrink: 0 }}>
-                                3+ Tage • 3m
+                                1-3 Tage • {level === 3 ? 10 : level === 2 ? 5 : 3}m
                               </span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {isTier1Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 3 - streak)} ${Math.max(1, 3 - streak) === 1 ? 'Tag' : 'Tage'}`}
+                              {streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start! Fange heute an!'}
                             </div>
                           </div>
                         </div>
@@ -6850,11 +7247,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 Mittlere Flamme
                               </span>
                               <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier2Unlocked ? '#9a3412' : '#94a3b8', flexShrink: 0 }}>
-                                6+ Tage • 5m
+                                4-8 Tage • {level === 3 ? 15 : level === 2 ? 10 : 5}m
                               </span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {isTier2Unlocked ? '🎉 Freigeschaltet!' : `Noch ${Math.max(1, 6 - streak)} ${Math.max(1, 6 - streak) === 1 ? 'Tag' : 'Tage'}`}
+                              {isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)} ${Math.max(1, 4 - streak) === 1 ? 'Tag' : 'Tage'}`}
                             </div>
                           </div>
                         </div>
@@ -6890,7 +7287,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 Helden-Feuer
                               </span>
                               <span style={{ fontSize: '0.65rem', fontWeight: 800, color: isTier3Unlocked ? '#991b1b' : '#94a3b8', flexShrink: 0 }}>
-                                9+ Tage • 10m
+                                9+ Tage • {level === 3 ? 20 : level === 2 ? 15 : 10}m
                               </span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -6981,8 +7378,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: 'rgba(255, 255, 255, 0.2)',
-                                    color: '#ffffff',
+                                    background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)',
+                                    color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#ffffff',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -6991,10 +7388,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; }}
+                                  onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
                                 >
-                                  <MessageSquare size={14} />
+                                  <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                                 </button>
                               </div>
                             </div>
@@ -7050,8 +7447,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: 'rgba(120, 53, 15, 0.12)',
-                                    color: '#78350f',
+                                    background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)',
+                                    color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#ffffff' : '#78350f',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -7060,10 +7457,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.22)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(120, 53, 15, 0.12)'; }}
+                                  onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
                                 >
-                                  <MessageSquare size={14} />
+                                  <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                                 </button>
                               </div>
                             </div>
@@ -7102,8 +7499,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: '#f1f5f9',
-                                color: '#475569',
+                                background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9',
+                                color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569',
                                 width: '32px',
                                 height: '32px',
                                 borderRadius: '50%',
@@ -7114,15 +7511,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 flexShrink: 0
                               }}
                               onMouseOver={e => {
-                                e.currentTarget.style.background = '#e2e8f0';
-                                e.currentTarget.style.color = '#0b57d0';
+                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#e2e8f0';
+                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#0b57d0';
                               }}
                               onMouseOut={e => {
-                                e.currentTarget.style.background = '#f1f5f9';
-                                e.currentTarget.style.color = '#475569';
+                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9';
+                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569';
                               }}
                             >
-                              <MessageSquare size={14} />
+                              <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
                             </button>
                           </div>
                         );
@@ -7184,7 +7581,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             border: `1px solid ${cardBorder}`, 
                             display: 'flex', 
                             flexDirection: 'column', 
-                            gap: '8px' 
+                            gap: '8px',
+                            position: 'relative',
+                            zIndex: 5
                           }}>
                             <div>
                               <div style={{ fontSize: '0.65rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '2px' }}>
@@ -7199,7 +7598,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 </div>
                                 {!isReschedule && (
                                   <button 
-                                    onClick={() => handleAcknowledgeCancellation(occ.id)}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleAcknowledgeCancellation(occ.id);
+                                    }}
                                     style={{ 
                                       background: isRegularReset ? '#10b981' : '#ef4444', 
                                       color: 'white', 
@@ -7211,7 +7614,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       cursor: 'pointer',
                                       boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
                                       transition: 'all 0.2s',
-                                      flexShrink: 0
+                                      flexShrink: 0,
+                                      position: 'relative',
+                                      zIndex: 10
                                     }}
                                   >
                                     Gelesen abhaken
@@ -7229,7 +7634,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '2px' }}>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                   <button 
-                                    onClick={() => handleRejectReschedule(occ)}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleRejectReschedule(occ);
+                                    }}
                                     style={{ 
                                       background: '#ef4444', 
                                       color: 'white', 
@@ -7240,13 +7649,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       fontWeight: 700, 
                                       cursor: 'pointer',
                                       boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
-                                      transition: 'all 0.2s'
+                                      transition: 'all 0.2s',
+                                      position: 'relative',
+                                      zIndex: 10
                                     }}
                                   >
                                     Ablehnen
                                   </button>
                                   <button 
-                                    onClick={() => handleConfirmReschedule(occ.id)}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleConfirmReschedule(occ.id);
+                                    }}
                                     style={{ 
                                       background: '#eab308', 
                                       color: 'white', 
@@ -7257,7 +7672,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       fontWeight: 700, 
                                       cursor: 'pointer',
                                       boxShadow: '0 2px 4px rgba(234, 179, 8, 0.15)',
-                                      transition: 'all 0.2s'
+                                      transition: 'all 0.2s',
+                                      position: 'relative',
+                                      zIndex: 10
                                     }}
                                   >
                                     Bestätigen
@@ -7315,16 +7732,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       const isAchieved = pct >= 100;
 
                       return (
-                        <div key={goal.id} style={{
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          background: '#10b981',
-                          boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
-                          borderRadius: '16px',
-                          padding: '12px 14px',
-                          gap: '8px'
-                        }}>
+                        <div 
+                          key={goal.id} 
+                          onClick={() => handleOpenContributions(goal.title || 'Klassen-Übe-Ziel', goal.minutes)}
+                          onMouseOver={e => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.22)';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.12)';
+                          }}
+                          style={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            background: '#10b981',
+                            boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                            borderRadius: '16px',
+                            padding: '12px 14px',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        >
                           {/* Row 1: Title, Deadline on left & Percentage on right */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -7537,25 +7968,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               </div>
               
-              <div style={{
-                position: 'absolute',
-                bottom: '-8px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#0b57d0',
-                color: '#ffffff',
-                fontWeight: 900,
-                fontSize: '0.68rem',
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-                padding: '4px 14px',
-                borderRadius: '100px',
-                boxShadow: '0 4px 12px rgba(11, 87, 208, 0.25)',
-                border: '2px solid #ffffff',
-                whiteSpace: 'nowrap'
-              }}>
-                Evolution {currentLevel}
-              </div>
+              {xpActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-8px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#0b57d0',
+                  color: '#ffffff',
+                  fontWeight: 900,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  padding: '4px 14px',
+                  borderRadius: '100px',
+                  boxShadow: '0 4px 12px rgba(11, 87, 208, 0.25)',
+                  border: '2px solid #ffffff',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Evolution {currentLevel}
+                </div>
+              )}
             </div>
 
             {/* Info Block */}
@@ -7563,37 +7996,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <h3 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                 Mein Held
               </h3>
-              <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                <Award size={13} /> {levelTitle}
-              </span>
+              {xpActive && (
+                <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                  <Award size={13} /> {levelTitle}
+                </span>
+              )}
             </div>
 
             {/* XP Progress Bar */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                <span>Erfahrungspunkte (XP)</span>
-                <span style={{ color: '#0b57d0', fontFamily: 'monospace', fontWeight: 900 }}>
-                  {currentLevel === 3 ? `${currentXp} XP (MAX)` : `${currentXp} / ${nextThreshold} XP`}
-                </span>
-              </div>
+            {xpActive && (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  <span>Erfahrungspunkte (XP)</span>
+                  <span style={{ color: '#0b57d0', fontFamily: 'monospace', fontWeight: 900 }}>
+                    {currentLevel === 3 ? `${currentXp} XP (MAX)` : `${currentXp} / ${nextThreshold} XP`}
+                  </span>
+                </div>
 
-              <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '100px', height: '10px', overflow: 'hidden' }}>
-                <div
-                  style={{ width: `${xpPercentage}%`, height: '100%', borderRadius: '100px', background: '#0b57d0', transition: 'all 1s' }}
-                />
-              </div>
+                <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '100px', height: '10px', overflow: 'hidden' }}>
+                  <div
+                    style={{ width: `${xpPercentage}%`, height: '100%', borderRadius: '100px', background: '#0b57d0', transition: 'all 1s' }}
+                  />
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-                {currentLevel === 3 ? (
-                  <span>Glückwunsch! Höchste Stufe erreicht!</span>
-                ) : (
-                  <>
-                    <span>Noch {nextThreshold - currentXp} XP bis Evolution {currentLevel + 1}</span>
-                    <span>{Math.round(xpPercentage)}%</span>
-                  </>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                  {currentLevel === 3 ? (
+                    <span>Glückwunsch! Höchste Stufe erreicht!</span>
+                  ) : (
+                    <>
+                      <span>Noch {nextThreshold - currentXp} XP bis Evolution {currentLevel + 1}</span>
+                      <span>{Math.round(xpPercentage)}%</span>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Missions Board / Adventure Map */}
@@ -7905,30 +8342,34 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           {/* Metrics Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
             {/* Metric 1: XP */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Star size={22} fill="#34a853" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Erfahrung (XP)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
-                  {avatar?.xp || 0} XP
+            {xpActive && (
+              <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Star size={22} fill="#34a853" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Erfahrung (XP)</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                    {avatar?.xp || 0} XP
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Metric 2: Übe-Streak */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Flame size={22} fill="#ef4444" color="#ef4444" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Übe-Streak</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
-                  {avatar?.streak_flame || 0} Tage
+            {flamesActive && (
+              <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Flame size={22} fill="#ef4444" color="#ef4444" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Übe-Streak</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                    {avatar?.streak_flame || 0} Tage
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Metric 3: Focus Month */}
             <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
@@ -9244,7 +9685,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'white' }}>Fokus abgeschlossen!</h2>
               <p style={{ color: '#a1a1aa', fontSize: '0.9rem', marginTop: '8px', maxWidth: '280px' }}>
-                Sehr gut! Du warst {detoxMinutes} Minuten voll konzentriert. Dir wurden +100 XP auf deinen Avatar gebucht.
+                {xpActive 
+                  ? `Sehr gut! Du warst ${detoxMinutes} Minuten voll konzentriert. Dir wurden +100 XP auf deinen Avatar gebucht.`
+                  : `Sehr gut! Du warst ${detoxMinutes} Minuten voll konzentriert. Dein Fokus war erfolgreich!`}
               </p>
               
               <button 
@@ -9260,6 +9703,244 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           )}
         </div>
       )}
+
+      {/* Contributions breakdown pie chart modal */}
+      {contributionsModalData && (() => {
+        const contributions = contributionsModalData.contributions || [];
+        const totalContributed = contributions.reduce((sum, c) => sum + c.minutes, 0);
+
+        const colorPalette = [
+          '#6366f1', // Indigo
+          '#10b981', // Emerald
+          '#f59e0b', // Amber
+          '#ef4444', // Red
+          '#3b82f6', // Blue
+          '#ec4899', // Pink
+          '#8b5cf6', // Violet
+          '#14b8a6', // Teal
+        ];
+
+        let accumulatedPercent = 0;
+        const gradientSectors = contributions.map((c, idx) => {
+          const percent = (c.minutes / (totalContributed || 1)) * 100;
+          const start = accumulatedPercent;
+          accumulatedPercent += percent;
+          const color = colorPalette[idx % colorPalette.length];
+          return `${color} ${start}% ${accumulatedPercent}%`;
+        });
+        const conicGradient = totalContributed > 0 
+          ? `conic-gradient(${gradientSectors.join(', ')})`
+          : '#cbd5e1';
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(16px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'white', padding: '32px', borderRadius: '28px', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.16)', width: '460px', maxWidth: '95vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', maxHeight: '90vh', overflowY: 'auto' }}>
+              
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🌱 Übe-Ziele der Klasse
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                    {contributionsModalData.goalTitle}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setContributionsModalData(null)}
+                  style={{ background: '#f8fafc', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {loadingContributions ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', border: '3px solid #f3f3f3', borderTop: '3px solid #10b981', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>Lade Schülerbeiträge...</span>
+                  <style>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', alignItems: 'center' }}>
+                  {/* Pie / Donut Chart */}
+                  <div style={{
+                    width: '180px',
+                    height: '180px',
+                    borderRadius: '50%',
+                    background: conicGradient,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)'
+                  }}>
+                    {/* Donut hole */}
+                    <div style={{
+                      width: '120px',
+                      height: '120px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.04)'
+                    }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamt</span>
+                      <span style={{ fontSize: '1.6rem', fontWeight: 950, color: '#1e293b', letterSpacing: '-0.02em', fontFeatureSettings: '"tnum"' }}>{totalContributed}<span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#64748b', marginLeft: '1px' }}>m</span></span>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>von {contributionsModalData.targetMinutes}m</span>
+                    </div>
+                  </div>
+
+                  {/* Contributions List */}
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                      Beiträge dieser Woche
+                    </div>
+                    {contributions.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.82rem', padding: '20px 0', fontWeight: 650 }}>
+                        🎵 Bisher hat noch kein Schüler geübt. Mach den ersten Schritt!
+                      </div>
+                    ) : (
+                      contributions.map((c, idx) => {
+                        const percent = totalContributed > 0 ? Math.round((c.minutes / totalContributed) * 100) : 0;
+                        const sliceColor = colorPalette[idx % colorPalette.length];
+                        return (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: sliceColor }} />
+                              <span style={{ fontSize: '0.85rem', fontWeight: 750, color: '#1e293b' }}>{c.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', fontFeatureSettings: '"tnum"' }}>{c.minutes} Min</span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', background: '#e2e8f0', padding: '2px 8px', borderRadius: '100px', fontFeatureSettings: '"tnum"' }}>{percent}%</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <button 
+                onClick={() => setContributionsModalData(null)}
+                style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', borderRadius: '14px', padding: '12px 20px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '28px', width: '100%', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)', transition: 'all 0.2s' }}
+                onMouseOver={e => e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.25)'}
+                onMouseOut={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)'}
+              >
+                Schließen
+              </button>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Spielregeln Modal */}
+      {showRulesModal && (() => {
+        const level = avatar?.evolution_level || 1;
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div style={{ background: '#ffffff', padding: '28px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(15, 23, 42, 0.12)', width: '450px', maxWidth: '100%', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+              
+              {/* Close icon */}
+              <button 
+                onClick={() => setShowRulesModal(false)}
+                style={{ position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
+                onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+              >
+                <X size={16} />
+              </button>
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <Flame size={24} color="#ea580c" fill="#ea580c" />
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>
+                  Spielregeln: Flammen-Pfad (Level {level})
+                </h3>
+              </div>
+
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
+                Halte deine Flamme am Brennen! Übe jeden Tag aktiv mit der App, um deine Übestreak (Serie) auszubauen und neue Flammen-Stufen freizuschalten.
+              </p>
+
+              {/* Flame Levels */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Die Flammen-Stufen:
+                </span>
+                
+                {/* Kleine Flamme */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                  <div style={{ color: '#eab308', display: 'flex', alignItems: 'center' }}>
+                    <Flame size={20} fill="currentColor" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Kleine Flamme</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak von 1 - 3 Tagen • Ziel: <strong style={{ color: '#854d0e' }}>{level === 3 ? 10 : level === 2 ? 5 : 3} Min.</strong> Üben täglich</div>
+                  </div>
+                </div>
+
+                {/* Mittlere Flamme */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                  <div style={{ color: '#f97316', display: 'flex', alignItems: 'center' }}>
+                    <Flame size={20} fill="currentColor" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Mittlere Flamme</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak von 4 - 8 Tagen • Ziel: <strong style={{ color: '#a21caf' }}>{level === 3 ? 15 : level === 2 ? 10 : 5} Min.</strong> Üben täglich</div>
+                  </div>
+                </div>
+
+                {/* Helden-Feuer */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                  <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center' }}>
+                    <Flame size={20} fill="currentColor" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Helden-Feuer</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak ab 9 Tagen • Ziel: <strong style={{ color: '#b91c1c' }}>{level === 3 ? 20 : level === 2 ? 15 : 10} Min.</strong> Üben täglich</div>
+                  </div>
+                </div>
+              </div>
+
+            {/* Joker Info */}
+            <div style={{ background: '#ecfdf5', border: '1px solid #d1fae5', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46', fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>
+                🎯 Der wöchentliche Joker & Fehltage
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
+                Jede Woche (Montag bis Sonntag) erhältst du <strong>1 Joker</strong>. Wenn du das Üben an einem Tag verpasst, wird der Joker am Tagesende automatisch eingesetzt, um deinen Streak zu retten. Hast du keinen Joker mehr, wird <strong>jeder Fehltag als -1 auf deinen Streak</strong> gewertet (z. B. fällt ein 5-Tage-Streak nach einem Fehltag auf 4 Tage).
+              </p>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
+                <strong>Wichtig:</strong> Um die Kleine Flamme zum Brennen zu bringen, benötigst du mindestens <strong>1 Übe-Tag (Streak &gt;= 1)</strong>. Wenn der Streak durch Fehltage auf 0 fällt, leuchtet keine Flamme mehr.
+              </p>
+            </div>
+
+            {/* Action Button */}
+            <button 
+              onClick={() => setShowRulesModal(false)}
+              style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: 'white', border: 'none', borderRadius: '16px', padding: '14px 20px', fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', width: '100%', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.2)', transition: 'all 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 88, 12, 0.3)'}
+              onMouseOut={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 88, 12, 0.2)'}
+            >
+              Alles klar!
+            </button>
+
+          </div>
+        </div>
+      );
+    })()}
 
       {/* Appointment Quick Chat (Shoutbox) Modal */}
       {showAppointmentChat && appointmentChatData && (() => {

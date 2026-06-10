@@ -519,6 +519,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleUpdateEvolutionLevel = async (level: number) => {
+    try {
+      const { error } = await supabase
+        .from('avatars')
+        .upsert({ 
+          user_id: student.id, 
+          evolution_level: level,
+          instrument_type: student.instrument || 'Musiker',
+          avatar_style: avatar?.avatar_style || 'student_eguitar_alt',
+          xp: avatar?.xp || 0,
+          streak_flame: avatar?.streak_flame || 0
+        }, { onConflict: 'user_id' });
+      if (error) throw error;
+      
+      const { data: updatedAvatar } = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', student.id)
+        .single();
+      setAvatar(updatedAvatar);
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Levels: ' + err.message);
+    }
+  };
+
   const handleTogglePremium = async (newVal: boolean) => {
     try {
       const { error } = await supabase
@@ -1729,6 +1754,41 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
                         {lessonDuration} Min
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
+                  </div>
+                  {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
+                    <select
+                      value={avatar?.evolution_level || 1}
+                      onChange={(e) => handleUpdateEvolutionLevel(parseInt(e.target.value))}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        color: '#1e293b',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={1}>Level 1 (3/5/10 Min.)</option>
+                      <option value={2}>Level 2 (5/10/15 Min.)</option>
+                      <option value={3}>Level 3 (10/15/20 Min.)</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        Level {avatar?.evolution_level || 1}
                       </span>
                     </div>
                   )}

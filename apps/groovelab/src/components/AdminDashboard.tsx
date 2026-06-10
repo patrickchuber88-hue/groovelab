@@ -12,6 +12,7 @@ import { StudentDetailModal } from './StudentDetailModal';
 import { ScheduleBoard } from './ScheduleBoard';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
+import { CampusSetupScreen } from './CampusSetupScreen';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -3946,7 +3947,7 @@ export function AdminDashboard({
     { id: 'songs', label: 'Songs', icon: Music },
     { id: 'stats', label: 'Statistik', icon: LucideBarChart },
     { id: 'gallery', label: 'ID Galerie', icon: QrCode },
-    { id: 'setup', label: 'Einstellungen', icon: Settings },
+    { id: 'setup', label: activePlatform === 'campus' ? 'Einstellungen' : 'Setup', icon: activePlatform === 'campus' ? Settings : Shield },
   ];
 
   const renderLiveTab = () => (
@@ -9713,20 +9714,29 @@ export function AdminDashboard({
 
   const renderSetupTab = () => (
     <div style={{ marginTop: '0px' }}>
-      <DeviceSetupScreen 
-        rooms={setupRooms} 
-        stations={setupStations} 
-        brandColor={brandColor} 
-        activeSessions={activeSessions}
-        students={students}
-        school={admin?.schools}
-        admin={admin}
-        kiosks={kiosks || []}
-        onUpdate={() => fetchData()}
-        onCleanupPlanning={handleCleanupPlanning}
-        onResetPlanning={handleResetAllPlanning}
-        activePlatform={activePlatform}
-      />
+      {activePlatform === 'campus' ? (
+        <CampusSetupScreen 
+          school={admin?.schools} 
+          admin={admin} 
+          brandColor={brandColor} 
+          onUpdate={() => fetchData()} 
+        />
+      ) : (
+        <DeviceSetupScreen 
+          rooms={setupRooms} 
+          stations={setupStations} 
+          brandColor={brandColor} 
+          activeSessions={activeSessions}
+          students={students}
+          school={admin?.schools}
+          admin={admin}
+          kiosks={kiosks || []}
+          onUpdate={() => fetchData()}
+          onCleanupPlanning={handleCleanupPlanning}
+          onResetPlanning={handleResetAllPlanning}
+          activePlatform={activePlatform}
+        />
+      )}
     </div>
   );
 

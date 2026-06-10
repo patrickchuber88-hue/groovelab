@@ -92,6 +92,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [customEvents, setCustomEvents] = useState<CampusEvent[]>([]);
   const [subscribedEvents, setSubscribedEvents] = useState<any[]>([]);
   const [calendarUrl, setCalendarUrl] = useState<string>('');
+  const [icalActive, setIcalActive] = useState<boolean>(true);
   
   // Loaders
   const [loadingLessons, setLoadingLessons] = useState(true);
@@ -478,11 +479,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     try {
       const { data, error } = await supabase
         .from('schools')
-        .select('calendar_url')
+        .select('calendar_url, opening_hours')
         .eq('id', schoolId)
         .single();
       
       if (error) throw error;
+      const campusSettings = data?.opening_hours?.campus_settings || {};
+      setIcalActive(campusSettings.ical_active !== false);
       if (data?.calendar_url) {
         setCalendarUrl(data.calendar_url);
         fetchSubscribedCalendar(data.calendar_url);
@@ -1316,39 +1319,41 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </div>
 
           {/* iCal Subscription Button (Noticeable Apple Red) */}
-          <button
-            onClick={() => setShowIcalModal(true)}
-            className="hover-scale pulse-calendar"
-            title="Unterrichtstermine abonnieren (iCal)"
-            style={{
-              border: 'none',
-              background: '#ef4444',
-              color: '#ffffff',
-              padding: '8px 14px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              flexShrink: 0
-            }}
-            onMouseEnter={e => { 
-              e.currentTarget.style.background = '#dc2626'; 
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.45)'; 
-            }}
-            onMouseLeave={e => { 
-              e.currentTarget.style.background = '#ef4444'; 
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.35)'; 
-            }}
-          >
-            <CalendarPlus size={15} />
-            <span>Abonnieren</span>
-          </button>
+          {icalActive && (
+            <button
+              onClick={() => setShowIcalModal(true)}
+              className="hover-scale pulse-calendar"
+              title="Unterrichtstermine abonnieren (iCal)"
+              style={{
+                border: 'none',
+                background: '#ef4444',
+                color: '#ffffff',
+                padding: '8px 14px',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                flexShrink: 0
+              }}
+              onMouseEnter={e => { 
+                e.currentTarget.style.background = '#dc2626'; 
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.45)'; 
+              }}
+              onMouseLeave={e => { 
+                e.currentTarget.style.background = '#ef4444'; 
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.35)'; 
+              }}
+            >
+              <CalendarPlus size={15} />
+              <span>Abonnieren</span>
+            </button>
+          )}
         </div>
 
         {/* Tabs switcher */}

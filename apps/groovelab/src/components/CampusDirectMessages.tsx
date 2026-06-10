@@ -66,6 +66,7 @@ interface CampusDirectMessagesProps {
   onMarkAsRead: (senderId: string) => Promise<void>;
   selectedRecipient: any;
   setSelectedRecipient: (recipient: any) => void;
+  studentToTeacherChat?: boolean;
 }
 
 export default function CampusDirectMessages({
@@ -75,7 +76,8 @@ export default function CampusDirectMessages({
   onSendMessage,
   onMarkAsRead,
   selectedRecipient,
-  setSelectedRecipient
+  setSelectedRecipient,
+  studentToTeacherChat = true
 }: CampusDirectMessagesProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [typedMessage, setTypedMessage] = useState('');
@@ -234,28 +236,30 @@ export default function CampusDirectMessages({
                 {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
               </p>
             </div>
-            <button 
-              onClick={() => setShowNewChatModal(true)}
-              style={{
-                background: '#16a34a',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
-              }}
-              className="hover-scale"
-              type="button"
-            >
-              <Plus size={14} />
-              <span>Neu</span>
-            </button>
+            {(!isStudent || studentToTeacherChat) && (
+              <button 
+                onClick={() => setShowNewChatModal(true)}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
+                }}
+                className="hover-scale"
+                type="button"
+              >
+                <Plus size={14} />
+                <span>Neu</span>
+              </button>
+            )}
           </div>
           
           <div style={{ position: 'relative' }}>
