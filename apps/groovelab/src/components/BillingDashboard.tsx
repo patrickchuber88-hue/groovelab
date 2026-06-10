@@ -97,7 +97,7 @@ export function BillingDashboard() {
 
       const { data: users, error: usersErr } = await supabase
         .from('users')
-        .select('school_id, role, is_active, is_premium_user');
+        .select('school_id, role, is_active, is_campus_active');
 
       if (usersErr) throw usersErr;
 
@@ -111,7 +111,7 @@ export function BillingDashboard() {
           if (u.is_active) {
             userStatsMap[u.school_id].activeStudents++;
           }
-          if (u.is_premium_user) {
+          if (u.is_campus_active) {
             userStatsMap[u.school_id].premiumStudents++;
           }
         }
@@ -274,7 +274,7 @@ export function BillingDashboard() {
             <Users size={28} />
           </div>
           <div>
-            <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Premium App-User</span>
+            <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Campus aktive User</span>
             <span className="block text-2xl font-black text-slate-800 tracking-tight mt-1">
               {invoices.reduce((sum, inv) => sum + inv.premiumStudents, 0)} Schüler
             </span>
@@ -335,7 +335,7 @@ export function BillingDashboard() {
                 <th className="py-4 px-6">Musikschule</th>
                 <th className="py-4 px-6">Abo-Status</th>
                 <th className="py-4 px-6 text-center">Schüler (Gesamt)</th>
-                <th className="py-4 px-6 text-center">Premium App-User</th>
+                <th className="py-4 px-6 text-center">Campus aktive User</th>
                 <th className="py-4 px-6 text-right">B2B-Umsatz</th>
                 <th className="py-4 px-6 text-right">B2C-Umsatz-Anteil</th>
                 <th className="py-4 px-6 text-center">User-Kontingent</th>
@@ -392,7 +392,7 @@ export function BillingDashboard() {
                     {/* Premium Users */}
                     <td className="py-4.5 px-6 text-center">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-650 bg-indigo-50/80 px-2 py-1 rounded-xl">
-                        👑 {inv.premiumStudents} User
+                        🎓 {inv.premiumStudents} Campus aktiv
                       </span>
                     </td>
 

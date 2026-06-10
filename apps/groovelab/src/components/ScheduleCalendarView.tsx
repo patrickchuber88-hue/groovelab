@@ -1243,11 +1243,11 @@ export function ScheduleCalendarView({
               try {
                 const { data: studentProfile } = await supabase
                   .from('users')
-                  .select('is_premium_user, first_name')
+                  .select('is_campus_active, first_name')
                   .eq('id', change.student_id)
                   .single();
 
-                if (studentProfile && studentProfile.is_premium_user) {
+                if (studentProfile && studentProfile.is_campus_active) {
                   let pushTitle = 'Terminänderung 📅';
                   if (change.status === 'cancelled') {
                     pushTitle = 'Unterricht fällt aus ☕';

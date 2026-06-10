@@ -890,11 +890,11 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         try {
           const { data: studentProfile } = await supabase
             .from('users')
-            .select('is_premium_user, first_name')
+            .select('is_campus_active, first_name')
             .eq('id', studentId)
             .single();
 
-          if (studentProfile && studentProfile.is_premium_user) {
+          if (studentProfile && studentProfile.is_campus_active) {
             // Log in notifications table
             const { data: notification, error: notifErr } = await supabase
               .from('notifications')

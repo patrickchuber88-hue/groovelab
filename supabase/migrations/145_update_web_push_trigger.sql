@@ -13,7 +13,7 @@ DECLARE
   v_sender_name TEXT;
   v_instrument TEXT;
   v_slot_time TEXT;
-  v_is_premium BOOLEAN;
+  v_is_campus_active BOOLEAN;
 BEGIN
   -- We trigger pushes on status changes OR time slot changes OR day of week changes
   IF (TG_OP = 'UPDATE' AND (
@@ -24,13 +24,13 @@ BEGIN
     
     -- Case 1: Canceled by teacher (sick) -> Notify Student (if Premium)
     IF NEW.status IN ('canceled_by_teacher_sick', 'teacher_sick') THEN
-      SELECT u.id, u.first_name, u.is_premium_user, t.first_name, NEW.time_slot
-      INTO v_user_id, v_recipient_name, v_is_premium, v_sender_name, v_slot_time
+      SELECT u.id, u.first_name, u.is_campus_active, t.first_name, NEW.time_slot
+      INTO v_user_id, v_recipient_name, v_is_campus_active, v_sender_name, v_slot_time
       FROM public.users u
       JOIN public.users t ON t.id = NEW.teacher_id
       WHERE u.id = NEW.student_id;
 
-      IF v_user_id IS NOT NULL AND v_is_premium = TRUE THEN
+      IF v_user_id IS NOT NULL AND v_is_campus_active = TRUE THEN
         v_title := 'Unterricht fällt aus ☕';
         v_body := 'Hallo ' || v_recipient_name || ', dein Unterricht heute um ' || COALESCE(v_slot_time, '') || ' Uhr bei ' || COALESCE(v_sender_name, '') || ' fällt krankheitsbedingt aus.';
         v_url := '/';
@@ -59,8 +59,8 @@ BEGIN
 
     -- Case 2: Canceled by student -> Notify Teacher
     IF NEW.status = 'canceled_by_student' THEN
-      SELECT t.id, t.first_name, t.is_premium_user, u.first_name, NEW.time_slot
-      INTO v_user_id, v_recipient_name, v_is_premium, v_sender_name, v_slot_time
+      SELECT t.id, t.first_name, t.is_campus_active, u.first_name, NEW.time_slot
+      INTO v_user_id, v_recipient_name, v_is_campus_active, v_sender_name, v_slot_time
       FROM public.users t
       JOIN public.users u ON u.id = NEW.student_id
       WHERE t.id = NEW.teacher_id;
@@ -129,13 +129,13 @@ BEGIN
 
     -- Case 4: Rescheduled confirmed -> Notify Student (if Premium)
     IF NEW.status = 'rescheduled_confirmed' THEN
-      SELECT u.id, u.first_name, u.is_premium_user, t.first_name, NEW.time_slot
-      INTO v_user_id, v_recipient_name, v_is_premium, v_sender_name, v_slot_time
+      SELECT u.id, u.first_name, u.is_campus_active, t.first_name, NEW.time_slot
+      INTO v_user_id, v_recipient_name, v_is_campus_active, v_sender_name, v_slot_time
       FROM public.users u
       JOIN public.users t ON t.id = NEW.teacher_id
       WHERE u.id = NEW.student_id;
 
-      IF v_user_id IS NOT NULL AND v_is_premium = TRUE THEN
+      IF v_user_id IS NOT NULL AND v_is_campus_active = TRUE THEN
         v_title := 'Terminänderung bestätigt! 📅';
         v_body := 'Hallo ' || v_recipient_name || ', deine Verschiebung wurde von ' || COALESCE(v_sender_name, '') || ' bestätigt. Neuer Termin ist heute um ' || COALESCE(v_slot_time, '') || ' Uhr.';
         v_url := '/';
@@ -164,13 +164,13 @@ BEGIN
 
     -- Case 5: Direct reschedule by teacher (time/day changed and status is approved) -> Notify Student (if Premium)
     IF TG_OP = 'UPDATE' AND NEW.status = 'approved' AND (OLD.time_slot IS DISTINCT FROM NEW.time_slot OR OLD.day_of_week IS DISTINCT FROM NEW.day_of_week) THEN
-      SELECT u.id, u.first_name, u.is_premium_user, t.first_name, NEW.time_slot
-      INTO v_user_id, v_recipient_name, v_is_premium, v_sender_name, v_slot_time
+      SELECT u.id, u.first_name, u.is_campus_active, t.first_name, NEW.time_slot
+      INTO v_user_id, v_recipient_name, v_is_campus_active, v_sender_name, v_slot_time
       FROM public.users u
       JOIN public.users t ON t.id = NEW.teacher_id
       WHERE u.id = NEW.student_id;
 
-      IF v_user_id IS NOT NULL AND v_is_premium = TRUE THEN
+      IF v_user_id IS NOT NULL AND v_is_campus_active = TRUE THEN
         v_title := 'Unterricht verschoben 📅';
         v_body := 'Hallo ' || v_recipient_name || ', dein Unterricht bei ' || COALESCE(v_sender_name, '') || ' wurde verschoben auf ' || 
           CASE NEW.day_of_week

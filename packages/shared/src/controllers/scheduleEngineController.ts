@@ -541,14 +541,14 @@ export async function cancelScheduleByStudentHandler(req: Request, res: Response
  */
 async function sendInstantPushNotification(
   userId: string,
-  isPremium: boolean,
+  isCampusActive: boolean,
   title: string,
   body: string,
   url: string,
   metadata: any
 ): Promise<void> {
-  if (!isPremium) {
-    console.log(`[Push Notification] Skipping user ${userId} because they are not premium.`);
+  if (!isCampusActive) {
+    console.log(`[Push Notification] Skipping user ${userId} because they do not have Campus activated.`);
     return;
   }
   try {
@@ -605,7 +605,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    // 1. Fetch current schedule, student details (including premium status), and teacher details
+    // 1. Fetch current schedule, student details (including campus active status), and teacher details
     const { data: schedule, error: schedError } = await supabase
       .from('schedules')
       .select(`
@@ -616,7 +616,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         day_of_week,
         time_slot,
         room_id,
-        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_premium_user),
+        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_campus_active),
         teacher:users!schedules_teacher_id_fkey (id, first_name, last_name)
       `)
       .eq('id', scheduleId)
@@ -677,7 +677,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         time_slot,
         room_id,
         status,
-        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_premium_user),
+        student:users!schedules_student_id_fkey (id, instrument, first_name, last_name, is_campus_active),
         teacher:users!schedules_teacher_id_fkey (id, first_name, last_name)
       `)
       .eq('day_of_week', targetDayOfWeek)
@@ -780,7 +780,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         if (student) {
           sendInstantPushNotification(
             student.id,
-            !!student.is_premium_user,
+            !!student.is_campus_active,
             'Unterricht verschoben 📅',
             `Hallo ${student.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${targetTimeSlot} Uhr.`,
             '/',
@@ -790,7 +790,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         if (targetStudent) {
           sendInstantPushNotification(
             targetStudent.id,
-            !!targetStudent.is_premium_user,
+            !!targetStudent.is_campus_active,
             'Unterricht verschoben 📅',
             `Hallo ${targetStudent.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${sourceDayName} um ${schedule.time_slot} Uhr.`,
             '/',
@@ -802,7 +802,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         if (student) {
           sendInstantPushNotification(
             student.id,
-            !!student.is_premium_user,
+            !!student.is_campus_active,
             'Terminänderung freigeben? 📅',
             `Hallo ${student.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${targetTimeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
             '/',
@@ -812,7 +812,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
         if (targetStudent) {
           sendInstantPushNotification(
             targetStudent.id,
-            !!targetStudent.is_premium_user,
+            !!targetStudent.is_campus_active,
             'Terminänderung freigeben? 📅',
             `Hallo ${targetStudent.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${sourceDayName} um ${schedule.time_slot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
             '/',
@@ -900,7 +900,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       if (student) {
         sendInstantPushNotification(
           student.id,
-          !!student.is_premium_user,
+          !!student.is_campus_active,
           'Unterricht verschoben 📅',
           `Hallo ${student.first_name}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${targetTimeSlot} Uhr.`,
           '/',
@@ -938,7 +938,7 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
       if (student) {
         sendInstantPushNotification(
           student.id,
-          !!student.is_premium_user,
+          !!student.is_campus_active,
           'Terminänderung freigeben? 📅',
           `Hallo ${student.first_name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${targetTimeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
           '/',

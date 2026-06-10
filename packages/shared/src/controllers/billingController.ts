@@ -125,7 +125,7 @@ export async function getBillingMetricsHandler(req: Request, res: Response): Pro
     // 5. Query all users to count student roles and premium statuses
     const { data: allUsers, error: usersError } = await supabase
       .from('users')
-      .select('school_id, role, is_active, is_premium_user');
+      .select('school_id, role, is_active, is_campus_active');
 
     if (usersError) {
       res.status(500).json({ error: 'Failed to fetch users for billing breakdown.', details: usersError.message });
@@ -142,7 +142,7 @@ export async function getBillingMetricsHandler(req: Request, res: Response): Pro
         if (u.is_active) {
           userStatsMap[u.school_id].activeStudents++;
         }
-        if (u.is_premium_user) {
+        if (u.is_campus_active) {
           userStatsMap[u.school_id].premiumStudents++;
         }
       }
