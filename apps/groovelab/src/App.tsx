@@ -4,6 +4,7 @@ import { useWindowSize } from 'react-use';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
 import { QRCodeModal } from './components/QRCodeModal';
+import { QRLandingPage } from './components/QRLandingPage';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
