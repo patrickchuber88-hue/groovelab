@@ -1,0 +1,21 @@
+{
+  "short_name": "Campus",
+  "name": "Campus GrooveLab",
+  "icons": [
+    {
+      "src": "/pwa-icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/pwa-icon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0c0f12",
+  "theme_color": "#34a853",
+  "display": "standalone",
+  "orientation": "portrait"
+}
