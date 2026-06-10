@@ -72,18 +72,20 @@ SET search_path = public
 AS $$
 DECLARE
   v_user RECORD;
-  v_expected_day TEXT;
+  v_expected_day INT;
 BEGIN
-  -- Nutzer finden
+  -- Nutzer finden und day_of_birth aus activation_days holen
   BEGIN
-    SELECT id, first_name, birth_date INTO v_user
-    FROM public.users
-    WHERE qr_token = p_qr_token::UUID
+    SELECT u.id, u.first_name, ad.day_of_birth INTO v_user
+    FROM public.users u
+    LEFT JOIN public.activation_days ad ON u.id = ad.student_id
+    WHERE u.qr_token = p_qr_token::UUID
     LIMIT 1;
   EXCEPTION WHEN OTHERS THEN
-    SELECT id, first_name, birth_date INTO v_user
-    FROM public.users
-    WHERE teacher_qr_token = p_qr_token
+    SELECT u.id, u.first_name, ad.day_of_birth INTO v_user
+    FROM public.users u
+    LEFT JOIN public.activation_days ad ON u.id = ad.student_id
+    WHERE u.teacher_qr_token = p_qr_token
     LIMIT 1;
   END;
 
@@ -91,16 +93,15 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'user_not_found');
   END IF;
 
-  -- birth_date muss gesetzt sein
-  IF v_user.birth_date IS NULL THEN
+  -- day_of_birth muss gesetzt sein
+  IF v_user.day_of_birth IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'no_birth_date');
-  END If;
+  END IF;
 
-  -- Tag aus Geburtsdatum extrahieren (z.B. '1990-03-15' -> '15')
-  v_expected_day := EXTRACT(DAY FROM v_user.birth_date::DATE)::TEXT;
+  v_expected_day := v_user.day_of_birth;
 
   -- PIN vergleichen (tolerant gegen führende Nullen: "05" == "5")
-  IF LPAD(p_pin, 2, '0') != LPAD(v_expected_day, 2, '0') THEN
+  IF LPAD(p_pin, 2, '0') != LPAD(v_expected_day::TEXT, 2, '0') THEN
     RETURN jsonb_build_object('success', false, 'error', 'wrong_pin');
   END IF;
 
@@ -112,6 +113,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'user_id', v_user.id, 'first_name', v_user.first_name);
 END;
 $$;
+
 
 -- 4. RPC: Schlanke Schüler-Daten für QR-Landing-Page laden (ohne sensible Daten)
 CREATE OR REPLACE FUNCTION public.get_qr_profile(
