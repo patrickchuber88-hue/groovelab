@@ -1347,12 +1347,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       sessionStorage.setItem('groovelab_user_id', user.id);
+      localStorage.setItem('groovelab_user_id', user.id);
+      localStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
       setLoading(false);
       
       onLogin(user.id, isHome);
     } catch (err: any) {
       console.error('[Login] Finalize error:', err.message);
       sessionStorage.removeItem('groovelab_user_id');
+      localStorage.removeItem('groovelab_user_id');
+      localStorage.removeItem('groovelab_location_mode');
       setError(err.message);
       setLoading(false);
     }

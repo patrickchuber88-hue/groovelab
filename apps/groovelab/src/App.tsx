@@ -1320,6 +1320,8 @@ if (kioskTokenParam) {
   localStorage.removeItem('groovelab_station_id');
   localStorage.removeItem('groovelab_kiosk_room_id');
   sessionStorage.removeItem('groovelab_user_id');
+  localStorage.removeItem('groovelab_user_id');
+  localStorage.removeItem('groovelab_location_mode');
   // Strip parameter and redirect to clean up URL
   params.delete('kiosk_token');
   const newSearch = params.toString();
@@ -1331,6 +1333,8 @@ const kioskStationId = params.get('kiosk_station_id');
 if (kioskStationId) {
   localStorage.setItem('groovelab_station_id', kioskStationId);
   sessionStorage.removeItem('groovelab_user_id');
+  localStorage.removeItem('groovelab_user_id');
+  localStorage.removeItem('groovelab_location_mode');
   // Strip parameter and redirect to clean up URL
   params.delete('kiosk_station_id');
   const newSearch = params.toString();
@@ -1534,7 +1538,7 @@ function App() {
     return <QRLandingPage token={qrPathMatch[1]} />;
   }
 
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id'));
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id') || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null));
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
@@ -1905,7 +1909,7 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home');
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentMessages, setStudentMessages] = useState<any[]>([]);
@@ -5094,6 +5098,8 @@ function App() {
       setSession(null);
       sessionStorage.removeItem('groovelab_user_id');
       sessionStorage.removeItem('groovelab_location_mode');
+      localStorage.removeItem('groovelab_user_id');
+      localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
       // Redirect
@@ -5110,6 +5116,8 @@ function App() {
     setSession(null);
     sessionStorage.removeItem('groovelab_user_id');
     sessionStorage.removeItem('groovelab_location_mode');
+    localStorage.removeItem('groovelab_user_id');
+    localStorage.removeItem('groovelab_location_mode');
     localStorage.removeItem('groovelab_active_tab');
   };
 
@@ -5144,6 +5152,8 @@ function App() {
     setLocationMode(mode);
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
+    localStorage.setItem('groovelab_user_id', userId);
+    localStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';

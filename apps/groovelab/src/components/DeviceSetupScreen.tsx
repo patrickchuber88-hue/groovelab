@@ -60,6 +60,8 @@ export function DeviceSetupScreen() {
 
       // Finalize login (reload to activate Master Admin Dashboard)
       sessionStorage.setItem('groovelab_user_id', user.id);
+      localStorage.setItem('groovelab_user_id', user.id);
+      localStorage.setItem('groovelab_location_mode', 'home');
       window.location.reload();
     } catch (err: any) {
       setLoginError(err.message);
@@ -242,6 +244,8 @@ export function DeviceSetupScreen() {
     }
 
     sessionStorage.removeItem('groovelab_user_id');
+    localStorage.removeItem('groovelab_user_id');
+    localStorage.removeItem('groovelab_location_mode');
     localStorage.setItem('groovelab_station_id', stationId);
     
     // Clean up URL parameters by redirecting to base path
