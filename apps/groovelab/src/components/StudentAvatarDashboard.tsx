@@ -1097,8 +1097,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [savingProfile, setSavingProfile] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushNotifScheduleChanges, setPushNotifScheduleChanges] = useState(true);
-  const [pushNotifHomework, setPushNotifHomework] = useState(true);
-  const [pushNotifAllFeatures, setPushNotifAllFeatures] = useState(true);
+  const [pushNotifHomework, setPushNotifHomework] = useState(false);
+  const [pushNotifAllFeatures, setPushNotifAllFeatures] = useState(false);
 
   const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
@@ -3015,8 +3015,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setIsPremiumUser((user.is_premium_user || user.is_active || user.is_campus_active) ?? false);
       setPushEnabled(user.push_notifications_enabled ?? false);
       setPushNotifScheduleChanges(user.push_notif_schedule_changes ?? true);
-      setPushNotifHomework(user.push_notif_homework ?? true);
-      setPushNotifAllFeatures(user.push_notif_all_features ?? true);
+      setPushNotifHomework(user.push_notif_homework ?? false);
+      setPushNotifAllFeatures(user.push_notif_all_features ?? false);
 
       // 2. Fetch avatar records
       const { data: avatarRecord, error: avatarErr } = await supabase
