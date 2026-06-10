@@ -1545,6 +1545,48 @@ function App() {
   const [deletionPromptUserId, setDeletionPromptUserId] = useState<string | null>(null);
   const [deletionPromptIsHome, setDeletionPromptIsHome] = useState<boolean | undefined>(undefined);
 
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      
+      const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      if (isStandalone) return;
+
+      const dismissedTime = localStorage.getItem('groovelab_install_prompt_dismissed');
+      const dismissedRecent = dismissedTime && (Date.now() - Number(dismissedTime) < 7 * 24 * 60 * 60 * 1000);
+      
+      if (!dismissedRecent) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !loggedInUserId) return;
+    const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    
+    if (isIOS && !isStandalone) {
+      const dismissedTime = localStorage.getItem('groovelab_install_prompt_dismissed');
+      const dismissedRecent = dismissedTime && (Date.now() - Number(dismissedTime) < 7 * 24 * 60 * 60 * 1000);
+      if (!dismissedRecent) {
+        setShowInstallBanner(true);
+      }
+    }
+  }, [loggedInUserId]);
+
   const debounceDashboardTimerRef = useRef<any>(null);
   
   const debouncedFetchDashboardData = (userId: string, isInitial: boolean = false) => {
@@ -5855,6 +5897,21 @@ function App() {
     trialDaysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
   }
 
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install: ${outcome}`);
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    }
+  };
+
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('groovelab_install_prompt_dismissed', String(Date.now()));
+  };
+
   return (
     <div className="app-layout">
       {toastMessage && (
@@ -5887,12 +5944,119 @@ function App() {
           <span>{toastMessage.text}</span>
         </div>
       )}
+
+      {showInstallBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '24px',
+          right: '24px',
+          margin: '0 auto',
+          maxWidth: '500px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px) saturate(190%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          borderRadius: '24px',
+          padding: '16px 20px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.08)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          justifyContent: 'space-between',
+          animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+          pointerEvents: 'auto'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              background: '#e8f5e9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
+              border: '1px solid rgba(52, 168, 83, 0.08)'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>🎓</span>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>Campus App installieren</h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.3 }}>
+                {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream 
+                  ? 'Tippe unten auf das Teilen-Symbol und wähle "Zum Home-Bildschirm".'
+                  : 'Installiere Campus direkt auf deinem Startbildschirm für schnellen Zugriff.'}
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {(!/iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).MSStream) && deferredPrompt ? (
+              <button 
+                onClick={handleInstallPWA}
+                style={{
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '8px 16px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                  transition: 'transform 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                Hinzufügen
+              </button>
+            ) : (
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', background: 'rgba(22,163,74,0.08)', padding: '4px 10px', borderRadius: '8px' }}>
+                Info
+              </span>
+            )}
+            <button 
+              onClick={handleDismissInstall}
+              style={{
+                background: 'rgba(0,0,0,0.04)',
+                border: 'none',
+                color: '#64748b',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 700
+              }}
+              title="Schließen"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .sidebar-nav .hover-scale { transition: all 0.2s ease !important; }
         .sidebar-nav .hover-scale:hover { 
           transform: translateX(4px); 
           background: rgba(255,255,255,0.03) !important;
           border-color: rgba(255,255,255,0.05) !important;
+        }
+        @keyframes slideUpFade {
+          from {
+            transform: translateY(30px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
