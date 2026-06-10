@@ -10614,6 +10614,67 @@ export function AdminDashboard({
   const renderQRModal = () => {
     if (!selectedQRUser) return null;
 
+    const handleRegenerateToken = async () => {
+      if (!window.confirm('Möchtest du diesen QR-Code wirklich sperren und neu generieren? Der alte Code verliert sofort seine Gültigkeit.')) {
+        return;
+      }
+
+      const isStudent = selectedQRUser.role === 'student';
+      let newToken: string;
+
+      if (isStudent) {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          newToken = crypto.randomUUID();
+        } else {
+          newToken = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        }
+      } else {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        newToken = 't_';
+        for (let i = 0; i < 24; i++) {
+          newToken += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+      }
+
+      try {
+        const updateData = isStudent 
+          ? { qr_token: newToken } 
+          : { teacher_qr_token: newToken };
+
+        const { error } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('id', selectedQRUser.id);
+
+        if (error) {
+          alert('Fehler beim Sperren/Generieren des QR-Codes: ' + error.message);
+        } else {
+          // Update selected user state immediately
+          setSelectedQRUser({
+            ...selectedQRUser,
+            qr_token: isStudent ? newToken : selectedQRUser.qr_token,
+            teacher_qr_token: !isStudent ? newToken : selectedQRUser.teacher_qr_token
+          });
+
+          // Sync the global lists in AdminDashboard
+          if (isStudent) {
+            setStudents(prev => prev.map(u => u.id === selectedQRUser.id ? { ...u, qr_token: newToken } : u));
+          } else {
+            setTeachers(prev => prev.map(u => u.id === selectedQRUser.id ? { ...u, teacher_qr_token: newToken } : u));
+          }
+
+          alert('QR-Code erfolgreich neu generiert!');
+        }
+      } catch (err: any) {
+        console.error('Error updating qr_token in AdminDashboard:', err);
+        alert('Fehler beim Aktualisieren: ' + (err.message || 'Unbekannter Fehler'));
+      }
+    };
+
     const saveAsImage = async () => {
       if (!qrCardRef.current) return;
       try {
@@ -10751,7 +10812,7 @@ export function AdminDashboard({
                     justifyContent: 'center',
                     border: '1.5px solid rgba(251, 191, 36, 0.3)'
                   }}>
-                    <QRCode value={selectedQRUser.qr_token || selectedQRUser.id || ''} size={135} />
+                    <QRCode value={selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''} size={135} />
                   </div>
                 </div>
               </>
@@ -10821,7 +10882,7 @@ export function AdminDashboard({
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <QRCode value={selectedQRUser.qr_token || selectedQRUser.id} size={150} />
+                    <QRCode value={selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''} size={150} />
                   </div>
                   
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
@@ -10860,6 +10921,40 @@ export function AdminDashboard({
             }} 
           >
             <Download size={24} /> Ausweis als JPEG speichern
+          </button>
+
+          {/* Action button for managers to regenerate QR Code */}
+          <button
+            onClick={handleRegenerateToken}
+            className="google-btn-secondary"
+            style={{
+              width: '100%',
+              padding: '20px',
+              borderRadius: '24px',
+              border: '1.5px solid #fecdd3',
+              background: '#fff1f2',
+              color: '#e11d48',
+              fontWeight: 900,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              marginTop: '16px',
+              boxShadow: '0 15px 35px rgba(225, 29, 72, 0.05)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#ffe4e6';
+              e.currentTarget.style.borderColor = '#fda4af';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#fff1f2';
+              e.currentTarget.style.borderColor = '#fecdd3';
+            }}
+          >
+            🔄 QR-Code sperren &amp; neu generieren
           </button>
         </div>
       </div>

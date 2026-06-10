@@ -63,6 +63,93 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   const cardRef = useRef<HTMLDivElement>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [schoolNameAndCity, setSchoolNameAndCity] = useState<string>('Campus Musikschule');
+  const [localQrToken, setLocalQrToken] = useState<string>(user.qr_token || '');
+  const [localTeacherQrToken, setLocalTeacherQrToken] = useState<string>(user.teacher_qr_token || '');
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalQrToken(user.qr_token || '');
+  }, [user.qr_token]);
+
+  useEffect(() => {
+    setLocalTeacherQrToken(user.teacher_qr_token || '');
+  }, [user.teacher_qr_token]);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', authUser.id)
+          .single();
+        if (data) {
+          setCurrentUserRole(data.role);
+        }
+      }
+    };
+    fetchUserRole();
+  }, []);
+
+  const generateSecureQrToken = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = 't_';
+    for (let i = 0; i < 24; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+  };
+
+  const handleRegenerateToken = async () => {
+    if (!window.confirm('Möchtest du diesen QR-Code wirklich sperren und neu generieren? Der alte Code verliert sofort seine Gültigkeit.')) {
+      return;
+    }
+
+    const isStudent = user.role === 'student';
+    let newToken: string;
+
+    if (isStudent) {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        newToken = crypto.randomUUID();
+      } else {
+        newToken = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      }
+    } else {
+      newToken = generateSecureQrToken();
+    }
+
+    try {
+      const updateData = isStudent 
+        ? { qr_token: newToken } 
+        : { teacher_qr_token: newToken };
+
+      const { error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) {
+        alert('Fehler beim Sperren/Generieren des QR-Codes: ' + error.message);
+      } else {
+        if (isStudent) {
+          setLocalQrToken(newToken);
+          user.qr_token = newToken;
+        } else {
+          setLocalTeacherQrToken(newToken);
+          user.teacher_qr_token = newToken;
+        }
+        alert('QR-Code erfolgreich neu generiert!');
+      }
+    } catch (err: any) {
+      console.error('Error updating qr_token in QRCodeModal:', err);
+      alert('Fehler beim Aktualisieren: ' + (err.message || 'Unbekannter Fehler'));
+    }
+  };
 
   useEffect(() => {
     const fetchSchool = async () => {
@@ -365,7 +452,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 justifyContent: 'center',
                 border: '1.5px solid rgba(251, 191, 36, 0.3)'
               }}>
-                <QRCode value={user.teacher_qr_token || user.qr_token || ''} size={135} />
+                <QRCode value={localTeacherQrToken || localQrToken || ''} size={135} />
               </div>
             </div>
           </div>
@@ -445,7 +532,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <QRCode value={user.teacher_qr_token || user.qr_token || ''} size={150} />
+                <QRCode value={localTeacherQrToken || localQrToken || ''} size={150} />
               </div>
 
               <p style={{ 
@@ -493,6 +580,42 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         >
           <Download size={24} /> Ausweis als JPEG speichern
         </button>
+
+        {/* Action button for managers to regenerate QR Code */}
+        {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+          <button
+            onClick={handleRegenerateToken}
+            className="google-btn-secondary"
+            style={{
+              width: '100%',
+              padding: '20px',
+              borderRadius: '24px',
+              border: '1.5px solid #fecdd3',
+              background: '#fff1f2',
+              color: '#e11d48',
+              fontWeight: 900,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              marginTop: '16px',
+              boxShadow: '0 15px 35px rgba(225, 29, 72, 0.05)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#ffe4e6';
+              e.currentTarget.style.borderColor = '#fda4af';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#fff1f2';
+              e.currentTarget.style.borderColor = '#fecdd3';
+            }}
+          >
+            🔄 QR-Code sperren &amp; neu generieren
+          </button>
+        )}
       </div>
     </div>
   );

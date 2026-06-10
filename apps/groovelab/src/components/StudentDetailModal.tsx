@@ -159,6 +159,64 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [showTageskompassModal, setShowTageskompassModal] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | undefined>(undefined);
   const [schoolName, setSchoolName] = useState<string>('Campus Musikschule');
+  const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setCurrentUserRole(data.role);
+            }
+          });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    setLocalQrToken(student.qr_token || '');
+  }, [student.qr_token]);
+
+  const handleRegenerateQrToken = async () => {
+    if (!window.confirm('Möchtest du diesen QR-Code wirklich sperren und neu generieren? Der alte Code verliert sofort seine Gültigkeit.')) {
+      return;
+    }
+    
+    let newUuid: string;
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      newUuid = crypto.randomUUID();
+    } else {
+      newUuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ qr_token: newUuid })
+        .eq('id', student.id);
+        
+      if (error) {
+        alert('Fehler beim Sperren/Generieren des QR-Codes: ' + error.message);
+      } else {
+        setLocalQrToken(newUuid);
+        student.qr_token = newUuid;
+        alert('QR-Code erfolgreich neu generiert!');
+      }
+    } catch (err: any) {
+      console.error('Error updating qr_token:', err);
+      alert('Fehler beim Aktualisieren: ' + (err.message || 'Unbekannter Fehler'));
+    }
+  };
 
   useEffect(() => {
     const fetchSchool = async () => {
@@ -1778,7 +1836,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 boxShadow: '0 20px 45px rgba(0,0,0,0.1)',
                 overflow: 'hidden',
                 width: '100%',
-                height: '480px',
+                minHeight: '480px',
+                height: 'auto',
                 border: '1.5px solid #e2e8f0',
                 boxSizing: 'border-box'
               }}>
@@ -1865,6 +1924,43 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   background: `linear-gradient(90deg, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'}, #1e293b, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'})` 
                 }} />
               </div>
+            )}
+
+            {/* Action button for managers to regenerate QR Code */}
+            {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+              <button
+                onClick={handleRegenerateQrToken}
+                className="google-btn-secondary"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 850,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: '#fff1f2',
+                  border: '1.5px solid #fecdd3',
+                  color: '#e11d48',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  marginTop: '20px',
+                  boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
+                  transition: 'all 0.2s',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ffe4e6';
+                  e.currentTarget.style.borderColor = '#fda4af';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#fff1f2';
+                  e.currentTarget.style.borderColor = '#fecdd3';
+                }}
+              >
+                🔄 QR-Code sperren &amp; neu generieren
+              </button>
             )}
 
           </aside>
