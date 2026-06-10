@@ -1461,10 +1461,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       // Fetch pending students (only in anonymized tables)
       const { data: pendingStudents } = await supabase
-        .from('students')
-        .select('id, school_id, teacher_id, instrument, status, created_at, student_names(first_name, last_name), activation_days(day_of_birth)')
-        .eq('school_id', schoolId)
-        .eq('status', 'ausstehend');
+        .from('pending_students_decrypted')
+        .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+        .eq('school_id', schoolId);
 
       // Fetch activation days for student onboarding verification
       const { data: actDays } = await supabase
@@ -1587,10 +1586,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Merge pending students into student list
       if (pendingStudents) {
         pendingStudents.forEach(ps => {
-          const names = Array.isArray(ps.student_names) ? ps.student_names[0] : (ps.student_names as any);
-          const actDay = Array.isArray(ps.activation_days) ? ps.activation_days[0] : (ps.activation_days as any);
-          const fName = names?.first_name || 'Ausstehendes';
-          const lName = names?.last_name || 'Onboarding';
+          const fName = ps.first_name || 'Ausstehendes';
+          const lName = ps.last_name || 'Onboarding';
           const fullName = `${fName} ${lName}`;
           
           map[ps.id] = fullName;
@@ -1610,7 +1607,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             is_groovelab_active: false,
             status: 'inactive',
             isPendingOnboarding: true,
-            day_of_birth: actDay?.day_of_birth || null,
+            day_of_birth: ps.day_of_birth || null,
             ausweis_nummer: 'Ausstehend (Onboarding)',
             created_at: ps.created_at || new Date().toISOString()
           });
