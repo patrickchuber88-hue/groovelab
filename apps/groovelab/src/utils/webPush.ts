@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BFN6dZ9Hw1jW14S1CqP2U_lRND1fM6L1n_N9jV5-d14kL6V14hN1c-N8jV5-d14kL6V14hN1c9jV5-d14kL6V14hN1c'; // Fallback public key
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BAq9l0chUV4DOE58mzN74drPzhGrhE4xSmRcRCc4BRPyDACTIS3qUU-uCce237nw7Lq6CFgGqsIerlvbNAZJhA4'; // Fallback public key
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
