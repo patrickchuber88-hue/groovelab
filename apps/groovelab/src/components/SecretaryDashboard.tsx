@@ -13839,17 +13839,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
                 const moduleCost = activeModulesCount * 4.99;
                 const studentLevyMonthly = (() => {
-                  if (studentBillingOption === 'option1') return students.length * (5.29 / 12);
+                  if (studentBillingOption === 'option1') return 0;
                   if (studentBillingOption === 'option2') return students.length * 0.49;
                   if (studentBillingOption === 'option3_1') return students.length * 0.24;
-                  if (studentBillingOption === 'option3_2') return students.length * (2.59 / 12);
+                  if (studentBillingOption === 'option3_2') return 0;
                   return 0;
                 })();
                 const extraLevyMonthly = (() => {
-                  if (extraBillingOption === 'option1') return bookedExtraUsers * (5.29 / 12);
+                  if (extraBillingOption === 'option1') return 0;
                   if (extraBillingOption === 'option2') return bookedExtraUsers * 0.49;
                   if (extraBillingOption === 'option3_1') return bookedExtraUsers * 0.24;
-                  if (extraBillingOption === 'option3_2') return bookedExtraUsers * (2.59 / 12);
+                  if (extraBillingOption === 'option3_2') return 0;
                   return 0;
                 })();
                 return (
