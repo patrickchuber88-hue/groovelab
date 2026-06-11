@@ -12952,7 +12952,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
 
                               {/* Floor Badge pill */}
-                              <div style={{ display: 'flex', alignItems: 'center', minWidth: '130px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', minWidth: '100px' }}>
                                 <span style={{ 
                                   display: 'flex',
                                   alignItems: 'center',
