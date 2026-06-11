@@ -10909,28 +10909,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       </div>
 
                                       
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setAdHocRoomId(room.id);
-                                          setShowAdHocBooking(true);
-                                        }}
-                                        style={{
-                                          alignSelf: 'flex-start',
-                                          background: 'rgba(52, 168, 83, 0.06)',
-                                          border: '1px dashed rgba(52, 168, 83, 0.25)',
-                                          color: '#137333',
-                                          fontSize: '0.62rem',
-                                          fontWeight: 800,
-                                          padding: '3px 8px',
-                                          borderRadius: '8px',
-                                          cursor: 'pointer',
-                                          marginTop: '2px',
-                                          transition: 'all 0.15s'
-                                        }}
-                                      >
-                                        ➕ Spontan buchen
-                                      </button>
                                     </div>
 
                                     {/* Right timeline grid area */}
