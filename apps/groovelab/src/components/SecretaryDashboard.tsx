@@ -7688,8 +7688,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const tId = sched.teacher_id;
                             if (!groupedPending[tId]) {
                               groupedPending[tId] = {
-                                teacherName: sched.teacher_name,
-                                instrument: sched.instrument || '',
+                                teacherName: sched.teacher_name || 'Unbekannte Lehrkraft',
+                                instrument: '',
                                 days: [],
                                 slotsCount: 0
                               };
