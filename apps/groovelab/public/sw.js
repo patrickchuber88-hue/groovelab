@@ -1,9 +1,38 @@
+const CACHE_NAME = 'groovelab-static-v1';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/pwa-icon.png'
+];
+
 self.addEventListener('install', function(event) {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.addAll(ASSETS_TO_CACHE);
+    }).then(function() {
+      return self.skipWaiting();
+    }).catch(function(err) {
+      console.warn('Pre-caching failed during install:', err);
+      return self.skipWaiting();
+    })
+  );
 });
 
 self.addEventListener('activate', function(event) {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.map(function(cacheName) {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(function() {
+      return clients.claim();
+    })
+  );
 });
 
 self.addEventListener('push', function(event) {
@@ -25,7 +54,7 @@ self.addEventListener('push', function(event) {
         }
       };
       event.waitUntil(
-        self.registration.showNotification(payload.title, options)
+        self.registration.showNotification(payload.title || 'Campus', options)
       );
     } catch (e) {
       console.error('Error parsing push data:', e);
@@ -48,25 +77,34 @@ self.addEventListener('notificationclick', function(event) {
   const supabaseKey = event.notification.data?.supabaseKey;
   const url = event.notification.data?.url || '/';
 
-  // Mark notification as read via direct REST API patch
+  // 1. Immediately focus or open the window
+  const navigationPromise = focusOrOpenWindow(url);
+
+  // 2. Perform DB update in parallel without blocking client response
+  let dbUpdatePromise = Promise.resolve();
   if (notificationId && supabaseUrl && supabaseKey) {
-    event.waitUntil(
-      Promise.all([
-        fetch(`${supabaseUrl}/rest/v1/notifications?id=eq.${notificationId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          },
-          body: JSON.stringify({ is_read: true })
-        }).catch(err => console.error('Error marking notification as read in sw:', err)),
-        focusOrOpenWindow(url)
-      ])
-    );
-  } else {
-    event.waitUntil(focusOrOpenWindow(url));
+    dbUpdatePromise = fetch(`${supabaseUrl}/rest/v1/notifications?id=eq.${notificationId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`
+      },
+      body: JSON.stringify({ is_read: true })
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('PATCH status: ' + res.status);
+      return res;
+    })
+    .catch(function(err) {
+      console.error('Error marking notification as read in sw:', err);
+    });
   }
+
+  // 3. Keep SW active until settled, but do not block UI opening on db latency
+  event.waitUntil(
+    Promise.allSettled([navigationPromise, dbUpdatePromise])
+  );
 });
 
 function focusOrOpenWindow(targetUrl) {
@@ -90,17 +128,60 @@ function focusOrOpenWindow(targetUrl) {
   });
 }
 
-// Add fetch event listener to satisfy PWA installability requirements
 self.addEventListener('fetch', function(event) {
-  // Pass-through to network, can be extended to caching later
+  // Only handle GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(event.request.url);
+
+  // Skip API/Supabase internal traffic
+  if (url.pathname.includes('/rest/v1/') || url.pathname.includes('/functions/v1/')) {
+    return;
+  }
+
+  // Navigate mode (HTML documents) -> Network First with Cache fallback
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(function(response) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, responseClone);
+          });
+          return response;
+        })
+        .catch(function() {
+          return caches.match(event.request).then(function(cachedResponse) {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            });
+          });
+        })
+    );
+    return;
+  }
+
+  // Static assets (CSS, JS, Fonts, Images) -> Stale-While-Revalidate
   event.respondWith(
-    fetch(event.request).catch(function() {
-      // Fallback for document navigation when offline
-      if (event.request.mode === 'navigate') {
-        return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' }
-        });
-      }
+    caches.match(event.request).then(function(cachedResponse) {
+      const fetchPromise = fetch(event.request).then(function(networkResponse) {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return networkResponse;
+      }).catch(function(err) {
+        // Silent logging, as network is offline/slow
+      });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });

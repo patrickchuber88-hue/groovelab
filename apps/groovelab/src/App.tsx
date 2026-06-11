@@ -5979,52 +5979,51 @@ function App() {
       {showInstallBanner && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
+          top: '12px',
           left: '16px',
           right: '16px',
           margin: '0 auto',
-          maxWidth: '420px',
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-          border: '1px solid rgba(255, 255, 255, 0.4)',
-          borderRadius: '20px',
-          padding: '12px 16px',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02)',
+          maxWidth: '440px',
+          background: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '16px',
+          padding: '10px 14px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
           zIndex: 99999,
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+          animation: 'appleAlertScaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
           pointerEvents: 'auto',
           boxSizing: 'border-box'
         }}>
-          {/* App Icon (Apple style rounded rect) */}
+          {/* App Icon (BILD-style red square with white serif text) */}
           <div style={{
             width: '40px',
             height: '40px',
-            borderRadius: '9px',
-            background: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+            borderRadius: '8px',
+            background: '#ef4444',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '1.4rem',
-            boxShadow: '0 4px 10px rgba(34, 197, 94, 0.15)',
+            fontFamily: '"Georgia", "Times New Roman", serif',
+            fontSize: '1.25rem',
+            fontWeight: 950,
+            letterSpacing: '-1px',
+            boxShadow: '0 3px 8px rgba(239, 68, 68, 0.2)',
             flexShrink: 0
           }}>
-            🎓
+            {activePlatform === 'campus' ? 'C' : 'GL'}
           </div>
 
           {/* 2-line Text content */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: 750, color: '#1e293b' }}>
-              Campus App
+            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+              {activePlatform === 'campus' ? 'Campus App' : 'GrooveLab'} installieren
             </span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 550, color: '#64748b', lineHeight: 1.25 }}>
-              {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream 
-                ? 'Teilen-Symbol tippen & "Zum Home-Bildschirm"'
-                : 'Auf Startbildschirm hinzufügen'}
+            <span style={{ fontSize: '0.78rem', fontWeight: 550, color: '#64748b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {typeof window !== 'undefined' ? window.location.hostname : 'groovelab.app'}
             </span>
           </div>
 
@@ -6034,16 +6033,16 @@ function App() {
               <button 
                 onClick={() => setShowInstallGuide(true)}
                 style={{
-                  background: '#16a34a',
-                  color: 'white',
+                  background: '#f1f5f9',
+                  color: '#0f172a',
                   border: 'none',
                   borderRadius: '100px',
                   padding: '6px 14px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
-                  minHeight: '30px'
+                  minHeight: '30px',
+                  transition: 'background 0.2s'
                 }}
                 className="hover-scale"
               >
@@ -6053,35 +6052,35 @@ function App() {
               <button 
                 onClick={handleInstallPWA}
                 style={{
-                  background: '#16a34a',
-                  color: 'white',
+                  background: '#f1f5f9',
+                  color: '#0f172a',
                   border: 'none',
                   borderRadius: '100px',
                   padding: '6px 14px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
-                  minHeight: '30px'
+                  minHeight: '30px',
+                  transition: 'background 0.2s'
                 }}
                 className="hover-scale"
               >
-                Laden
+                Installieren
               </button>
             ) : (
               <button 
                 onClick={() => setShowInstallGuide(true)}
                 style={{
-                  background: '#16a34a',
-                  color: 'white',
+                  background: '#f1f5f9',
+                  color: '#0f172a',
                   border: 'none',
                   borderRadius: '100px',
                   padding: '6px 14px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
-                  minHeight: '30px'
+                  minHeight: '30px',
+                  transition: 'background 0.2s'
                 }}
                 className="hover-scale"
               >
@@ -6091,11 +6090,11 @@ function App() {
             <button 
               onClick={handleDismissInstall}
               style={{
-                background: 'rgba(0,0,0,0.04)',
+                background: 'transparent',
                 border: 'none',
-                color: '#64748b',
-                width: '30px',
-                height: '30px',
+                color: '#94a3b8',
+                width: '24px',
+                height: '24px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',

@@ -5535,7 +5535,7 @@ export function TeacherDashboard({
                                                 <span style={{ fontWeight: 750, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                   {slot.student?.name}
                                                 </span>
-                                                <span style={{ color: '#86868b', fontSize: '0.75rem', fontWeight: 500 }}>
+                                                <span style={{ color: '#86868b', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
                                                   ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
                                                 </span>
                                                 {!isCanceled && matchRem && (
@@ -5546,7 +5546,8 @@ export function TeacherDashboard({
                                                     marginLeft: '8px',
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
-                                                    gap: '4px'
+                                                    gap: '4px',
+                                                    whiteSpace: 'nowrap'
                                                   }}>
                                                     ➔ {matchRem.weekdayShort}. {matchRem.dateStr}.
                                                   </span>
