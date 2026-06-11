@@ -9527,14 +9527,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     
                                     // Construct mail components
                                     const emailRecipient = emp.email || '';
-                                    const subject = encodeURIComponent('🎓 Campus Mitarbeiter Login');
+                                    const subject = encodeURIComponent('Dein Campus-Mitarbeiterzugang 🎓');
                                     const body = encodeURIComponent(
                                       `Hallo ${emp.first_name || 'Mitarbeiter(in)'},\n\n` +
-                                      `willkommen im GrooveLab-Team!\n\n` +
+                                      `willkommen im Campus-Team!\n\n` +
                                       `Dein persönlicher Mitarbeiter-PIN für die Anmeldung und Profilverknüpfung lautet:\n` +
                                       `👉 ${emp.ausweis_nummer}\n\n` +
                                       `(Die PIN wurde soeben auch in deine Zwischenablage kopiert)\n\n` +
-                                      `Damit kannst du dich auf der Plattform anmelden oder dein Profil mit der App verknüpfen.\n\n` +
+                                      `Damit kannst du dich auf dem Campus-Portal anmelden oder dein Profil verknüpfen.\n\n` +
                                       `Viele Grüße,\n` +
                                       `Musikschule Bad Säckingen`
                                     );
