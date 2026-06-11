@@ -1932,6 +1932,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           sonstiges: r.sonstiges || localSonstiges
         };
       });
+      mappedRooms.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de-DE', { numeric: true, sensitivity: 'base' }));
       setRooms(mappedRooms);
       if (mappedRooms.length > 0 && !selectedRoomId) {
         setSelectedRoomId(mappedRooms[0].id);
@@ -10928,9 +10929,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
                                         {room.name}
                                       </strong>
-                                      <span style={{ fontSize: '0.6rem', color: draggedPlanId && !isCompatible ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
-                                        {draggedPlanId && !isCompatible ? '⚠️ Nicht geeignet' : (room.equipment?.join(' · ') || 'Alle Instrumente')}
-                                      </span>
+                                      {draggedPlanId && !isCompatible && (
+                                        <span style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: 600 }}>
+                                          ⚠️ Nicht geeignet
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                   {[1,2,3,4,5,6,7].map(dayNum => {
