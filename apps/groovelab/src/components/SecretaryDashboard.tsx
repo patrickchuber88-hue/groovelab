@@ -1269,6 +1269,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [editingEquipmentGroup, setEditingEquipmentGroup] = useState<any | null>(null);
   const [editGroupName, setEditGroupName] = useState<string>('');
   const [editGroupModel, setEditGroupModel] = useState<string>('');
+  const [editGroupLink, setEditGroupLink] = useState<string>('');
   const [editGroupCoupled, setEditGroupCoupled] = useState<boolean>(true);
   const [editGroupInstancesData, setEditGroupInstancesData] = useState<any[]>([]);
   // Helpers
@@ -6111,14 +6112,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     try {
       // Load global model mapping
       let localModelMap: Record<string, string> = {};
+      let localLinkMap: Record<string, string> = {};
       try {
         localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+      } catch {}
+      try {
+        localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
       } catch {}
 
       if (editGroupCoupled) {
         // SCENARIO A: Coupled (all exemplars have the same name and model)
         const newBaseName = editGroupName.trim();
         const newModel = editGroupModel.trim();
+        const newLink = editGroupLink.trim();
         
         // Prepare renaming map and array of updates
         const updatedInstances = editingEquipmentGroup.instances.map((inst: any, idx: number) => {
@@ -6136,6 +6142,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         for (const inst of updatedInstances) {
           await supabase.from('school_equipment').update({ name: inst.newName }).eq('id', inst.id);
           localModelMap[inst.newName] = newModel;
+          if (newLink) {
+            localLinkMap[inst.newName] = newLink;
+          } else {
+            delete localLinkMap[inst.newName];
+          }
         }
 
         // 2. Update local state
@@ -6169,6 +6180,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         for (const inst of editGroupInstancesData) {
           await supabase.from('school_equipment').update({ name: inst.fullName.trim() }).eq('id', inst.id);
           localModelMap[inst.fullName.trim()] = inst.model.trim();
+          if (inst.linkUrl && inst.linkUrl.trim()) {
+            localLinkMap[inst.fullName.trim()] = inst.linkUrl.trim();
+          } else {
+            delete localLinkMap[inst.fullName.trim()];
+          }
         }
 
         // 2. Update local state
@@ -6198,8 +6214,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         }
       }
 
-      // Save model mapping to localStorage
+      // Save model mapping and links to localStorage
       localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
+      localStorage.setItem(`groovelab_instrument_links_${schoolId}`, JSON.stringify(localLinkMap));
       setEditingEquipmentGroup(null);
     } catch (e: any) {
       console.error('Equipment group save error:', e);
@@ -14146,6 +14163,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             model = roomInst?.model;
                           }
                         }
+                        let linkUrl = '';
+                        try {
+                          const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+                          if (localLinkMap[eq.name]) {
+                            linkUrl = localLinkMap[eq.name];
+                          }
+                        } catch {}
                         const baseName = eq.name.replace(/\s+#\d+$/, '');
 
                         return {
@@ -14153,6 +14177,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           fullName: eq.name,
                           baseName,
                           model,
+                          linkUrl,
                           roomId: assignedRm?.id || null,
                           roomName: assignedRm?.name || null,
                           roomInstIdx: assignedRm ? assignedRm.room_instruments.findIndex((inst: any) => inst.name === eq.name) : -1
@@ -14230,6 +14255,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               setEditingEquipmentGroup(group);
                               setEditGroupName(group.baseName);
                               setEditGroupModel(group.model);
+                              setEditGroupLink(group.instances[0]?.linkUrl || '');
                               setEditGroupCoupled(true);
                               setEditGroupInstancesData(group.instances.map(inst => ({ ...inst })));
                             }}
@@ -14254,8 +14280,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               {/* Horizontal wrapper for name/model and locations */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1e293b' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {group.baseName}
+                                    {group.instances[0]?.linkUrl && (
+                                      <a 
+                                        href={group.instances[0].linkUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ display: 'inline-flex', alignItems: 'center', color: '#0b57d0' }}
+                                        title="Instrument online ansehen"
+                                      >
+                                        <LinkIcon size={12} />
+                                      </a>
+                                    )}
                                   </span>
                                   <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 800 }}>
                                     Modell: {group.model} ({group.instances.length})
@@ -14501,6 +14539,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
                             />
                           </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Link / Webseite (optional)</span>
+                            <input
+                              value={editGroupLink}
+                              onChange={e => setEditGroupLink(e.target.value)}
+                              placeholder="https://example.com/instrument-info"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                            />
+                          </div>
                         </>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -14527,6 +14575,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     const val = e.target.value;
                                     setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, model: val } : p));
                                   }}
+                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Link / Webseite (optional)</span>
+                                <input
+                                  value={inst.linkUrl || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, linkUrl: val } : p));
+                                  }}
+                                  placeholder="https://example.com/..."
                                   style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
                                 />
                               </div>
