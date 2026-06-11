@@ -1256,6 +1256,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [equipmentFormName, setEquipmentFormName] = useState('');
   const [editingEquipment, setEditingEquipment] = useState<any | null>(null);
   const [equipmentSaving, setEquipmentSaving] = useState(false);
+  const [selectedEquipmentRoomId, setSelectedEquipmentRoomId] = useState<string>('All');
+  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
@@ -1810,10 +1812,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         .select('*')
         .eq('school_id', schoolId);
 
-      const mappedRooms = (roomsData || []).map(r => ({
-        ...r,
-        equipment: r.allowed_instruments || []
-      }));
+      const mappedRooms = (roomsData || []).map(r => {
+        const localUnsuitable = (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+            return map[r.id] || [];
+          } catch { return []; }
+        })();
+        const localInstruments = (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+            return map[r.id] || [];
+          } catch { return []; }
+        })();
+        const localSonstiges = (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
+            return map[r.id] || '';
+          } catch { return ''; }
+        })();
+
+        return {
+          ...r,
+          equipment: r.allowed_instruments || [],
+          unsuitable_instruments: r.unsuitable_instruments || localUnsuitable,
+          room_instruments: r.room_instruments || localInstruments,
+          sonstiges: r.sonstiges || localSonstiges
+        };
+      });
       setRooms(mappedRooms);
       if (mappedRooms.length > 0 && !selectedRoomId) {
         setSelectedRoomId(mappedRooms[0].id);
@@ -6082,6 +6108,92 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
+  const handleDropInstrumentOnRoom = async (instrumentName: string, roomId: string) => {
+    const targetRoom = rooms.find(r => r.id === roomId);
+    if (!targetRoom) return;
+
+    const currentInsts = Array.isArray(targetRoom.room_instruments) 
+      ? targetRoom.room_instruments 
+      : (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+            return map[roomId] || [];
+          } catch { return []; }
+        })();
+
+    const updatedInsts = [...currentInsts, { name: instrumentName, model: 'Standard' }];
+
+    // Update LocalStorage first
+    try {
+      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+      map[roomId] = updatedInsts;
+      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Update state
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
+
+    // Update Supabase
+    try {
+      const { error } = await supabase.from('rooms').update({
+        room_instruments: updatedInsts
+      }).eq('id', roomId);
+
+      if (error && error.message.includes("room_instruments")) {
+        console.warn("Supabase room_instruments column missing, using local storage fallback.");
+      } else if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      console.error("Error saving room instruments:", err);
+    }
+  };
+
+  const handleRemoveRoomInstrument = async (roomId: string, idxToRemove: number) => {
+    const targetRoom = rooms.find(r => r.id === roomId);
+    if (!targetRoom) return;
+
+    const currentInsts = Array.isArray(targetRoom.room_instruments) 
+      ? targetRoom.room_instruments 
+      : (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+            return map[roomId] || [];
+          } catch { return []; }
+        })();
+
+    const updatedInsts = currentInsts.filter((_: any, idx: number) => idx !== idxToRemove);
+
+    // Update LocalStorage first
+    try {
+      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+      map[roomId] = updatedInsts;
+      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Update state
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
+
+    // Update Supabase
+    try {
+      const { error } = await supabase.from('rooms').update({
+        room_instruments: updatedInsts
+      }).eq('id', roomId);
+
+      if (error && error.message.includes("room_instruments")) {
+        console.warn("Supabase room_instruments column missing, using local storage fallback.");
+      } else if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      console.error("Error removing room instrument:", err);
+    }
+  };
+
   const getTabTitle = () => {
     switch (activeTab) {
       case 'secretary':
@@ -6763,7 +6875,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit')) && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -12956,6 +13068,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 550, fontFamily: 'Inter' }}>qm</span>
                                     </div>
                                   </div>
+                                  {Array.isArray(room.room_instruments) && room.room_instruments.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                                      {room.room_instruments.map((inst: any, idx: number) => (
+                                        <span key={idx} style={{ fontSize: '0.65rem', fontWeight: 750, padding: '2px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontFamily: 'Urbanist' }}>
+                                          🎹 {inst.name} {inst.model ? `(${inst.model})` : ''}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -13726,79 +13847,250 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         {/* TAB 1.7.5: SECRETARY - EQUIPMENT */}
 
-        {activeTab === 'secretary' && secretarySubTab === 'equipment' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
-            {/* Header */}
-            <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Settings size={20} color="#0b57d0" /> Instrumente & Ausstattung
-                </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
-                  Definiere die Ausstattungsmerkmale (Instrumente, Equipment), die Räumen und Lehrern zugewiesen werden können.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
-              {/* Form */}
-              <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '28px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Edit3 size={16} color="#0b57d0" /> {editingEquipment ? `„${editingEquipment.name}" bearbeiten` : 'Neue Ausstattung anlegen'}
-                </h4>
-
-                <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Name der Ausstattung *</label>
-                  <input
-                    value={equipmentFormName}
-                    onChange={e => setEquipmentFormName(e.target.value)}
-                    placeholder='z.B. „Schlagzeug" oder „Beamer"'
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
-                  />
+        {activeTab === 'secretary' && secretarySubTab === 'equipment' && (() => {
+          const selectedRoom = rooms.find(r => r.id === selectedEquipmentRoomId);
+          
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
+              
+              {/* LEFT COLUMN: WIDGET */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* Selected Room Header or Title */}
+                <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {selectedRoom ? `🏢 Instrumente in „${selectedRoom.name}“` : '🎸 Alle Instrumente & Ausstattungen'}
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+                    {selectedRoom 
+                      ? 'Hier siehst du alle diesem Raum zugeordneten Instrumente. Ziehe Instrumente aus dem Pool unten hinein oder lösche sie.'
+                      : 'Verwalte den globalen Instrumentenpool. Ziehe Instrumente per Drag & Drop auf die Räume in der Sidebar, um sie zuzuweisen.'
+                    }
+                  </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                  <button
-                    onClick={handleSaveEquipment}
-                    disabled={equipmentSaving || !equipmentFormName.trim()}
-                    style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer', opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1, transition: 'all 0.2s' }}
-                  >
-                    {equipmentSaving ? 'Speichert…' : editingEquipment ? '💾 Änderungen speichern' : '+ Ausstattung anlegen'}
-                  </button>
-                  {editingEquipment && (
-                    <button onClick={() => openEquipmentEditor(null)} style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
-                      Abbrechen
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Existing Equipment list */}
-              <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <h5 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Alle Ausstattungen ({schoolEquipment.length})</h5>
-                  <button onClick={() => openEquipmentEditor(null)} style={{ background: '#0b57d0', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '8px', fontWeight: 800, fontSize: '0.65rem', cursor: 'pointer' }}>
-                    + Neu
-                  </button>
-                </div>
-                {schoolEquipment.map(eq => (
-                  <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '10px', border: editingEquipment?.id === eq.id ? '1.5px solid #0b57d0' : '1px solid #f1f5f9', background: editingEquipment?.id === eq.id ? '#eff6ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => openEquipmentEditor(eq)}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{eq.name}</span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={(e) => { e.stopPropagation(); openEquipmentEditor(eq); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#0b57d0' }}>
-                        <Edit3 size={13} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
-                        <Trash2 size={13} />
-                      </button>
+                {/* If a room is selected, show its assigned instruments list */}
+                {selectedRoom && (
+                  <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zugeordnete Instrumente ({selectedRoom.room_instruments?.length || 0})</h4>
+                    
+                    {/* Drop Zone inside selected room container */}
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverRoomId(selectedRoom.id);
+                      }}
+                      onDragLeave={() => setDragOverRoomId(null)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const instName = e.dataTransfer.getData("text/plain");
+                        setDragOverRoomId(null);
+                        if (instName) {
+                          await handleDropInstrumentOnRoom(instName, selectedRoom.id);
+                        }
+                      }}
+                      style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: dragOverRoomId === selectedRoom.id ? '2px dashed #0b57d0' : '2px dashed #cbd5e1',
+                        background: dragOverRoomId === selectedRoom.id ? '#eff6ff' : '#f8fafc',
+                        textAlign: 'center',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: dragOverRoomId === selectedRoom.id ? '#0b57d0' : '#64748b',
+                        transition: 'all 0.2s',
+                        marginBottom: '10px'
+                      }}
+                    >
+                      {dragOverRoomId === selectedRoom.id ? '✨ Loslassen zum Hinzufügen!' : '📥 Instrument hierhin ziehen zum Hinzufügen'}
                     </div>
+
+                    {(!selectedRoom.room_instruments || selectedRoom.room_instruments.length === 0) ? (
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', fontWeight: 600 }}>In diesem Raum sind noch keine Instrumente vorhanden.</p>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        {selectedRoom.room_instruments.map((inst: any, idx: number) => (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between', 
+                              padding: '10px 14px', 
+                              borderRadius: '12px', 
+                              border: '1px solid #f1f5f9', 
+                              background: '#f8fafc' 
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>🎹 {inst.name}</span>
+                              <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700 }}>{inst.model || 'Standard'}</span>
+                            </div>
+                            <button 
+                              onClick={() => handleRemoveRoomInstrument(selectedRoom.id, idx)}
+                              style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer', padding: '4px' }}
+                            >
+                              Entfernen
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-                {schoolEquipment.length === 0 && <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '16px 0' }}>Noch keine Ausstattung</p>}
+                )}
+
+                {/* Global Instrumenten-Pool Widget */}
+                <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {selectedRoom ? 'Verfügbare Instrumente (Drag & Drop)' : `Instrumentenpool (${schoolEquipment.length})`}
+                    </h4>
+                  </div>
+
+                  {/* Inline creation form */}
+                  <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1' }}>
+                    <input
+                      value={equipmentFormName}
+                      onChange={e => setEquipmentFormName(e.target.value)}
+                      placeholder='Neues Instrument anlegen (z.B. „Schlagzeug“)'
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }}
+                    />
+                    <button
+                      onClick={handleSaveEquipment}
+                      disabled={equipmentSaving || !equipmentFormName.trim()}
+                      style={{ padding: '8px 16px', background: '#0b57d0', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '0.74rem', cursor: 'pointer', opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1 }}
+                    >
+                      Anlegen
+                    </button>
+                  </div>
+
+                  {/* Instruments tags grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '4px' }}>
+                    {schoolEquipment.map(eq => (
+                      <div 
+                        key={eq.id} 
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", eq.name);
+                          e.dataTransfer.effectAllowed = "copyMove";
+                        }}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          padding: '10px 14px', 
+                          borderRadius: '12px', 
+                          border: '1.5px solid #e2e8f0', 
+                          background: 'white', 
+                          cursor: 'grab', 
+                          transition: 'all 0.15s' 
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155' }}>🎸 {eq.name}</span>
+                        {!selectedRoom && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} 
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {schoolEquipment.length === 0 && (
+                      <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '12px 0' }}>Noch keine Instrumente im Pool</p>
+                    )}
+                  </div>
+                </div>
+
               </div>
+
+              {/* RIGHT COLUMN: SIDEBAR */}
+              <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Räume der Musikschule</h4>
+                
+                {/* Alle Räume Sidebar Row */}
+                <div 
+                  onClick={() => setSelectedEquipmentRoomId('All')}
+                  style={{ 
+                    padding: '12px 14px', 
+                    borderRadius: '12px', 
+                    cursor: 'pointer', 
+                    background: selectedEquipmentRoomId === 'All' ? '#eff6ff' : '#f8fafc',
+                    border: selectedEquipmentRoomId === 'All' ? '1.5px solid #0b57d0' : '1px solid #f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: selectedEquipmentRoomId === 'All' ? '#0b57d0' : '#1e293b' }}>
+                    🏢 Alle Räume
+                  </span>
+                </div>
+
+                {/* Rooms List */}
+                {rooms.map(rm => {
+                  const isSelected = selectedEquipmentRoomId === rm.id;
+                  const isDragOver = dragOverRoomId === rm.id;
+                  
+                  return (
+                    <div 
+                      key={rm.id}
+                      onClick={() => setSelectedEquipmentRoomId(rm.id)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverRoomId(rm.id);
+                      }}
+                      onDragLeave={() => setDragOverRoomId(null)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const instName = e.dataTransfer.getData("text/plain");
+                        setDragOverRoomId(null);
+                        if (instName) {
+                          await handleDropInstrumentOnRoom(instName, rm.id);
+                        }
+                      }}
+                      style={{ 
+                        padding: '12px 14px', 
+                        borderRadius: '12px', 
+                        cursor: 'pointer', 
+                        background: isSelected ? '#eff6ff' : isDragOver ? '#f0fdf4' : '#f8fafc',
+                        border: isSelected ? '1.5px solid #0b57d0' : isDragOver ? '2px dashed #22c55e' : '1px solid #f1f5f9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isSelected ? '#0b57d0' : '#1e293b' }}>
+                          🚪 {rm.name}
+                        </span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#86868b', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>
+                          {rm.floor || 'Allgemein'}
+                        </span>
+                      </div>
+                      
+                      {/* Short summary of configured instruments */}
+                      {rm.room_instruments && rm.room_instruments.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+                          {rm.room_instruments.map((inst: any, idx: number) => (
+                            <span key={idx} style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 650, background: 'white', padding: '1px 4px', borderRadius: '3px', border: '1px solid #e2e8f0' }}>
+                              {inst.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 1.8: SECRETARY - SETUP */}
 
