@@ -10907,9 +10907,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                           </span>
                                         )}
                                       </div>
-                                      <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                        🎸 {room.allowed_instruments?.join(' · ') || room.equipment?.join(' · ') || 'Alle Instrumente'}
-                                      </span>
+
                                       
                                       <button
                                         type="button"
