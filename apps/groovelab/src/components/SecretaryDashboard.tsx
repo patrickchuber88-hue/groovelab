@@ -13841,7 +13841,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 Abrechnung &amp; Infrastruktur
               </h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Verwalte deine lizenzierten Module und buche zusätzliche Benutzerkontingente.
+                Verwalte deine aktiven Module und buche zusätzliche Schülerzugänge.
               </p>
 
               {(() => {
@@ -13899,7 +13899,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         {/* Card 1: Gebuchte Module */}
                         <div style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lizenzierte Module</span>
+                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Module</span>
                           
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                             {/* Campus */}
@@ -14160,10 +14160,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       </div>
                                     </div>
 
-                                    {/* Extra-User Lizenzen (Separate Position) */}
+                                    {/* Extra-User (Separate Position) */}
                                     <div style={{ background: '#f5f3ff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ddd6fe', marginTop: '2px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6d28d9', fontWeight: 700 }}>
-                                        <span>• Extra-User Lizenzen:</span>
+                                        <span>• Extra-User (Zusatzbuchung):</span>
                                         <strong>
                                           {(schoolShareBookedExtra + extraLevyMonthly).toFixed(2)} €
                                           {(schoolShareAdditional + extraLevyMonthlyAdditional) > 0 && (
@@ -14921,7 +14921,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div>
                                 <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
                                 <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                                  Abrechnungsjahr: {inv.year} | B2B (Schule): {inv.b2b.toFixed(2).replace('.', ',')} € | B2C (Schüler): {inv.b2c.toFixed(2).replace('.', ',')} € | Extra-User Lizenzen: {inv.extra.toFixed(2).replace('.', ',')} €
+                                  Abrechnungsjahr: {inv.year} | B2B (Schule): {inv.b2b.toFixed(2).replace('.', ',')} € | B2C (Schüler): {inv.b2c.toFixed(2).replace('.', ',')} € | Zusätzliche Schüler: {inv.extra.toFixed(2).replace('.', ',')} €
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
