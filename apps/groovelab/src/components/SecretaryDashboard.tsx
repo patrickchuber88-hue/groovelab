@@ -12253,14 +12253,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {isExpanded && (
                                     <div style={{ padding: '8px 12px 12px 12px', background: '#f2f2f7', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                       <div style={{ border: '1px solid #d1d1d6', borderRadius: '10px', overflow: 'hidden', background: '#ffffff' }}>
-                                        {data.blocks.map((block, idx) => (
+                                        {[...data.blocks]
+                                          .sort((a, b) => {
+                                            if (a.dayOfWeek !== b.dayOfWeek) {
+                                              return a.dayOfWeek - b.dayOfWeek;
+                                            }
+                                            return (a.startTime || '').localeCompare(b.startTime || '');
+                                          })
+                                          .map((block, idx, sortedArr) => (
                                           <div 
                                             key={block.id}
                                             draggable
                                             onDragStart={() => handleDragStartMatrix(block.id)}
                                             style={{
                                               background: '#ffffff',
-                                              borderBottom: idx < data.blocks.length - 1 ? '1px solid #e5e5ea' : 'none',
+                                              borderBottom: idx < sortedArr.length - 1 ? '1px solid #e5e5ea' : 'none',
                                               padding: '10px 12px',
                                               cursor: 'grab',
                                               display: 'flex',
