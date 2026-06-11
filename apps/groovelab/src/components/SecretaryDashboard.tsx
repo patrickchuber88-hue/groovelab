@@ -14516,7 +14516,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         zIndex: 5
                       }}>
                         <path
-                          d="M 75,0 L 75,65 L 37.5,65 L 37.5,0"
+                          d="M 87.5,0 L 87.5,65 L 37.5,65 L 37.5,0"
                           fill="none"
                           stroke="#7c3aed"
                           strokeWidth="2"
