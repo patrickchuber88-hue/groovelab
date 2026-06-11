@@ -14555,7 +14555,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Exemplare einzeln bearbeiten</span>
                           {editGroupInstancesData.map((inst, idx) => (
                             <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>Exemplar #{idx + 1}</span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>{inst.fullName || `Exemplar #${idx + 1}`}</span>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Name</span>
                                 <input
