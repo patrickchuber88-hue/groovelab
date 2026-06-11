@@ -13828,7 +13828,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="google-card" style={{ paddingLeft: '44px' }}>
               <div className="google-kpi-bar bg-google-red" />
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800 }}>🎫 Abrechnung &amp; Infrastruktur</h3>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800 }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '8px' }}>🎫</span>Abrechnung &amp; Infrastruktur</h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b' }}>
                 Verwalte deine lizenzierten Module und buche zusätzliche Benutzerkontingente.
               </p>
@@ -13863,7 +13863,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>
                           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🏫</span> Bereich Musikschule (B2B)
+                            <span style={{ filter: 'grayscale(1)', opacity: 0.8 }}>🏫</span> Bereich Musikschule (B2B)
                           </h4>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Grundgebühren &amp; Infrastruktur für Mitarbeiter</span>
                         </div>
@@ -13871,11 +13871,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Widgets: Verwaltung & Lehrer */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                           <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>💼 Verwaltung</span>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '4px' }}>💼</span>Verwaltung</span>
                             <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{employees.length} User</strong>
                           </div>
                           <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>🧑‍🏫 Lehrer</span>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '4px' }}>🧑‍🏫</span>Lehrer</span>
                             <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{allTeachers.length} User</strong>
                           </div>
                         </div>
@@ -13901,7 +13901,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                  <strong style={{ fontSize: '0.78rem', color: '#1e293b', display: 'block' }}>🎓 Campus</strong>
+                                  <strong style={{ fontSize: '0.78rem', color: '#1e293b', display: 'block' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '4px' }}>🎓</span>Campus</strong>
                                   <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Verwaltung</span>
                                 </div>
                                 <input 
@@ -13933,7 +13933,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                  <strong style={{ fontSize: '0.78rem', color: '#1e293b', display: 'block' }}>🎸 GrooveLab</strong>
+                                  <strong style={{ fontSize: '0.78rem', color: '#1e293b', display: 'block' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '4px' }}>🎸</span>GrooveLab</strong>
                                   <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Übe-App</span>
                                 </div>
                                 <input 
@@ -14101,14 +14101,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '8px' }}>
                           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#6b21a8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>👥</span> Bereich Schüler (B2C)
+                            <span style={{ filter: 'grayscale(1)', opacity: 0.8 }}>👥</span> Bereich Schüler (B2C)
                           </h4>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Umlage &amp; Finanzierung durch Schüler</span>
                         </div>
 
                         {/* Widget: Schüler */}
                         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>👥 Schüler</span>
+                          <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '4px' }}>👥</span>Schüler</span>
                           <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{students.length} Schüler</strong>
                         </div>
 
@@ -14166,7 +14166,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <strong style={{ fontSize: '0.72rem', color: '#1e293b' }}>{opt.emoji} {opt.title}</strong>
+                                  <strong style={{ fontSize: '0.72rem', color: '#1e293b' }}><span style={{ filter: 'grayscale(1)', opacity: 0.8, marginRight: '6px' }}>{opt.emoji}</span>{opt.title}</strong>
                                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                                     {(() => {
                                       const isDiscount = opt.badge.includes('Rabatt');
