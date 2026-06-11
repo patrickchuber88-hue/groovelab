@@ -1298,6 +1298,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
   const [sidebarTeacherSearch, setSidebarTeacherSearch] = useState<string>('');
   const [expandedSidebarTeacherId, setExpandedSidebarTeacherId] = useState<string | null>(null);
+  const [selectedFilterTeacherId, setSelectedFilterTeacherId] = useState<string | null>(null);
 
   // Räume-Verwaltung State
   const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
@@ -10875,7 +10876,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 700 }}>↓ in Raum ziehen</span>
                               </td>
                               {[1,2,3,4,5,6,7].map(dayNum => {
-                                const unassigned = matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === dayNum);
+                                const unassigned = matrixAllocations.filter(p => {
+                                  if (p.roomId) return false;
+                                  if (p.dayOfWeek !== dayNum) return false;
+                                  if (selectedFilterTeacherId && p.teacherId !== selectedFilterTeacherId) return false;
+                                  return true;
+                                });
                                 return (
                                   <td
                                     key={dayNum}
@@ -12145,14 +12151,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {/* "Alle Lehrer" Button */}
+                            <button
+                              onClick={() => {
+                                setSelectedFilterTeacherId(null);
+                                setExpandedSidebarTeacherId(null);
+                              }}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid',
+                                borderColor: selectedFilterTeacherId === null ? '#f59e0b' : '#e2e8f0',
+                                background: selectedFilterTeacherId === null ? '#fffbeb' : '#ffffff',
+                                color: selectedFilterTeacherId === null ? '#b45309' : '#334155',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <span>👥 Alle Lehrer anzeigen</span>
+                              <span style={{ fontSize: '0.65rem', background: selectedFilterTeacherId === null ? '#fde68a' : '#f1f5f9', padding: '2px 6px', borderRadius: '6px', color: '#64748b' }}>
+                                {unassigned.length}
+                              </span>
+                            </button>
+
                             {filteredTeachers.map(([tId, data]) => {
+                              const isSelected = selectedFilterTeacherId === tId;
                               const isExpanded = expandedSidebarTeacherId === tId;
                               return (
                                 <div 
                                   key={tId} 
                                   style={{ 
-                                    background: isExpanded ? '#f8fafc' : 'white', 
-                                    border: isExpanded ? '1px solid #cbd5e1' : '1px solid #e2e8f0', 
+                                    background: isSelected ? '#fffbeb' : (isExpanded ? '#f8fafc' : 'white'), 
+                                    border: isSelected ? '1px solid #f59e0b' : (isExpanded ? '1px solid #cbd5e1' : '1px solid #e2e8f0'), 
                                     borderRadius: '14px', 
                                     overflow: 'hidden',
                                     transition: 'all 0.15s'
@@ -12160,22 +12196,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 >
                                   {/* Accordion Header */}
                                   <div 
-                                    onClick={() => setExpandedSidebarTeacherId(isExpanded ? null : tId)}
+                                    onClick={() => {
+                                      setSelectedFilterTeacherId(isSelected ? null : tId);
+                                      setExpandedSidebarTeacherId(isExpanded ? null : tId);
+                                    }}
                                     style={{ 
                                       padding: '10px 12px', 
                                       cursor: 'pointer', 
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
-                                      background: isExpanded ? '#f1f5f9' : 'transparent',
+                                      background: isSelected ? '#fffbeb' : (isExpanded ? '#f1f5f9' : 'transparent'),
                                       borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none'
                                     }}
                                   >
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{data.teacherName}</span>
-                                      <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>{data.instrument}</span>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isSelected ? '#b45309' : '#0f172a' }}>{data.teacherName}</span>
+                                      <span style={{ fontSize: '0.62rem', color: isSelected ? '#d97706' : '#64748b', fontWeight: 700 }}>{data.instrument}</span>
                                     </div>
-                                    <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#1d4ed8', fontWeight: 900, padding: '2px 8px', borderRadius: '8px' }}>
+                                    <span style={{ fontSize: '0.65rem', background: isSelected ? '#fde68a' : '#eff6ff', color: isSelected ? '#b45309' : '#1d4ed8', fontWeight: 900, padding: '2px 8px', borderRadius: '8px' }}>
                                       {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
                                     </span>
                                   </div>
