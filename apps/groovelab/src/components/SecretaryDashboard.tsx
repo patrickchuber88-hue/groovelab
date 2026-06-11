@@ -13956,6 +13956,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
                           const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
                           const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
+                          const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
                           
                           // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
                           const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
@@ -14038,9 +14039,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       );
                                     })()}
                                   </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px', opacity: (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') ? 1 : 0.4 }}>
+                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px', opacity: isAnnual ? 1 : 0.4 }}>
                                     <span>• Schüler-Jahrespauschale</span>
                                     <span>• Wird 1× jährlich eingezogen</span>
+                                    {isAnnual && (
+                                      <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', fontWeight: 700, marginTop: '4px' }}>
+                                        ◀ fließt aus B2C Schüler-Modul ein
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
@@ -14090,7 +14096,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         <strong>{(studentLevyMonthly + extraLevyMonthly).toFixed(2)} €</strong>
                                       </div>
                                       <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', textAlign: 'right', fontWeight: 700, marginTop: '-2px' }}>
-                                        ◀ fließt aus B2C Schüler-Modul ein
+                                        {!isAnnual && '◀ fließt aus B2C Schüler-Modul ein'}
                                       </span>
                                     </div>
                                     <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '2.5px', marginTop: '2.5px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.66rem', color: '#15803d' }}>
