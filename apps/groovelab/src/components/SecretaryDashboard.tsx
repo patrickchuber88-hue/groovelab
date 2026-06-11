@@ -10912,18 +10912,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               
                               let isCompatible = true;
                               if (draggedPlan && draggedPlan.instrument) {
-                                const instrLower = draggedPlan.instrument.toLowerCase();
-                                const roomNameLower = room.name.toLowerCase();
-                                const eq = room.allowed_instruments || room.equipment || [];
-                                const eqLower = eq.map((e: string) => e.toLowerCase());
-
-                                if (instrLower.includes('schlagzeug') || instrLower.includes('drums') || instrLower.includes('drum')) {
-                                  isCompatible = eqLower.includes('drums') || eqLower.includes('schlagzeug') || eqLower.includes('drum') || 
-                                                 roomNameLower.includes('schlagzeug') || roomNameLower.includes('drums') || roomNameLower.includes('band') || roomNameLower.includes('drum');
-                                } else if (instrLower.includes('klavier') || instrLower.includes('piano') || instrLower.includes('flügel') || instrLower.includes('keys') || instrLower.includes('keyboard')) {
-                                  isCompatible = eqLower.includes('piano') || eqLower.includes('klavier') || eqLower.includes('keys') || eqLower.includes('keyboard') ||
-                                                 roomNameLower.includes('klavier') || roomNameLower.includes('piano') || roomNameLower.includes('flügel') || roomNameLower.includes('keyboard') || roomNameLower.includes('keys');
-                                }
+                                const unsuitable = room.unsuitable_instruments || (() => {
+                                  try {
+                                    const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                    return map[room.id] || [];
+                                  } catch { return []; }
+                                })();
+                                isCompatible = !unsuitable.some((inst: string) => inst.toLowerCase() === draggedPlan.instrument.toLowerCase());
                               }
 
                               return (
