@@ -9527,7 +9527,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     
                                     // Construct mail components
                                     const emailRecipient = emp.email || '';
-                                    const subject = encodeURIComponent('Dein GrooveLab Mitarbeiter-Zugang 🎸');
+                                    const subject = encodeURIComponent('🎓 Campus Mitarbeiter Login');
                                     const body = encodeURIComponent(
                                       `Hallo ${emp.first_name || 'Mitarbeiter(in)'},\n\n` +
                                       `willkommen im GrooveLab-Team!\n\n` +
