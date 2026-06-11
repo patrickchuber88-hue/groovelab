@@ -14023,18 +14023,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   display: 'flex',
                                   flexDirection: 'column',
                                   justifyContent: 'space-between',
-                                  background: '#e0f2fe',
+                                  background: '#ffffff',
                                   padding: '12px',
                                   borderRadius: '12px',
-                                  border: '1.5px solid #0284c7',
-                                  boxShadow: '0 2px 6px rgba(3, 105, 161, 0.04)',
+                                  border: '2px solid #0284c7',
+                                  boxShadow: '0 4px 12px rgba(3, 105, 161, 0.08)',
                                   marginTop: '-4px',
                                   marginBottom: '-4px'
                                 }}>
                                   <div>
                                     <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
-                                    <strong style={{ display: 'block', fontSize: '1.35rem', color: '#0369a1', margin: '2px 0', fontWeight: 800 }}>
-                                      {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.68rem', fontWeight: 500 }}>/ Mo.</span>
+                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#0369a1', margin: '2px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                      {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
                                     </strong>
                                     {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
                                       <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
