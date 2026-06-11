@@ -1305,6 +1305,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   });
   const [extraUsersSliderVal, setExtraUsersSliderVal] = useState<number>(0);
   const [extraBillingOption, setExtraBillingOption] = useState<string>('option1');
+  const [nextBillingOption, setNextBillingOption] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('nextBillingOption') || '') : '';
+  });
+  const [nextBillingOptionEffectiveAt, setNextBillingOptionEffectiveAt] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('nextBillingOptionEffectiveAt') || '') : '';
+  });
+  const [showChangeTariffModal, setShowChangeTariffModal] = useState<boolean>(false);
+  const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -14270,8 +14278,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </span>
                                 <button 
                                   onClick={() => {
-                                    setIsBillingBooked(false);
-                                    localStorage.removeItem('isBillingBooked');
+                                    setSelectedModalOption(studentBillingOption);
+                                    setShowChangeTariffModal(true);
                                   }} 
                                   style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '0.68rem', textDecoration: 'underline', fontWeight: 600 }}
                                 >
@@ -14281,6 +14289,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '0.65rem', color: '#7c3aed', fontWeight: 500 }}>
                                 Tarifänderungen sind gesperrt. Du kannst unten zusätzliche Schüler buchen.
                               </span>
+                              {nextBillingOption && (
+                                <div style={{
+                                  background: '#fff7ed',
+                                  border: '1px solid #ffedd5',
+                                  borderRadius: '8px',
+                                  padding: '8px 10px',
+                                  fontSize: '0.68rem',
+                                  color: '#c2410c',
+                                  marginTop: '6px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
+                                    <span>🗓️ Tarifwechsel vorgemerkt</span>
+                                    <button 
+                                      onClick={() => {
+                                        setNextBillingOption('');
+                                        setNextBillingOptionEffectiveAt('');
+                                        localStorage.removeItem('nextBillingOption');
+                                        localStorage.removeItem('nextBillingOptionEffectiveAt');
+                                      }}
+                                      style={{ background: 'none', border: 'none', color: '#ea580c', cursor: 'pointer', fontSize: '0.65rem', textDecoration: 'underline', fontWeight: 700 }}
+                                    >
+                                      Abbrechen
+                                    </button>
+                                  </div>
+                                  <span style={{ fontWeight: 500, lineHeight: 1.3 }}>
+                                    Am <strong>{nextBillingOptionEffectiveAt}</strong> wird gewechselt zu: 
+                                    <strong> {
+                                      nextBillingOption === 'option1' ? 'Jahrespauschale (5,29 € / Jahr)' :
+                                      nextBillingOption === 'option2' ? 'Monatsumlage (0,49 € / Mo.)' :
+                                      nextBillingOption === 'option3_1' ? 'Kofinanzierung Mo. (Schüler 0,24 €)' :
+                                      nextBillingOption === 'option3_2' ? 'Kofinanzierung Jahr (Schüler 2,59 €)' : nextBillingOption
+                                    }</strong>.
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -14640,40 +14686,94 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       })()}
                     </div>
 
+                    {/* Invoice list */}
+                    <div>
+                      <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist' }}>Rechnungen</h4>
+                      <div style={{ border: '1px solid #f1f5f9', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
+                        {(() => {
+                          const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
+                          const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
+                          const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
+                          const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
+                          
+                          const isAnnualB2C = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                          const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
+                          
+                          // B2B Annual: 12 months of B2B monthly total
+                          const b2bAnnual = currentTotalB2B * 12;
+                          
+                          // B2C Annual:
+                          const b2cAnnual = isAnnualB2C 
+                            ? (students.length * pricePerStudent + bookedExtraUsers * (extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0))
+                            : ((studentLevyMonthly + extraLevyMonthly) * 12);
+                            
+                          const total2026 = b2bAnnual + b2cAnnual;
+
+                          const invoiceList = [
+                            { 
+                              id: 'RE-2026-0001', 
+                              year: '2026',
+                              date: '01. Jan. 2026', 
+                              b2b: b2bAnnual, 
+                              b2c: b2cAnnual, 
+                              amount: total2026, 
+                              status: isBillingBooked ? 'Bezahlt' : 'Entwurf' 
+                            },
+                            { 
+                              id: 'RE-2025-0001', 
+                              year: '2025',
+                              date: '01. Jan. 2025', 
+                              b2b: 1120.50, 
+                              b2c: 845.20, 
+                              amount: 1965.70, 
+                              status: 'Bezahlt' 
+                            },
+                            { 
+                              id: 'RE-2024-0001', 
+                              year: '2024',
+                              date: '01. Jan. 2024', 
+                              b2b: 980.00, 
+                              b2c: 650.00, 
+                              amount: 1630.00, 
+                              status: 'Bezahlt' 
+                            }
+                          ];
+
+                          return invoiceList.map((inv) => (
+                            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid #f1f5f9', background: '#ffffff', fontSize: '0.82rem', fontFamily: 'Inter' }}>
+                              <div>
+                                <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                                  Abrechnungsjahr: {inv.year} | B2B Anteil: {inv.b2b.toFixed(2).replace('.', ',')} € | B2C Schüler-Umlage: {inv.b2c.toFixed(2).replace('.', ',')} €
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                                <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{inv.amount.toFixed(2).replace('.', ',')} €</strong>
+                                <span style={{ 
+                                  fontSize: '0.7rem', 
+                                  background: inv.status === 'Bezahlt' ? '#d1fae5' : '#fef3c7', 
+                                  color: inv.status === 'Bezahlt' ? '#065f46' : '#b45309', 
+                                  padding: '6px 14px', 
+                                  borderRadius: '100px', 
+                                  fontWeight: 800 
+                                }}>{inv.status}</span>
+                                <button 
+                                  onClick={() => alert(`Rechnung ${inv.id} heruntergeladen!`)} 
+                                  className="hover-scale font-bold"
+                                  style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                                >
+                                  PDF
+                                </button>
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
 
                   </>
                 );
               })()}
-
-              {/* Invoice list */}
-              <div>
-                <h4 style={{ margin: '0 0 14px 0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist' }}>Rechnungen</h4>
-                <div style={{ border: '1px solid #f1f5f9', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
-                  {[
-                    { id: 'INV-2026-05', date: '15. Mai 2026', amount: '169,00 €', status: 'Bezahlt' },
-                    { id: 'INV-2026-04', date: '15. April 2026', amount: '169,00 €', status: 'Bezahlt' },
-                    { id: 'INV-2026-03', date: '15. März 2026', amount: '145,00 €', status: 'Bezahlt' }
-                  ].map((inv) => (
-                    <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid #f1f5f9', background: '#ffffff', fontSize: '0.82rem', fontFamily: 'Inter' }}>
-                      <div>
-                        <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id}</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Abrechnungsdatum: {inv.date}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-                        <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{inv.amount}</strong>
-                        <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '6px 14px', borderRadius: '100px', fontWeight: 800 }}>{inv.status}</span>
-                        <button 
-                          onClick={() => alert('Rechnung heruntergeladen!')} 
-                          className="hover-scale font-bold"
-                          style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                        >
-                          PDF
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -17454,6 +17554,147 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
         );
       })()}
+
+      {/* Modal for scheduled billing option change */}
+      {showChangeTariffModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #f1f5f9',
+            fontFamily: 'Inter',
+            animation: 'scaleUp 0.2s ease-out'
+          }}>
+            <style>{`
+              @keyframes scaleUp {
+                from { transform: scale(0.95); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="3"/><path d="M18 16.5v1.5l1 1"/></svg>
+              Tarifänderung zum neuen Monat
+            </h3>
+            
+            <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4', margin: '0 0 20px 0' }}>
+              Da das Abrechnungssystem für dieses Schuljahr bereits eingebucht ist, werden Tarifänderungen erst **zum 1. des nächsten Monats** wirksam. Wähle das neue Abrechnungsmodell für Schüler aus:
+            </p>
+
+            {/* Selection options inside the modal */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+              {[
+                { id: 'option1', title: 'Option 1: Jahrespauschale', desc: '5,29 € / Jahr pro Schüler (Einmalzahlung)' },
+                { id: 'option2', title: 'Option 2: Monatsumlage', desc: '0,49 € / Mo. pro Schüler (Monatlich)' },
+                { id: 'option3_1', title: 'Option 3.1: Kofinanzierung Mo.', desc: 'Schüler 0,24 € / Mo. & Schule 0,25 € / Mo.' },
+                { id: 'option3_2', title: 'Option 3.2: Kofinanzierung Jahr', desc: 'Schüler 2,59 € / Jahr & Schule 0,25 € / Mo.' }
+              ].map((opt) => {
+                const isSelected = selectedModalOption === opt.id;
+                const isCurrentActive = studentBillingOption === opt.id;
+                return (
+                  <label 
+                    key={opt.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      border: '1.5px solid',
+                      borderColor: isSelected ? '#7c3aed' : '#e2e8f0',
+                      background: isSelected ? '#f5f3ff' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    onClick={() => {
+                      setSelectedModalOption(opt.id);
+                    }}
+                  >
+                    <input 
+                      type="radio" 
+                      name="modal_billing_option"
+                      checked={isSelected}
+                      onChange={() => setSelectedModalOption(opt.id)}
+                      style={{ accentColor: '#7c3aed', marginTop: '3px', cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{opt.title}</strong>
+                        {isCurrentActive && <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>Aktuell aktiv</span>}
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginTop: '2px' }}>{opt.desc}</span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Dynamic Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setShowChangeTariffModal(false)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.78rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  color: '#475569'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button 
+                onClick={() => {
+                  const now = new Date();
+                  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                  const formatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+                  const effectiveDateStr = formatter.format(nextMonth);
+
+                  setNextBillingOption(selectedModalOption);
+                  setNextBillingOptionEffectiveAt(effectiveDateStr);
+                  localStorage.setItem('nextBillingOption', selectedModalOption);
+                  localStorage.setItem('nextBillingOptionEffectiveAt', effectiveDateStr);
+                  setShowChangeTariffModal(false);
+                }}
+                disabled={selectedModalOption === studentBillingOption}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: selectedModalOption === studentBillingOption ? '#e2e8f0' : '#7c3aed',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: selectedModalOption === studentBillingOption ? 'not-allowed' : 'pointer',
+                  color: selectedModalOption === studentBillingOption ? '#94a3b8' : '#ffffff',
+                  boxShadow: selectedModalOption === studentBillingOption ? 'none' : '0 2px 6px rgba(124, 58, 237, 0.15)'
+                }}
+              >
+                Wechsel vormerken
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
   );
