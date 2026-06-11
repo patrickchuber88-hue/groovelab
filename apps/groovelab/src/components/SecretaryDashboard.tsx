@@ -13920,99 +13920,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
                     {selectedRoom 
-                      ? 'Hier siehst du alle diesem Raum zugeordneten Instrumente. Ziehe Instrumente aus dem Pool unten hinein oder lösche sie.'
-                      : 'Verwalte den globalen Instrumentenpool. Ziehe Instrumente per Drag & Drop auf die Räume in der Sidebar, um sie zuzuweisen.'
+                      ? `Es werden nur Instrumente angezeigt, die dem Raum „${selectedRoom.name}“ zugeordnet sind. Klicke auf ein Instrument, um es zu bearbeiten.`
+                      : 'Hier werden alle Instrumente der Musikschule aufgelistet. Ziehe freie Instrumente auf die Räume rechts, um sie zuzuweisen.'
                     }
                   </p>
                 </div>
 
-                {/* If a room is selected, show its assigned instruments list */}
-                {selectedRoom && (
-                  <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zugeordnete Instrumente ({selectedRoom.room_instruments?.length || 0})</h4>
-                    
-                    {/* Drop Zone inside selected room container */}
-                    <div 
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragOverRoomId(selectedRoom.id);
-                      }}
-                      onDragLeave={() => setDragOverRoomId(null)}
-                      onDrop={async (e) => {
-                        e.preventDefault();
-                        const instName = e.dataTransfer.getData("text/plain");
-                        setDragOverRoomId(null);
-                        if (instName) {
-                          await handleDropInstrumentOnRoom(instName, selectedRoom.id);
-                        }
-                      }}
-                      style={{
-                        padding: '16px',
-                        borderRadius: '12px',
-                        border: dragOverRoomId === selectedRoom.id ? '2px dashed #0b57d0' : '2px dashed #cbd5e1',
-                        background: dragOverRoomId === selectedRoom.id ? '#eff6ff' : '#f8fafc',
-                        textAlign: 'center',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: dragOverRoomId === selectedRoom.id ? '#0b57d0' : '#64748b',
-                        transition: 'all 0.2s',
-                        marginBottom: '10px'
-                      }}
-                    >
-                      {dragOverRoomId === selectedRoom.id ? '✨ Loslassen zum Hinzufügen!' : '📥 Instrument hierhin ziehen zum Hinzufügen'}
-                    </div>
-
-                    {(!selectedRoom.room_instruments || selectedRoom.room_instruments.length === 0) ? (
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', fontWeight: 600 }}>In diesem Raum sind noch keine Instrumente vorhanden.</p>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        {selectedRoom.room_instruments.map((inst: any, idx: number) => (
-                          <div 
-                            key={idx} 
-                            onClick={() => {
-                              setEditingRoomInstrument({ roomId: selectedRoom.id, index: idx, name: inst.name, model: inst.model || '' });
-                              setEditRoomInstFormName(inst.name);
-                              setEditRoomInstFormModel(inst.model || '');
-                            }}
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between', 
-                              padding: '10px 14px', 
-                              borderRadius: '12px', 
-                              border: '1px solid #f1f5f9', 
-                              background: '#f8fafc',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>🎹 {inst.name}</span>
-                              <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700 }}>{inst.model || 'Standard'}</span>
-                            </div>
-                            <button 
-                              onClick={() => handleRemoveRoomInstrument(selectedRoom.id, idx)}
-                              style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer', padding: '4px' }}
-                            >
-                              Entfernen
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Global Instrumenten-Pool Widget */}
+                {/* Unified Instruments List Widget */}
                 <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {selectedRoom ? 'Verfügbare Instrumente (Drag & Drop)' : `Instrumentenpool (${schoolEquipment.length})`}
-                    </h4>
-                  </div>
-
-                  {/* Inline creation form */}
+                  
+                  {/* Inline creation form (Always visible to add new instruments to the pool) */}
                   <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center' }}>
                     <input
                       value={equipmentFormName}
@@ -14021,7 +13938,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }}
                     />
                     
-                    {/* Quantity Selector */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
                       <input
@@ -14043,68 +13959,227 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </button>
                   </div>
 
-                  {/* Instruments tags grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '4px' }}>
-                    {schoolEquipment.map(eq => {
-                      const assignedRoom = rooms.find(rm => 
-                        Array.isArray(rm.room_instruments) && 
-                        rm.room_instruments.some((inst: any) => inst.name === eq.name)
-                      );
-                      
-                      return (
-                        <div 
-                          key={eq.id} 
-                          draggable={!assignedRoom}
-                          onDragStart={(e) => {
-                            if (assignedRoom) return;
-                            e.dataTransfer.setData("text/plain", eq.name);
-                            e.dataTransfer.effectAllowed = "copyMove";
-                          }}
-                          style={{ 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            gap: '4px',
-                            padding: '10px 14px', 
-                            borderRadius: '12px', 
-                            border: assignedRoom ? '1.5px solid #e2e8f0' : '1.5px solid #0b57d0', 
-                            background: assignedRoom ? '#f1f5f9' : 'white', 
-                            opacity: assignedRoom ? 0.65 : 1,
-                            cursor: assignedRoom ? 'not-allowed' : 'grab', 
-                            transition: 'all 0.15s' 
-                          }}
-                          className={assignedRoom ? "" : "hover-scale-mini"}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155' }}>🎸 {eq.name}</span>
-                            {!selectedRoom && !assignedRoom && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} 
-                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
+                  {/* Drop zone inside active room list header */}
+                  {selectedRoom && (
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverRoomId(selectedRoom.id);
+                      }}
+                      onDragLeave={() => setDragOverRoomId(null)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const instName = e.dataTransfer.getData("text/plain");
+                        setDragOverRoomId(null);
+                        if (instName) {
+                          await handleDropInstrumentOnRoom(instName, selectedRoom.id);
+                        }
+                      }}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '10px',
+                        border: dragOverRoomId === selectedRoom.id ? '2px dashed #0b57d0' : '2px dashed #cbd5e1',
+                        background: dragOverRoomId === selectedRoom.id ? '#eff6ff' : '#f8fafc',
+                        textAlign: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: dragOverRoomId === selectedRoom.id ? '#0b57d0' : '#64748b',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {dragOverRoomId === selectedRoom.id ? '✨ Loslassen zum Hinzufügen!' : '📥 Instrument hierhin ziehen zum Hinzufügen'}
+                    </div>
+                  )}
+
+                  {/* Unified List items list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(() => {
+                      const filteredInstruments = selectedRoom 
+                        ? (selectedRoom.room_instruments || []).map((inst: any, idx: number) => ({
+                            id: `room-${selectedRoom.id}-${idx}`,
+                            name: inst.name,
+                            model: inst.model || '',
+                            assignedToRoomId: selectedRoom.id,
+                            assignedToRoomName: selectedRoom.name,
+                            indexInRoom: idx,
+                            isGlobalPoolItem: false
+                          }))
+                        : schoolEquipment.map((eq: any) => {
+                            const assignedRm = rooms.find(rm => 
+                              Array.isArray(rm.room_instruments) && 
+                              rm.room_instruments.some((inst: any) => inst.name === eq.name)
+                            );
+                            return {
+                              id: eq.id,
+                              name: eq.name,
+                              model: assignedRm?.room_instruments?.find((inst: any) => inst.name === eq.name)?.model || '',
+                              assignedToRoomId: assignedRm?.id || null,
+                              assignedToRoomName: assignedRm?.name || null,
+                              isGlobalPoolItem: true,
+                              globalItem: eq
+                            };
+                          });
+
+                      if (filteredInstruments.length === 0) {
+                        return (
+                          <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.78rem', fontWeight: 700, padding: '24px 0', margin: 0 }}>
+                            {selectedRoom ? 'Keine Instrumente in diesem Raum' : 'Keine Instrumente im Pool'}
+                          </p>
+                        );
+                      }
+
+                      return filteredInstruments.map((item: any) => {
+                        const isAssigned = !!item.assignedToRoomId;
+                        
+                        return (
+                          <div 
+                            key={item.id}
+                            draggable={!isAssigned}
+                            onDragStart={(e) => {
+                              if (isAssigned) return;
+                              e.dataTransfer.setData("text/plain", item.name);
+                              e.dataTransfer.effectAllowed = "copyMove";
+                            }}
+                            onClick={() => {
+                              if (item.assignedToRoomId) {
+                                const targetRoomId = item.assignedToRoomId;
+                                const targetIdx = item.isGlobalPoolItem ? 
+                                  (rooms.find(r => r.id === targetRoomId)?.room_instruments || []).findIndex((inst: any) => inst.name === item.name) : 
+                                  item.indexInRoom;
+                                
+                                if (targetIdx !== -1) {
+                                  setEditingRoomInstrument({ 
+                                    roomId: targetRoomId, 
+                                    index: targetIdx, 
+                                    name: item.name, 
+                                    model: item.model || '' 
+                                  });
+                                  setEditRoomInstFormName(item.name);
+                                  setEditRoomInstFormModel(item.model || '');
+                                }
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              background: 'white',
+                              border: '1px solid #f1f5f9',
+                              borderRadius: '12px',
+                              cursor: isAssigned ? (selectedRoom ? 'pointer' : 'default') : 'grab',
+                              transition: 'all 0.2s',
+                              opacity: (!selectedRoom && isAssigned) ? 0.65 : 1,
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                            }}
+                            className={isAssigned && !selectedRoom ? "" : "hover-scale-mini"}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '1.2rem' }}>🎹</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.name}
+                                </span>
+                                {item.model && (
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
+                                    Modell: {item.model}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                              {/* Room assignment badge */}
+                              {isAssigned ? (
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 800, 
+                                  color: '#0b57d0', 
+                                  background: '#eff6ff', 
+                                  border: '1.5px solid #dbeafe',
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontFamily: 'Urbanist'
+                                }}>
+                                  🚪 {item.assignedToRoomName}
+                                </span>
+                              ) : (
+                                <span style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 800, 
+                                  color: '#475569', 
+                                  background: '#f8fafc', 
+                                  border: '1.5px solid #e2e8f0',
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px',
+                                  fontFamily: 'Urbanist'
+                                }}>
+                                  📦 Im Pool / Frei
+                                </span>
+                              )}
+
+                              {/* Actions */}
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {isAssigned ? (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const targetRoomId = item.assignedToRoomId;
+                                      const targetIdx = item.isGlobalPoolItem ? 
+                                        (rooms.find(r => r.id === targetRoomId)?.room_instruments || []).findIndex((inst: any) => inst.name === item.name) : 
+                                        item.indexInRoom;
+                                      if (targetIdx !== -1) {
+                                        await handleRemoveRoomInstrument(targetRoomId, targetIdx);
+                                      }
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#ef4444',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      transition: 'all 0.2s',
+                                      fontFamily: 'Urbanist'
+                                    }}
+                                    className="hover-scale-mini"
+                                    title="Freigeben (zurück in den Pool legen)"
+                                  >
+                                    Freigeben
+                                  </button>
+                                ) : (
+                                  !selectedRoom && (
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        await handleDeleteEquipment(item.id);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        padding: '4px'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Löschen"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )
+                                )}
+                              </div>
+                            </div>
+
                           </div>
-                          {assignedRoom && (
-                            <span style={{ 
-                              fontSize: '0.62rem', 
-                              fontWeight: 800, 
-                              color: '#475569', 
-                              background: '#e2e8f0', 
-                              padding: '2px 6px', 
-                              borderRadius: '4px',
-                              alignSelf: 'flex-start',
-                              marginTop: '2px'
-                            }}>
-                              🚪 {assignedRoom.name}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {schoolEquipment.length === 0 && (
-                      <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '12px 0' }}>Noch keine Instrumente im Pool</p>
-                    )}
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
