@@ -980,6 +980,21 @@ const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
   );
 };
 
+const parseRoomName = (name: string) => {
+  const trimmed = name.trim();
+  const match = trimmed.match(/^(.*?)\s*(\d+)$/);
+  if (match) {
+    return {
+      prefix: match[1].trim(),
+      number: parseInt(match[2], 10)
+    };
+  }
+  return {
+    prefix: trimmed,
+    number: null
+  };
+};
+
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
@@ -12937,6 +12952,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             return acc;
           }, []);
 
+
+
           // Filter logic for rooms matching search and selected floor & status
           const filteredRooms = uniqueRooms.filter((r: any) => {
             const name = (r.name || '').toLowerCase();
@@ -12953,9 +12970,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             
             return matchesSearch && matchesFloor && matchesStatus;
           }).sort((a, b) => {
-            const nameA = (a.name || '').toLowerCase().trim();
-            const nameB = (b.name || '').toLowerCase().trim();
-            return nameA.localeCompare(nameB, 'de', { numeric: true, sensitivity: 'base' });
+            const parsedA = parseRoomName(a.name || '');
+            const parsedB = parseRoomName(b.name || '');
+            const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix, 'de', { sensitivity: 'base' });
+            if (prefixCompare !== 0) return prefixCompare;
+            
+            const numA = parsedA.number !== null ? parsedA.number : -1;
+            const numB = parsedB.number !== null ? parsedB.number : -1;
+            return numA - numB;
           });
 
           // Sort helper for floors: Allgemein is top (9999), EG is 0, OGs are positive, UGs are negative
@@ -14792,7 +14814,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Rooms List */}
-                {rooms.map(rm => {
+                {[...rooms].sort((a, b) => {
+                  const parsedA = parseRoomName(a.name || '');
+                  const parsedB = parseRoomName(b.name || '');
+                  const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix, 'de', { sensitivity: 'base' });
+                  if (prefixCompare !== 0) return prefixCompare;
+                  
+                  const numA = parsedA.number !== null ? parsedA.number : -1;
+                  const numB = parsedB.number !== null ? parsedB.number : -1;
+                  return numA - numB;
+                }).map(rm => {
                   const isSelected = selectedEquipmentRoomId === rm.id;
                   const isDragOver = dragOverRoomId === rm.id;
                   
