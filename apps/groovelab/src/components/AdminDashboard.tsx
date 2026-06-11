@@ -371,6 +371,7 @@ export function AdminDashboard({
   };
 
   const [hasInitializedRoom, setHasInitializedRoom] = useState(false);
+  const [dbRoomBookings, setDbRoomBookings] = useState<any[]>([]);
 
   const myRooms = React.useMemo(() => {
     const roomIds = new Set<string>();
@@ -395,8 +396,18 @@ export function AdminDashboard({
       });
     }
 
+    // 3. Check database room bookings
+    if (dbRoomBookings && dbRoomBookings.length > 0) {
+      dbRoomBookings.forEach((b: any) => {
+        const isOwn = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+        if (isOwn && b.roomId) {
+          roomIds.add(b.roomId);
+        }
+      });
+    }
+
     return rooms.filter((r: any) => roomIds.has(r.id));
-  }, [rooms, schedules, campusBookings, userId, admin]);
+  }, [rooms, schedules, campusBookings, dbRoomBookings, userId, admin]);
 
   const parseICSDate = (icsDateStr: string): Date => {
     const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
@@ -1832,6 +1843,13 @@ export function AdminDashboard({
   }, [forceTab]);
 
   useEffect(() => {
+    window.addEventListener('refresh-bookings', fetchData);
+    return () => {
+      window.removeEventListener('refresh-bookings', fetchData);
+    };
+  }, []);
+
+  useEffect(() => {
     fetchData();
   }, [activeTab, activePlatform, bookingDate, missionFilter]);
 
@@ -2052,7 +2070,75 @@ export function AdminDashboard({
           .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
           .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
 
-        setScheduleOccurrences(occursData || []);
+        // Will set schedule occurrences after loading room overrides so we can map overrides
+        // setScheduleOccurrences(occursData || []);
+
+        // Fetch room_bookings from database for the selected week
+        const { data: dbBookingsData } = await supabase
+          .from('room_bookings')
+          .select(`
+            id,
+            room_id,
+            date,
+            start_time,
+            end_time,
+            title,
+            booked_by,
+            profiles:users!booked_by (
+              first_name,
+              last_name
+            )
+          `)
+          .eq('school_id', adminData.school_id)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
+
+        if (dbBookingsData) {
+          const mapped = dbBookingsData.map((db: any) => {
+            const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
+            const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
+            const teacherName = db.profiles ? `${db.profiles.first_name} ${db.profiles.last_name}` : 'Lehrer';
+            return {
+              id: db.id,
+              roomId: db.room_id,
+              date: db.date,
+              startTime: startTimeStr,
+              endTime: endTimeStr,
+              purpose: db.title || 'Unterricht',
+              teacherId: db.booked_by,
+              teacherName: teacherName,
+              isDbBooking: true
+            };
+          });
+          setDbRoomBookings(mapped);
+        } else {
+          setDbRoomBookings([]);
+        }
+
+        // Map room overrides onto loaded occurrences so their room is correct
+        let mappedOccurs = occursData || [];
+        if (dbBookingsData && occursData) {
+          mappedOccurs = occursData.map((occ: any) => {
+            const booking = dbBookingsData.find(b => 
+              b.date === occ.date && 
+              b.start_time.substring(0, 5) === occ.start_time.substring(0, 5) &&
+              b.booked_by === occ.teacher_id
+            );
+            if (booking) {
+              return {
+                ...occ,
+                schedules: occ.schedules ? {
+                  ...occ.schedules,
+                  room_id: booking.room_id
+                } : {
+                  room_id: booking.room_id
+                }
+              };
+            }
+            return occ;
+          });
+        }
+        setScheduleOccurrences(mappedOccurs);
 
         let { data: stationsData } = await supabase
           .from('stations')
@@ -5355,11 +5441,103 @@ export function AdminDashboard({
     const handleCancelBooking = async (bookingId: string | string[]) => {
       const ids = Array.isArray(bookingId) ? bookingId : [bookingId];
       
-      const manualIds = ids.filter(id => !id.includes('-') && !scheduleOccurrences.some(o => o.id === id));
-      const occurIds = ids.filter(id => id.includes('-') || scheduleOccurrences.some(o => o.id === id));
+      const localManualIds = ids.filter(id => !id.includes('-') && !scheduleOccurrences.some(o => o.id === id));
+      const dbBookingIds = ids.filter(id => dbRoomBookings.some(b => b.id === id));
+      const occurIds = ids.filter(id => 
+        (id.includes('-') || scheduleOccurrences.some(o => o.id === id)) && 
+        !dbRoomBookings.some(b => b.id === id) &&
+        !dbBookingIds.some(dbId => {
+          const dbB = dbRoomBookings.find(b => b.id === dbId);
+          const occ = scheduleOccurrences.find(o => o.id === id);
+          return dbB && occ && dbB.date === occ.date && dbB.startTime.substring(0, 5) === occ.start_time.substring(0, 5);
+        })
+      );
       
-      if (manualIds.length > 0) {
-        setCampusBookings(prev => prev.filter(b => !manualIds.includes(b.id)));
+      if (localManualIds.length > 0) {
+        setCampusBookings(prev => prev.filter(b => !localManualIds.includes(b.id)));
+      }
+      
+      if (dbBookingIds.length > 0) {
+        if (!window.confirm('Möchtest du diese Raumbuchung wirklich löschen/stornieren?')) return;
+        try {
+          for (const bId of dbBookingIds) {
+            const b = dbRoomBookings.find(db => db.id === bId);
+            if (!b) continue;
+
+            // Check if term-coupled
+            const { data: occ } = await supabase
+              .from('schedule_occurrences')
+              .select('*, schedules(*)')
+              .eq('date', b.date)
+              .eq('start_time', b.startTime.length === 5 ? `${b.startTime}:00` : b.startTime)
+              .eq('teacher_id', b.teacherId)
+              .maybeSingle();
+
+            if (occ) {
+              const regularRoomId = occ.schedules?.room_id;
+              if (regularRoomId) {
+                if (b.roomId === regularRoomId) {
+                  // Revert occurrence
+                  if (occ.original_date && occ.original_start_time) {
+                    const { error: updErr } = await supabase
+                      .from('schedule_occurrences')
+                      .update({
+                        date: occ.original_date,
+                        start_time: occ.original_start_time,
+                        status: 'scheduled'
+                      })
+                      .eq('id', occ.id);
+                    if (updErr) throw updErr;
+                  } else {
+                    const { error: delErr } = await supabase
+                      .from('schedule_occurrences')
+                      .delete()
+                      .eq('id', occ.id);
+                    if (delErr) throw delErr;
+                  }
+                  
+                  // Delete room booking
+                  const { error: delErr } = await supabase
+                    .from('room_bookings')
+                    .delete()
+                    .eq('id', b.id);
+                  if (delErr) throw delErr;
+                  
+                  alert('Die Terminverschiebung wurde storniert und auf die ursprüngliche Zeit zurückgesetzt.');
+                } else {
+                  const { error: updErr } = await supabase
+                    .from('room_bookings')
+                    .update({ room_id: regularRoomId })
+                    .eq('id', b.id);
+                  if (updErr) throw updErr;
+                  
+                  const { data: roomData } = await supabase
+                    .from('rooms')
+                    .select('name')
+                    .eq('id', regularRoomId)
+                    .maybeSingle();
+                  const roomName = roomData?.name || 'regulären Unterrichtsraum';
+                  alert(`Der Raum für den Termin wurde wieder auf den ${roomName} zurückgesetzt.`);
+                }
+              } else {
+                alert('Für diesen Termin wurde noch kein regulärer Raum zugeordnet.');
+                continue;
+              }
+            } else {
+              // Not term-coupled, delete directly
+              const { error: delErr } = await supabase
+                .from('room_bookings')
+                .delete()
+                .eq('id', bId);
+              if (delErr) throw delErr;
+            }
+          }
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          await fetchData();
+        } catch (err) {
+          console.error('Error canceling db room booking:', err);
+          alert('Fehler beim Löschen der Raumbuchung.');
+        }
       }
       
       if (occurIds.length > 0) {
@@ -5481,6 +5659,35 @@ export function AdminDashboard({
         return slotHour >= startHour && slotHour < endHour;
       });
 
+      // 1b. Database manual bookings
+      const dbManualForSlot = dbRoomBookings.filter((b: any) => {
+        if (b.roomId !== selectedRoom.id) return false;
+        const bDate = parseLocalDate(b.date);
+        if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
+        
+        const bDayIndex = getWeekdayIndex(b.date);
+        if (bDayIndex !== dayIdx) return false;
+
+        const slotHour = parseInt(hourStr.split(':')[0]);
+        const startHour = parseInt(b.startTime.split(':')[0]);
+        const endHour = parseInt(b.endTime.split(':')[0]);
+        
+        return slotHour >= startHour && slotHour < endHour;
+      });
+
+      // Combine local and DB manual bookings, de-duplicating by date + room + start_time
+      const combinedManuals = [...manualForSlot];
+      dbManualForSlot.forEach((dbB: any) => {
+        const isDup = combinedManuals.some((m: any) => 
+          m.date === dbB.date && 
+          m.startTime === dbB.startTime && 
+          m.roomId === dbB.roomId
+        );
+        if (!isDup) {
+          combinedManuals.push(dbB);
+        }
+      });
+
       // 2. Weekly recurring schedules
       const DAYS_MAP = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const targetDay = DAYS_MAP[dayIdx];
@@ -5583,6 +5790,14 @@ export function AdminDashboard({
         if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
           return false;
         }
+
+        // Exclude if there's already a manual DB room booking for this teacher's lesson at this slot to avoid duplicates
+        const hasDbBooking = dbRoomBookings.some((b: any) => 
+          b.date === occ.date && 
+          b.startTime.substring(0, 5) === occ.start_time.substring(0, 5) &&
+          b.teacherId === occ.teacher_id
+        );
+        if (hasDbBooking) return false;
 
         const templateTime = occ.schedules?.time_slot || '';
         const templateDay = occ.schedules?.day_of_week || 0;
@@ -5689,11 +5904,11 @@ export function AdminDashboard({
                  occ.original_date !== occ.date && 
                  !holidays.some((h: any) => occ.original_date >= h.start && occ.original_date <= h.end);
         });
-        // We DO return manualForSlot (manual room bookings) during holidays!
-        return [...manualForSlot, ...allowedDynamics, ...draftPreviewBooking];
+        // We DO return combinedManuals (manual room bookings) during holidays!
+        return [...combinedManuals, ...allowedDynamics, ...draftPreviewBooking];
       }
 
-      return [...manualForSlot, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
+      return [...combinedManuals, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
@@ -5707,11 +5922,18 @@ export function AdminDashboard({
       const targetDay = DAYS_MAP[dayVal];
       const targetDayInt = dayVal === 0 ? 7 : dayVal; // 1 = Monday, 7 = Sunday
 
+      const hasDbBooking = dbRoomBookings.some((b: any) => {
+        if (b.roomId !== roomId) return false;
+        if (b.date !== bookingDate) return false;
+        if (selectedBooking && b.id === selectedBooking.id) return false;
+        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
+      });
+
       const hasBooking = dateBookings.some((b: any) => {
         if (b.roomId !== roomId) return false;
         if (selectedBooking && b.id === selectedBooking.id) return false;
         return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
-      });
+      }) || hasDbBooking;
 
       const hasSchedule = isHoliday ? false : mergedSchedules.some((s: any) => {
         if (s.room_id !== roomId) return false;
@@ -6198,8 +6420,11 @@ export function AdminDashboard({
      // Merge overlapping/consecutive bookings for "Meine Buchungen" sidebar
      const groupedMyBookings: { [key: string]: any[] } = {};
      
-     // Own manual bookings
-     const ownManualBookings = campusBookings.filter((b: any) => b.teacherId === userId);
+     // Own manual bookings (combining local storage memory and database bookings)
+     const ownManualBookings = [
+       ...campusBookings.filter((b: any) => b.teacherId === userId),
+       ...dbRoomBookings.filter((b: any) => b.teacherId === userId)
+     ];
      
      // Own rescheduled occurrences
      const ownRescheduledOccurs = scheduleOccurrences

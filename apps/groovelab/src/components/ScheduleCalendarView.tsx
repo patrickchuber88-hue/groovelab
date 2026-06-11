@@ -31,6 +31,9 @@ interface ScheduleOccurrence {
     last_name: string;
     instrument: string;
   };
+  template_room_id?: string | null;
+  room_override_id?: string | null;
+  room_override_name?: string | null;
   schedules?: {
     room_id: string | null;
     room?: {
@@ -80,7 +83,9 @@ export function ScheduleCalendarView({
   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string } | null>(null);
+  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null } | null>(null);
+  const [freeRooms, setFreeRooms] = useState<any[]>([]);
+  const [loadingFreeRooms, setLoadingFreeRooms] = useState(false);
 
   const [calendarUrl, setCalendarUrl] = useState<string>('');
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -301,6 +306,136 @@ export function ScheduleCalendarView({
     });
     return merged;
   }, [baseOccurrences, pendingChanges]);
+
+  useEffect(() => {
+    if (!editOccState) {
+      setFreeRooms([]);
+      return;
+    }
+    const occ = occurrences.find(o => o.id === editOccState.id);
+    const duration = occ?.duration || 45;
+
+    const fetchFreeRooms = async () => {
+      setLoadingFreeRooms(true);
+      try {
+        const date = editOccState.date;
+        const startTime = editOccState.start_time;
+        if (!date || !startTime) return;
+
+        const formattedStartTime = startTime.length === 5 ? `${startTime}:00` : startTime;
+        const startMins = timeToMinutes(formattedStartTime);
+        const endMins = startMins + duration;
+        
+        // Convert end minutes back to a time string like "HH:MM:SS"
+        const eh = Math.floor(endMins / 60);
+        const em = endMins % 60;
+        const formattedEndTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
+        // Get day of week (1 = Mon, 7 = Sun) from UTC components to avoid local timezone offset shifting
+        const [yyyy, mm, dd] = date.split('-').map(Number);
+        const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+        const rawDay = d.getUTCDay();
+        const dayOfWeek = rawDay === 0 ? 7 : rawDay;
+
+        // 1. Fetch booked room_ids from schedules (recurring)
+        const { data: schedBooked } = await supabase
+          .from('schedules')
+          .select('room_id, time_slot, duration')
+          .eq('school_id', schoolId)
+          .eq('day_of_week', dayOfWeek)
+          .not('room_id', 'is', null);
+
+        // 2. Fetch booked room_ids from campus_events (one-off)
+        const { data: evBooked } = await supabase
+          .from('campus_events')
+          .select('room_id, start_time, end_time')
+          .eq('school_id', schoolId)
+          .eq('event_date', date)
+          .not('room_id', 'is', null);
+
+        // 3. Fetch booked room_ids from room_bookings (one-off)
+        const { data: rbBooked } = await supabase
+          .from('room_bookings')
+          .select('room_id, start_time, end_time, booked_by')
+          .eq('school_id', schoolId)
+          .eq('date', date)
+          .not('room_id', 'is', null);
+
+        // Helper: check time overlap
+        const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
+          const aS = aStart.substring(0, 5);
+          const aE = aEnd.substring(0, 5);
+          const bS = bStart.substring(0, 5);
+          const bE = bEnd.substring(0, 5);
+          return aS < bE && aE > bS;
+        };
+
+        const bookedRoomIds = new Set<string>();
+
+        (schedBooked || []).forEach((s: any) => {
+          const sStart = (s.time_slot || '00:00').substring(0, 5);
+          const durMins = s.duration || 45;
+          const [sh, sm] = sStart.split(':').map(Number);
+          const sEndMins = sh * 60 + sm + durMins;
+          const sEnd = `${String(Math.floor(sEndMins / 60)).padStart(2, '0')}:${String(sEndMins % 60).padStart(2, '0')}`;
+          
+          if (s.room_id) {
+            if (overlaps(sStart, sEnd, formattedStartTime, formattedEndTime)) {
+              bookedRoomIds.add(s.room_id);
+            }
+          }
+        });
+
+        (evBooked || []).forEach((ev: any) => {
+          const evStart = (ev.start_time || '00:00').substring(0, 5);
+          const evEnd = ev.end_time ? ev.end_time.substring(0, 5) : (() => {
+            const [h, m] = evStart.split(':').map(Number);
+            const em = h * 60 + m + 60;
+            return `${String(Math.floor(em / 60)).padStart(2, '0')}:${String(em % 60).padStart(2, '0')}`;
+          })();
+          if (ev.room_id) {
+            if (overlaps(evStart, evEnd, formattedStartTime, formattedEndTime)) {
+              bookedRoomIds.add(ev.room_id);
+            }
+          }
+        });
+
+        (rbBooked || []).forEach((rb: any) => {
+          // If this is the current teacher's booking for this exact slot, we do not treat it as a conflict
+          const isCurrentOwnBooking = rb.booked_by === userId && 
+            rb.date === occ?.date && 
+            rb.start_time.substring(0, 5) === occ?.start_time.substring(0, 5);
+
+          if (isCurrentOwnBooking) {
+            return;
+          }
+
+          const rbStart = (rb.start_time || '00:00').substring(0, 5);
+          const rbEnd = rb.end_time ? rb.end_time.substring(0, 5) : (() => {
+            const [h, m] = rbStart.split(':').map(Number);
+            const em = h * 60 + m + duration;
+            return `${String(Math.floor(em / 60)).padStart(2, '0')}:${String(em % 60).padStart(2, '0')}`;
+          })();
+          if (rb.room_id) {
+            if (overlaps(rbStart, rbEnd, formattedStartTime, formattedEndTime)) {
+              bookedRoomIds.add(rb.room_id);
+            }
+          }
+        });
+
+        const currentRoomId = occ?.schedules?.room_id || null;
+        const selectedRoomId = editOccState.room_id || null;
+        const filtered = rooms.filter(r => !bookedRoomIds.has(r.id) || r.id === currentRoomId || r.id === selectedRoomId);
+        setFreeRooms(filtered);
+      } catch (err) {
+        console.error("Error fetching free rooms:", err);
+      } finally {
+        setLoadingFreeRooms(false);
+      }
+    };
+
+    fetchFreeRooms();
+  }, [editOccState?.date, editOccState?.start_time, editOccState?.id, schoolId, rooms, occurrences, userId]);
 
   // Direct Chat states inside appointment modal
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -644,6 +779,21 @@ export function ScheduleCalendarView({
       const endDateStr = toLocalYYYYMMDD(weekEnd);
 
       let fetchedData: any[] = [];
+      let roomBookings: any[] = [];
+      try {
+        const { data: rbData } = await supabase
+          .from('room_bookings')
+          .select('room_id, date, start_time, room:rooms(name)')
+          .eq('booked_by', userId)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
+        if (rbData) {
+          roomBookings = rbData;
+        }
+      } catch (err) {
+        console.warn('Error fetching room bookings:', err);
+      }
+
       try {
         const { data, error } = await supabase
           .from('schedule_occurrences')
@@ -654,7 +804,27 @@ export function ScheduleCalendarView({
           .order('start_time');
 
         if (!error && data) {
-          fetchedData = data;
+          fetchedData = data.map((occ: any) => {
+            const booking = roomBookings.find(b => 
+              b.date === occ.date && 
+              b.start_time.substring(0, 5) === occ.start_time.substring(0, 5)
+            );
+            if (booking) {
+              return {
+                ...occ,
+                template_room_id: occ.schedules?.room_id || null,
+                schedules: occ.schedules ? {
+                  ...occ.schedules,
+                  room_id: booking.room_id,
+                  room: booking.room
+                } : {
+                  room_id: booking.room_id,
+                  room: booking.room
+                }
+              };
+            }
+            return occ;
+          });
         }
       } catch (err) {
         console.warn('DB fetch failed', err);
@@ -884,6 +1054,13 @@ export function ScheduleCalendarView({
         }
       }
 
+      // Fetch occurrences about to be deleted so we can clean up their room bookings
+      const { data: occurrencesToDelete } = await supabase
+        .from('schedule_occurrences')
+        .select('date, start_time')
+        .eq('teacher_id', userId)
+        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
+
       const { error } = await supabase
         .from('schedule_occurrences')
         .delete()
@@ -891,6 +1068,24 @@ export function ScheduleCalendarView({
         .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
       
       if (error) throw error;
+
+      // Clean up corresponding room bookings
+      if (occurrencesToDelete && occurrencesToDelete.length > 0) {
+        try {
+          await Promise.all(
+            occurrencesToDelete.map(occ =>
+              supabase.from('room_bookings')
+                .delete()
+                .eq('booked_by', userId)
+                .eq('date', occ.date)
+                .eq('start_time', occ.start_time)
+            )
+          );
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        } catch (roomErr) {
+          console.warn('Error deleting room bookings on reset week:', roomErr);
+        }
+      }
 
       await loadOccurrences();
     } catch (err) {
@@ -1101,23 +1296,42 @@ export function ScheduleCalendarView({
     if (!editOccState) return;
     const occ = occurrences.find(o => o.id === editOccState.id);
     if (occ) {
-      const changed = occ.date !== editOccState.date || occ.start_time !== editOccState.start_time;
-      if (changed) {
-        const formattedTime = editOccState.start_time.length === 5 ? `${editOccState.start_time}:00` : editOccState.start_time;
-        
-        // Check room conflict
-        const roomId = occ.schedules?.room_id || null;
-        const conflict = getRoomConflict(editOccState.id, editOccState.date, formattedTime, occ.duration, roomId);
-        if (conflict) {
-          const roomName = occ.schedules?.room?.name || 'diesem Raum';
-          const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben?`;
-          if (!confirm(confirmMsg)) {
-            // Keep the modal open so the user can change the time
-            return;
+      const formattedTime = editOccState.start_time.length === 5 ? `${editOccState.start_time}:00` : editOccState.start_time;
+      const timeChanged = occ.date !== editOccState.date || occ.start_time !== formattedTime;
+      const roomChanged = (occ.schedules?.room_id || null) !== editOccState.room_id;
+
+      if (timeChanged || roomChanged) {
+        // If room changed but time didn't, or both changed, we check room conflict for the new room_id
+        if (editOccState.room_id) {
+          const conflict = getRoomConflict(editOccState.id, editOccState.date, formattedTime, occ.duration, editOccState.room_id);
+          if (conflict) {
+            const roomName = rooms.find(r => r.id === editOccState.room_id)?.name || 'diesem Raum';
+            const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben/buchen?`;
+            if (!confirm(confirmMsg)) {
+              return;
+            }
           }
         }
 
-        updateOccurrence(editOccState.id, { date: editOccState.date, start_time: formattedTime, status: 'pending_reschedule' });
+        // Update occurrence local state
+        const updatedSchedules = occ.schedules ? {
+          ...occ.schedules,
+          room_id: editOccState.room_id,
+          room: { name: rooms.find(r => r.id === editOccState.room_id)?.name || '' }
+        } : {
+          room_id: editOccState.room_id,
+          room: { name: rooms.find(r => r.id === editOccState.room_id)?.name || '' }
+        };
+
+        const templateRoomId = occ.template_room_id !== undefined ? occ.template_room_id : (occ.schedules?.room_id || null);
+
+        updateOccurrence(editOccState.id, {
+          date: editOccState.date,
+          start_time: formattedTime,
+          status: 'pending_reschedule',
+          schedules: updatedSchedules,
+          template_room_id: templateRoomId
+        });
       }
     }
     setEditOccState(null);
@@ -1136,7 +1350,7 @@ export function ScheduleCalendarView({
           if (!change.student_id || change.student_id === 'vacant') {
             continue;
           }
-          const { id, student, original_start_time, schedules, ...insertData } = change;
+          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, ...insertData } = change;
           insertData.original_date = insertData.original_date || change.date;
           
           if (!insertData.student_id) {
@@ -1195,6 +1409,59 @@ export function ScheduleCalendarView({
             .eq('id', change.id);
           
           if (error) throw error;
+        }
+
+        // Manage room bookings for this occurrence
+        try {
+          const oldDate = originalOcc?.date || change.date;
+          const oldStartTime = originalOcc?.start_time || change.start_time;
+
+          // Always delete any existing booking at the old date/time for this teacher
+          await supabase.from('room_bookings')
+            .delete()
+            .eq('booked_by', userId)
+            .eq('date', oldDate)
+            .eq('start_time', oldStartTime);
+
+          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
+          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+          const originalRoomId = originalOcc?.template_room_id !== undefined 
+            ? originalOcc.template_room_id 
+            : (originalOcc?.schedules?.room_id || null);
+          const currentRoomId = change.schedules?.room_id || null;
+
+          const timeChanged = change.date !== origDateStr || change.start_time.substring(0, 5) !== origTimeStr.substring(0, 5);
+          const roomChanged = originalRoomId !== currentRoomId;
+          const isCancelled = change.status === 'cancelled';
+
+          const needsRoomBooking = !isCancelled && currentRoomId && (timeChanged || roomChanged);
+
+          // If the lesson is rescheduled or room-overridden, insert the new room booking
+          if (needsRoomBooking) {
+            const startMins = timeToMinutes(change.start_time);
+            const duration = change.duration || 45;
+            const endMins = startMins + duration;
+            const eh = Math.floor(endMins / 60);
+            const em = endMins % 60;
+            const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
+            const studentName = `${change.student?.first_name || ''} ${change.student?.last_name || ''}`.trim() || 'Schüler';
+
+            await supabase.from('room_bookings').insert({
+              school_id: schoolId,
+              room_id: currentRoomId,
+              booked_by: userId,
+              date: change.date,
+              start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+              end_time: endTimeStr,
+              title: `Unterricht: ${studentName}`
+            });
+          }
+
+          // Notify dashboard components of updated bookings
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        } catch (bookingErr) {
+          console.warn('Error syncing room booking in savePendingChanges:', bookingErr);
         }
 
         // Automatic Notification logic via Campus Direct Messages
@@ -1743,10 +2010,12 @@ export function ScheduleCalendarView({
                   let finalColors = { ...colors };
                   let cardBackground = '';
  
+                  const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
                   const isRescheduled = !isBreak && !isVacant && !isSick && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
-                    (occ.original_date && occ.original_date !== occ.date)
+                    (occ.original_date && occ.original_date !== occ.date) ||
+                    isRoomOverridden
                   );
  
                   if (isRescheduled) {
@@ -1776,7 +2045,12 @@ export function ScheduleCalendarView({
                       title={isVacant ? `${occ.student?.first_name} ${occ.student?.last_name}` : undefined}
                        onClick={() => {
                         if (!isBreak) {
-                          setEditOccState({ id: occ.id, date: occ.date, start_time: occ.start_time });
+                          setEditOccState({ 
+                            id: occ.id, 
+                            date: occ.date, 
+                            start_time: occ.start_time,
+                            room_id: occ.schedules?.room_id || null
+                          });
                         }
                         // Save selected sick date to localStorage for persistence across tab unmounts
                         localStorage.setItem('selected_sick_date', occ.date);
@@ -1981,323 +2255,391 @@ export function ScheduleCalendarView({
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status === 'cancelled';
         const canDiscard = isMoved || isCancelled;
-        
+        const studentName = occ ? `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim() : 'Schüler';
+        const modalTitle = occ?.student_id ? `Termin bearbeiten: ${studentName}` : 'Pause bearbeiten';
+        const formattedDateLabel = occ ? new Date(editOccState.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+        const formattedTimeLabel = editOccState.start_time.substring(0, 5);
+
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ 
               position: 'relative',
               background: '#ffffff', 
-              padding: '28px', 
               borderRadius: '24px', 
-              boxShadow: '0 20px 50px rgba(0,0,0,0.08)', 
+              boxShadow: '0 20px 50px rgba(0,0,0,0.12)', 
               width: '780px', 
               maxWidth: '95vw', 
               border: '1px solid rgba(0,0,0,0.08)', 
               display: 'flex', 
-              gap: '28px', 
+              flexDirection: 'column',
+              overflow: 'hidden',
               boxSizing: 'border-box' 
             }}>
               
-              {/* Close Button Top Right */}
-              <button
-                onClick={() => setEditOccState(null)}
-                title="Schließen"
-                style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  background: 'rgba(0,0,0,0.04)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#86868b',
-                  transition: 'all 0.2s',
-                  zIndex: 10
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.08)';
-                  e.currentTarget.style.color = '#1d1d1f';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.04)';
-                  e.currentTarget.style.color = '#86868b';
-                }}
-              >
-                <X size={16} strokeWidth={2.5} />
-              </button>
-              
-              {/* Left Column: Edit Form */}
-              <div style={{ width: '320px', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '24px', fontSize: '1.35rem', fontWeight: 800, color: '#1d1d1f', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Termin bearbeiten</h3>
-                
-                <div style={{ marginBottom: '18px' }}>
-                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Datum</label>
-                  <input 
-                    type="date" 
-                    value={editOccState.date} 
-                    onChange={e => setEditOccState({ ...editOccState, date: e.target.value })} 
-                    style={{ 
-                      width: '100%', 
-                      padding: '11px 14px', 
-                      borderRadius: '10px', 
-                      border: '1px solid rgba(0, 0, 0, 0.15)', 
-                      background: 'rgba(255,255,255,0.8)',
-                      fontSize: '0.92rem', 
-                      fontFamily: 'inherit', 
-                      outline: 'none', 
-                      boxSizing: 'border-box',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                      transition: 'border-color 0.2s'
-                    }} 
-                  />
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
-                  <input 
-                    type="time" 
-                    value={editOccState.start_time.substring(0, 5)} 
-                    onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
-                    style={{ 
-                      width: '100%', 
-                      padding: '11px 14px', 
-                      borderRadius: '10px', 
-                      border: '1px solid rgba(0, 0, 0, 0.15)', 
-                      background: 'rgba(255,255,255,0.8)',
-                      fontSize: '0.92rem', 
-                      fontFamily: 'inherit',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                      transition: 'border-color 0.2s'
-                    }} 
-                  />
-                </div>
-
-                {/* Explicit Cancel Lesson Section */}
-                {!isCancelled && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <button 
-                      onClick={(e) => {
-                        handleCancel(e as any, editOccState.id);
-                        setEditOccState(null);
-                      }}
-                      style={{ 
-                        width: '100%',
-                        padding: '12px', 
-                        borderRadius: '12px', 
-                        border: '1px solid rgba(255, 59, 48, 0.15)', 
-                        background: 'rgba(255, 59, 48, 0.04)', 
-                        color: '#ff3b30', 
-                        fontSize: '0.85rem', 
-                        fontWeight: 600, 
-                        cursor: 'pointer', 
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s' 
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.25)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'rgba(255, 59, 48, 0.04)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.15)';
-                      }}
-                    >
-                      <Trash2 size={16} />
-                      Termin absagen
-                    </button>
-                  </div>
-                )}
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+              {/* Premium Green Header Banner */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #118a44 0%, #15803d 100%)', 
+                padding: '20px 28px', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                color: '#ffffff',
+                borderBottom: '1px solid rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '1.5rem' }}>💬</span>
                   <div>
-                    {/* Discard changes / Reset button */}
-                    {canDiscard && (
-                      <button 
-                        onClick={async () => {
-                          if (!editOccState.id.startsWith('mock-')) {
-                            try {
-                              setLoading(true);
-                              const targetDate = occ.original_date || occ.date;
-                              const targetStartTime = occ.original_start_time || occ.start_time;
-
-                              const { error } = await supabase
-                                .from('schedule_occurrences')
-                                .update({
-                                  date: targetDate,
-                                  start_time: targetStartTime,
-                                  status: 'scheduled',
-                                  student_acknowledged: false
-                                })
-                                .eq('id', editOccState.id);
-                              if (error) throw error;
-
-                              // Automatic Notification to Student about Reverting to Regular Time
-                              try {
-                                if (occ.student_id) {
-                                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                  const newDate = new Date(targetDate);
-                                  const newDayLabel = DAYS_DE[newDate.getDay()];
-                                  const newDateLabel = newDate.toLocaleDateString('de-DE');
-                                  const newTimeLabel = targetStartTime.substring(0, 5);
-
-                                  const notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
-                                  
-                                  await supabase.from('campus_direct_messages').insert({
-                                    sender_id: userId,
-                                    recipient_id: occ.student_id,
-                                    content: notificationMessage
-                                  });
-                                }
-                              } catch (notifErr) {
-                                console.warn('Could not send revert notification:', notifErr);
-                              }
-
-                              await loadOccurrences();
-                            } catch (err) {
-                              console.error(err);
-                              alert('Fehler beim Zurücksetzen des Termins');
-                            } finally {
-                              setLoading(false);
-                            }
-                          } else {
-                            resetOccurrence(editOccState.id);
-                          }
-                          setEditOccState(null);
-                        }} 
-                        style={{ padding: '8px 14px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.2s' }}
-                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
-                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        Zurücksetzen
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      onClick={() => setEditOccState(null)} 
-                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.09)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-                    >
-                      Abbrechen
-                    </button>
-                    <button 
-                      onClick={handleSaveEdit} 
-                      style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#16a34a', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                      onMouseOver={e => e.currentTarget.style.background = '#15803d'}
-                      onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
-                    >
-                      Speichern
-                    </button>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                      {modalTitle}
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 550, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                      Termin am {formattedDateLabel} um {formattedTimeLabel} Uhr
+                    </p>
                   </div>
                 </div>
+
+                {/* Close Button Top Right (semi-transparent) */}
+                <button
+                  onClick={() => setEditOccState(null)}
+                  title="Schließen"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.2s',
+                    zIndex: 10
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  }}
+                >
+                  <X size={16} strokeWidth={2.5} />
+                </button>
               </div>
 
-              {occ && occ.student_id && (() => {
-                let isFrozen = false;
-                try {
-                  const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
-                  const lessonDateTime = new Date(`${occ.date}T${timePart}`);
-                  isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
-                } catch (e) {}
-
-                return (
-                  <div style={{ flex: 1, width: '320px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-                    <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.25rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
-                    </h3>
-
-                    {isMoved && (
-                      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
-                          {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Chat messages viewport */}
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
-                      {isFrozen && (
-                        <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
-                          🔒 Shoutbox eingefroren (Schreibschutz aktiv)
-                        </div>
-                      )}
-                      {chatMessages.length === 0 ? (
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
-                          Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
-                        </div>
-                      ) : (
-                        chatMessages.map((msg, idx) => {
-                          const isMe = msg.sender_id === userId;
-                          const isTerminMsg = msg.content.startsWith('[Termin');
-                          let displayedContent = msg.content;
-                          let prefixText = '';
-                          if (isTerminMsg) {
-                            const closeBracketIdx = msg.content.indexOf(']');
-                            if (closeBracketIdx !== -1) {
-                              prefixText = msg.content.substring(1, closeBracketIdx);
-                              displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
-                            }
-                          }
-
-                          return (
-                            <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
-                              {prefixText && (
-                                <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
-                                  📅 {prefixText}
-                                </span>
-                              )}
-                              <div style={{ 
-                                background: isMe ? '#0071e3' : '#f5f5f7', 
-                                color: isMe ? 'white' : '#1d1d1f', 
-                                padding: '8px 12px', 
-                                borderRadius: '12px', 
-                                borderBottomRightRadius: isMe ? '2px' : '12px',
-                                borderBottomLeftRadius: isMe ? '12px' : '2px',
-                                fontSize: '0.82rem',
-                                lineHeight: 1.4,
-                                wordBreak: 'break-word'
-                              }}>
-                                {displayedContent}
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
-                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                      <div ref={chatMessagesEndRef} />
-                    </div>
-
-                    {/* Send Input Form */}
-                    <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                      <input 
-                        type="text" 
-                        placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
-                        disabled={isFrozen}
-                        value={chatTypedMessage}
-                        onChange={e => setChatTypedMessage(e.target.value)}
-                        style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
-                      />
-                      <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#0071e3', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
-                        <Send size={14} />
-                      </button>
-                    </form>
+              {/* Modal Inner Content Body */}
+              <div style={{ display: 'flex', gap: '28px', padding: '28px', boxSizing: 'border-box' }}>
+                
+                {/* Left Column: Edit Form */}
+                <div style={{ width: '320px', display: 'flex', flexDirection: 'column' }}>
+                  
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Datum</label>
+                    <input 
+                      type="date" 
+                      value={editOccState.date} 
+                      onChange={e => setEditOccState({ ...editOccState, date: e.target.value })} 
+                      style={{ 
+                        width: '100%', 
+                        padding: '11px 14px', 
+                        borderRadius: '10px', 
+                        border: '1px solid rgba(0, 0, 0, 0.15)', 
+                        background: 'rgba(255,255,255,0.8)',
+                        fontSize: '0.92rem', 
+                        fontFamily: 'inherit', 
+                        outline: 'none', 
+                        boxSizing: 'border-box',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                        transition: 'border-color 0.2s'
+                      }} 
+                    />
                   </div>
-                );
-              })()}
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
+                    <input 
+                      type="time" 
+                      value={editOccState.start_time.substring(0, 5)} 
+                      onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
+                      style={{ 
+                        width: '100%', 
+                        padding: '11px 14px', 
+                        borderRadius: '10px', 
+                        border: '1px solid rgba(0, 0, 0, 0.15)', 
+                        background: 'rgba(255,255,255,0.8)',
+                        fontSize: '0.92rem', 
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                        transition: 'border-color 0.2s'
+                      }} 
+                    />
+                  </div>
+
+                  {/* Room Selection Dropdown */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Raum</label>
+                    <select 
+                      value={editOccState.room_id || ''} 
+                      onChange={e => setEditOccState({ ...editOccState, room_id: e.target.value || null })} 
+                      style={{ 
+                        width: '100%', 
+                        padding: '11px 14px', 
+                        borderRadius: '10px', 
+                        border: '1px solid rgba(0, 0, 0, 0.15)', 
+                        background: 'rgba(255,255,255,0.8)',
+                        fontSize: '0.92rem', 
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                        transition: 'border-color 0.2s',
+                        cursor: 'pointer'
+                      }} 
+                    >
+                      <option value="">Kein Raum</option>
+                      {freeRooms.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                    {loadingFreeRooms && (
+                      <span style={{ fontSize: '0.75rem', color: '#86868b', marginTop: '4px', display: 'block' }}>Lade freie Räume...</span>
+                    )}
+                  </div>
+  
+                  {/* Explicit Cancel Lesson Section */}
+                  {!isCancelled && (
+                    <div style={{ marginBottom: '24px' }}>
+                      <button 
+                        onClick={(e) => {
+                          handleCancel(e as any, editOccState.id);
+                          setEditOccState(null);
+                        }}
+                        style={{ 
+                          width: '100%',
+                          padding: '12px', 
+                          borderRadius: '12px', 
+                          border: '1px solid rgba(255, 59, 48, 0.15)', 
+                          background: 'rgba(255, 59, 48, 0.04)', 
+                          color: '#ff3b30', 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600, 
+                          cursor: 'pointer', 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s' 
+                        }}
+                        onMouseOver={e => {
+                          e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.25)';
+                        }}
+                        onMouseOut={e => {
+                          e.currentTarget.style.background = 'rgba(255, 59, 48, 0.04)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.15)';
+                        }}
+                      >
+                        <Trash2 size={16} />
+                        Termin absagen
+                      </button>
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div>
+                      {/* Discard changes / Reset button */}
+                      {canDiscard && (
+                        <button 
+                          onClick={async () => {
+                            if (!editOccState.id.startsWith('mock-')) {
+                              try {
+                                setLoading(true);
+                                const targetDate = occ.original_date || occ.date;
+                                const targetStartTime = occ.original_start_time || occ.start_time;
+  
+                                const { error } = await supabase
+                                  .from('schedule_occurrences')
+                                  .update({
+                                    date: targetDate,
+                                    start_time: targetStartTime,
+                                    status: 'scheduled',
+                                    student_acknowledged: false
+                                  })
+                                  .eq('id', editOccState.id);
+                                if (error) throw error;
+  
+                                // Clean up any override room bookings for this occurrence
+                                try {
+                                  await supabase.from('room_bookings')
+                                    .delete()
+                                    .eq('booked_by', userId)
+                                    .eq('date', occ.date)
+                                    .eq('start_time', occ.start_time);
+                                  window.dispatchEvent(new CustomEvent('refresh-bookings'));
+                                } catch (roomErr) {
+                                  console.warn('Error deleting room booking on revert:', roomErr);
+                                }
+
+                                // Automatic Notification to Student about Reverting to Regular Time
+                                try {
+                                  if (occ.student_id) {
+                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                                    const newDate = new Date(targetDate);
+                                    const newDayLabel = DAYS_DE[newDate.getDay()];
+                                    const newDateLabel = newDate.toLocaleDateString('de-DE');
+                                    const newTimeLabel = targetStartTime.substring(0, 5);
+  
+                                    const notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
+                                    
+                                    await supabase.from('campus_direct_messages').insert({
+                                      sender_id: userId,
+                                      recipient_id: occ.student_id,
+                                      content: notificationMessage
+                                    });
+                                  }
+                                } catch (notifErr) {
+                                  console.warn('Could not send revert notification:', notifErr);
+                                }
+  
+                                await loadOccurrences();
+                              } catch (err) {
+                                console.error(err);
+                                alert('Fehler beim Zurücksetzen des Termins');
+                              } finally {
+                                setLoading(false);
+                              }
+                            } else {
+                              resetOccurrence(editOccState.id);
+                            }
+                            setEditOccState(null);
+                          }} 
+                          style={{ padding: '8px 14px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.2s' }}
+                          onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Zurücksetzen
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => setEditOccState(null)} 
+                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.09)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                      >
+                        Abbrechen
+                      </button>
+                      <button 
+                        onClick={handleSaveEdit} 
+                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+                        onMouseOut={e => e.currentTarget.style.background = '#118a44'}
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                  </div>
+                </div>
+  
+                {occ && occ.student_id && (() => {
+                  let isFrozen = false;
+                  try {
+                    const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
+                    const lessonDateTime = new Date(`${occ.date}T${timePart}`);
+                    isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
+                  } catch (e) {}
+  
+                  return (
+                    <div style={{ flex: 1, width: '320px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                      <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
+                      </h4>
+  
+                      {isMoved && (
+                        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
+                            {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
+                          </span>
+                        </div>
+                      )}
+  
+                      {/* Chat messages viewport */}
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
+                        {isFrozen && (
+                          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
+                            🔒 Shoutbox eingefroren (Schreibschutz aktiv)
+                          </div>
+                        )}
+                        {chatMessages.length === 0 ? (
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
+                            Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
+                          </div>
+                        ) : (
+                          chatMessages.map((msg, idx) => {
+                            const isMe = msg.sender_id === userId;
+                            const isTerminMsg = msg.content.startsWith('[Termin');
+                            let displayedContent = msg.content;
+                            let prefixText = '';
+                            if (isTerminMsg) {
+                              const closeBracketIdx = msg.content.indexOf(']');
+                              if (closeBracketIdx !== -1) {
+                                prefixText = msg.content.substring(1, closeBracketIdx);
+                                displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
+                              }
+                            }
+  
+                            return (
+                              <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
+                                {prefixText && (
+                                  <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+                                    📅 {prefixText}
+                                  </span>
+                                )}
+                                <div style={{ 
+                                  background: isMe ? '#118a44' : '#f5f5f7', 
+                                  color: isMe ? 'white' : '#1d1d1f', 
+                                  padding: '8px 12px', 
+                                  borderRadius: '12px', 
+                                  borderBottomRightRadius: isMe ? '2px' : '12px',
+                                  borderBottomLeftRadius: isMe ? '12px' : '2px',
+                                  fontSize: '0.82rem',
+                                  lineHeight: 1.4,
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {displayedContent}
+                                </div>
+                                <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
+                                  {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div ref={chatMessagesEndRef} />
+                      </div>
+  
+                      {/* Send Input Form */}
+                      <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                        <input 
+                          type="text" 
+                          placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
+                          disabled={isFrozen}
+                          value={chatTypedMessage}
+                          onChange={e => setChatTypedMessage(e.target.value)}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
+                        />
+                        <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#118a44', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+                          <Send size={14} />
+                        </button>
+                      </form>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         );

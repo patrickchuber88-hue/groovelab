@@ -14,13 +14,15 @@ const supabase = createClient(url, key, {
 });
 
 async function run() {
-  console.log("Querying schedule_occurrences for 2026-06-11 as Patrick Huber...");
-  const { data, error } = await supabase
+  const occId = "6c22036b-ab2c-4724-8e90-84272d9db0ef";
+  console.log(`Attempting to delete schedule occurrence ID ${occId} as Patrick Huber...`);
+  const { data, error, count } = await supabase
     .from('schedule_occurrences')
-    .select('*, schedules(*)')
-    .eq('date', '2026-06-11');
-  console.log("Data:", JSON.stringify(data, null, 2));
-  console.log("Error:", error);
+    .delete()
+    .eq('id', occId);
+  console.log("Delete result data:", data);
+  console.log("Delete result error:", error);
+  console.log("Delete count:", count);
 }
 
 run();
