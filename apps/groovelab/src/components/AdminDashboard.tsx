@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -283,6 +283,8 @@ export function AdminDashboard({
   // Campus Bookings states
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
   const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
+  const [showUnsuitableList, setShowUnsuitableList] = useState(false);
+  const [hoveredInstrumentIdx, setHoveredInstrumentIdx] = useState<number | null>(null);
   const consolidateBookings = (bookings: any[]) => {
     const timeToMins = (t: string) => {
       if (!t) return 0;
@@ -8247,6 +8249,236 @@ export function AdminDashboard({
                       : `${selectedRoom.name} buchen`}
 
                 </button>
+
+              </div>
+            )}
+
+            {/* properties widget */}
+            {selectedRoom && (
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  background: 'white', 
+                  borderRadius: '18px', 
+                  border: '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: '14px 16px', 
+                  boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sliders size={15} style={{ color: brandColor }} />
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1c1c1e', margin: 0 }}>
+                    Eigenschaften
+                  </h3>
+                </div>
+
+                {/* Grid stats: Size and Max Students */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {/* Size */}
+                  <div style={{ 
+                    background: '#f8fafc', 
+                    border: '1px solid rgba(0,0,0,0.02)', 
+                    borderRadius: '12px', 
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Maximize2 size={14} style={{ color: '#64748b' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 800, textTransform: 'uppercase' }}>Größe</span>
+                      <span style={{ fontSize: '0.8rem', color: '#1c1c1e', fontWeight: 700 }}>{selectedRoom.qm || '—'} qm</span>
+                    </div>
+                  </div>
+
+                  {/* Max Students */}
+                  <div style={{ 
+                    background: '#f8fafc', 
+                    border: '1px solid rgba(0,0,0,0.02)', 
+                    borderRadius: '12px', 
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Users size={14} style={{ color: '#64748b' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 800, textTransform: 'uppercase' }}>Kapazität</span>
+                      <span style={{ fontSize: '0.8rem', color: '#1c1c1e', fontWeight: 700 }}>{selectedRoom.max_students || '1'} Schüler</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acoustics (unsuitable list dropdown/modal) */}
+                {selectedRoom.unsuitable_instruments && selectedRoom.unsuitable_instruments.length > 0 && (
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowUnsuitableList(prev => !prev)}
+                      style={{
+                        width: '100%',
+                        background: '#fff5f5',
+                        border: '1px solid #fee2e2',
+                        borderRadius: '12px',
+                        padding: '8px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#fca5a5'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#fee2e2'; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <VolumeX size={15} style={{ color: '#ef4444' }} />
+                        <span style={{ fontSize: '0.74rem', color: '#991b1b', fontWeight: 700 }}>
+                          Akustik ungeeignet für...
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', background: '#fca5a550', color: '#b91c1c', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                        {selectedRoom.unsuitable_instruments.length}
+                      </span>
+                    </button>
+
+                    {showUnsuitableList && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        background: 'white',
+                        border: '1px solid #f3f4f6',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        borderRadius: '12px',
+                        padding: '10px',
+                        zIndex: 40,
+                        maxHeight: '120px',
+                        overflowY: 'auto'
+                      }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {selectedRoom.unsuitable_instruments.map((inst: string, idx: number) => (
+                            <span 
+                              key={idx} 
+                              style={{ 
+                                fontSize: '0.68rem', 
+                                background: '#fee2e2', 
+                                color: '#b91c1c', 
+                                padding: '3px 8px', 
+                                borderRadius: '6px', 
+                                fontWeight: 700 
+                              }}
+                            >
+                              {inst}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Instruments List (with Tooltips) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                    Vorhandene Instrumente
+                  </span>
+                  {selectedRoom.room_instruments && selectedRoom.room_instruments.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {selectedRoom.room_instruments.map((inst: any, idx: number) => (
+                        <div 
+                          key={idx} 
+                          style={{ position: 'relative' }}
+                          onMouseEnter={() => setHoveredInstrumentIdx(idx)}
+                          onMouseLeave={() => setHoveredInstrumentIdx(null)}
+                        >
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.74rem',
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            border: '1px solid #e2e8f0',
+                            cursor: inst.model ? 'help' : 'default'
+                          }}>
+                            {inst.name}
+                          </span>
+
+                          {/* Hover Tooltip showing the model info */}
+                          {inst.model && hoveredInstrumentIdx === idx && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '100%',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              marginBottom: '6px',
+                              background: '#0f172a',
+                              color: 'white',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                              zIndex: 50
+                            }}>
+                              {inst.model}
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: 0,
+                                height: 0,
+                                borderLeft: '4px solid transparent',
+                                borderRight: '4px solid transparent',
+                                borderTop: '4px solid #0f172a'
+                              }} />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', fontWeight: 600 }}>
+                      Keine Instrumente angegeben
+                    </span>
+                  )}
+                </div>
+
+                {/* Sonstiges (Comments) */}
+                {selectedRoom.sonstiges && selectedRoom.sonstiges.trim() && (
+                  <div style={{ 
+                    borderTop: '1px solid #f1f5f9', 
+                    paddingTop: '8px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '4px' 
+                  }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                      Sonstiges
+                    </span>
+                    <p style={{ 
+                      fontSize: '0.74rem', 
+                      color: '#475569', 
+                      fontWeight: 600, 
+                      margin: 0, 
+                      background: '#f8fafc',
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(0,0,0,0.01)'
+                    }}>
+                      {selectedRoom.sonstiges}
+                    </p>
+                  </div>
+                )}
 
               </div>
             )}

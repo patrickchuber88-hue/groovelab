@@ -1103,3 +1103,110 @@ button, a, [role="button"], [onClick] {
   transform: scale(1.3);
 }
 
+/* ============================================================
+   APPLE-STYLE DROPDOWN MENUS (SELECT ELEMENTS)
+   ============================================================ */
+select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237d7d82' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 10px !important;
+  padding-right: 28px !important; /* Ensure space for chevron */
+  
+  /* Modern clean fonts and transitions */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Unless custom style overrides the whole visual frame, we want a premium default frame for selects */
+select:not([style*="background"]):not([style*="background-color"]) {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+select:not([style*="border"]) {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+select:not([style*="padding"]) {
+  padding: 8px 30px 8px 12px;
+}
+
+select:not([style*="font-size"]) {
+  font-size: 0.85rem;
+}
+
+select:not([style*="font-weight"]) {
+  font-weight: 500;
+}
+
+select:not([style*="color"]) {
+  color: #1d1d1f;
+}
+
+/* Hover & focus states */
+select:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+select:focus {
+  outline: none !important;
+  border-color: #007aff !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Custom styles for dark areas or dark theme */
+.dark select,
+[data-theme="dark"] select,
+.bg-slate-900 select,
+.bg-gray-900 select,
+.bg-slate-950 select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E") !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f5f5f7 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark select:hover,
+[data-theme="dark"] select:hover,
+.bg-slate-900 select:hover,
+.bg-gray-900 select:hover,
+.bg-slate-950 select:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark select:focus,
+[data-theme="dark"] select:focus,
+.bg-slate-900 select:focus,
+.bg-gray-900 select:focus,
+.bg-slate-950 select:focus {
+  border-color: #0a84ff !important;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Styled option elements */
+select option {
+  background-color: #ffffff;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.dark select option,
+[data-theme="dark"] select option,
+.bg-slate-900 select option,
+.bg-gray-900 select option,
+.bg-slate-950 select option {
+  background-color: #1c1c1e;
+  color: #f5f5f7;
+}
