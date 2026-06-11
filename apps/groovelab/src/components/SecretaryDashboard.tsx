@@ -10998,7 +10998,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     {hoveredUnassignedDayNum === dayNum && unassigned.length > 0 && (
                                       <div style={{
                                         position: 'absolute',
-                                        top: '100%',
+                                        bottom: '100%',
                                         left: '8px',
                                         width: '210px',
                                         background: 'rgba(255, 255, 255, 0.96)',
@@ -11012,11 +11012,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: '6px',
-                                        marginTop: '4px',
-                                        pointerEvents: draggedPlanId ? 'none' : 'auto',
-                                        opacity: draggedPlanId ? 0 : 1,
-                                        visibility: draggedPlanId ? 'hidden' : 'visible',
-                                        transition: 'opacity 0.15s, visibility 0.15s'
+                                        marginBottom: '6px'
                                       }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px', marginBottom: '2px' }}>
                                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase' }}>Offene Termine</span>
