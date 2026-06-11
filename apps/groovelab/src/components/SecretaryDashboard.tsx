@@ -9522,8 +9522,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (emp.ausweis_nummer) {
+                                    // Copy to clipboard as backup
                                     navigator.clipboard.writeText(emp.ausweis_nummer);
-                                    alert(`PIN "${emp.ausweis_nummer}" wurde in die Zwischenablage kopiert.`);
+                                    
+                                    // Construct mail components
+                                    const emailRecipient = emp.email || '';
+                                    const subject = encodeURIComponent('Dein GrooveLab Mitarbeiter-Zugang 🎸');
+                                    const body = encodeURIComponent(
+                                      `Hallo ${emp.first_name || 'Mitarbeiter(in)'},\n\n` +
+                                      `willkommen im GrooveLab-Team!\n\n` +
+                                      `Dein persönlicher Mitarbeiter-PIN für die Anmeldung und Profilverknüpfung lautet:\n` +
+                                      `👉 ${emp.ausweis_nummer}\n\n` +
+                                      `(Die PIN wurde soeben auch in deine Zwischenablage kopiert)\n\n` +
+                                      `Damit kannst du dich auf der Plattform anmelden oder dein Profil mit der App verknüpfen.\n\n` +
+                                      `Viele Grüße,\n` +
+                                      `Musikschule Bad Säckingen`
+                                    );
+                                    
+                                    window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
                                   } else {
                                     alert('Keine PIN vorhanden.');
                                   }
