@@ -13838,6 +13838,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
                 const moduleCost = activeModulesCount * 4.99;
+                const studentLevyMonthly = (() => {
+                  if (studentBillingOption === 'option1') return students.length * (5.29 / 12);
+                  if (studentBillingOption === 'option2') return students.length * 0.49;
+                  if (studentBillingOption === 'option3_1') return students.length * 0.24;
+                  if (studentBillingOption === 'option3_2') return students.length * (2.59 / 12);
+                  return 0;
+                })();
+                const extraLevyMonthly = (() => {
+                  if (extraBillingOption === 'option1') return bookedExtraUsers * (5.29 / 12);
+                  if (extraBillingOption === 'option2') return bookedExtraUsers * 0.49;
+                  if (extraBillingOption === 'option3_1') return bookedExtraUsers * 0.24;
+                  if (extraBillingOption === 'option3_2') return bookedExtraUsers * (2.59 / 12);
+                  return 0;
+                })();
                 return (
                   <>
 
@@ -13946,6 +13960,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
                           const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
                           
+                          // Mixed Total B2B + B2C
+                          const mixedTotal = currentTotalB2B + studentLevyMonthly + extraLevyMonthly;
+                          
                           return (
                             <div style={{
                               background: '#f0f9ff',
@@ -13954,52 +13971,81 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               border: '1.5px solid #bae6fd',
                               display: 'flex',
                               flexDirection: 'column',
-                              justifyContent: 'space-between',
                               minHeight: '190px',
                               marginTop: 'auto',
                               boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
                             }}>
-                              <div>
-                                <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Monatlicher Bankeinzug B2B</span>
-                                <strong style={{ display: 'block', fontSize: '1.6rem', color: '#0369a1', margin: '6px 0', fontWeight: 800 }}>
-                                  {currentTotalB2B.toFixed(2)} € 
-                                  {!isBillingBooked && studentSharePreview > 0 && (
-                                    <span style={{ fontSize: '0.9rem', color: '#0284c7', fontWeight: 600, marginLeft: '6px' }}>
-                                      + {studentSharePreview.toFixed(2)} €
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#0369a1' }}> / Mo.</span>
-                                </strong>
-                                {!isBillingBooked && studentSharePreview > 0 && (
-                                  <span style={{ fontSize: '0.66rem', color: '#0284c7', display: 'block', marginTop: '-4px', fontWeight: 700 }}>
-                                    {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € = {(baseB2B + studentSharePreview).toFixed(2)} € / Mo. (nach Einbuchung)
-                                  </span>
-                                )}
-                              </div>
+                              <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>Monatlicher Bankeinzug B2B + B2C (Gesamteinzug)</span>
 
-                              <div style={{ fontSize: '0.7rem', color: '#0284c7', borderTop: '1px solid #bae6fd', paddingTop: '8px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>• Modul-Grundgebühr:</span>
-                                  <strong>{moduleCost.toFixed(2)} €</strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>• User-Infrastruktur ({allTeachers.length + employees.length} User):</span>
-                                  <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
-                                </div>
-                                {studentSharePreview > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: isBillingBooked ? 700 : 400 }}>
-                                    <span>• Kofinanzierungs-Schulanteil (25¢):</span>
-                                    <strong>
-                                      {isBillingBooked ? '' : '(Vorschau) '}{(students.length * 0.25).toFixed(2)} €
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', flex: 1, alignItems: 'stretch' }}>
+                                {/* Left Side: Reine Schul-Kosten */}
+                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                  <div>
+                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 700 }}>Anteil Musikschule</span>
+                                    <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0369a1', margin: '4px 0', fontWeight: 800 }}>
+                                      {currentTotalB2B.toFixed(2)} € <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>/ Mo.</span>
                                     </strong>
+                                    {!isBillingBooked && studentSharePreview > 0 && (
+                                      <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
+                                        {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € (Vorschau)
+                                      </span>
+                                    )}
                                   </div>
-                                )}
-                                {schoolShareBookedExtra > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                    <span>• Extra-User Kofinanzierungsanteil ({bookedExtraUsers} Schüler):</span>
-                                    <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
+                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>• Grundpreis:</span>
+                                      <strong>{moduleCost.toFixed(2)} €</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>• Team ({allTeachers.length + employees.length}):</span>
+                                      <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
+                                    </div>
+                                    {isBillingBooked && studentSharePreview > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                        <span>• Kofinanzierung:</span>
+                                        <strong>{studentSharePreview.toFixed(2)} €</strong>
+                                      </div>
+                                    )}
+                                    {schoolShareBookedExtra > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                        <span>• Extra-User:</span>
+                                        <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
+
+                                {/* Divider */}
+                                <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
+
+                                {/* Right Side: Gesamteinzug (Mischpreis) */}
+                                <div id="b2b-mixed-price-target" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+                                  <div>
+                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 700 }}>Gesamter Einzug (Mischpreis)</span>
+                                    <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0369a1', margin: '4px 0', fontWeight: 800 }}>
+                                      {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>/ Mo.</span>
+                                    </strong>
+                                    {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
+                                      <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
+                                        (Vorschau nach Einbuchung)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>• Schule (B2B):</span>
+                                      <strong>{currentTotalB2B.toFixed(2)} €</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
+                                      <span>• Schüler (B2C Umlage):</span>
+                                      <strong>{(studentLevyMonthly + extraLevyMonthly).toFixed(2)} €</strong>
+                                    </div>
+                                    <div style={{ borderTop: '1px dashed #bae6fd', paddingTop: '2px', marginTop: '2px', display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                                      <span>Gesamteinzug:</span>
+                                      <span>{mixedTotal.toFixed(2)} €</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           );
@@ -14268,8 +14314,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           flexDirection: 'column',
                           minHeight: '190px',
                           marginTop: 'auto',
-                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)'
+                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)',
+                          position: 'relative'
                         }}>
+                          {/* Flow Arrow pointing to B2B Mixed Price on the left */}
+                          <div style={{
+                            position: 'absolute',
+                            left: '-24px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: '#faf5ff',
+                            border: '1.5px dashed #6b21a8',
+                            color: '#6b21a8',
+                            fontSize: '0.55rem',
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: '100px',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 6px rgba(107, 33, 168, 0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            zIndex: 10,
+                            pointerEvents: 'none'
+                          }}>
+                            <span>◀ Umlage fließt in Gesamteinzug ein</span>
+                          </div>
+
                           <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Umlage pro Schüler B2C</span>
                           
                           {studentBillingOption === 'option1' && (() => {
