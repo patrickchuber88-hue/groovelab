@@ -14836,50 +14836,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Divider 1 */}
                         <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
 
-                        {/* Middle Side: Einmalige Umlage (Schüler-Pauschale) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                          <div>
-                            <span style={{ fontSize: '0.58rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800 }}>Anteil Schüler (B2C)</span>
-                            {(() => {
-                              const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                              const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
-                              const totalYearly = students.length * pricePerStudent;
-                              return (
-                                <>
-                                  <strong style={{ display: 'block', fontSize: '1.4rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', margin: '6px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
-                                    {totalYearly.toFixed(2)} €
-                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
-                                      <span style={{ color: '#2563eb', fontSize: '0.9rem', marginLeft: '4px', fontWeight: 800 }}>
-                                        + {extraLevyYearlyAdditional.toFixed(2)} €
-                                      </span>
-                                    )}
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 500 }}> / Jahr</span>
-                                  </strong>
-                                  <span style={{ fontSize: '0.52rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
-                                    {isAnnual ? `${students.length} Schüler × ${pricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
-                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
-                                      <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
-                                    )}
-                                  </span>
-                                </>
-                              );
-                            })()}
-                          </div>
-                          <div style={{ fontSize: '0.66rem', color: '#6b21a8', display: 'flex', flexDirection: 'column', gap: '3px', opacity: isAnnual || isAnnualAdditional ? 1 : 0.4 }}>
-                            <span>• Schüler-Jahrespauschale</span>
-                            <span>• Wird 1× jährlich eingezogen</span>
-                            {(isAnnual || isAnnualAdditional) && (
-                              <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', fontWeight: 700, marginTop: '4px' }}>
-                                ◀ fließt aus B2C Schüler-Modul ein
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Divider 2 */}
-                        <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
-
-                        {/* Right Side: Gesamteinzug (Mischpreis) - Highlighted! */}
+                        {/* Middle Side: Gesamteinzug (Mischpreis) - Highlighted! */}
                         <div id="b2b-mixed-price-target" style={{
                           display: 'flex',
                           flexDirection: 'column',
@@ -14960,6 +14917,49 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €
                               </span>
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Divider 2 */}
+                        <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
+
+                        {/* Right Side: Einmalige Umlage (Schüler-Pauschale / Einmalzahlungen) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800 }}>Anteil Schüler (B2C)</span>
+                            {(() => {
+                              const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                              const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
+                              const totalYearly = students.length * pricePerStudent;
+                              return (
+                                <>
+                                  <strong style={{ display: 'block', fontSize: '1.4rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', margin: '6px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                    {totalYearly.toFixed(2)} €
+                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
+                                      <span style={{ color: '#2563eb', fontSize: '0.9rem', marginLeft: '4px', fontWeight: 800 }}>
+                                        + {extraLevyYearlyAdditional.toFixed(2)} €
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 500 }}> / Jahr</span>
+                                  </strong>
+                                  <span style={{ fontSize: '0.52rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
+                                    {isAnnual ? `${students.length} Schüler × ${pricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
+                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
+                                      <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
+                                    )}
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#6b21a8', display: 'flex', flexDirection: 'column', gap: '3px', opacity: isAnnual || isAnnualAdditional ? 1 : 0.4 }}>
+                            <span>• Schüler-Jahrespauschale</span>
+                            <span>• Wird 1× jährlich eingezogen</span>
+                            {(isAnnual || isAnnualAdditional) && (
+                              <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', fontWeight: 700, marginTop: '4px' }}>
+                                ◀ fließt aus B2C Schüler-Modul ein
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
