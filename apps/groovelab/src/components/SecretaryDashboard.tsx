@@ -14018,12 +14018,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {/* Divider */}
                                 <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
 
-                                {/* Right Side: Gesamteinzug (Mischpreis) */}
-                                <div id="b2b-mixed-price-target" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+                                {/* Right Side: Gesamteinzug (Mischpreis) - Highlighted! */}
+                                <div id="b2b-mixed-price-target" style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  background: '#e0f2fe',
+                                  padding: '12px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #0284c7',
+                                  boxShadow: '0 2px 6px rgba(3, 105, 161, 0.04)',
+                                  marginTop: '-4px',
+                                  marginBottom: '-4px'
+                                }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 700 }}>Gesamter Einzug (Mischpreis)</span>
-                                    <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0369a1', margin: '4px 0', fontWeight: 800 }}>
-                                      {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>/ Mo.</span>
+                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
+                                    <strong style={{ display: 'block', fontSize: '1.35rem', color: '#0369a1', margin: '2px 0', fontWeight: 800 }}>
+                                      {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.68rem', fontWeight: 500 }}>/ Mo.</span>
                                     </strong>
                                     {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
                                       <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
@@ -14036,11 +14047,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span>• Schule (B2B):</span>
                                       <strong>{currentTotalB2B.toFixed(2)} €</strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
-                                      <span>• Schüler (B2C Umlage):</span>
-                                      <strong>{(studentLevyMonthly + extraLevyMonthly).toFixed(2)} €</strong>
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
+                                        <span>• Schüler (B2C Umlage):</span>
+                                        <strong>{(studentLevyMonthly + extraLevyMonthly).toFixed(2)} €</strong>
+                                      </div>
+                                      <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', textAlign: 'right', fontWeight: 700, marginTop: '-2px' }}>
+                                        ◀ fließt aus B2C Schüler-Modul ein
+                                      </span>
                                     </div>
-                                    <div style={{ borderTop: '1px dashed #bae6fd', paddingTop: '2px', marginTop: '2px', display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                                    <div style={{ borderTop: '1px dashed #0284c7', paddingTop: '2.5px', marginTop: '2.5px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.66rem' }}>
                                       <span>Gesamteinzug:</span>
                                       <span>{mixedTotal.toFixed(2)} €</span>
                                     </div>
@@ -14314,33 +14330,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           flexDirection: 'column',
                           minHeight: '190px',
                           marginTop: 'auto',
-                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)',
-                          position: 'relative'
+                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)'
                         }}>
-                          {/* Flow Arrow pointing to B2B Mixed Price on the left */}
-                          <div style={{
-                            position: 'absolute',
-                            left: '-24px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: '#faf5ff',
-                            border: '1.5px dashed #6b21a8',
-                            color: '#6b21a8',
-                            fontSize: '0.55rem',
-                            fontWeight: 800,
-                            padding: '3px 8px',
-                            borderRadius: '100px',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 2px 6px rgba(107, 33, 168, 0.08)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            zIndex: 10,
-                            pointerEvents: 'none'
-                          }}>
-                            <span>◀ Umlage fließt in Gesamteinzug ein</span>
-                          </div>
-
                           <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Umlage pro Schüler B2C</span>
                           
                           {studentBillingOption === 'option1' && (() => {
