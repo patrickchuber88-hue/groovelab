@@ -14376,6 +14376,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const singlePrice = "5,29 €";
                             const period = "Jahr";
                             const totalVal = (students.length * 5.29).toFixed(2);
+                            const originalTotalVal = (students.length * 5.88).toFixed(2);
+                            const savedTotalVal = (students.length * 0.59).toFixed(2);
                             return (
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', flex: 1, marginTop: '8px', alignItems: 'stretch' }}>
                                 {/* Left Side: Einzelpreis */}
@@ -14400,9 +14402,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
                                     <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Kosten alle Schüler</span>
-                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
-                                      {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
-                                    </strong>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '4px 0 0 0' }}>
+                                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>
+                                        {originalTotalVal} €
+                                      </span>
+                                      <strong style={{ fontSize: '1.4rem', color: '#6b21a8', fontWeight: 800 }}>
+                                        {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
+                                      </strong>
+                                    </div>
+                                    <span style={{ fontSize: '0.52rem', background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0', padding: '1.5px 5px', borderRadius: '4px', fontWeight: 800, display: 'inline-block', marginTop: '2px' }}>
+                                      10% Rabatt: −{savedTotalVal} € gespart!
+                                    </span>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
                                     <strong>Rechnung (Einmalig):</strong><br />
@@ -14502,6 +14512,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const singlePrice = "2,59 €";
                             const period = "Jahr";
                             const totalVal = (students.length * 2.59).toFixed(2);
+                            const originalTotalVal = (students.length * 2.88).toFixed(2);
+                            const savedTotalVal = (students.length * 0.29).toFixed(2);
                             return (
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', flex: 1, marginTop: '8px', alignItems: 'stretch' }}>
                                 {/* Left Side: Einzelpreis */}
@@ -14526,9 +14538,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
                                     <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Kosten alle Schüler</span>
-                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
-                                      {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
-                                    </strong>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '4px 0 0 0' }}>
+                                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>
+                                        {originalTotalVal} €
+                                      </span>
+                                      <strong style={{ fontSize: '1.4rem', color: '#6b21a8', fontWeight: 800 }}>
+                                        {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
+                                      </strong>
+                                    </div>
+                                    <span style={{ fontSize: '0.52rem', background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0', padding: '1.5px 5px', borderRadius: '4px', fontWeight: 800, display: 'inline-block', marginTop: '2px' }}>
+                                      10% Rabatt: −{savedTotalVal} € gespart!
+                                    </span>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
                                     <strong>Rechnung (Einmalig):</strong><br />
