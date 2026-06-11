@@ -13873,7 +13873,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               borderColor: hasCampusSub ? '#10b981' : '#cbd5e1',
                               cursor: 'pointer',
                               transition: 'all 0.15s',
-                              minHeight: '100px'
+                              minHeight: '140px'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
@@ -13905,7 +13905,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               borderColor: hasGroovelabSub ? '#f59e0b' : '#cbd5e1',
                               cursor: 'pointer',
                               transition: 'all 0.15s',
-                              minHeight: '100px'
+                              minHeight: '140px'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
@@ -13936,7 +13936,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '140px',
+                          minHeight: '190px',
+                          marginTop: 'auto',
                           boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
                         }}>
                           <div>
@@ -14057,7 +14058,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '140px',
+                          minHeight: '190px',
+                          marginTop: 'auto',
                           boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)'
                         }}>
                           <div>
@@ -14134,45 +14136,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </div>
                     </div>
 
-                    {/* Section 5: User Breakdown List */}
-                    <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.01)' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>User &amp; Zuweisung nach Lehrern</h4>
 
-                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', textAlign: 'left' }}>
-                          <thead>
-                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                              <th style={{ padding: '6px 10px', fontWeight: 600, color: '#475569' }}>Lehrer</th>
-                              <th style={{ padding: '6px 10px', fontWeight: 600, color: '#475569' }}>Status</th>
-                              <th style={{ padding: '6px 10px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Schüler</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {allTeachers.map((c) => {
-                              const assignedStudentsCount = students.filter(s => s.teacher_id === c.id).length;
-                              return (
-                                <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                  <td style={{ padding: '6px 10px', fontWeight: 550, color: '#334155' }}>{c.firstName} {c.lastName}</td>
-                                  <td style={{ padding: '6px 10px' }}>
-                                    <span style={{
-                                      fontSize: '0.62rem',
-                                      padding: '1px 5px',
-                                      borderRadius: '100px',
-                                      background: c.isActive ? '#d1fae5' : '#fee2e2',
-                                      color: c.isActive ? '#065f46' : '#991b1b',
-                                      fontWeight: 600
-                                    }}>
-                                      {c.isActive ? 'Aktiv' : 'Inaktiv'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>{assignedStudentsCount}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
                   </>
                 );
               })()}
