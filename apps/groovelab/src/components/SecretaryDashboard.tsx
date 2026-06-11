@@ -7642,7 +7642,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     )}
                   </div>
 
-                  {/* WIDGET: Termineinreichungen */}
+                  {/* WIDGET: Stundenplaneinreichungen */}
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -7657,7 +7657,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                         <div>
                           <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Termineinreichungen
+                            Stundenplaneinreichungen
                           </h3>
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
                             Zu prüfende Stundenpläne ({pendingSchedules.length})
@@ -7681,82 +7681,87 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Es liegen aktuell keine ausstehenden Stundenplaneinreichungen vor.</span>
                         </div>
                       ) : (
-                        pendingSchedules.slice(0, 5).map((sched) => {
-                          const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-                          const dayLabel = days[sched.day_of_week - 1] || 'Wochentag';
-                          return (
-                            <div key={sched.id} style={{
-                              padding: '12px 14px',
-                              borderRadius: '16px',
-                              border: '1px solid rgba(37, 99, 235, 0.1)',
-                              background: 'rgba(37, 99, 235, 0.02)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '8px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div>
-                                  <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
-                                    👨‍🏫 {sched.teacher_name}
+                        (() => {
+                          // Group pending schedules by teacher
+                          const groupedPending: Record<string, { teacherName: string, instrument: string, days: number[], slotsCount: number }> = {};
+                          pendingSchedules.forEach(sched => {
+                            const tId = sched.teacher_id;
+                            if (!groupedPending[tId]) {
+                              groupedPending[tId] = {
+                                teacherName: sched.teacher_name,
+                                instrument: sched.instrument || '',
+                                days: [],
+                                slotsCount: 0
+                              };
+                            }
+                            groupedPending[tId].days.push(sched.day_of_week);
+                            groupedPending[tId].slotsCount++;
+                          });
+
+                          return Object.entries(groupedPending).map(([tId, data]) => {
+                            const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+                            const uniqueDays = Array.from(new Set(data.days)).sort((a, b) => a - b);
+                            let daysLabel = '';
+                            
+                            // Form contiguous range if possible
+                            let isContiguous = true;
+                            for (let i = 1; i < uniqueDays.length; i++) {
+                              if (uniqueDays[i] !== uniqueDays[i-1] + 1) {
+                                isContiguous = false;
+                                break;
+                              }
+                            }
+                            if (isContiguous && uniqueDays.length > 2) {
+                              daysLabel = `${daysOfWeek[uniqueDays[0] - 1]} – ${daysOfWeek[uniqueDays[uniqueDays.length - 1] - 1]}`;
+                            } else {
+                              daysLabel = uniqueDays.map(d => daysOfWeek[d - 1]).join(', ');
+                            }
+
+                            return (
+                              <div key={tId} style={{
+                                padding: '12px 16px',
+                                borderRadius: '16px',
+                                border: '1px solid rgba(0, 0, 0, 0.05)',
+                                background: 'rgba(0, 0, 0, 0.01)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '12px'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <strong style={{ fontSize: '0.84rem', color: '#1c1c1e', fontWeight: 700 }}>
+                                    {data.teacherName}
                                   </strong>
-                                  <span style={{ fontSize: '0.72rem', color: '#4b5563', fontWeight: 600 }}>
-                                    🎓 Schüler: {sched.student_name}
+                                  <span style={{ fontSize: '0.72rem', color: '#8e8e93', fontWeight: 500 }}>
+                                    📅 {daysLabel} ({data.slotsCount} {data.slotsCount === 1 ? 'Termin' : 'Termine'})
                                   </span>
                                 </div>
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                  <button
-                                    onClick={() => handleApproveSingleSchedule(sched.id)}
-                                    style={{
-                                      background: '#10b981',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      borderRadius: '8px',
-                                      padding: '4px 8px',
-                                      fontSize: '0.65rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
-                                    }}
-                                  >
-                                    Freigeben
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectSingleSchedule(sched.id)}
-                                    style={{
-                                      background: '#ef4444',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      borderRadius: '8px',
-                                      padding: '4px 8px',
-                                      fontSize: '0.65rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
-                                    }}
-                                  >
-                                    Ablehnen
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => {
+                                    setCampusSubTab('schedules');
+                                    setSchedulesRoomsViewMode('designer');
+                                    setSelectedFilterTeacherId(tId);
+                                    setExpandedSidebarTeacherId(tId);
+                                  }}
+                                  style={{
+                                    background: '#007aff',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    padding: '6px 14px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(0, 122, 255, 0.15)',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  Zuteilen
+                                </button>
                               </div>
-                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid rgba(0,0,0,0.03)', paddingTop: '6px' }}>
-                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
-                                  📅 {dayLabel}
-                                </span>
-                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
-                                  ⏱️ {sched.time_slot}
-                                </span>
-                                <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.05)', padding: '2px 6px', borderRadius: '6px', color: '#4b5563', fontWeight: 650 }}>
-                                  🚪 {sched.room_name}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                      {pendingSchedules.length > 5 && (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', display: 'block', marginTop: '4px' }}>
-                          und {pendingSchedules.length - 5} weitere ausstehende Einreichungen...
-                        </span>
+                            );
+                          });
+                        })()
                       )}
                     </div>
                   </div>
@@ -12042,81 +12047,108 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* Schedules Sidebar – Live Stats & Submissions */}
               {campusSubTab === 'schedules' && (
-                <div className="google-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '320px' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  minWidth: '320px',
+                  borderRadius: '16px',
+                  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.03)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif'
+                }}>
                   
                   {/* Segmented Control for Switchable Tabs */}
-                  <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{
+                    display: 'flex',
+                    background: 'rgba(120, 120, 128, 0.08)',
+                    padding: '2px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.02)'
+                  }}>
                     <button
                       type="button"
                       onClick={() => setSchedulesSidebarTab('submissions')}
                       style={{
                         flex: 1,
-                        background: schedulesSidebarTab === 'submissions' ? 'white' : 'transparent',
-                        color: schedulesSidebarTab === 'submissions' ? '#0f172a' : '#64748b',
+                        background: schedulesSidebarTab === 'submissions' ? '#ffffff' : 'transparent',
+                        color: schedulesSidebarTab === 'submissions' ? '#1c1c1e' : '#8e8e93',
                         border: 'none',
-                        boxShadow: schedulesSidebarTab === 'submissions' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
+                        boxShadow: schedulesSidebarTab === 'submissions' ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)' : 'none',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: 'all 0.15s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px'
                       }}
                     >
-                      📋 Einreichungen
+                      <ClipboardList size={13} style={{ color: schedulesSidebarTab === 'submissions' ? '#007aff' : '#8e8e93' }} />
+                      Einreichungen
                     </button>
                     <button
                       type="button"
                       onClick={() => setSchedulesSidebarTab('stats')}
                       style={{
                         flex: 1,
-                        background: schedulesSidebarTab === 'stats' ? 'white' : 'transparent',
-                        color: schedulesSidebarTab === 'stats' ? '#0f172a' : '#64748b',
+                        background: schedulesSidebarTab === 'stats' ? '#ffffff' : 'transparent',
+                        color: schedulesSidebarTab === 'stats' ? '#1c1c1e' : '#8e8e93',
                         border: 'none',
-                        boxShadow: schedulesSidebarTab === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
+                        boxShadow: schedulesSidebarTab === 'stats' ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)' : 'none',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: 'all 0.15s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px'
                       }}
                     >
-                      📊 Wochenauslastung
+                      <BarChart2 size={13} style={{ color: schedulesSidebarTab === 'stats' ? '#007aff' : '#8e8e93' }} />
+                      Wochenauslastung
                     </button>
                   </div>
 
                   {schedulesSidebarTab === 'submissions' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {/* Submissions header */}
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: '#1c1c1e' }}>
                         Offene Zuteilungen ({matrixAllocations.filter(p => !p.roomId).length} Tage offen)
                       </h4>
 
                       {/* Compact Search Filter for 50+ Teachers */}
-                      <input
-                        type="text"
-                        placeholder="Lehrkraft filtern..."
-                        value={sidebarTeacherSearch}
-                        onChange={(e) => setSidebarTeacherSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          fontSize: '0.78rem',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Search size={13} style={{ position: 'absolute', left: '10px', color: '#8e8e93', pointerEvents: 'none' }} />
+                        <input
+                          type="text"
+                          placeholder="Lehrkraft filtern..."
+                          value={sidebarTeacherSearch}
+                          onChange={(e) => setSidebarTeacherSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px 7px 28px',
+                            fontSize: '0.74rem',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(0, 0, 0, 0.1)',
+                            background: 'rgba(120, 120, 128, 0.04)',
+                            color: '#1c1c1e',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                      </div>
 
                       {/* Group and render submissions */}
                       {(() => {
@@ -12142,15 +12174,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         if (filteredTeachers.length === 0) {
                           return (
-                            <div style={{ padding: '32px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #e2e8f0' }}>
-                              <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>🎉</span>
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>Alle Stundenpläne erfolgreich zugeteilt!</span>
+                            <div style={{
+                              padding: '24px 16px',
+                              textAlign: 'center',
+                              background: 'rgba(52, 199, 89, 0.05)',
+                              borderRadius: '12px',
+                              border: '1px dashed rgba(52, 199, 89, 0.3)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                background: 'rgba(52, 199, 89, 0.1)',
+                                color: '#34c759'
+                              }}>
+                                <CheckCircle size={16} />
+                              </div>
+                              <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
+                                Alle Stundenpläne erfolgreich zugeteilt!
+                              </span>
                             </div>
                           );
                         }
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '2px' }}>
                             {/* "Alle Lehrer" Button */}
                             <button
                               onClick={() => {
@@ -12158,31 +12213,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 setExpandedSidebarTeacherId(null);
                               }}
                               style={{
-                                padding: '10px 14px',
-                                borderRadius: '10px',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
                                 border: 'none',
-                                background: selectedFilterTeacherId === null ? '#007aff' : '#f2f2f7',
+                                background: selectedFilterTeacherId === null ? '#007aff' : 'rgba(120, 120, 128, 0.08)',
                                 color: selectedFilterTeacherId === null ? '#ffffff' : '#1c1c1e',
-                                fontSize: '0.78rem',
+                                fontSize: '0.74rem',
                                 fontWeight: 600,
                                 textAlign: 'left',
                                 cursor: 'pointer',
                                 display: 'flex',
-                                justifyContent: 'space-between',
+                                justifyContainer: 'space-between',
                                 alignItems: 'center',
-                                transition: 'all 0.15s',
-                                boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(0,122,255,0.3)' : 'none'
+                                transition: 'all 0.15s ease',
+                                boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(0, 122, 255, 0.2)' : 'none'
                               }}
                             >
                               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.9rem' }}>👥</span> Alle Lehrer anzeigen
+                                <Users size={13} style={{ color: selectedFilterTeacherId === null ? '#ffffff' : '#8e8e93' }} />
+                                Alle Lehrer anzeigen
                               </span>
                               <span style={{ 
-                                fontSize: '0.68rem', 
-                                background: selectedFilterTeacherId === null ? 'rgba(255,255,255,0.25)' : '#e5e5ea', 
-                                padding: '2px 7px', 
-                                borderRadius: '10px', 
-                                color: selectedFilterTeacherId === null ? '#ffffff' : '#3a3a3c',
+                                fontSize: '0.66rem', 
+                                background: selectedFilterTeacherId === null ? 'rgba(255,255,255,0.25)' : 'rgba(120, 120, 128, 0.12)', 
+                                padding: '1px 5px', 
+                                borderRadius: '6px', 
+                                color: selectedFilterTeacherId === null ? '#ffffff' : '#8e8e93',
                                 fontWeight: 700 
                               }}>
                                 {unassigned.length}
@@ -12197,12 +12253,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   key={tId} 
                                   style={{ 
                                     background: '#ffffff', 
-                                    border: isSelected ? '1px solid #007aff' : '1px solid #e5e5ea', 
-                                    borderRadius: '12px', 
+                                    border: isSelected ? '1px solid rgba(0, 122, 255, 0.3)' : '1px solid rgba(0, 0, 0, 0.06)', 
+                                    borderRadius: '10px', 
                                     overflow: 'hidden',
-                                    transition: 'all 0.15s',
-                                    boxShadow: isSelected ? '0 3px 12px rgba(0,122,255,0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
-                                    borderLeft: isSelected ? '4px solid #007aff' : '1px solid #e5e5ea'
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: isSelected ? '0 2px 8px rgba(0, 122, 255, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)',
+                                    borderLeft: isSelected ? '3px solid #007aff' : '1px solid rgba(0, 0, 0, 0.06)'
                                   }}
                                 >
                                   {/* Accordion Header */}
@@ -12212,38 +12268,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       setExpandedSidebarTeacherId(isExpanded ? null : tId);
                                     }}
                                     style={{ 
-                                      padding: '11px 14px', 
+                                      padding: '9px 12px', 
                                       cursor: 'pointer', 
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
-                                      background: isSelected ? '#f2f8ff' : '#ffffff',
-                                      borderBottom: isExpanded ? '1px solid #e5e5ea' : 'none'
+                                      background: isSelected ? 'rgba(0, 122, 255, 0.03)' : '#ffffff',
+                                      borderBottom: isExpanded ? '1px solid rgba(0, 0, 0, 0.04)' : 'none'
                                     }}
                                   >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                      <span style={{ 
-                                        display: 'inline-block', 
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <ChevronRight size={10} style={{ 
                                         transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
                                         transition: 'transform 0.15s ease-out', 
-                                        marginRight: '8px', 
-                                        fontSize: '0.62rem', 
+                                        marginRight: '6px', 
                                         color: isSelected ? '#007aff' : '#8e8e93' 
-                                      }}>
-                                        ▶
-                                      </span>
+                                      }} />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? '#007aff' : '#1c1c1e' }}>{data.teacherName}</span>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: isSelected ? '#007aff' : '#1c1c1e' }}>{data.teacherName}</span>
                                         <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 500 }}>{data.instrument}</span>
                                       </div>
                                     </div>
                                     <span style={{ 
-                                      fontSize: '0.68rem', 
-                                      background: isSelected ? 'rgba(0,122,255,0.1)' : '#f2f2f7', 
+                                      fontSize: '0.66rem', 
+                                      background: isSelected ? 'rgba(0,122,255,0.1)' : 'rgba(120, 120, 128, 0.08)', 
                                       color: isSelected ? '#007aff' : '#8e8e93', 
                                       fontWeight: 700, 
-                                      padding: '2px 7px', 
-                                      borderRadius: '10px' 
+                                      padding: '1px 5px', 
+                                      borderRadius: '6px' 
                                     }}>
                                       {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
                                     </span>
@@ -12251,8 +12303,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                   {/* Collapsible content (Accordion Details) */}
                                   {isExpanded && (
-                                    <div style={{ padding: '8px 12px 12px 12px', background: '#f2f2f7', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      <div style={{ border: '1px solid #d1d1d6', borderRadius: '10px', overflow: 'hidden', background: '#ffffff' }}>
+                                    <div style={{ padding: '6px 8px 8px 8px', background: 'rgba(120, 120, 128, 0.04)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ border: '1px solid rgba(0, 0, 0, 0.06)', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
                                         {[...data.blocks]
                                           .sort((a, b) => {
                                             if (a.dayOfWeek !== b.dayOfWeek) {
@@ -12267,8 +12319,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             onDragStart={() => handleDragStartMatrix(block.id)}
                                             style={{
                                               background: '#ffffff',
-                                              borderBottom: idx < sortedArr.length - 1 ? '1px solid #e5e5ea' : 'none',
-                                              padding: '10px 12px',
+                                              borderBottom: idx < sortedArr.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                                              padding: '8px 10px',
                                               cursor: 'grab',
                                               display: 'flex',
                                               flexDirection: 'column',
@@ -12276,8 +12328,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             }}
                                           >
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                              <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                📅 {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
+                                              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Calendar size={11} style={{ color: '#007aff' }} />
+                                                {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
                                               </span>
                                               <span style={{ fontSize: '0.66rem', fontWeight: 500, color: '#8e8e93' }}>
                                                 {block.startTime}–{block.endTime}
@@ -12310,16 +12363,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               style={{
                                                 width: '100%',
                                                 fontSize: '0.68rem',
-                                                padding: '6px 24px 6px 8px',
+                                                padding: '5px 24px 5px 8px',
                                                 borderRadius: '6px',
                                                 border: 'none',
                                                 outline: 'none',
-                                                background: '#f2f2f7',
+                                                background: 'rgba(120, 120, 128, 0.08)',
                                                 color: '#1c1c1e',
                                                 fontWeight: 500,
                                                 appearance: 'none',
                                                 WebkitAppearance: 'none',
-                                                backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'%238e8e93\' height=\'16\' viewBox=\'0 0 24 24\' width=\'16\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>")',
+                                                backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'%238e8e93\' height=\'14\' viewBox=\'0 0 24 24\' width=\'14\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>")',
                                                 backgroundRepeat: 'no-repeat',
                                                 backgroundPositionX: '97%',
                                                 backgroundPositionY: '50%',
@@ -12345,43 +12398,166 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.65rem', color: '#2563eb', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Review</span>
-                          <strong style={{ fontSize: '1.4rem', color: '#1d4ed8', lineHeight: 1 }}>{pendingSchedules.length}</strong>
-                        </div>
-                        <div style={{ background: matrixAllocations.some(p => !p.roomId) ? '#fffbeb' : '#f0fdf4', border: `1px solid ${matrixAllocations.some(p => !p.roomId) ? '#fde68a' : '#bbf7d0'}`, padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.65rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Offen</span>
-                          <strong style={{ fontSize: '1.4rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', lineHeight: 1 }}>{matrixAllocations.filter(p => !p.roomId).length}</strong>
-                        </div>
-                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.65rem', color: '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Verteilt</span>
-                          <strong style={{ fontSize: '1.4rem', color: '#15803d', lineHeight: 1 }}>{matrixAllocations.filter(p => p.roomId).length}</strong>
-                        </div>
-                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.65rem', color: '#ef4444', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Konflikte</span>
-                          <strong style={{ fontSize: '1.4rem', color: '#ef4444', lineHeight: 1 }}>
-                            {(() => {
-                              let conflicts = 0;
-                              const byRoomDay: Record<string, any[]> = {};
-                              matrixAllocations.filter(p => p.roomId).forEach(p => {
-                                const k = `${p.roomId}_${p.dayOfWeek}`;
-                                if (!byRoomDay[k]) byRoomDay[k] = [];
-                                byRoomDay[k].push(p);
-                              });
-                              Object.values(byRoomDay).forEach(group => {
-                                if (group.length > 1) {
-                                  group.forEach((p, i) => {
-                                    group.forEach((q, j) => {
-                                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) conflicts++;
-                                    });
-                                  });
-                                }
-                              });
-                              return conflicts;
-                            })()}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        
+                        {/* REVIEW CARD */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1px solid rgba(0, 0, 0, 0.06)',
+                          borderRadius: '14px',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                          transition: 'transform 0.15s ease',
+                          cursor: 'default'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              background: 'rgba(0, 122, 255, 0.1)',
+                              color: '#007aff'
+                            }}>
+                              <Clock size={13} />
+                            </div>
+                            <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Review</span>
+                          </div>
+                          <strong style={{ fontSize: '1.6rem', color: '#1c1c1e', fontWeight: 700, marginTop: '8px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                            {pendingSchedules.length}
                           </strong>
                         </div>
+
+                        {/* OFFEN CARD */}
+                        {(() => {
+                          const hasUnassigned = matrixAllocations.some(p => !p.roomId);
+                          const unassignedCount = matrixAllocations.filter(p => !p.roomId).length;
+                          return (
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1px solid rgba(0, 0, 0, 0.06)',
+                              borderRadius: '14px',
+                              padding: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                              transition: 'transform 0.15s ease',
+                              cursor: 'default'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px' }}>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: hasUnassigned ? 'rgba(255, 149, 0, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                                  color: hasUnassigned ? '#ff9500' : '#34c759'
+                                }}>
+                                  <Calendar size={13} />
+                                </div>
+                                <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Offen</span>
+                              </div>
+                              <strong style={{ fontSize: '1.6rem', color: hasUnassigned ? '#ff9500' : '#34c759', fontWeight: 700, marginTop: '8px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                                {unassignedCount}
+                              </strong>
+                            </div>
+                          );
+                        })()}
+
+                        {/* VERTEILT CARD */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1px solid rgba(0, 0, 0, 0.06)',
+                          borderRadius: '14px',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                          transition: 'transform 0.15s ease',
+                          cursor: 'default'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px' }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              background: 'rgba(52, 199, 89, 0.1)',
+                              color: '#34c759'
+                            }}>
+                              <CheckCircle size={13} />
+                            </div>
+                            <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Verteilt</span>
+                          </div>
+                          <strong style={{ fontSize: '1.6rem', color: '#34c759', fontWeight: 700, marginTop: '8px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                            {matrixAllocations.filter(p => p.roomId).length}
+                          </strong>
+                        </div>
+
+                        {/* KONFLIKTE CARD */}
+                        {(() => {
+                          let conflicts = 0;
+                          const byRoomDay: Record<string, any[]> = {};
+                          matrixAllocations.filter(p => p.roomId).forEach(p => {
+                            const k = `${p.roomId}_${p.dayOfWeek}`;
+                            if (!byRoomDay[k]) byRoomDay[k] = [];
+                            byRoomDay[k].push(p);
+                          });
+                          Object.values(byRoomDay).forEach(group => {
+                            if (group.length > 1) {
+                              group.forEach((p, i) => {
+                                group.forEach((q, j) => {
+                                  if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) conflicts++;
+                                });
+                              });
+                            }
+                          });
+                          const hasConflicts = conflicts > 0;
+                          return (
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1px solid rgba(0, 0, 0, 0.06)',
+                              borderRadius: '14px',
+                              padding: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                              transition: 'transform 0.15s ease',
+                              cursor: 'default'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px' }}>
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: hasConflicts ? 'rgba(255, 59, 48, 0.1)' : 'rgba(142, 142, 147, 0.1)',
+                                  color: hasConflicts ? '#ff3b30' : '#8e8e93'
+                                }}>
+                                  <AlertCircle size={13} />
+                                </div>
+                                <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Konflikte</span>
+                              </div>
+                              <strong style={{ fontSize: '1.6rem', color: hasConflicts ? '#ff3b30' : '#1c1c1e', fontWeight: 700, marginTop: '8px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                                {conflicts}
+                              </strong>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Conflict details log logger if there are conflicts */}
@@ -12409,11 +12585,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         if (conflictDetails.length > 0) {
                           return (
-                            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <strong style={{ color: '#b91c1c', fontSize: '0.74rem' }}>⚠️ Konflikte gefunden:</strong>
+                            <div style={{
+                              background: 'rgba(255, 59, 48, 0.05)',
+                              border: '1px solid rgba(255, 59, 48, 0.15)',
+                              padding: '12px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <AlertCircle size={14} style={{ color: '#ff3b30' }} />
+                                <strong style={{ color: '#ff3b30', fontSize: '0.74rem', fontWeight: 700 }}>Konflikte gefunden:</strong>
+                              </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '100px', overflowY: 'auto' }}>
                                 {conflictDetails.map((det, idx) => (
-                                  <div key={idx} style={{ fontSize: '0.68rem', color: '#991b1b', lineHeight: '1.3' }}>
+                                  <div key={idx} style={{ fontSize: '0.68rem', color: '#ff3b30', lineHeight: '1.3', fontWeight: 500 }}>
                                     • {det}
                                   </div>
                                 ))}
@@ -12424,18 +12611,64 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         return null;
                       })()}
 
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
-                        <strong style={{ display: 'block', marginBottom: '4px', color: '#1f2937', fontSize: '0.78rem' }}>Räume verfügbar:</strong>
-                        <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.76rem' }}>
-                          {rooms.length} Räume · {rooms.length * 5} mögliche Tageszuteilungen pro Woche
-                        </p>
+                      <div style={{
+                        background: 'rgba(120, 120, 128, 0.06)',
+                        border: '1px solid rgba(0, 0, 0, 0.04)',
+                        padding: '12px 14px',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: 'rgba(120, 120, 128, 0.08)',
+                          color: '#8e8e93',
+                          flexShrink: 0
+                        }}>
+                          <DoorOpen size={15} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                          <strong style={{ display: 'block', color: '#1c1c1e', fontSize: '0.78rem', fontWeight: 600 }}>Räume verfügbar:</strong>
+                          <p style={{ margin: 0, color: '#8e8e93', lineHeight: '1.3', fontSize: '0.72rem', fontWeight: 500 }}>
+                            {rooms.length} Räume · {rooms.length * 5} mögliche Tageszuteilungen pro Woche
+                          </p>
+                        </div>
                       </div>
 
-                      <div style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#7f1d1d' }}>
-                        <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>Hinweis:</strong>
-                        <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
-                          Abgelehnte Stundenpläne gehen zurück in den Draft-Zustand. Lehrkräfte können erneut einreichen.
-                        </p>
+                      <div style={{
+                        background: 'rgba(255, 59, 48, 0.05)',
+                        border: '1px solid rgba(255, 59, 48, 0.12)',
+                        padding: '12px 14px',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        gap: '10px',
+                        alignItems: 'flex-start'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: 'rgba(255, 59, 48, 0.08)',
+                          color: '#ff3b30',
+                          flexShrink: 0
+                        }}>
+                          <AlertCircle size={15} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <strong style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#ff3b30' }}>Hinweis:</strong>
+                          <p style={{ margin: 0, fontSize: '0.72rem', lineHeight: '1.4', color: '#8e2d2d', fontWeight: 500 }}>
+                            Abgelehnte Stundenpläne gehen zurück in den Draft-Zustand. Lehrkräfte können erneut einreichen.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
