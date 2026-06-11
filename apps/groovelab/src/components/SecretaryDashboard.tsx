@@ -10914,149 +10914,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     key={dayNum}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={() => handleDropOnMatrix(null, dayNum)}
-                                    onMouseEnter={() => setHoveredUnassignedDayNum(dayNum)}
-                                    onMouseLeave={() => setHoveredUnassignedDayNum(null)}
-                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative' }}
+                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px' }}
                                   >
-                                    {unassigned.length === 0 ? (
-                                      <div style={{
-                                        height: '56px',
-                                        borderRadius: '10px',
-                                        border: '2px dashed rgba(245, 158, 11, 0.15)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'rgba(245, 158, 11, 0.35)',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 800,
-                                        background: 'rgba(254, 243, 199, 0.05)'
-                                      }}>
-                                        Leer
-                                      </div>
-                                    ) : (
-                                      <div style={{ position: 'relative', width: '100%', minHeight: '64px', marginBottom: unassigned.length > 1 ? '8px' : '0' }}>
-                                        {/* Stapel-Effekt (Hintergrundkarten) */}
-                                        {unassigned.length >= 3 && (
-                                          <div style={{ position: 'absolute', bottom: '-8px', left: '8px', right: '8px', height: '52px', background: '#fefbeb', border: '1px solid #fef3c7', borderRadius: '10px', zIndex: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} />
-                                        )}
-                                        {unassigned.length >= 2 && (
-                                          <div style={{ position: 'absolute', bottom: '-4px', left: '4px', right: '4px', height: '52px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '10px', zIndex: 1, boxShadow: '0 2px 4px rgba(245,158,11,0.03)' }} />
-                                        )}
-                                        
-                                        {/* Hauptkarte (Vordergrund) */}
-                                        {(() => {
-                                          const topPlan = unassigned[0];
-                                          return (
-                                            <div
-                                              draggable
-                                              onDragStart={() => handleDragStartMatrix(topPlan.id)}
-                                              onClick={() => setSelectedDayPlan(topPlan)}
-                                              style={{
-                                                position: 'relative',
-                                                zIndex: 2,
-                                                background: '#fffbeb',
-                                                border: '1px solid #fde68a',
-                                                borderLeft: '4px solid #f59e0b',
-                                                borderRadius: '10px',
-                                                padding: '7px 9px',
-                                                cursor: 'grab',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '2px',
-                                                boxShadow: '0 4px 8px rgba(245,158,11,0.06)'
-                                              }}
-                                            >
-                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{topPlan.teacherName}</span>
-                                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{topPlan.instrument}</span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {topPlan.startTime}–{topPlan.endTime}</span>
-                                              
-                                              {/* Anzahl-Badge */}
-                                              {unassigned.length > 1 && (
-                                                <span style={{
-                                                  position: 'absolute',
-                                                  top: '-6px',
-                                                  right: '-6px',
-                                                  background: '#f59e0b',
-                                                  color: 'white',
-                                                  fontSize: '0.58rem',
-                                                  fontWeight: 900,
-                                                  padding: '2px 5px',
-                                                  borderRadius: '6px',
-                                                  boxShadow: '0 2px 4px rgba(245,158,11,0.25)',
-                                                  zIndex: 10
-                                                }}>
-                                                  +{unassigned.length - 1}
-                                                </span>
-                                              )}
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    )}
-
-                                    {/* Flyout Popover */}
-                                    {hoveredUnassignedDayNum === dayNum && unassigned.length > 0 && (
-                                      <div style={{
-                                        position: 'absolute',
-                                        bottom: '100%',
-                                        left: '8px',
-                                        width: '210px',
-                                        background: 'rgba(255, 255, 255, 0.96)',
-                                        backdropFilter: 'blur(16px)',
-                                        WebkitBackdropFilter: 'blur(16px)',
-                                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                                        borderRadius: '16px',
-                                        padding: '10px',
-                                        boxShadow: '0 12px 30px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.02)',
-                                        zIndex: 9999,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        marginBottom: '6px'
-                                      }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px', marginBottom: '2px' }}>
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase' }}>Offene Termine</span>
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: '6px' }}>{unassigned.length}</span>
+                                    <style>{`
+                                      .custom-thin-scrollbar::-webkit-scrollbar {
+                                        width: 5px !important;
+                                        height: 5px !important;
+                                      }
+                                      .custom-thin-scrollbar::-webkit-scrollbar-track {
+                                        background: transparent !important;
+                                      }
+                                      .custom-thin-scrollbar::-webkit-scrollbar-thumb {
+                                        background: rgba(217, 119, 6, 0.2) !important;
+                                        border-radius: 10px !important;
+                                      }
+                                      .custom-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+                                        background: rgba(217, 119, 6, 0.4) !important;
+                                      }
+                                    `}</style>
+                                    
+                                    <div 
+                                      className="custom-thin-scrollbar"
+                                      style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', maxHeight: '170px', overflowY: 'auto', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '2px', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
+                                      {unassigned.map(plan => (
+                                        <div
+                                          key={plan.id}
+                                          draggable
+                                          onDragStart={() => handleDragStartMatrix(plan.id)}
+                                          onClick={() => setSelectedDayPlan(plan)}
+                                          style={{ background: 'rgba(254, 243, 199, 0.45)', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
+                                        >
+                                          <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.teacherName}</span>
+                                          <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
+                                          <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
                                         </div>
-                                        <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-                                          {unassigned.map(plan => (
-                                            <div
-                                              key={plan.id}
-                                              draggable
-                                              onDragStart={() => handleDragStartMatrix(plan.id)}
-                                              onClick={() => setSelectedDayPlan(plan)}
-                                              style={{
-                                                background: 'rgba(254, 243, 199, 0.7)',
-                                                border: '1px solid #fde68a',
-                                                borderLeft: '4px solid #f59e0b',
-                                                borderRadius: '10px',
-                                                padding: '7px 9px',
-                                                cursor: 'grab',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '2px',
-                                                boxShadow: '0 1px 3px rgba(245,158,11,0.04)',
-                                                transition: 'all 0.15s'
-                                              }}
-                                              onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                                e.currentTarget.style.boxShadow = '0 3px 6px rgba(245,158,11,0.08)';
-                                              }}
-                                              onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = 'none';
-                                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(245,158,11,0.04)';
-                                              }}
-                                            >
-                                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={plan.teacherName}>
-                                                {plan.teacherName}
-                                              </span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                                      ))}
+                                      {unassigned.length === 0 && (
+                                        <div style={{ height: '40px' }} />
+                                      )}
+                                    </div>
                                   </td>
                                 );
                               })}
