@@ -1310,6 +1310,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [bypassTeachers, setBypassTeachers] = useState<BypassTeacher[]>([]);
   const [coaches, setCoaches] = useState<GrooveLabCoach[]>([]);
   const [campusTeachers, setCampusTeachers] = useState<any[]>([]);
+  const [allTeachers, setAllTeachers] = useState<any[]>([]);
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
   
   // Room Planner Matrix states
@@ -1924,6 +1925,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setUserMap(map);
       setCoaches(coachesList);
       setCampusTeachers(campusTeachersList);
+      setAllTeachers(allUsers?.filter(u => u.role === 'teacher').map(u => ({
+        id: u.id,
+        firstName: u.first_name,
+        lastName: u.last_name,
+        email: u.email || '',
+        role: u.role,
+        instrument: u.instrument || '',
+        isActive: u.is_active ?? true,
+        isCampusActive: u.is_campus_active,
+        isGroovelabActive: u.is_groovelab_active
+      })) || []);
       setBypassTeachers(bypassList);
       setEmployees(employeesList);
       setStudents(studentsList);
@@ -13895,13 +13907,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <strong style={{ display: 'block', fontSize: '1rem', color: '#991b1b' }}>Monatliche B2B-Gesamtkosten (Kalkulation)</strong>
                           <span style={{ fontSize: '0.78rem', color: '#7f1d1d', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
                             • Modul-Grundgebühr: {moduleCost.toFixed(2)} € ({billedCampus ? 'Campus ' : ''}{billedCampus && billedGroovelab ? '+ ' : ''}{billedGroovelab ? 'GrooveLab' : ''}{activeModulesCount === 0 ? 'Keines' : ''})<br />
-                            • Lehrer-Infrastruktur: {coaches.length} Lehrer × 0,49 € = {(coaches.length * 0.49).toFixed(2)} €<br />
+                            • Lehrer-Infrastruktur: {allTeachers.length} Lehrer × 0,49 € = {(allTeachers.length * 0.49).toFixed(2)} €<br />
                             • Verwaltungsmitarbeiter: {employees.length} User × 0,49 € = {(employees.length * 0.49).toFixed(2)} €
                           </span>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <strong style={{ fontSize: '1.6rem', color: '#b91c1c', display: 'block' }}>
-                            {(moduleCost + (coaches.length + employees.length) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
+                            {(moduleCost + (allTeachers.length + employees.length) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
                           </strong>
                         </div>
                       </div>
@@ -13957,7 +13969,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                         <div style={{ flex: 1, background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                           <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lehrer</span>
-                          <strong style={{ display: 'block', fontSize: '1.1rem', color: '#0f172a', marginTop: '2px' }}>{coaches.length}</strong>
+                          <strong style={{ display: 'block', fontSize: '1.1rem', color: '#0f172a', marginTop: '2px' }}>{allTeachers.length}</strong>
                         </div>
                         <div style={{ flex: 1, background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                           <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Verwaltung</span>
@@ -13979,7 +13991,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             </tr>
                           </thead>
                           <tbody>
-                            {coaches.map((c) => {
+                            {allTeachers.map((c) => {
                               const assignedStudentsCount = students.filter(s => s.teacher_id === c.id).length;
                               return (
                                 <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
