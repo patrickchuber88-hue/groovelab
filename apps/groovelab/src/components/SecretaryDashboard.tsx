@@ -1774,7 +1774,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         setHasGroovelabSub(hasGroove);
         setCampusActivatedThisMonth(schoolData.campus_activated_this_month ?? false);
         setGroovelabActivatedThisMonth(schoolData.groovelab_activated_this_month ?? false);
-        setStudentBillingOption(schoolData.student_billing_option || 'option1');
+        
+        if (!hasCampus && !hasGroove) {
+          setIsBillingBooked(false);
+          localStorage.removeItem('isBillingBooked');
+          setBookedExtraUsers(0);
+          localStorage.setItem('bookedExtraUsers', '0');
+          setExtraUsersSliderVal(0);
+          setStudentBillingOption('option1');
+        } else {
+          setStudentBillingOption(schoolData.student_billing_option || 'option1');
+        }
         if (!hasCampus && hasGroove) {
           setActiveTab('groovelab');
         } else if (hasCampus && !hasGroove) {
