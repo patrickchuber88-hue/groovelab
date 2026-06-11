@@ -1319,6 +1319,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return typeof window !== 'undefined' ? (localStorage.getItem('nextBillingOptionEffectiveAt') || '') : '';
   });
   const [showChangeTariffModal, setShowChangeTariffModal] = useState<boolean>(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
@@ -14921,7 +14922,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                              
                           const total2026 = b2bRegularAnnual + b2cRegularAnnual + extraAnnual;
 
+                          const recipientDetails = {
+                            name: 'Simplified Work GbR',
+                            contact: 'Patrick Huber',
+                            street: 'Karl-Fürstenberg-Str. 59',
+                            city: '79618 Rheinfelden'
+                          };
+
                           const invoiceList = [
+                            { 
+                              id: 'RE-2026-06', 
+                              year: 'Juni 2026',
+                              date: '12. Juni 2026', 
+                              b2b: baseB2B + (isBillingBooked ? studentSharePreview : 0), 
+                              b2c: studentLevyMonthly, 
+                              extra: schoolShareBookedExtra + extraLevyMonthly,
+                              amount: (baseB2B + (isBillingBooked ? studentSharePreview : 0)) + studentLevyMonthly + (schoolShareBookedExtra + extraLevyMonthly), 
+                              status: 'Entwurf',
+                              recipient: recipientDetails,
+                              isCurrentMonth: true
+                            },
                             { 
                               id: 'RE-2026-0001', 
                               year: '2026',
@@ -14930,7 +14950,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               b2c: b2cRegularAnnual, 
                               extra: extraAnnual,
                               amount: total2026, 
-                              status: isBillingBooked ? 'Bezahlt' : 'Entwurf' 
+                              status: isBillingBooked ? 'Bezahlt' : 'Entwurf',
+                              recipient: recipientDetails
                             },
                             { 
                               id: 'RE-2025-0001', 
@@ -14940,7 +14961,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               b2c: 745.20, 
                               extra: 300.00,
                               amount: 1965.70, 
-                              status: 'Bezahlt' 
+                              status: 'Bezahlt',
+                              recipient: recipientDetails
                             },
                             { 
                               id: 'RE-2024-0001', 
@@ -14950,7 +14972,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               b2c: 650.00, 
                               extra: 150.00,
                               amount: 1630.00, 
-                              status: 'Bezahlt' 
+                              status: 'Bezahlt',
+                              recipient: recipientDetails
                             }
                           ];
 
@@ -14959,7 +14982,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div>
                                 <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
                                 <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                                  Abrechnungsjahr: {inv.year} | B2B (Schule): {inv.b2b.toFixed(2).replace('.', ',')} € | B2C (Schüler): {inv.b2c.toFixed(2).replace('.', ',')} € | Zusätzliche Schüler: {inv.extra.toFixed(2).replace('.', ',')} €
+                                  Abrechnungszeitraum: {inv.year} | B2B (Schule): {inv.b2b.toFixed(2).replace('.', ',')} € | B2C (Schüler): {inv.b2c.toFixed(2).replace('.', ',')} € | Zusätzliche Schüler: {inv.extra.toFixed(2).replace('.', ',')} €
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
@@ -14973,7 +14996,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   fontWeight: 800 
                                 }}>{inv.status}</span>
                                 <button 
-                                  onClick={() => alert(`Rechnung ${inv.id} heruntergeladen!`)} 
+                                  onClick={() => setSelectedInvoice(inv)} 
                                   className="hover-scale font-bold"
                                   style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
                                 >
@@ -17910,6 +17933,258 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
         </div>
       )}
+
+      {/* Modal for Invoice Preview / Print */}
+      {selectedInvoice && (() => {
+        const billedCampus = hasCampusSub || campusActivatedThisMonth;
+        const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
+        const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
+        const mCost = activeModulesCount * 4.99;
+        
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '680px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+              border: '1px solid #e2e8f0',
+              fontFamily: 'Inter',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              animation: 'scaleUp 0.2s ease-out'
+            }}>
+              {/* Header / Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Rechnungs-Vorschau</span>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => {
+                      const printContent = document.getElementById('printable-invoice')?.innerHTML;
+                      if (printContent) {
+                        window.print();
+                      }
+                    }}
+                    style={{
+                      background: '#7c3aed',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      fontSize: '0.72rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(124, 58, 237, 0.15)'
+                    }}
+                  >
+                    Drucken / PDF
+                  </button>
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    style={{
+                      background: '#ffffff',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      fontSize: '0.72rem',
+                      fontWeight: 750,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Schließen
+                  </button>
+                </div>
+              </div>
+
+              {/* Print Area */}
+              <div id="printable-invoice" style={{ padding: '40px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.5' }}>
+                {/* Invoice Meta */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, color: '#7c3aed', fontFamily: 'Urbanist', fontSize: '1.6rem', fontWeight: 900 }}>Groovelab</h2>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Simplified Work GbR Billing System</span>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
+                    <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>RECHNUNG</strong>
+                    <span style={{ color: '#64748b' }}>Nr. {selectedInvoice.id}</span>
+                  </div>
+                </div>
+
+                {/* Addresses */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', fontSize: '0.78rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Rechnungsempfänger</span>
+                    <strong style={{ color: '#0f172a', display: 'block' }}>{selectedInvoice.recipient?.name}</strong>
+                    <span>{selectedInvoice.recipient?.contact}</span><br />
+                    <span>{selectedInvoice.recipient?.street}</span><br />
+                    <span>{selectedInvoice.recipient?.city}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
+                    <strong style={{ color: '#0f172a', display: 'block' }}>Groovelab app (hue-music)</strong>
+                    <span>Software &amp; Education Tech Solutions</span><br />
+                    <span>Karl-Fürstenberg-Str. 59</span><br />
+                    <span>79618 Rheinfelden</span>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '0.75rem', marginBottom: '30px', border: '1px solid #f1f5f9' }}>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
+                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Leistungszeitraum</span>
+                    <strong style={{ color: '#0f172a' }}>
+                      {selectedInvoice.isCurrentMonth ? 'Juni 2026' : `Schuljahr ${selectedInvoice.year}`}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
+                    <strong style={{ color: '#0f172a' }}>B2B Lastschrift</strong>
+                  </div>
+                </div>
+
+                {/* Line Items Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '30px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
+                      <th style={{ padding: '8px 0' }}>Position</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>Menge</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>Einzelpreis</th>
+                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Gesamtpreis</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Position 1: 100% Kostenlose Software Lizenz */}
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 0' }}>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Groovelab Musikschul-Software</strong>
+                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>1</td>
+                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
+                      <td style={{ padding: '12px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                    </tr>
+
+                    {/* Position 2: Active Modules */}
+                    {selectedInvoice.b2b > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Aktive Zusatz-Module (Campus/Groovelab)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastruktur &amp; Plattform-Zugang</span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {mCost.toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 3: Team-Members (excl. students) */}
+                    {selectedInvoice.b2b > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Mitarbeiter &amp; Lehrer Team-Profile</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {(((allTeachers.length + employees.length) * 0.49) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 4: Student Base Umlage (B2C) */}
+                    {selectedInvoice.b2c > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Basis Umlage (B2C Schüler-Anteil)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Direkt-Umlage für Schüler-Konten</span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? (selectedInvoice.b2c).toFixed(2).replace('.', ',') : (selectedInvoice.b2c / 12).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.b2c.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 5: Additional Students (Extra-User) */}
+                    {selectedInvoice.extra > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Zusätzliche Schüler-Zugänge (Zusatzbuchung)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{bookedExtraUsers} aktiv gebuchte Extra-Schüler</span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {(selectedInvoice.extra / (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.extra.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Total Calculation */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                  <div style={{ width: '240px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span>Netto-Summe:</span>
+                      <strong>{(selectedInvoice.amount / 1.19).toFixed(2).replace('.', ',')} €</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#64748b' }}>
+                      <span>Zzgl. 19% MwSt.:</span>
+                      <span>{(selectedInvoice.amount - (selectedInvoice.amount / 1.19)).toFixed(2).replace('.', ',')} €</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '0.92rem', color: '#0f172a' }}>
+                      <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
+                      <strong style={{ fontWeight: 900, color: '#7c3aed' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   </div>
   );
