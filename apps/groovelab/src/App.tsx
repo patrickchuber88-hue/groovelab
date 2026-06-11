@@ -6654,6 +6654,9 @@ function App() {
                 <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Schüler
                 </button>
+                <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
+                  <Library size={20} /> Mediathek
+                </button>
                 <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
                   <Box size={20} /> Räume
                 </button>

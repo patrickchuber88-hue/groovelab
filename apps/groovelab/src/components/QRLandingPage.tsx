@@ -61,12 +61,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
   const [avatar, setAvatar] = useState<any | null>(null);
+
+  // Daily goal based on evolution level (Level 1 = 10m, Level 2 = 15m, Level 3 = 20m)
+  const dailyGoal = avatar?.evolution_level === 3 ? 20 : (avatar?.evolution_level === 2 ? 15 : 10);
   const [loggedMinutesToday, setLoggedMinutesToday] = useState<number>(0);
   const [ringProgress, setRingProgress] = useState<number>(0);
   const [hasExploded, setHasExploded] = useState<boolean>(false);
 
   // Ref for canvas particle explosion
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Focus Timer Sensors & Grace states
+  const [isPhoneFlat, setIsPhoneFlat] = useState(false);
+  const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
+  const [isGraceActive, setIsGraceActive] = useState(false);
+  const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
+  const [isDesktopFallback, setIsDesktopFallback] = useState(false);
+  const [isExtraTime, setIsExtraTime] = useState(false);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const isExtraTimeRef = useRef(false);
+  useEffect(() => {
+    isExtraTimeRef.current = isExtraTime;
+  }, [isExtraTime]);
   /*
   const [activeDriver, setActiveDriver] = useState<'Du' | 'Mama' | 'Papa' | 'Oma'>('Du');
 
@@ -87,16 +104,169 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Focus Timer interval effect
+  // Focus Timer interval effect & Anti-Cheat monitoring
   useEffect(() => {
-    let interval: any = null;
-    if (timerRunning) {
-      interval = setInterval(() => {
+    if (!timerRunning) {
+      setIsPhoneFlat(false);
+      setFlatType('none');
+      setIsGraceActive(false);
+      setGraceSecondsLeft(10);
+      return;
+    }
+
+    const isStudentOnly = profile?.app_usage_mode === 'student_only';
+
+    if (!isStudentOnly) {
+      const interval = setInterval(() => {
         setElapsedSeconds(s => s + 1);
       }, 1000);
+      return () => clearInterval(interval);
     }
-    return () => clearInterval(interval);
-  }, [timerRunning]);
+
+    const targetSeconds = dailyGoal * 60;
+
+    let isOrientedFlat = false;
+    let currentFlatType: 'face-up' | 'face-down' | 'none' = 'none';
+    let isMoving = false;
+    let motionTimeout: any = null;
+
+    // Detect mobile and check if deviceorientation is available
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const usesSensors = isMobile && (typeof window.DeviceOrientationEvent !== 'undefined');
+    
+    setIsDesktopFallback(!usesSensors);
+
+    let graceWarningPlayed = false;
+
+    // Timer interval
+    const interval = setInterval(() => {
+      // In sensor mode, device must be flat, stable, and page must be visible.
+      // In desktop mode, only page visibility matters.
+      const isNowFlat = usesSensors 
+        ? (isOrientedFlat && !isMoving && !document.hidden)
+        : !document.hidden;
+
+      // Update states
+      setIsPhoneFlat(isNowFlat);
+      setFlatType(isNowFlat ? currentFlatType : 'none');
+
+      if (isNowFlat) {
+        setIsGraceActive(false);
+        setGraceSecondsLeft(10);
+        graceWarningPlayed = false;
+
+        setElapsedSeconds(prev => {
+          const nextVal = prev + 1;
+          if (!isExtraTimeRef.current && nextVal >= targetSeconds) {
+            setIsExtraTime(true);
+            playSuccessChime();
+          }
+          return nextVal;
+        });
+      } else {
+        if (isExtraTimeRef.current) {
+          // In extra time, we don't reset to 0; we just pause the timer.
+          setIsGraceActive(false);
+        } else {
+          // Normal focus period -> Grace period active
+          setIsGraceActive(true);
+          
+          setGraceSecondsLeft(prevGrace => {
+            if (prevGrace <= 1) {
+              // Grace period expired! Reset timer to 0
+              setElapsedSeconds(0);
+              setIsGraceActive(false);
+              playBeep(330, 600); // Fail tone
+              if (navigator.vibrate) {
+                navigator.vibrate([400, 100, 400]);
+              }
+              return 10;
+            }
+            
+            // Still in grace period, play warning tone once
+            if (!graceWarningPlayed) {
+              playBeep(660, 200); // Warning tone
+              if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
+              }
+              graceWarningPlayed = true;
+            }
+            
+            return prevGrace - 1;
+          });
+        }
+      }
+    }, 1000);
+
+    // Orientation event handler
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      const beta = e.beta;
+      const gamma = e.gamma;
+      
+      if (beta === null || gamma === null) {
+        // Fall back to flat if no orientation details
+        isOrientedFlat = true;
+        currentFlatType = 'face-up';
+        return;
+      }
+
+      // Flat Face-Up: screen up, beta and gamma near 0
+      const faceUp = Math.abs(beta) < 18 && Math.abs(gamma) < 18;
+      
+      // Flat Face-Down: screen down, beta near 180 (or -180) and gamma near 0
+      const faceDown = Math.abs(Math.abs(beta) - 180) < 18 && Math.abs(gamma) < 18;
+      
+      isOrientedFlat = faceUp || faceDown;
+      currentFlatType = faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none');
+    };
+
+    // Motion event handler
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const acc = e.acceleration;
+      if (!acc) return;
+      const x = acc.x || 0;
+      const y = acc.y || 0;
+      const z = acc.z || 0;
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+      
+      // Filter out lower magnitude instrument vibrations (use 1.8 m/s^2)
+      if (magnitude > 1.8) {
+        isMoving = true;
+        if (motionTimeout) clearTimeout(motionTimeout);
+        motionTimeout = setTimeout(() => {
+          isMoving = false;
+        }, 1500);
+      }
+    };
+
+    // Page Visibility listener
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isOrientedFlat = false;
+        currentFlatType = 'none';
+        setIsPhoneFlat(false);
+      }
+    };
+
+    if (usesSensors) {
+      window.addEventListener('deviceorientation', handleOrientation);
+      window.addEventListener('devicemotion', handleMotion);
+    } else {
+      isOrientedFlat = true;
+      currentFlatType = 'face-up';
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      if (motionTimeout) clearTimeout(motionTimeout);
+      if (usesSensors) {
+        window.removeEventListener('deviceorientation', handleOrientation);
+        window.removeEventListener('devicemotion', handleMotion);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [timerRunning, dailyGoal, profile?.app_usage_mode]);
 
   // ── Init: Device prüfen oder direkt Profil laden ──────────────────────────
   useEffect(() => {
@@ -329,8 +499,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
   };
 
-  // Daily goal based on evolution level (Level 1 = 10m, Level 2 = 15m, Level 3 = 20m)
-  const dailyGoal = avatar?.evolution_level === 3 ? 20 : (avatar?.evolution_level === 2 ? 15 : 10);
+  const playBeep = (freq: number, duration: number) => {
+    try {
+      if (!audioContextRef.current) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+        }
+      }
+      const ctx = audioContextRef.current;
+      if (!ctx) return;
+      
+      // Resume context if suspended
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + (duration / 1000));
+    } catch (e) {
+      console.warn("AudioContext warning beep failed:", e);
+    }
+  };
+
 
   // Animate SVG circular ring
   useEffect(() => {
@@ -607,6 +805,41 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     await handleQuickLogPractice(loggedMinutes);
     setElapsedSeconds(0);
     setTimerRunning(false);
+    setIsExtraTime(false);
+  };
+
+  const handleStartTimer = async () => {
+    // Unlock or initialize AudioContext
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to initialize AudioContext on user gesture:", e);
+    }
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const usesSensors = isMobile && (typeof window.DeviceOrientationEvent !== 'undefined');
+
+    if (usesSensors && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      try {
+        const permission = await (DeviceOrientationEvent as any).requestPermission();
+        if (permission === 'granted') {
+          setTimerRunning(true);
+        } else {
+          alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff! 📱");
+        }
+      } catch (err) {
+        console.error("iOS Sensor Permission error:", err);
+        setTimerRunning(true);
+      }
+    } else {
+      setTimerRunning(true);
+    }
   };
 
   // ── PIN-Eingabe: Ziffern-Eingabe-Handler ─────────────────────────────────
@@ -1577,7 +1810,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           {!timerRunning && elapsedSeconds === 0 ? (
                             <button
                               type="button"
-                              onClick={() => setTimerRunning(true)}
+                              onClick={handleStartTimer}
                               style={{
                                 flex: 1,
                                 padding: '16px',
@@ -1601,7 +1834,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             <>
                               <button
                                 type="button"
-                                onClick={() => setTimerRunning(!timerRunning)}
+                                onClick={() => {
+                                  if (timerRunning) {
+                                    setTimerRunning(false);
+                                  } else {
+                                    handleStartTimer();
+                                  }
+                                }}
                                 style={{
                                   flex: 1,
                                   padding: '16px',
@@ -1674,6 +1913,243 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           </div>
         </div>
+
+        {/* Focus Timer Overlays for student_only user */}
+        {profile.app_usage_mode === 'student_only' && timerRunning && (
+          <>
+            {/* 1. Flat on Table Mode */}
+            {isPhoneFlat && (
+              <div 
+                className="fokus-overlay-container"
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 9999,
+                  background: '#000000', // AMOLED Black base
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  userSelect: 'none',
+                  fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+                  overflow: 'hidden'
+                }}
+              >
+                <style dangerouslySetInnerHTML={{__html: `
+                  @keyframes timerBreathe {
+                    0%, 100% { opacity: 0.8; text-shadow: 0 0 10px rgba(255,255,255,0.05); }
+                    50% { opacity: 1; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
+                  }
+                  .fokus-digits {
+                    animation: timerBreathe 4s ease-in-out infinite;
+                  }
+                  .fokus-controls {
+                    opacity: 0;
+                    transform: translateY(10px);
+                    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                  }
+                  .fokus-overlay-container:hover .fokus-controls {
+                    opacity: 1;
+                    transform: translateY(0);
+                  }
+                `}} />
+
+                {/* Large Timer digits only */}
+                <div className="fokus-digits" style={{
+                  fontSize: 'clamp(5.5rem, 18vw, 10rem)',
+                  fontWeight: 100,
+                  fontFamily: 'system-ui, -apple-system, monospace',
+                  letterSpacing: '-0.03em',
+                  lineHeight: 1,
+                  color: '#ffffff',
+                  textAlign: 'center',
+                  zIndex: 10
+                }}>
+                  {formatTime(elapsedSeconds)}
+                </div>
+
+                {/* Action buttons only visible on desktop fallback or hovered */}
+                {(isDesktopFallback || true) && (
+                  <div className="fokus-controls" style={{ 
+                    position: 'absolute',
+                    bottom: '60px',
+                    display: 'flex', 
+                    gap: '16px', 
+                    zIndex: 100 
+                  }}>
+                    <button
+                      type="button"
+                      onClick={handleFinishFocusSession}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 28px',
+                        borderRadius: '14px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.2)',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      🏁 Beenden
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                          setElapsedSeconds(0);
+                          setTimerRunning(false);
+                          setIsExtraTime(false);
+                        }
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#ffffff',
+                        padding: '12px 24px',
+                        borderRadius: '14px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.transform = 'scale(1.03)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
+            {isGraceActive && !isPhoneFlat && (
+              <div 
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 10001, // Layered above the flat overlay
+                  background: 'rgba(9, 9, 11, 0.72)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                  color: '#ffffff',
+                  userSelect: 'none',
+                  fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
+                }}
+              >
+                <div style={{
+                  width: '100%',
+                  maxWidth: '340px',
+                  background: 'rgba(24, 24, 27, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '32px',
+                  padding: '40px 30px',
+                  textAlign: 'center',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '24px'
+                }}>
+                  {/* Warning Sign */}
+                  <div style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '22px',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fbbf24',
+                    animation: 'pulseSoft 1.5s infinite'
+                  }}>
+                    <Shield size={32} style={{ animation: 'bounce 2s infinite' }} />
+                  </div>
+
+                  <div>
+                    <h3 style={{ fontSize: '1.45rem', fontWeight: 850, color: '#f59e0b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                      Fokus unterbrochen!
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#a1a1aa', fontWeight: 550, lineHeight: 1.5, margin: 0 }}>
+                      {isDesktopFallback 
+                        ? 'Wechsle sofort zurück auf diese Seite, um den Fokus fortzusetzen.'
+                        : 'Lege das Handy wieder flach auf den Tisch, um den Fokus fortzusetzen.'}
+                    </p>
+                  </div>
+
+                  {/* Big countdown number */}
+                  <div style={{
+                    fontSize: '4.8rem',
+                    fontWeight: 800,
+                    color: '#fbbf24',
+                    fontFamily: 'monospace, sans-serif',
+                    lineHeight: 1,
+                    margin: '4px 0'
+                  }}>
+                    {graceSecondsLeft}
+                  </div>
+
+                  {/* Animated shrinking progress bar */}
+                  <div style={{
+                    width: '100%',
+                    height: '6px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    borderRadius: '3px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
+                      width: `${graceSecondsLeft * 10}%`,
+                      transition: 'width 1s linear',
+                      borderRadius: '3px'
+                    }} />
+                  </div>
+
+                  {/* Quick Action Buttons */}
+                  <button
+                    type="button"
+                    onClick={handleFinishFocusSession}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      color: '#ffffff',
+                      padding: '14px 20px',
+                      borderRadius: '16px',
+                      fontWeight: 700,
+                      fontSize: '0.88rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                  >
+                    Fokus beenden & Sichern
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }

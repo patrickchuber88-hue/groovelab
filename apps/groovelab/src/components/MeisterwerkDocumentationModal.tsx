@@ -3802,7 +3802,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                         {[
                           { label: '⏱️ Tempo halten', text: 'Achte diese Woche besonders darauf, das Metronom bei X BPM zu halten.', hasPrompt: true },
-                          { label: '✨ Sauber greifen', text: 'Achte auf sauberen Klang, kein Schnarren.' },
+                          { label: '✨ Sauber spielen', text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.' },
                           { label: '🥁 Rhythmus-Metronom', text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.' },
                           { label: '🖖 Fingersatz üben', text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.' }
                         ].map((tpl, i) => (
@@ -4764,7 +4764,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <button
                               type="button"
                               onClick={() => {
-                                const text = "Achte auf sauberen Klang, kein Schnarren.";
+                                const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
                                 setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
                                 setIsCurrentHomework(true);
                                 setHasChanges(true);
@@ -4779,9 +4779,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span>✨</span>
-                                <span style={{ fontWeight: 800 }}>Sauber greifen</span>
+                                <span>Sauber spielen</span>
                               </div>
-                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Sauberer Klang</span>
+                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Klarer Klang</span>
                             </button>
 
                             <button

@@ -3023,7 +3023,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                     <button
                       type="button"
                       onClick={() => {
-                        const text = "Achte auf sauberen Klang, kein Schnarren.";
+                        const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
                         setNewDocNotes(prev => prev ? `${prev}\n${text}` : text);
                         setNewDocHomework(true);
                       }}
@@ -3031,8 +3031,8 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                     >
                       <span className="text-sm">✨</span>
                       <div className="flex flex-col">
-                        <span className="font-bold">Sauber greifen</span>
-                        <span className="text-[9px] text-slate-500 font-medium">Sauberer Klang</span>
+                        <span className="font-bold">Sauber spielen</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Klarer Klang</span>
                       </div>
                     </button>
 

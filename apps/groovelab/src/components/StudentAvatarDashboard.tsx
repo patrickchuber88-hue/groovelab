@@ -2108,7 +2108,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     sessionCompletedTarget: boolean;
     usedJokerThisSession: boolean;
     streak: number;
+    sessionMinutes?: number;
+    dailyGoal?: number;
   } | null>(null);
+
+  const [celebrationRingProgress, setCelebrationRingProgress] = useState(0);
+  const [celebrationExploded, setCelebrationExploded] = useState(false);
+  const celebrationCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [lastFinishedTimestamp, setLastFinishedTimestamp] = useState<number | null>(null);
   const wakeLockRef = useRef<any>(null);
 
@@ -2172,21 +2178,179 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
 
-  const getTargetMinutes = (streak: number) => {
+  const getTargetMinutes = (streak?: number) => {
     const level = avatar?.evolution_level || 1;
-    if (level === 3) {
-      if (streak >= 9) return 20;
-      if (streak >= 4) return 15;
-      return 10;
-    } else if (level === 2) {
-      if (streak >= 9) return 15;
-      if (streak >= 4) return 10;
-      return 5;
+    if (level === 3) return 20;
+    if (level === 2) return 15;
+    return 10;
+  };
+
+  // Animate SVG circular ring in celebration modal
+  useEffect(() => {
+    if (showCelebration && celebrationDetails) {
+      const timer = setTimeout(() => {
+        const goal = celebrationDetails.dailyGoal || 10;
+        const target = Math.min(1.0, (celebrationDetails.sessionMinutes || 0) / goal);
+        setCelebrationRingProgress(target);
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
-      if (streak >= 9) return 10;
-      if (streak >= 4) return 5;
-      return 3;
+      setCelebrationRingProgress(0);
+      setCelebrationExploded(false);
     }
+  }, [showCelebration, celebrationDetails]);
+
+  // Trigger HTML5 Canvas particle explosion in celebration modal
+  useEffect(() => {
+    if (showCelebration && celebrationDetails && celebrationDetails.sessionCompletedTarget && !celebrationExploded && celebrationRingProgress >= 1.0) {
+      const timer = setTimeout(() => {
+        triggerCelebrationExplosion();
+        setCelebrationExploded(true);
+      }, 1200); // Trigger near the end of the 1.5s ring animation
+      return () => clearTimeout(timer);
+    }
+  }, [showCelebration, celebrationDetails, celebrationRingProgress, celebrationExploded]);
+
+  // Canvas particle explosion logic for celebration modal
+  const triggerCelebrationExplosion = () => {
+    // Trigger mechanisches haptisches Feedback (50ms - 30ms - 50ms)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+
+    const canvas = celebrationCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    let animationFrameId: number;
+    const particles: any[] = [];
+    const particleCount = 100;
+    
+    const noteSymbols = ['♪', '♫', '♬', '♩'];
+    const colors = ['#fbbf24', '#10b981', '#6366f1', '#ec4899', '#3b82f6', '#f59e0b', '#a855f7'];
+
+    const drawStar = (c: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) => {
+      let rot = Math.PI / 2 * 3;
+      let x = cx;
+      let y = cy;
+      let step = Math.PI / spikes;
+
+      c.beginPath();
+      c.moveTo(cx, cy - outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        c.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        c.lineTo(x, y);
+        rot += step;
+      }
+      c.lineTo(cx, cy - outerRadius);
+      c.closePath();
+      c.fill();
+    };
+
+    const drawSparkle = (c: CanvasRenderingContext2D, cx: number, cy: number, size: number) => {
+      c.beginPath();
+      c.moveTo(cx - size, cy);
+      c.quadraticCurveTo(cx, cy, cx, cy - size);
+      c.quadraticCurveTo(cx, cy, cx + size, cy);
+      c.quadraticCurveTo(cx, cy, cx, cy + size);
+      c.quadraticCurveTo(cx, cy, cx, cy + size);
+      c.quadraticCurveTo(cx, cy, cx - size, cy);
+      c.closePath();
+      c.fill();
+    };
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 8;
+      const typeRand = Math.random();
+      let type: 'star' | 'circle' | 'note' | 'sparkle' = 'circle';
+      if (typeRand < 0.25) type = 'star';
+      else if (typeRand < 0.5) type = 'note';
+      else if (typeRand < 0.75) type = 'sparkle';
+
+      particles.push({
+        x: centerX,
+        y: centerY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (Math.random() * 2),
+        size: 5 + Math.random() * 7,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1,
+        decay: 0.01 + Math.random() * 0.015,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.15,
+        type,
+        noteSymbol: type === 'note' ? noteSymbols[Math.floor(Math.random() * noteSymbols.length)] : undefined,
+        gravity: 0.1 + Math.random() * 0.08,
+        friction: 0.96 + Math.random() * 0.02
+      });
+    }
+
+    const renderFrame = () => {
+      ctx.clearRect(0, 0, width, height);
+      let activeParticles = 0;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (p.alpha <= 0) continue;
+
+        activeParticles++;
+        p.vx *= p.friction;
+        p.vy *= p.friction;
+        p.vy += p.gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.rotationSpeed;
+        p.alpha -= p.decay;
+
+        if (p.alpha < 0) p.alpha = 0;
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+
+        if (p.type === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'star') {
+          drawStar(ctx, 0, 0, 5, p.size, p.size / 2.5);
+        } else if (p.type === 'sparkle') {
+          drawSparkle(ctx, 0, 0, p.size);
+        } else if (p.type === 'note') {
+          ctx.font = `bold ${Math.round(p.size * 1.6)}px sans-serif`;
+          ctx.fillText(p.noteSymbol!, 0, 0);
+        }
+
+        ctx.restore();
+      }
+
+      if (activeParticles > 0) {
+        animationFrameId = requestAnimationFrame(renderFrame);
+      } else {
+        ctx.clearRect(0, 0, width, height);
+      }
+    };
+
+    renderFrame();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   };
 
   const getFlameLevelName = (streak: number) => {
@@ -2987,8 +3151,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         streakFlame: streakFlame,
         sessionCompletedTarget: sessionCompletedTarget,
         usedJokerThisSession: usedJokerThisSession,
-        streak: streak
+        streak: streak,
+        sessionMinutes: totalMinutes,
+        dailyGoal: getTargetMinutes(streakFlame)
       });
+      setCelebrationRingProgress(0);
+      setCelebrationExploded(false);
       setShowCelebration(true);
       setLastFinishedTimestamp(Date.now());
       
@@ -4870,20 +5038,85 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         gap: '24px',
                         position: 'relative'
                       }}>
-                        {/* Golden Flame Sparkle Effect */}
-                        <div style={{
-                          width: '80px',
-                          height: '80px',
-                          borderRadius: '26px',
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#10b981',
-                          fontSize: '2rem'
-                        }}>
-                          🔥
+                        {/* Animated Progress Ring Container */}
+                        <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                          {/* Canvas for Particle Explosion */}
+                          <canvas
+                            ref={celebrationCanvasRef}
+                            width={320}
+                            height={320}
+                            style={{
+                              position: 'absolute',
+                              top: '-80px',
+                              left: '-80px',
+                              width: '320px',
+                              height: '320px',
+                              pointerEvents: 'none',
+                              zIndex: 10
+                            }}
+                          />
+
+                          {/* SVG circular progress bar */}
+                          <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                            {/* Background Track */}
+                            <circle
+                              cx="80"
+                              cy="80"
+                              r="70"
+                              fill="transparent"
+                              stroke="rgba(255, 255, 255, 0.08)"
+                              strokeWidth="8"
+                            />
+                            {/* Foreground Progress */}
+                            <circle
+                              cx="80"
+                              cy="80"
+                              r="70"
+                              fill="transparent"
+                              stroke="url(#celebrationProgressGrad)"
+                              strokeWidth="8"
+                              strokeDasharray="439.82"
+                              strokeDashoffset={439.82 - 439.82 * celebrationRingProgress}
+                              strokeLinecap="round"
+                              style={{
+                                transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                              }}
+                            />
+                            <defs>
+                              <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#10b981" />
+                                <stop offset="100%" stopColor="#059669" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+
+                          {/* Flame Icon & Streak Count in Center */}
+                          <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 5
+                          }}>
+                            <Flame
+                              size={36}
+                              color="#ea580c"
+                              fill="#ea580c"
+                              style={{
+                                filter: 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.5))',
+                                transform: 'scale(1)',
+                                animation: 'pulse 2s infinite ease-in-out'
+                              }}
+                            />
+                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#ffffff', marginTop: '2px', lineHeight: 1 }}>
+                              {celebrationDetails.streakFlame}
+                            </span>
+                            <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '1px' }}>
+                              Tage Streak
+                            </span>
+                          </div>
                         </div>
 
                         <div>
