@@ -13550,7 +13550,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             {roomFormRoomInstruments.map((inst, idx) => (
                               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                                  🎸 {inst.name} <span style={{ color: '#64748b', fontWeight: 550 }}>({inst.model || 'Standard'})</span>
+                                  {inst.name} <span style={{ color: '#64748b', fontWeight: 550 }}>({inst.model || 'Standard'})</span>
                                 </span>
                                 <button
                                   type="button"
