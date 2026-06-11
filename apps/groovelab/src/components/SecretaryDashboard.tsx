@@ -13818,7 +13818,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="google-card" style={{ paddingLeft: '44px' }}>
               <div className="google-kpi-bar bg-google-red" />
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800 }}>🎫 Aktive Module &amp; Abrechnung</h3>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800 }}>🎫 Abrechnung &amp; Infrastruktur</h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b' }}>
                 Verwalte deine lizenzierten Module und buche zusätzliche Benutzerkontingente.
               </p>
