@@ -15208,7 +15208,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         fontFamily: 'Urbanist'
                       }}
                     >
-                      <span>📦 Freie Instrumente</span>
+                      <span>Freie Instrumente</span>
                     </button>
                   </div>
 
