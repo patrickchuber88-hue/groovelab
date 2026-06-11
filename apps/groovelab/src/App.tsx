@@ -1550,7 +1550,7 @@ function App() {
     return <QRLandingPage token={qrPathMatch[1]} />;
   }
 
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => sessionStorage.getItem('groovelab_user_id') || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null));
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
@@ -1861,7 +1861,7 @@ function App() {
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth < 1200;
+      return window.innerWidth < 1024;
     }
     return false;
   });
@@ -1981,7 +1981,7 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentMessages, setStudentMessages] = useState<any[]>([]);
@@ -5247,8 +5247,6 @@ function App() {
     setLocationMode(mode);
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
-    localStorage.setItem('groovelab_user_id', userId);
-    localStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -6472,7 +6470,7 @@ function App() {
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
-      <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
+      <aside className="sidebar-nav" style={{ display: windowWidth > 800 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {activePlatform === 'campus' ? (
             <>
@@ -6811,12 +6809,12 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 800 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
-            gap: windowWidth <= 1024 ? '4px' : '6px', 
+            gap: windowWidth <= 800 ? '4px' : '6px', 
             height: '100%',
             paddingTop: '20px',
             boxSizing: 'border-box'
@@ -6834,7 +6832,7 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.05)',
                   color: activePlatform === 'campus' ? '#ffffff' : '#34a853',
@@ -6871,7 +6869,7 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.05)',
                   color: activePlatform === 'groovelab' ? '#09090b' : '#b45309',
@@ -6907,7 +6905,7 @@ function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
                 borderRadius: '12px 12px 0 0',
                 background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
                 color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
@@ -6935,8 +6933,8 @@ function App() {
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: windowWidth <= 1024 ? '16px' : '28px',
-            marginLeft: windowWidth <= 1024 ? '24px' : '48px'
+            gap: windowWidth <= 800 ? '16px' : '28px',
+            marginLeft: windowWidth <= 800 ? '24px' : '48px'
           }}>
             {/* Status Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
@@ -7127,7 +7125,7 @@ function App() {
             </div>
 
             {/* Ausweis Button (Only Student, Desktop only) */}
-            {user.role?.toLowerCase() === 'student' && windowWidth > 1024 && (
+            {user.role?.toLowerCase() === 'student' && windowWidth > 800 && (
               <button onClick={() => setShowQR(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', padding: '10px 20px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
                 <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
                 <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
@@ -7135,8 +7133,8 @@ function App() {
             )}
 
             {/* User Info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '8px' : '16px', paddingLeft: windowWidth <= 1024 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
-              {windowWidth > 1024 && activePlatform !== 'campus' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 800 ? '8px' : '16px', paddingLeft: windowWidth <= 800 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
+              {windowWidth > 800 && activePlatform !== 'campus' && (
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
@@ -7768,7 +7766,7 @@ function App() {
               {user.role === 'student' && (
                 <>
                   {/* Bottom: Radar & Planner */}
-                  <div style={{ display: 'grid', gridTemplateColumns: width < 1024 ? '1fr' : '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                     {/* Skill Radar */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -8067,7 +8065,7 @@ function App() {
                   </div>
 
                   {/* Third Row: Repertoire & Bands */}
-                  <div style={{ display: 'grid', gridTemplateColumns: width < 1024 ? '1fr' : '1fr 1fr', gap: '24px', paddingBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px', paddingBottom: '32px' }}>
                     {/* Übesongs */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -8226,7 +8224,7 @@ function App() {
               )}
               {user.role !== 'student' && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: width < 1024 ? '1fr' : '1.5fr 1fr', gap: '24px', paddingBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1.5fr 1fr', gap: '24px', paddingBottom: '32px' }}>
                     {/* Wochen-Planner */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -11773,7 +11771,7 @@ function App() {
           <nav 
             className="mobile-nav" 
             style={{ 
-              display: windowWidth <= 1024 ? 'flex' : 'none',
+              display: windowWidth <= 800 ? 'flex' : 'none',
               justifyContent: isCompact ? 'space-around' : 'flex-start',
               gap: isCompact ? '4px' : '12px',
               padding: isCompact ? '8px 12px 24px 12px' : '12px 16px 28px 16px'

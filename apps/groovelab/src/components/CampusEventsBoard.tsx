@@ -1828,6 +1828,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 catBg = '#f1f5f9';
               }
 
+              const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
+
               return (
                 <div
                   key={ev.id}
@@ -1840,16 +1842,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     cursor: 'pointer',
                     background: isHolidayEvent 
                       ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' 
+                      : '#ffffff',
+                    border: hasFestInTitle
+                      ? '1.5px solid #f97316'
                       : isKlassenvorspiel
-                        ? 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)'
-                        : '#ffffff',
-                    border: isHolidayEvent 
-                      ? '1px solid #a7f3d0' 
+                        ? '1.5px solid #3b82f6'
+                        : isHolidayEvent 
+                          ? '1px solid #a7f3d0' 
+                          : '1px solid #e2e8f0',
+                    borderLeft: hasFestInTitle
+                      ? '6px solid #f97316'
                       : isKlassenvorspiel
-                        ? '1px solid #bfdbfe'
-                        : '1px solid #e2e8f0',
-                    borderLeft: `4px solid ${catColor}`,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.015)',
+                        ? '6px solid #3b82f6'
+                        : `4px solid ${catColor}`,
+                    boxShadow: hasFestInTitle
+                      ? '0 6px 18px rgba(249, 115, 22, 0.08)'
+                      : isKlassenvorspiel
+                        ? '0 6px 18px rgba(59, 130, 246, 0.08)'
+                        : '0 4px 12px rgba(0,0,0,0.015)',
                     transition: 'all 0.2s ease',
                     position: 'relative'
                   }}
@@ -1861,8 +1871,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <span style={{
                         fontSize: '0.62rem',
                         fontWeight: 900,
-                        color: catColor,
-                        background: catBg,
+                        color: hasFestInTitle ? '#ea580c' : catColor,
+                        background: hasFestInTitle ? '#ffedd5' : catBg,
                         padding: '3px 8px',
                         borderRadius: '6px',
                         textTransform: 'uppercase',
@@ -1870,6 +1880,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       }}>
                         {ev.category}
                       </span>
+
+                      {hasFestInTitle && (
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          color: '#ffffff',
+                          background: '#f97316',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          🎉 Fest / Event
+                        </span>
+                      )}
 
                       <span style={{
                         fontSize: '0.6rem',
@@ -1919,11 +1947,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       margin: 0, 
                       fontSize: '0.98rem', 
                       fontWeight: 800, 
-                      color: isHolidayEvent 
-                        ? '#065f46' 
-                        : isKlassenvorspiel
-                          ? '#1e40af'
-                          : '#0f172a', 
+                      color: hasFestInTitle
+                        ? '#c2410c'
+                        : isHolidayEvent 
+                          ? '#065f46' 
+                          : isKlassenvorspiel
+                            ? '#1e40af'
+                            : '#0f172a', 
                       fontFamily: 'Urbanist', 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -1938,21 +1968,28 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           <Palmtree size={15} strokeWidth={2.5} />
                         </span>
                       )}
+                      {hasFestInTitle && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>🎉</span>
+                      )}
                       {ev.title}
                     </h4>
                     <span style={{
                       fontSize: '0.72rem',
                       fontWeight: 800,
-                      color: isHolidayEvent 
-                        ? '#047857' 
-                        : isKlassenvorspiel
-                          ? '#2563eb'
-                          : '#475569',
-                      background: isHolidayEvent 
-                        ? '#d1fae5' 
-                        : isKlassenvorspiel
-                          ? '#dbeafe'
-                          : '#f1f5f9',
+                      color: hasFestInTitle
+                        ? '#ea580c'
+                        : isHolidayEvent 
+                          ? '#047857' 
+                          : isKlassenvorspiel
+                            ? '#2563eb'
+                            : '#475569',
+                      background: hasFestInTitle
+                        ? '#ffedd5'
+                        : isHolidayEvent 
+                          ? '#d1fae5' 
+                          : isKlassenvorspiel
+                            ? '#dbeafe'
+                            : '#f1f5f9',
                       padding: '4px 8px',
                       borderRadius: '8px',
                       whiteSpace: 'nowrap',
@@ -2766,8 +2803,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       {/* ── Event Detail Modal ── */}
       {selectedEvent && (() => {
         const ev = selectedEvent;
-        const catColor = ev.catColor || '#64748b';
-        const catBg = ev.catBg || '#f1f5f9';
+        const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
+        const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
+        const catColor = hasFestInTitle ? '#f97316' : (ev.catColor || '#64748b');
+        const catBg = hasFestInTitle ? '#ffedd5' : (ev.catBg || '#f1f5f9');
         const isSubscribed = ev.is_subscribed;
         const canEditVisibility = (role === 'admin' || role === 'secretary') && !isSubscribed;
         const currentVisibility = ev.visibility || 'all';
@@ -2799,7 +2838,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 maxWidth: '460px',
                 boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
                 overflow: 'hidden',
-                fontFamily: 'Urbanist, sans-serif'
+                fontFamily: 'Urbanist, sans-serif',
+                border: hasFestInTitle
+                  ? '2px solid #f97316'
+                  : isKlassenvorspiel
+                    ? '2px solid #3b82f6'
+                    : 'none'
               }}
             >
               {/* Color bar */}
@@ -2815,6 +2859,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   }}>
                     {ev.category}
                   </span>
+                  
+                  {hasFestInTitle && (
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 900,
+                      color: '#ffffff', background: '#f97316',
+                      padding: '4px 10px', borderRadius: '8px',
+                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                      display: 'inline-flex', alignItems: 'center', gap: '2px'
+                    }}>
+                      🎉 Fest / Event
+                    </span>
+                  )}
+
                   <span style={{
                     fontSize: '0.62rem', fontWeight: 800,
                     color: isSubscribed ? '#475569' : '#0369a1',
@@ -2842,7 +2899,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               {/* Body — always read-only */}
               <div style={{ padding: '16px 22px 24px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Title */}
-                <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.25 }}>
+                <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: hasFestInTitle ? '#c2410c' : '#0f172a', lineHeight: 1.25 }}>
+                  {hasFestInTitle && <span style={{ marginRight: '6px' }}>🎉</span>}
                   {ev.title}
                 </h2>
 

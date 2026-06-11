@@ -549,7 +549,7 @@ export function AdminDashboard({
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 800);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -1374,7 +1374,7 @@ export function AdminDashboard({
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth < 1200;
+      return window.innerWidth < 1024;
     }
     return false;
   });
@@ -1398,7 +1398,7 @@ export function AdminDashboard({
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
   
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
@@ -6724,7 +6724,7 @@ export function AdminDashboard({
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
           }
-          @media (max-width: 1024px) {
+          @media (max-width: 800px) {
             .calendar-header-flex {
               flex-direction: column !important;
               align-items: stretch !important;
@@ -8489,7 +8489,7 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => {
-    const brandColor = '#eab308';
+    const brandColor = activePlatform === 'campus' ? '#16a34a' : '#eab308';
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())

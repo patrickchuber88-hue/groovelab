@@ -693,7 +693,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
             >
               <div 
                 onClick={() => c.users && onProfileSelect(c.users)}
-                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '4px solid #22c55e' : '4px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.3)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #22c55e' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.2)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
@@ -1979,7 +1979,7 @@ export function TeacherDashboard({
 
   const [localIsSidebarCollapsed, setLocalIsSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth < 1200;
+      return window.innerWidth < 1024;
     }
     return false;
   });
@@ -2156,13 +2156,20 @@ export function TeacherDashboard({
     ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
     : 0;
 
-  const birthdaysCount = briefingData?.timeline
-    ? briefingData.timeline.filter((s: any) => {
-        if (!s.student) return false;
-        if (s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick' || s.status === 'rescheduled_away') return false;
-        return isStudentBirthdayToday(s.student);
-      }).length
-    : 0;
+  const avgStreak = useMemo(() => {
+    if (!briefingData?.timeline) return '0.0';
+    const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
+      s.student && 
+      s.status !== 'canceled_by_student' && 
+      s.status !== 'teacher_sick' && 
+      s.status !== 'cancelled' && 
+      s.status !== 'canceled_by_teacher_sick' && 
+      s.status !== 'rescheduled_away'
+    );
+    if (activeTimelineStudents.length === 0) return '0.0';
+    const totalStreak = activeTimelineStudents.reduce((acc: number, s: any) => acc + (s.student?.streakFlame || 0), 0);
+    return (totalStreak / activeTimelineStudents.length).toFixed(1);
+  }, [briefingData?.timeline]);
 
   const workloadMinutes = briefingData?.timeline
     ? briefingData.timeline
@@ -2941,7 +2948,7 @@ export function TeacherDashboard({
                 is_app_user,
                 instrument,
                 birth_date,
-                avatars (avatar_style, evolution_level, xp)
+                avatars (avatar_style, evolution_level, xp, streak_flame)
               )
             `)
             .eq('teacher_id', userId)
@@ -2971,7 +2978,7 @@ export function TeacherDashboard({
                 is_app_user,
                 instrument,
                 birth_date,
-                avatars (avatar_style, evolution_level, xp)
+                avatars (avatar_style, evolution_level, xp, streak_flame)
               )
             `)
             .eq('teacher_id', userId)
@@ -2996,7 +3003,8 @@ export function TeacherDashboard({
                 name: `${student.first_name} ${student.last_name}`,
                 isAppUser: student.is_app_user ?? false,
                 isAnalogStickerUser,
-                birthDate: student.birth_date
+                birthDate: student.birth_date,
+                streakFlame: avatar?.streak_flame || 0
               } : null
             };
           });
@@ -3031,7 +3039,8 @@ export function TeacherDashboard({
                     name: `${student.first_name} ${student.last_name}`,
                     isAppUser: student.is_app_user ?? false,
                     isAnalogStickerUser,
-                    birthDate: student.birth_date
+                    birthDate: student.birth_date,
+                    streakFlame: avatar?.streak_flame || 0
                   } : null
                 };
 
@@ -5355,11 +5364,11 @@ export function TeacherDashboard({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Std.</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
                         </div>
                       </div>
 
-                      {/* Card 2: Geburtstage Heute (Green matching Songs) */}
+                      {/* Card 2: Ø Übe-Streak Heute (Green matching Songs) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
@@ -5370,12 +5379,14 @@ export function TeacherDashboard({
                         border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Geburtstage</span>
-                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px', fontSize: '0.8rem' }}>🎂</div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Streak</span>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                            <Flame size={14} color="white" />
+                          </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{birthdaysCount}</span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgStreak}</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
                         </div>
                       </div>
 
@@ -8500,19 +8511,28 @@ export function TeacherDashboard({
                           right: 0,
                           bottom: 0,
                           borderRadius: '24px',
-                          background: 'rgba(255, 255, 255, 0.15)',
-                          backdropFilter: 'blur(3px)',
-                          WebkitBackdropFilter: 'blur(3px)',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          backdropFilter: 'blur(0.2px)',
+                          WebkitBackdropFilter: 'blur(0.2px)',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           zIndex: 1000,
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
                           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
                           padding: '24px',
                           textAlign: 'center'
                         }}>
+                          {/* Light diagonal stripes overlay (5% opacity) */}
+                          <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
+                            pointerEvents: 'none',
+                            borderRadius: 'inherit',
+                            zIndex: -1
+                          }} />
                           <div 
                             className={shakeLock ? 'shake-lock-active' : ''}
                             style={{
@@ -8591,7 +8611,7 @@ export function TeacherDashboard({
                         display: 'block', 
                         boxSizing: 'border-box', 
                         padding: '16px',
-                        filter: !isUserCheckedIn ? 'blur(1px)' : 'none',
+                        filter: 'none',
                         pointerEvents: !isUserCheckedIn ? 'none' : 'auto'
                       }}
                     >
@@ -8733,19 +8753,28 @@ export function TeacherDashboard({
                       right: 0,
                       bottom: 0,
                       borderRadius: '32px',
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      backdropFilter: 'blur(3px)',
-                      WebkitBackdropFilter: 'blur(3px)',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      backdropFilter: 'blur(0.2px)',
+                      WebkitBackdropFilter: 'blur(0.2px)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       zIndex: 1000,
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                       boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
                       padding: '24px',
                       textAlign: 'center'
                     }}>
+                      {/* Light diagonal stripes overlay (5% opacity) */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
+                        pointerEvents: 'none',
+                        borderRadius: 'inherit',
+                        zIndex: -1
+                      }} />
                       <div 
                         className={shakeLock ? 'shake-lock-active' : ''}
                         style={{
@@ -8816,7 +8845,7 @@ export function TeacherDashboard({
                     padding: '24px', 
                     borderRadius: '32px', 
                     border: '1px solid #e2e8f0',
-                    filter: !isUserCheckedIn ? 'blur(1px)' : 'none',
+                    filter: 'none',
                     pointerEvents: !isUserCheckedIn ? 'none' : 'auto'
                   }}>
                     {/* Coaches Node */}

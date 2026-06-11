@@ -301,9 +301,9 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
 };
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    const handleResize = () => setIsMobile(window.innerWidth < 800);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -1347,16 +1347,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       sessionStorage.setItem('groovelab_user_id', user.id);
-      localStorage.setItem('groovelab_user_id', user.id);
-      localStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
+      sessionStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
       setLoading(false);
       
       onLogin(user.id, isHome);
     } catch (err: any) {
       console.error('[Login] Finalize error:', err.message);
       sessionStorage.removeItem('groovelab_user_id');
-      localStorage.removeItem('groovelab_user_id');
-      localStorage.removeItem('groovelab_location_mode');
+      sessionStorage.removeItem('groovelab_location_mode');
       setError(err.message);
       setLoading(false);
     }

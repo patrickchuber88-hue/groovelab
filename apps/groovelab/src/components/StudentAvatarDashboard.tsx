@@ -1135,7 +1135,7 @@ function MobileBriefingView({
 
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
 
   const campusSettings = useMemo(() => {
     return studentUser?.schools?.opening_hours?.campus_settings || {};
@@ -1149,7 +1149,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 800);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -2505,7 +2505,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         date: dateStr,
         focusSeconds: 0,
         extraSeconds: 0,
-        flameLevel: getFlameLevelName(avatar?.streak_flame || 0),
+        flameLevel: 'Keine Flamme',
         isPlaceholder: true
       };
     }
@@ -3130,6 +3130,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       let currentXp = totalMinutes * 10;
       let streakFlame = streak;
       let lastPracticeDate = null;
+      let lastSecuredDate = null;
 
       if (stats) {
         totalFocus = (stats.total_focus_minutes || 0) + totalMinutes;
@@ -3137,6 +3138,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         currentXp = (stats.current_xp || 0) + (totalMinutes * 10);
         streakFlame = stats.streak_flame || 0;
         lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : null;
+        lastSecuredDate = lastPracticeDate;
+      }
+
+      if (studentUser?.joker_used_at) {
+        const jokerDateStr = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
+        if (!lastSecuredDate || jokerDateStr > lastSecuredDate) {
+          lastSecuredDate = jokerDateStr;
+        }
+      }
+
+      if (!lastSecuredDate && studentUser?.created_at) {
+        lastSecuredDate = toLocalYYYYMMDD(new Date(studentUser.created_at));
       }
 
       // Check if this session completed the target or if target was already completed today
@@ -3144,12 +3157,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       let usedJokerThisSession = false;
       
       if (sessionCompletedTarget) {
-        if (lastPracticeDate === yesterdayStr) {
+        if (lastSecuredDate === yesterdayStr) {
           streakFlame += 1;
-        } else if (lastPracticeDate === todayStr) {
+        } else if (lastSecuredDate === todayStr) {
           // Keep same streak
-        } else if (lastPracticeDate) {
-          const diffDays = getDaysBetweenLocal(lastPracticeDate, todayStr);
+        } else if (lastSecuredDate) {
+          const diffDays = getDaysBetweenLocal(lastSecuredDate, todayStr);
           const totalMissedDays = diffDays - 1;
           
           const currentWeek = getISOWeek(new Date());
@@ -3652,12 +3665,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (avatarRes.error) throw avatarRes.error;
 
       let activeStreak = avatarRecord?.streak_flame || 0;
-      const lastFocusDateStr = avatarRecord?.last_focus_date;
-      if (lastFocusDateStr && activeStreak > 0) {
+      let lastSecuredDateStr = avatarRecord?.last_focus_date || null;
+      if (user?.joker_used_at) {
+        const jokerDateStr = toLocalYYYYMMDD(new Date(user.joker_used_at));
+        if (!lastSecuredDateStr || jokerDateStr > lastSecuredDateStr) {
+          lastSecuredDateStr = jokerDateStr;
+        }
+      }
+      if (!lastSecuredDateStr && user?.created_at) {
+        lastSecuredDateStr = toLocalYYYYMMDD(new Date(user.created_at));
+      }
+
+      if (lastSecuredDateStr && activeStreak > 0) {
         const todayStr = toLocalYYYYMMDD(new Date());
-        const diffDays = getDaysBetweenLocal(lastFocusDateStr, todayStr);
+        const diffDays = getDaysBetweenLocal(lastSecuredDateStr, todayStr);
         if (diffDays > 1) {
-          let tempDate = new Date(lastFocusDateStr);
+          let tempDate = new Date(lastSecuredDateStr);
           let currentDecayedStreak = activeStreak;
           const initialJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
           let lastJokerWeek = initialJokerWeek;
@@ -6299,8 +6322,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   statusBg = '#d1fae5';
                                   statusText = 'Meisterwerk!';
                                 } else {
-                                  statusColor = '#eab308';
-                                  statusBg = '#fffbeb';
+                                  statusColor = '#16a34a';
+                                  statusBg = '#f0fdf4';
                                   statusText = 'In Arbeit';
                                 }
                               }
@@ -10107,8 +10130,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {sortedPages.map((page) => {
-                        let badgeBg = '#fffbeb';
-                        let badgeColor = '#854d0e';
+                        let badgeBg = '#f0fdf4';
+                        let badgeColor = '#16a34a';
                         let badgeText = 'In Arbeit';
 
                         if (page.status === 'THEORY_DONE') {

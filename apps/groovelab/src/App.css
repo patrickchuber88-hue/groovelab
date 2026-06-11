@@ -686,7 +686,7 @@ div:hover > .photo-overlay {
   box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 800px) {
   .sidebar-nav {
     display: none;
   }
@@ -734,7 +734,7 @@ div:hover > .photo-overlay {
   100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
 }
 
-@media (min-width: 1025px) {
+@media (min-width: 801px) {
   .app-layout {
     height: 100vh !important;
     max-height: 100vh !important;
@@ -750,7 +750,7 @@ div:hover > .photo-overlay {
 }
 
 /* Apple-style floating SOS adjust for mobile and tablet bottom nav */
-@media (max-width: 1024px) {
+@media (max-width: 800px) {
   .fab-container {
     bottom: 108px !important; /* Raised above the bottom nav bar */
     right: 16px !important;

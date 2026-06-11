@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   Calendar as CalendarIcon, 
   Clock, 
   AlertCircle,
@@ -86,6 +87,7 @@ export function ScheduleCalendarView({
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null } | null>(null);
   const [freeRooms, setFreeRooms] = useState<any[]>([]);
   const [loadingFreeRooms, setLoadingFreeRooms] = useState(false);
+  const [roomDropdownOpen, setRoomDropdownOpen] = useState(false);
 
   const [calendarUrl, setCalendarUrl] = useState<string>('');
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -308,6 +310,7 @@ export function ScheduleCalendarView({
   }, [baseOccurrences, pendingChanges]);
 
   useEffect(() => {
+    setRoomDropdownOpen(false);
     if (!editOccState) {
       setFreeRooms([]);
       return;
@@ -2275,7 +2278,6 @@ export function ScheduleCalendarView({
               border: '1px solid rgba(0,0,0,0.08)', 
               display: 'flex', 
               flexDirection: 'column',
-              overflow: 'hidden',
               boxSizing: 'border-box' 
             }}>
               
@@ -2287,7 +2289,9 @@ export function ScheduleCalendarView({
                 justifyContent: 'space-between', 
                 alignItems: 'center', 
                 color: '#ffffff',
-                borderBottom: '1px solid rgba(0,0,0,0.05)'
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                borderTopLeftRadius: '23px',
+                borderTopRightRadius: '23px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{ fontSize: '1.5rem' }}>💬</span>
@@ -2380,31 +2384,180 @@ export function ScheduleCalendarView({
                   </div>
 
                   {/* Room Selection Dropdown */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Raum</label>
-                    <select 
-                      value={editOccState.room_id || ''} 
-                      onChange={e => setEditOccState({ ...editOccState, room_id: e.target.value || null })} 
-                      style={{ 
-                        width: '100%', 
-                        padding: '11px 14px', 
-                        borderRadius: '10px', 
-                        border: '1px solid rgba(0, 0, 0, 0.15)', 
-                        background: 'rgba(255,255,255,0.8)',
-                        fontSize: '0.92rem', 
+                  <div style={{ marginBottom: '20px', position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Freie Räume</label>
+                    
+                    {/* Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => setRoomDropdownOpen(!roomDropdownOpen)}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        border: roomDropdownOpen ? '1px solid #118a44' : '1px solid rgba(0, 0, 0, 0.15)',
+                        background: '#ffffff',
+                        fontSize: '0.92rem',
                         fontFamily: 'inherit',
+                        fontWeight: 600,
+                        color: '#1d1d1f',
                         outline: 'none',
                         boxSizing: 'border-box',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                        transition: 'border-color 0.2s',
-                        cursor: 'pointer'
-                      }} 
+                        boxShadow: roomDropdownOpen ? '0 0 0 3px rgba(17, 138, 68, 0.12)' : '0 2px 4px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        textAlign: 'left'
+                      }}
                     >
-                      <option value="">Kein Raum</option>
-                      {freeRooms.map(r => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.1rem' }}>
+                          {editOccState.room_id ? '🏫' : '❌'}
+                        </span>
+                        <span>
+                          {editOccState.room_id 
+                            ? (rooms.find(r => r.id === editOccState.room_id)?.name || 'Raum') 
+                            : 'Kein Raum'}
+                        </span>
+                      </div>
+                      <ChevronDown 
+                        size={16} 
+                        style={{ 
+                          transform: roomDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', 
+                          transition: 'transform 0.2s ease', 
+                          color: '#86868b' 
+                        }} 
+                      />
+                    </button>
+
+                    {/* Click Outside Overlay */}
+                    {roomDropdownOpen && (
+                      <div 
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 999,
+                          background: 'transparent'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRoomDropdownOpen(false);
+                        }}
+                      />
+                    )}
+
+                    {/* Dropdown Menu */}
+                    {roomDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          marginTop: '6px',
+                          background: '#ffffff',
+                          borderRadius: '14px',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+                          zIndex: 1000,
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          padding: '6px',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {/* Option: Kein Raum */}
+                        <div
+                          onClick={() => {
+                            setEditOccState({ ...editOccState, room_id: null });
+                            setRoomDropdownOpen(false);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            background: !editOccState.room_id ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
+                            color: !editOccState.room_id ? '#1d1d1f' : '#515154',
+                            fontWeight: !editOccState.room_id ? 700 : 500,
+                            fontSize: '0.9rem',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            if (editOccState.room_id) {
+                              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)';
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (editOccState.room_id) {
+                              e.currentTarget.style.background = 'transparent';
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>❌</span>
+                            <span>Kein Raum</span>
+                          </div>
+                          {!editOccState.room_id && (
+                            <span style={{ color: '#118a44', fontWeight: 'bold' }}>✓</span>
+                          )}
+                        </div>
+
+                        {/* List of Free Rooms */}
+                        {freeRooms.map(r => {
+                          const isSelected = editOccState.room_id === r.id;
+                          return (
+                            <div
+                              key={r.id}
+                              onClick={() => {
+                                setEditOccState({ ...editOccState, room_id: r.id });
+                                setRoomDropdownOpen(false);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(17, 138, 68, 0.08)' : 'transparent',
+                                color: isSelected ? '#118a44' : '#1d1d1f',
+                                fontWeight: isSelected ? 700 : 500,
+                                fontSize: '0.9rem',
+                                marginTop: '2px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = 'rgba(17, 138, 68, 0.04)';
+                                }
+                              }}
+                              onMouseLeave={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = 'transparent';
+                                }
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🏫</span>
+                                <span>{r.name}</span>
+                              </div>
+                              {isSelected && (
+                                <span style={{ color: '#118a44', fontWeight: 'bold' }}>✓</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {loadingFreeRooms && (
                       <span style={{ fontSize: '0.75rem', color: '#86868b', marginTop: '4px', display: 'block' }}>Lade freie Räume...</span>
                     )}

@@ -1521,327 +1521,294 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <Sliders size={16} style={{ color: '#64748b' }} /> Module &amp; Einstellungen
               </h4>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                   {/* Campus-Modul */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus</span>
                     {activePlatform === 'secretary' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {campusRequestSent && (
-                          <span style={{ 
-                            background: '#fffbeb', 
-                            color: '#b45309', 
-                            border: '1px solid #fde68a', 
-                            padding: '2px 4px', 
-                            borderRadius: '6px', 
-                            fontSize: '0.6rem', 
-                            fontWeight: 800,
-                            display: 'inline-flex',
-                            alignItems: 'center'
-                          }} title="Freischaltungsanfrage liegt vor">
-                            ⏳
-                          </span>
-                        )}
-                        <div style={{ 
-                          background: '#f1f5f9', 
-                          padding: '2px', 
-                          borderRadius: '100px', 
-                          display: 'inline-flex', 
-                          border: '1px solid #e2e8f0' 
-                        }}>
-                          <button
-                            onClick={() => handleToggleCampus(false)}
-                            style={{
-                              background: !isCampusActive ? 'white' : 'transparent',
-                              color: !isCampusActive ? '#64748b' : '#94a3b8',
-                              border: 'none',
-                              borderRadius: '100px',
-                              padding: '2px 6px',
-                              fontSize: '0.65rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: !isCampusActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                            }}
-                          >
-                            Aus
-                          </button>
-                          <button
-                            onClick={() => handleToggleCampus(true)}
-                            style={{
-                              background: isCampusActive ? '#22c55e' : 'transparent',
-                              color: isCampusActive ? 'white' : '#64748b',
-                              border: 'none',
-                              borderRadius: '100px',
-                              padding: '2px 6px',
-                              fontSize: '0.65rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: isCampusActive ? '0 1px 4px rgba(34, 197, 94, 0.3)' : 'none'
-                            }}
-                          >
-                            Ein
-                          </button>
-                        </div>
+                      <div style={{ 
+                        background: '#f1f5f9', 
+                        padding: '2px', 
+                        borderRadius: '12px', 
+                        display: 'inline-flex', 
+                        border: 'none',
+                        alignItems: 'center'
+                      }}>
+                        <button
+                          onClick={() => handleToggleCampus(false)}
+                          style={{
+                            background: !isCampusActive ? '#ffffff' : 'transparent',
+                            color: !isCampusActive ? '#1e293b' : '#64748b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: !isCampusActive ? 800 : 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: !isCampusActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                          }}
+                        >
+                          Inaktiv
+                        </button>
+                        <button
+                          onClick={() => handleToggleCampus(true)}
+                          style={{
+                            background: isCampusActive ? '#34c759' : 'transparent', // Apple Green
+                            color: isCampusActive ? '#ffffff' : '#64748b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: isCampusActive ? 800 : 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: isCampusActive ? '0 1px 4px rgba(52, 199, 89, 0.3)' : 'none'
+                          }}
+                        >
+                          Aktiv
+                        </button>
                       </div>
-                    ) : isCampusActive ? (
-                      <span style={{ background: '#e6f4ea', color: '#137333', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
-                        Aktiv
-                      </span>
-                    ) : campusRequestSent ? (
-                      <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                        ⏳ Angefragt
-                      </span>
                     ) : (
-                      <button
-                        onClick={() => {
-                          localStorage.setItem(`req_campus_${student.id}`, 'true');
-                          setCampusRequestSent(true);
-                          alert(`Freischaltungsanfrage für Campus (${student.first_name}) wurde an die Verwaltung gesendet!`);
-                        }}
-                        style={{
-                          background: '#f8fafc',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '8px',
-                          padding: '4px 8px',
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.color = '#22c55e'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
-                      >
-                        🔒 Anfragen
-                      </button>
+                      <span style={{ 
+                        background: isCampusActive ? '#e6f4ea' : '#f1f5f9', 
+                        color: isCampusActive ? '#137333' : '#64748b', 
+                        padding: '4px 10px', 
+                        borderRadius: '10px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 800 
+                      }}>
+                        {isCampusActive ? 'Aktiv' : 'Inaktiv'}
+                      </span>
                     )}
                   </div>
 
                   {/* Vertikaler Trenner zwischen Campus und GrooveLab */}
-                  <div style={{ width: '1px', height: '18px', background: '#f1f5f9' }} />
+                  <div style={{ width: '1px', height: '18px', background: '#e2e8f0' }} />
 
                   {/* GrooveLab-Modul */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>GrooveLab</span>
                     {activePlatform === 'secretary' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {groovelabRequestSent && (
-                          <span style={{ 
-                            background: '#fffbeb', 
-                            color: '#b45309', 
-                            border: '1px solid #fde68a', 
-                            padding: '2px 4px', 
-                            borderRadius: '6px', 
-                            fontSize: '0.6rem', 
-                            fontWeight: 800,
-                            display: 'inline-flex',
-                            alignItems: 'center'
-                          }} title="Freischaltungsanfrage liegt vor">
-                            ⏳
-                          </span>
-                        )}
-                        <div style={{ 
-                          background: '#f1f5f9', 
-                          padding: '2px', 
-                          borderRadius: '100px', 
-                          display: 'inline-flex', 
-                          border: '1px solid #e2e8f0' 
-                        }}>
-                          <button
-                            onClick={() => handleToggleGroovelab(false)}
-                            style={{
-                              background: !isGroovelabActive ? 'white' : 'transparent',
-                              color: !isGroovelabActive ? '#64748b' : '#94a3b8',
-                              border: 'none',
-                              borderRadius: '100px',
-                              padding: '2px 6px',
-                              fontSize: '0.65rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                            }}
-                          >
-                            Aus
-                          </button>
-                          <button
-                            onClick={() => handleToggleGroovelab(true)}
-                            style={{
-                              background: isGroovelabActive ? '#007aff' : 'transparent',
-                              color: isGroovelabActive ? 'white' : '#64748b',
-                              border: 'none',
-                              borderRadius: '100px',
-                              padding: '2px 6px',
-                              fontSize: '0.65rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: isGroovelabActive ? '0 1px 4px rgba(0, 122, 255, 0.3)' : 'none'
-                            }}
-                          >
-                            Ein
-                          </button>
-                        </div>
+                      <div style={{ 
+                        background: '#f1f5f9', 
+                        padding: '2px', 
+                        borderRadius: '12px', 
+                        display: 'inline-flex', 
+                        border: 'none',
+                        alignItems: 'center'
+                      }}>
+                        <button
+                          onClick={() => handleToggleGroovelab(false)}
+                          style={{
+                            background: !isGroovelabActive ? '#ffffff' : 'transparent',
+                            color: !isGroovelabActive ? '#1e293b' : '#64748b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: !isGroovelabActive ? 800 : 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                          }}
+                        >
+                          Inaktiv
+                        </button>
+                        <button
+                          onClick={() => handleToggleGroovelab(true)}
+                          style={{
+                            background: isGroovelabActive ? '#007aff' : 'transparent', // Apple Blue
+                            color: isGroovelabActive ? '#ffffff' : '#64748b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: isGroovelabActive ? 800 : 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: isGroovelabActive ? '0 1px 4px rgba(0, 122, 255, 0.3)' : 'none'
+                          }}
+                        >
+                          Aktiv
+                        </button>
                       </div>
-                    ) : isGroovelabActive ? (
-                      <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
-                        Aktiv
-                      </span>
-                    ) : groovelabRequestSent ? (
-                      <span style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                        ⏳ Angefragt
-                      </span>
                     ) : (
-                      <button
-                        onClick={() => {
-                          localStorage.setItem(`req_groovelab_${student.id}`, 'true');
-                          setGroovelabRequestSent(true);
-                          alert(`Freischaltungsanfrage für GrooveLab (${student.first_name}) wurde an die Verwaltung gesendet!`);
-                        }}
-                        style={{
-                          background: '#f8fafc',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '8px',
-                          padding: '4px 8px',
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          color: '#64748b',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#007aff'; e.currentTarget.style.color = '#007aff'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
-                      >
-                        🔒 Anfragen
-                      </button>
+                      <span style={{ 
+                        background: isGroovelabActive ? '#eff6ff' : '#f1f5f9', 
+                        color: isGroovelabActive ? '#1d4ed8' : '#64748b', 
+                        padding: '4px 10px', 
+                        borderRadius: '10px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 800 
+                      }}>
+                        {isGroovelabActive ? 'Aktiv' : 'Inaktiv'}
+                      </span>
                     )}
                   </div>
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsform</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsform</span>
                   {activePlatform === 'secretary' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {durationRequestSent && (
                         <span style={{ 
                           background: '#fffbeb', 
                           color: '#b45309', 
                           border: '1px solid #fde68a', 
-                          padding: '4px 8px', 
+                          padding: '3px 6px', 
                           borderRadius: '8px', 
                           fontSize: '0.65rem', 
                           fontWeight: 800,
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '2px'
                         }}>
                           ⏳ Wunsch: {requestedDuration} Min
                         </span>
                       )}
-                      <select
-                        value={lessonDuration}
-                        onChange={(e) => handleUpdateDuration(parseInt(e.target.value))}
-                        style={{
-                          background: '#f8fafc',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '10px',
-                          padding: '6px 12px',
-                          fontSize: '0.8rem',
-                          fontWeight: 800,
-                          color: '#1e293b',
-                          outline: 'none',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value={30}>30 Min</option>
-                        <option value={45}>45 Min</option>
-                        <option value={60}>60 Min</option>
-                        <option value={90}>90 Min</option>
-                      </select>
+                      <div style={{
+                        background: '#f1f5f9',
+                        padding: '2px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        {[30, 45, 60, 90].map((dur) => {
+                          const isSelected = lessonDuration === dur;
+                          return (
+                            <button
+                              key={dur}
+                              onClick={() => handleUpdateDuration(dur)}
+                              style={{
+                                background: isSelected ? '#ffffff' : 'transparent',
+                                color: isSelected ? '#1e293b' : '#64748b',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '4px 8px',
+                                fontSize: '0.75rem',
+                                fontWeight: isSelected ? 800 : 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                              }}
+                            >
+                              {dur} Min
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                        {lessonDuration} Min
-                      </span>
-                    </div>
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      {lessonDuration} Min
+                    </span>
                   )}
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
                   {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                    <select
-                      value={avatar?.evolution_level || 1}
-                      onChange={(e) => handleUpdateEvolutionLevel(parseInt(e.target.value))}
-                      style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        color: '#1e293b',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value={1}>Level 1 (3/5/10 Min.)</option>
-                      <option value={2}>Level 2 (5/10/15 Min.)</option>
-                      <option value={3}>Level 3 (10/15/20 Min.)</option>
-                    </select>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                        Level {avatar?.evolution_level || 1}
-                      </span>
+                    <div style={{
+                      background: '#f1f5f9',
+                      padding: '2px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      {[1, 2, 3].map((lvl) => {
+                        const isSelected = (avatar?.evolution_level || 1) === lvl;
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => handleUpdateEvolutionLevel(lvl)}
+                            style={{
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? '#1e293b' : '#64748b',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              fontWeight: isSelected ? 800 : 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                            }}
+                            title={lvl === 1 ? '3/5/10 Min.' : lvl === 2 ? '5/10/15 Min.' : '10/15/20 Min.'}
+                          >
+                            Level {lvl}
+                          </button>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      Level {avatar?.evolution_level || 1}
+                    </span>
                   )}
                 </div>
 
                 {isCampusActive && (
                   <>
                     <div style={{ height: '1px', background: '#f1f5f9' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
                       {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                        <select
-                          value={appUsageMode}
-                          onChange={(e) => handleUpdateAppUsageMode(e.target.value)}
-                          style={{
-                            background: '#f8fafc',
-                            border: '1.5px solid #e2e8f0',
-                            borderRadius: '10px',
-                            padding: '6px 12px',
-                            fontSize: '0.8rem',
-                            fontWeight: 800,
-                            color: '#1e293b',
-                            outline: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="student_only">📱 Selbstnutzer</option>
-                          <option value="parent_hybrid">👪 Eltern-Hybrid</option>
-                        </select>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                            {appUsageMode === 'parent_hybrid' ? '👪 Eltern-Hybrid' : '📱 Selbstnutzer'}
-                          </span>
+                        <div style={{
+                          background: '#f1f5f9',
+                          padding: '2px',
+                          borderRadius: '12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          <button
+                            onClick={() => handleUpdateAppUsageMode('student_only')}
+                            style={{
+                              background: appUsageMode === 'student_only' ? '#ffffff' : 'transparent',
+                              color: appUsageMode === 'student_only' ? '#1e293b' : '#64748b',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              fontWeight: appUsageMode === 'student_only' ? 800 : 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              boxShadow: appUsageMode === 'student_only' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                            }}
+                          >
+                            📱 Selbstnutzer
+                          </button>
+                          <button
+                            onClick={() => handleUpdateAppUsageMode('parent_hybrid')}
+                            style={{
+                              background: appUsageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                              color: appUsageMode === 'parent_hybrid' ? '#1e293b' : '#64748b',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              fontWeight: appUsageMode === 'parent_hybrid' ? 800 : 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              boxShadow: appUsageMode === 'parent_hybrid' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                            }}
+                          >
+                            👪 Hybrid
+                          </button>
                         </div>
+                      ) : (
+                        <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                          {appUsageMode === 'parent_hybrid' ? '👪 Hybrid' : '📱 Selbstnutzer'}
+                        </span>
                       )}
                     </div>
                   </>

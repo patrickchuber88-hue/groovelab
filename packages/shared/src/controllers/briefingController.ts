@@ -213,7 +213,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           is_premium_user,
           instrument,
           birth_date,
-          avatars (avatar_style, evolution_level, xp)
+          avatars (avatar_style, evolution_level, xp, streak_flame)
         )
       `)
       .eq('teacher_id', userId)
@@ -248,7 +248,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           is_premium_user,
           instrument,
           birth_date,
-          avatars (avatar_style, evolution_level, xp)
+          avatars (avatar_style, evolution_level, xp, streak_flame)
         )
       `)
       .eq('teacher_id', userId)
@@ -273,7 +273,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           name: `${student.first_name} ${student.last_name}`,
           isAppUser: student.is_app_user ?? false,
           isAnalogStickerUser,
-          birthDate: student.birth_date
+          birthDate: student.birth_date,
+          streakFlame: avatar?.streak_flame || 0
         } : null
       };
     });
@@ -309,7 +310,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
               name: `${student.first_name} ${student.last_name}`,
               isAppUser: student.is_app_user ?? false,
               isAnalogStickerUser,
-              birthDate: student.birth_date
+              birthDate: student.birth_date,
+              streakFlame: avatar?.streak_flame || 0
             } : null
           };
 

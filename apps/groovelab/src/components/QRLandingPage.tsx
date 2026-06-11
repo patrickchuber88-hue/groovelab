@@ -715,15 +715,60 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       const currentStreak = currentStats?.streak_flame || 0;
       let newStreak = 1;
+      let usedJokerThisSession = false;
 
-      if (currentStats) {
-        if (currentStats.last_practice_date === yesterdayStr) {
+      let lastSecuredDate = currentStats?.last_practice_date || null;
+      if (profile?.joker_used_at) {
+        const jokerDateStr = new Date(profile.joker_used_at).toLocaleDateString('en-CA');
+        if (!lastSecuredDate || jokerDateStr > lastSecuredDate) {
+          lastSecuredDate = jokerDateStr;
+        }
+      }
+      if (!lastSecuredDate && profile?.created_at) {
+        lastSecuredDate = new Date(profile.created_at).toLocaleDateString('en-CA');
+      }
+
+      if (lastSecuredDate) {
+        if (lastSecuredDate === yesterdayStr) {
           newStreak = currentStreak + 1;
-        } else if (currentStats.last_practice_date === todayStr) {
+        } else if (lastSecuredDate === todayStr) {
           newStreak = currentStreak; // bereits heute geübt
         } else {
-          newStreak = 1;
+          const getDaysBetween = (d1: string, d2: string) => {
+            const dt1 = new Date(d1 + 'T12:00:00');
+            const dt2 = new Date(d2 + 'T12:00:00');
+            return Math.round((dt2.getTime() - dt1.getTime()) / (86400000));
+          };
+          const diffDays = getDaysBetween(lastSecuredDate, todayStr);
+          const totalMissedDays = diffDays - 1;
+
+          const getISOWeekLocal = (d: Date) => {
+            const target = new Date(d.valueOf());
+            const dayNr = (d.getDay() + 6) % 7;
+            target.setDate(target.getDate() - dayNr + 3);
+            const firstThursday = target.valueOf();
+            target.setMonth(0, 1);
+            if (target.getDay() !== 4) {
+              target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+            }
+            return Math.ceil((firstThursday - target.valueOf()) / 604800000) + 1;
+          };
+          
+          const currentWeek = getISOWeekLocal(new Date());
+          const lastJokerWeek = profile?.joker_used_at ? getISOWeekLocal(new Date(profile.joker_used_at)) : null;
+          const isJokerAvailable = !profile?.joker_used_at || lastJokerWeek !== currentWeek;
+
+          let unprotectedMissedDays = totalMissedDays;
+          if (isJokerAvailable) {
+            unprotectedMissedDays = totalMissedDays - 1;
+            usedJokerThisSession = true;
+          }
+
+          const decayedStreak = Math.max(0, currentStreak - unprotectedMissedDays);
+          newStreak = decayedStreak + 1;
         }
+      } else {
+        newStreak = 1;
       }
 
       const totalMins = (currentStats?.total_focus_minutes || 0) + minutes;
@@ -764,6 +809,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           streak_flame: newStreak,
           last_focus_date: todayStr
         }).eq('id', avatarRecord.id);
+      }
+
+      if (usedJokerThisSession) {
+        await supabase.from('users').update({
+          joker_used_at: new Date().toISOString()
+        }).eq('id', profile.id);
+        profile.joker_used_at = new Date().toISOString();
       }
 
       playSuccessChime();
