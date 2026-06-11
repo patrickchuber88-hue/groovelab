@@ -13877,6 +13877,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   if (extraBillingOption === 'option3_2') return 0;
                   return 0;
                 })();
+
+                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
+                const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
+                const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
+                const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                
+                // Slider prospective change variables (Real-time preview)
+                const schoolShareAdditional = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? extraUsersSliderVal * 0.25 : 0;
+                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : extraBillingOption === 'option3_1' ? extraUsersSliderVal * 0.24 : 0);
+                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * 5.29 : extraBillingOption === 'option3_2' ? extraUsersSliderVal * 2.59 : 0);
+                const isAnnualAdditional = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
+
+                // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
+                const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
+                
+                // Mixed Total B2B + B2C
+                const mixedTotal = (isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)) + studentLevyMonthly + extraLevyMonthly;
+
                 return (
                   <>
 
@@ -13982,229 +14000,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </div>
                         </div>
 
-                        {/* Card 2: B2B Bankeinzug Schule */}
-                        {(() => {
-                          const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
-                          const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
-                          const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
-                          const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                          
-                          // Slider prospective change variables (Real-time preview)
-                          const schoolShareAdditional = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? extraUsersSliderVal * 0.25 : 0;
-                          const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : extraBillingOption === 'option3_1' ? extraUsersSliderVal * 0.24 : 0);
-                          const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * 5.29 : extraBillingOption === 'option3_2' ? extraUsersSliderVal * 2.59 : 0);
-                          const isAnnualAdditional = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
-
-                          // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
-                          const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
-                          
-                          // Mixed Total B2B + B2C
-                          const mixedTotal = (isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)) + studentLevyMonthly + extraLevyMonthly;
-                          
-                          return (
-                            <div style={{
-                              background: '#f0f9ff',
-                              padding: '16px',
-                              borderRadius: '16px',
-                              border: '1.5px solid #bae6fd',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              minHeight: '225px',
-                              height: 'auto',
-                              marginTop: 'auto',
-                              boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
-                            }}>
-                              <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>Monatlicher Bankeinzug B2B + B2C (Gesamteinzug)</span>
-
-                              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr auto 1.1fr auto 1.2fr', gap: '12px', flex: 1, alignItems: 'stretch' }}>
-                                {/* Left Side: Reine Schul-Kosten */}
-                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                  <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 700 }}>Anteil Musikschule</span>
-                                    <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0369a1', margin: '4px 0', fontWeight: 800 }}>
-                                      {currentTotalB2B.toFixed(2)} €
-                                      {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
-                                        <span style={{ color: '#2563eb', fontSize: '0.8rem', marginLeft: '4px', fontWeight: 800 }}>
-                                          + {schoolShareAdditional.toFixed(2)} €
-                                        </span>
-                                      )}
-                                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#0369a1' }}> / Mo.</span>
-                                    </strong>
-                                    {!isBillingBooked && studentSharePreview > 0 && (
-                                      <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
-                                        {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € (Vorschau)
-                                      </span>
-                                    )}
-                                    {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
-                                      <span style={{ fontSize: '0.52rem', color: '#2563eb', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
-                                        (inkl. +{extraUsersSliderVal} neue Schüler)
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>• Grundpreis:</span>
-                                      <strong>{moduleCost.toFixed(2)} €</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>• Team ({allTeachers.length + employees.length}):</span>
-                                      <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
-                                    </div>
-                                    {studentSharePreview > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                        <span>• Kofinanzierung {!isBillingBooked && '(Vorschau)'}:</span>
-                                        <strong>{studentSharePreview.toFixed(2)} €</strong>
-                                      </div>
-                                    )}
-                                    {schoolShareBookedExtra > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                        <span>• Gebuchte Extra-Schüler:</span>
-                                        <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
-                                      </div>
-                                    )}
-                                    {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#2563eb' }}>
-                                        <span>• Neue Slider-Schüler:</span>
-                                        <strong>+{schoolShareAdditional.toFixed(2)} €</strong>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Divider 1 */}
-                                <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
-
-                                {/* Middle Side: Einmalige Umlage (Schüler-Pauschale) */}
-                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                  <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 700 }}>Einmaliger Einzug</span>
-                                    {(() => {
-                                      const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                                      const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
-                                      const totalYearly = students.length * pricePerStudent;
-                                      return (
-                                        <>
-                                          <strong style={{ display: 'block', fontSize: '1.25rem', color: isAnnual || isAnnualAdditional ? '#0369a1' : '#94a3b8', margin: '4px 0', fontWeight: 800 }}>
-                                            {totalYearly.toFixed(2)} €
-                                            {extraUsersSliderVal > 0 && isAnnualAdditional && (
-                                              <span style={{ color: '#2563eb', fontSize: '0.8rem', marginLeft: '4px', fontWeight: 800 }}>
-                                                + {extraLevyYearlyAdditional.toFixed(2)} €
-                                              </span>
-                                            )}
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 500 }}> / Jahr</span>
-                                          </strong>
-                                          <span style={{ fontSize: '0.52rem', color: isAnnual || isAnnualAdditional ? '#0284c7' : '#94a3b8', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
-                                            {isAnnual ? `${students.length} Schüler × ${pricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
-                                            {extraUsersSliderVal > 0 && isAnnualAdditional && (
-                                              <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
-                                            )}
-                                          </span>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px', opacity: isAnnual || isAnnualAdditional ? 1 : 0.4 }}>
-                                    <span>• Schüler-Jahrespauschale</span>
-                                    <span>• Wird 1× jährlich eingezogen</span>
-                                    {(isAnnual || isAnnualAdditional) && (
-                                      <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', fontWeight: 700, marginTop: '4px' }}>
-                                        ◀ fließt aus B2C Schüler-Modul ein
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Divider 2 */}
-                                <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
-
-                                {/* Right Side: Gesamteinzug (Mischpreis) - Highlighted! */}
-                                <div id="b2b-mixed-price-target" style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  justifyContent: 'space-between',
-                                  background: '#ffffff',
-                                  padding: '12px',
-                                  borderRadius: '12px',
-                                  border: '2px solid #16a34a',
-                                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)',
-                                  marginTop: '-4px',
-                                  marginBottom: '-4px'
-                                }}>
-                                  <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
-                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#15803d', margin: '2px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
-                                      {mixedTotal.toFixed(2)} €
-                                      {extraUsersSliderVal > 0 && (schoolShareAdditional + extraLevyMonthlyAdditional) > 0 && (
-                                        <span style={{ color: '#2563eb', fontSize: '0.9rem', marginLeft: '4px', fontWeight: 800 }}>
-                                          + {(schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €
-                                        </span>
-                                      )}
-                                      <span style={{ fontSize: '0.7rem', fontWeight: 500 }}> / Mo.</span>
-                                    </strong>
-                                    {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
-                                      <span style={{ fontSize: '0.52rem', color: '#64748b', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
-                                        (Vorschau nach Einbuchung)
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    {/* Schule (B2B) regular */}
-                                    <div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>• Schule Basis &amp; Team (B2B):</span>
-                                        <strong style={{ color: '#0f172a' }}>
-                                          {(baseB2B + (isBillingBooked ? studentSharePreview : 0)).toFixed(2)} €
-                                        </strong>
-                                      </div>
-                                      <div style={{ paddingLeft: '8px', marginTop: '1px', fontSize: '0.55rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
-                                        <span>• Basis &amp; Team: {baseB2B.toFixed(2)} €</span>
-                                        {studentSharePreview > 0 && (
-                                          <span>• Kofinanzierung: {studentSharePreview.toFixed(2)} €</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Schüler (B2C) regular */}
-                                    <div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 600 }}>
-                                        <span>• Schüler Basis Umlage (B2C):</span>
-                                        <strong style={{ color: '#6b21a8' }}>
-                                          {studentLevyMonthly.toFixed(2)} €
-                                        </strong>
-                                      </div>
-                                    </div>
-
-                                    {/* Extra-User (Separate Position) */}
-                                    <div style={{ background: '#f5f3ff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #ddd6fe', marginTop: '2px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6d28d9', fontWeight: 700 }}>
-                                        <span>• Extra-User (Zusatzbuchung):</span>
-                                        <strong>
-                                          {(schoolShareBookedExtra + extraLevyMonthly).toFixed(2)} €
-                                          {(schoolShareAdditional + extraLevyMonthlyAdditional) > 0 && (
-                                            <span style={{ color: '#2563eb' }}> + {(schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €</span>
-                                          )}
-                                        </strong>
-                                      </div>
-                                      <div style={{ paddingLeft: '4px', marginTop: '2px', fontSize: '0.55rem', color: '#7c3aed', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                        <span>• Aktiv gebucht: {bookedExtraUsers} Extra-Schüler</span>
-                                        {extraUsersSliderVal > 0 && (
-                                          <span style={{ color: '#2563eb', fontWeight: 700 }}>• Slider-Vorschau: +{extraUsersSliderVal} Schüler</span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '4px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.66rem', color: '#15803d' }}>
-                                      <span style={{ color: '#1e293b' }}>Gesamteinzug:</span>
-                                      <span>
-                                        {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
 
                       {/* Right Column: 👥 Bereich Schüler (B2C) */}
@@ -14856,48 +14651,227 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      {/* Custom Bottom Curved Arrow from B2C Card bottom to B2B highlighted card bottom */}
-                      {(() => {
-                        const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                        const targetX = isAnnual ? 23.5 : 45.5;
-                        return (
-                          <>
-                            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
-                              position: 'absolute',
-                              bottom: '-30px',
-                              left: 0,
-                              width: '100%',
-                              height: '32px',
-                              overflow: 'visible',
-                              pointerEvents: 'none',
-                              zIndex: 5
-                            }}>
-                              <path
-                                d={`M 87.5,0 L 87.5,65 L ${targetX},65 L ${targetX},0`}
-                                fill="none"
-                                stroke="#7c3aed"
-                                strokeWidth="2"
-                                strokeDasharray="4,4"
-                                style={{ vectorEffect: 'non-scaling-stroke' }}
-                              />
-                            </svg>
-                            {/* Triangle arrowhead pointing up at the B2B target */}
-                            <div style={{
-                              position: 'absolute',
-                              left: `${targetX}%`,
-                              bottom: '-4px',
-                              transform: 'translateX(-50%)',
-                              width: 0,
-                              height: 0,
-                              borderLeft: '5px solid transparent',
-                              borderRight: '5px solid transparent',
-                              borderBottom: '7px solid #7c3aed',
-                              pointerEvents: 'none',
-                              zIndex: 6
-                            }} />
-                          </>
-                        );
-                      })()}
+                    </div>
+
+                    {/* Visual flow arrows perfectly aligned with the centers of the two columns */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', margin: '14px 0 6px 0' }}>
+                      {/* Arrow Left */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#0369a1' }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                          <line x1="12" y1="5" x2="12" y2="19"/>
+                          <polyline points="19 12 12 19 5 12"/>
+                        </svg>
+                        <span style={{ fontSize: '0.55rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0369a1', marginTop: '3px' }}>Anteil Musikschule</span>
+                      </div>
+                      
+                      {/* Arrow Right */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#6b21a8' }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                          <line x1="12" y1="5" x2="12" y2="19"/>
+                          <polyline points="19 12 12 19 5 12"/>
+                        </svg>
+                        <span style={{ fontSize: '0.55rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b21a8', marginTop: '3px' }}>Anteil Schüler</span>
+                      </div>
+                    </div>
+
+                    {/* Full-Width Mischpreis Box */}
+                    <div style={{
+                      background: '#f0f9ff',
+                      padding: '20px 24px',
+                      borderRadius: '20px',
+                      border: '1.5px solid #bae6fd',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 4px 16px rgba(3, 105, 161, 0.04)',
+                      marginBottom: '44px'
+                    }}>
+                      <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em', display: 'block', marginBottom: '14px' }}>Monatlicher Bankeinzug B2B + B2C (Gesamteinzug)</span>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr auto 1.2fr auto 1.4fr', gap: '20px', alignItems: 'stretch' }}>
+                        {/* Left Side: Reine Schul-Kosten */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800 }}>Anteil Musikschule (B2B)</span>
+                            <strong style={{ display: 'block', fontSize: '1.4rem', color: '#0369a1', margin: '6px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                              {currentTotalB2B.toFixed(2)} €
+                              {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
+                                <span style={{ color: '#2563eb', fontSize: '0.9rem', marginLeft: '4px', fontWeight: 800 }}>
+                                  + {schoolShareAdditional.toFixed(2)} €
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.7rem', fontWeight: 500, color: '#0369a1' }}> / Mo.</span>
+                            </strong>
+                            {!isBillingBooked && studentSharePreview > 0 && (
+                              <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
+                                {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € (Vorschau)
+                              </span>
+                            )}
+                            {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
+                              <span style={{ fontSize: '0.52rem', color: '#2563eb', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
+                                (inkl. +{extraUsersSliderVal} neue Schüler)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>• Grundpreis:</span>
+                              <strong>{moduleCost.toFixed(2)} €</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>• Team ({allTeachers.length + employees.length}):</span>
+                              <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
+                            </div>
+                            {studentSharePreview > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                <span>• Kofinanzierung {!isBillingBooked && '(Vorschau)'}:</span>
+                                <strong>{studentSharePreview.toFixed(2)} €</strong>
+                              </div>
+                            )}
+                            {schoolShareBookedExtra > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                <span>• Gebuchte Extra-Schüler:</span>
+                                <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
+                              </div>
+                            )}
+                            {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#2563eb' }}>
+                                <span>• Neue Slider-Schüler:</span>
+                                <strong>+{schoolShareAdditional.toFixed(2)} €</strong>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Divider 1 */}
+                        <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
+
+                        {/* Middle Side: Einmalige Umlage (Schüler-Pauschale) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800 }}>Anteil Schüler (B2C)</span>
+                            {(() => {
+                              const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                              const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
+                              const totalYearly = students.length * pricePerStudent;
+                              return (
+                                <>
+                                  <strong style={{ display: 'block', fontSize: '1.4rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', margin: '6px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                    {totalYearly.toFixed(2)} €
+                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
+                                      <span style={{ color: '#2563eb', fontSize: '0.9rem', marginLeft: '4px', fontWeight: 800 }}>
+                                        + {extraLevyYearlyAdditional.toFixed(2)} €
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 500 }}> / Jahr</span>
+                                  </strong>
+                                  <span style={{ fontSize: '0.52rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
+                                    {isAnnual ? `${students.length} Schüler × ${pricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
+                                    {extraUsersSliderVal > 0 && isAnnualAdditional && (
+                                      <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
+                                    )}
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#6b21a8', display: 'flex', flexDirection: 'column', gap: '3px', opacity: isAnnual || isAnnualAdditional ? 1 : 0.4 }}>
+                            <span>• Schüler-Jahrespauschale</span>
+                            <span>• Wird 1× jährlich eingezogen</span>
+                            {(isAnnual || isAnnualAdditional) && (
+                              <span style={{ fontSize: '0.52rem', color: '#7c3aed', display: 'block', fontWeight: 700, marginTop: '4px' }}>
+                                ◀ fließt aus B2C Schüler-Modul ein
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Divider 2 */}
+                        <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
+
+                        {/* Right Side: Gesamteinzug (Mischpreis) - Highlighted! */}
+                        <div id="b2b-mixed-price-target" style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          background: '#ffffff',
+                          padding: '16px',
+                          borderRadius: '16px',
+                          border: '2px solid #16a34a',
+                          boxShadow: '0 6px 20px rgba(22, 163, 74, 0.1)',
+                          transform: 'scale(1.02)'
+                        }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
+                            <strong style={{ display: 'block', fontSize: '1.5rem', color: '#15803d', margin: '4px 0', fontWeight: 950, fontFamily: 'Urbanist' }}>
+                              {mixedTotal.toFixed(2)} €
+                              {extraUsersSliderVal > 0 && (schoolShareAdditional + extraLevyMonthlyAdditional) > 0 && (
+                                <span style={{ color: '#2563eb', fontSize: '0.95rem', marginLeft: '4px', fontWeight: 800 }}>
+                                  + {(schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.75rem', fontWeight: 500 }}> / Mo.</span>
+                            </strong>
+                            {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
+                              <span style={{ fontSize: '0.52rem', color: '#64748b', display: 'block', fontWeight: 700, lineHeight: '1.2', marginBottom: '6px' }}>
+                                (Vorschau nach Einbuchung)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                            {/* Schule (B2B) regular */}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>• Schule Basis &amp; Team (B2B):</span>
+                                <strong style={{ color: '#0f172a' }}>
+                                  {(baseB2B + (isBillingBooked ? studentSharePreview : 0)).toFixed(2)} €
+                                </strong>
+                              </div>
+                              <div style={{ paddingLeft: '8px', marginTop: '1px', fontSize: '0.58rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
+                                <span>• Basis &amp; Team: {baseB2B.toFixed(2)} €</span>
+                                {studentSharePreview > 0 && (
+                                  <span>• Kofinanzierung: {studentSharePreview.toFixed(2)} €</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Schüler (B2C) regular */}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 600 }}>
+                                <span>• Schüler Basis Umlage (B2C):</span>
+                                <strong style={{ color: '#6b21a8' }}>
+                                  {studentLevyMonthly.toFixed(2)} €
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Extra-User (Separate Position) */}
+                            <div style={{ background: '#f5f3ff', padding: '8px 10px', borderRadius: '10px', border: '1px solid #ddd6fe', marginTop: '2px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6d28d9', fontWeight: 700 }}>
+                                <span>• Extra-User (Zusatzbuchung):</span>
+                                <strong>
+                                  {(schoolShareBookedExtra + extraLevyMonthly).toFixed(2)} €
+                                  {(schoolShareAdditional + extraLevyMonthlyAdditional) > 0 && (
+                                    <span style={{ color: '#2563eb', paddingLeft: '4px' }}> + {(schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €</span>
+                                  )}
+                                </strong>
+                              </div>
+                              <div style={{ paddingLeft: '4px', marginTop: '2px', fontSize: '0.58rem', color: '#7c3aed', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                <span>• Aktiv gebucht: {bookedExtraUsers} Extra-Schüler</span>
+                                {extraUsersSliderVal > 0 && (
+                                  <span style={{ color: '#2563eb', fontWeight: 700 }}>• Slider-Vorschau: +{extraUsersSliderVal} Schüler</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '6px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '0.72rem', color: '#15803d' }}>
+                              <span style={{ color: '#1e293b' }}>Gesamteinzug:</span>
+                              <span>
+                                {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} €
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Invoice list */}
