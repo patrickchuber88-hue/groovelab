@@ -14077,9 +14077,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         <span>• Schule (B2B):</span>
                                         <strong style={{ color: '#0f172a' }}>{(isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)).toFixed(2)} €</strong>
                                       </div>
-                                      <span style={{ fontSize: '0.52rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-2px', whiteSpace: 'nowrap' }}>
-                                        ({(baseB2B + schoolShareBookedExtra).toFixed(2)} € Basis &amp; Team{studentSharePreview > 0 ? ` + ${studentSharePreview.toFixed(2)} € Kofinanz.` : ''})
-                                      </span>
+                                      <div style={{ paddingLeft: '8px', marginTop: '1px', fontSize: '0.55rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
+                                        <span>• Basis &amp; Team: {(baseB2B + schoolShareBookedExtra).toFixed(2)} €</span>
+                                        {studentSharePreview > 0 && (
+                                          <span>• Kofinanzierung: {studentSharePreview.toFixed(2)} €</span>
+                                        )}
+                                      </div>
                                     </div>
                                     <div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
