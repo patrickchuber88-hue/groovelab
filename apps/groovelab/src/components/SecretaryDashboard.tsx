@@ -13857,7 +13857,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
 
                     {/* Side-by-Side: Schüler Abrechnungsmodell und Vorschau */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px', alignItems: 'stretch' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '44px', alignItems: 'stretch', position: 'relative' }}>
                       
                       {/* Left Column: 🏫 Bereich Musikschule (B2B) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -14330,33 +14330,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           flexDirection: 'column',
                           minHeight: '190px',
                           marginTop: 'auto',
-                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)',
-                          position: 'relative'
+                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)'
                         }}>
-                          {/* Floating purple arrow in the gap pointing left */}
-                          <div style={{
-                            position: 'absolute',
-                            left: '-22px', // Centered in the 24px gap
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: '50%',
-                            background: '#7c3aed',
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.62rem',
-                            fontWeight: 900,
-                            boxShadow: '0 2px 5px rgba(124, 58, 237, 0.3)',
-                            border: '1.5px solid #ffffff',
-                            zIndex: 10,
-                            pointerEvents: 'none'
-                          }}>
-                            ◀
-                          </div>
-
                           <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Umlage pro Schüler B2C</span>
                           
                           {studentBillingOption === 'option1' && (() => {
@@ -14528,6 +14503,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           })()}
                         </div>
                       </div>
+
+                      {/* Custom Bottom Curved Arrow from B2C Card bottom to B2B highlighted card bottom */}
+                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
+                        position: 'absolute',
+                        bottom: '-30px',
+                        left: 0,
+                        width: '100%',
+                        height: '32px',
+                        overflow: 'visible',
+                        pointerEvents: 'none',
+                        zIndex: 5
+                      }}>
+                        <path
+                          d="M 75,0 L 75,65 L 37.5,65 L 37.5,0"
+                          fill="none"
+                          stroke="#7c3aed"
+                          strokeWidth="2"
+                          strokeDasharray="4,4"
+                          style={{ vectorEffect: 'non-scaling-stroke' }}
+                        />
+                      </svg>
+                      {/* Triangle arrowhead pointing up at the B2B target */}
+                      <div style={{
+                        position: 'absolute',
+                        left: '37.5%',
+                        bottom: '-4px',
+                        transform: 'translateX(-50%)',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderBottom: '7px solid #7c3aed',
+                        pointerEvents: 'none',
+                        zIndex: 6
+                      }} />
                     </div>
 
 
