@@ -12955,7 +12955,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           }).sort((a, b) => {
             const nameA = (a.name || '').toLowerCase().trim();
             const nameB = (b.name || '').toLowerCase().trim();
-            return nameA.localeCompare(nameB, 'de');
+            return nameA.localeCompare(nameB, 'de', { numeric: true, sensitivity: 'base' });
           });
 
           // Sort helper for floors: Allgemein is top (9999), EG is 0, OGs are positive, UGs are negative
