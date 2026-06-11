@@ -14490,12 +14490,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       background: 'white',
                       borderRadius: '24px',
                       padding: '24px',
-                      width: '420px',
-                      maxWidth: '90%',
+                      width: (!editGroupCoupled && editGroupInstancesData.length > 1) ? '680px' : '420px',
+                      maxWidth: '95%',
                       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '16px'
+                      gap: '16px',
+                      transition: 'width 0.25s ease-in-out'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Ausstattung bearbeiten</h3>
@@ -14551,47 +14552,56 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </div>
                         </>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Exemplare einzeln bearbeiten</span>
-                          {editGroupInstancesData.map((inst, idx) => (
-                            <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>{inst.fullName || `Exemplar #${idx + 1}`}</span>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Name</span>
-                                <input
-                                  value={inst.fullName}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, fullName: val } : p));
-                                  }}
-                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
-                                />
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: editGroupInstancesData.length > 1 ? 'repeat(auto-fill, minmax(280px, 1fr))' : '1fr', 
+                            gap: '12px', 
+                            maxHeight: '380px', 
+                            overflowY: 'auto', 
+                            paddingRight: '4px' 
+                          }}>
+                            {editGroupInstancesData.map((inst, idx) => (
+                              <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>{inst.fullName || `Exemplar #${idx + 1}`}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Name</span>
+                                  <input
+                                    value={inst.fullName}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, fullName: val } : p));
+                                    }}
+                                    style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Modell</span>
+                                  <input
+                                    value={inst.model}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, model: val } : p));
+                                    }}
+                                    style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Link / Webseite (optional)</span>
+                                  <input
+                                    value={inst.linkUrl || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, linkUrl: val } : p));
+                                    }}
+                                    placeholder="https://example.com/..."
+                                    style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                  />
+                                </div>
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Modell</span>
-                                <input
-                                  value={inst.model}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, model: val } : p));
-                                  }}
-                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Link / Webseite (optional)</span>
-                                <input
-                                  value={inst.linkUrl || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, linkUrl: val } : p));
-                                  }}
-                                  placeholder="https://example.com/..."
-                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
-                                />
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
 
