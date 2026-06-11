@@ -1259,6 +1259,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [equipmentSaving, setEquipmentSaving] = useState(false);
   const [selectedEquipmentRoomId, setSelectedEquipmentRoomId] = useState<string>('All');
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+  const [equipmentSearchQuery, setEquipmentSearchQuery] = useState<string>('');
+  const [equipmentSortFreeFirst, setEquipmentSortFreeFirst] = useState<boolean>(false);
   const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
   const [editRoomInstFormName, setEditRoomInstFormName] = useState<string>('');
   const [editRoomInstFormModel, setEditRoomInstFormModel] = useState<string>('');
@@ -13953,7 +13955,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         max="50"
                         value={equipmentFormQty}
                         onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
-                        style={{ width: '50px', padding: '8px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none' }}
                       />
                     </div>
 
@@ -13966,37 +13967,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </button>
                   </form>
 
-                  {/* Drop zone inside active room list header */}
-                  {selectedRoom && (
-                    <div 
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragOverRoomId(selectedRoom.id);
-                      }}
-                      onDragLeave={() => setDragOverRoomId(null)}
-                      onDrop={async (e) => {
-                        e.preventDefault();
-                        const instName = e.dataTransfer.getData("text/plain");
-                        setDragOverRoomId(null);
-                        if (instName) {
-                          await handleDropInstrumentOnRoom(instName, selectedRoom.id);
-                        }
-                      }}
+                  {/* Search and Sort controls bar */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
+                      <Search size={16} color="#94a3b8" />
+                      <input
+                        value={equipmentSearchQuery}
+                        onChange={e => setEquipmentSearchQuery(e.target.value)}
+                        placeholder="Instrumente durchsuchen..."
+                        style={{ border: 'none', outline: 'none', fontSize: '0.8rem', fontWeight: 700, width: '100%', color: '#0f172a' }}
+                      />
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
                       style={{
-                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
+                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #e2e8f0',
+                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
+                        padding: '8px 14px',
                         borderRadius: '10px',
-                        border: dragOverRoomId === selectedRoom.id ? '2px dashed #0b57d0' : '2px dashed #cbd5e1',
-                        background: dragOverRoomId === selectedRoom.id ? '#eff6ff' : '#f8fafc',
-                        textAlign: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: dragOverRoomId === selectedRoom.id ? '#0b57d0' : '#64748b',
-                        transition: 'all 0.2s'
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontFamily: 'Urbanist'
                       }}
                     >
-                      {dragOverRoomId === selectedRoom.id ? '✨ Loslassen zum Hinzufügen!' : '📥 Instrument hierhin ziehen zum Hinzufügen'}
-                    </div>
-                  )}
+                      <span>🔄 Freie zuerst</span>
+                    </button>
+                  </div>
 
                   {/* Unified List items list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -14038,6 +14042,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                       let filteredGroups = Object.values(groupsMap);
 
+                      // Apply search filter
+                      if (equipmentSearchQuery.trim()) {
+                        const query = equipmentSearchQuery.toLowerCase();
+                        filteredGroups = filteredGroups.filter(g => 
+                          g.baseName.toLowerCase().includes(query) || 
+                          g.model.toLowerCase().includes(query)
+                        );
+                      }
+
+                      // Apply sort: free first
+                      if (equipmentSortFreeFirst) {
+                        filteredGroups = [...filteredGroups].sort((a, b) => {
+                          const freeA = a.instances.filter(inst => !inst.roomId).length;
+                          const freeB = b.instances.filter(inst => !inst.roomId).length;
+                          return freeB - freeA;
+                        });
+                      }
+
                       // 3. Filter groups based on selected room
                       if (selectedRoom) {
                         filteredGroups = filteredGroups
@@ -14072,122 +14094,123 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             }}
                             style={{
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: '10px',
-                              padding: '16px',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
                               background: 'white',
                               border: '1px solid #f1f5f9',
                               borderRadius: '16px',
                               cursor: (hasFree && !selectedRoom) ? 'grab' : 'default',
                               transition: 'all 0.2s',
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              gap: '16px'
                             }}
+                            className={hasFree && !selectedRoom ? "hover-scale-mini" : ""}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontSize: '1.3rem' }}>🎹</span>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎹</span>
+                              
+                              {/* Horizontal wrapper for name/model and locations */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: '#1e293b' }}>
                                     {group.baseName}
                                   </span>
-                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
-                                    Modell: {group.model} ({group.instances.length} {group.instances.length === 1 ? 'Exemplar' : 'Exemplare'})
+                                  <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 800 }}>
+                                    Modell: {group.model} ({group.instances.length})
                                   </span>
                                 </div>
+
+                                {/* Locations row inline behind name/model */}
+                                <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '6px', alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, paddingBottom: '2px' }} className="no-scrollbar">
+                                  {group.instances.map((inst) => {
+                                    const isInstAssigned = !!inst.roomId;
+                                    
+                                    return (
+                                      <div 
+                                        key={inst.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isInstAssigned) {
+                                            setEditingRoomInstrument({ 
+                                              roomId: inst.roomId!, 
+                                              index: inst.roomInstIdx, 
+                                              name: inst.fullName, 
+                                              model: inst.model || '' 
+                                            });
+                                            setEditRoomInstFormName(inst.fullName);
+                                            setEditRoomInstFormModel(inst.model || '');
+                                          }
+                                        }}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          padding: '3px 8px',
+                                          borderRadius: '6px',
+                                          background: isInstAssigned ? '#eff6ff' : '#f8fafc',
+                                          border: isInstAssigned ? '1.5px solid #dbeafe' : '1.5px solid #e2e8f0',
+                                          cursor: isInstAssigned ? 'pointer' : 'grab',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          color: isInstAssigned ? '#0b57d0' : '#475569',
+                                          fontFamily: 'Urbanist',
+                                          transition: 'all 0.15s',
+                                          flexShrink: 0,
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                        className="hover-scale-mini"
+                                        title={isInstAssigned ? "Klicken zum Bearbeiten des Modells in diesem Raum" : "Ziehe dieses freie Instrument auf einen Raum"}
+                                      >
+                                        {isInstAssigned ? (
+                                          <>
+                                            <span>🚪 {inst.roomName}</span>
+                                            <button
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                await handleRemoveRoomInstrument(inst.roomId!, inst.roomInstIdx);
+                                              }}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#ef4444',
+                                                fontWeight: 900,
+                                                marginLeft: '3px',
+                                                cursor: 'pointer',
+                                                padding: 0
+                                              }}
+                                              title="Freigeben (zurück in den Pool)"
+                                            >
+                                              ✕
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <span>📦 Pool / Frei</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
+                            </div>
 
-                              {/* Delete group action if completely unassigned */}
-                              {!selectedRoom && group.instances.every(inst => !inst.roomId) && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (window.confirm(`Möchtest du alle ${group.instances.length} Exemplare von „${group.baseName}“ löschen?`)) {
-                                      for (const inst of group.instances) {
-                                        await supabase.from('school_equipment').delete().eq('id', inst.id);
-                                      }
-                                      setSchoolEquipment(prev => prev.filter(eq => !group.instances.some(inst => inst.id === eq.id)));
+                            {/* Delete group action if completely unassigned */}
+                            {!selectedRoom && group.instances.every(inst => !inst.roomId) && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Möchtest du alle ${group.instances.length} Exemplare von „${group.baseName}“ löschen?`)) {
+                                    for (const inst of group.instances) {
+                                      await supabase.from('school_equipment').delete().eq('id', inst.id);
                                     }
-                                  }}
-                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* ASSIGNED INSTANCES FIELD / BADGES ROW */}
-                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px', width: '100%', WebkitOverflowScrolling: 'touch' }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>Standorte:</span>
-                              
-                              {group.instances.map((inst) => {
-                                const isInstAssigned = !!inst.roomId;
-                                
-                                return (
-                                  <div 
-                                    key={inst.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (isInstAssigned) {
-                                        setEditingRoomInstrument({ 
-                                          roomId: inst.roomId!, 
-                                          index: inst.roomInstIdx, 
-                                          name: inst.fullName, 
-                                          model: inst.model || '' 
-                                        });
-                                        setEditRoomInstFormName(inst.fullName);
-                                        setEditRoomInstFormModel(inst.model || '');
-                                      }
-                                    }}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      padding: '4px 10px',
-                                      borderRadius: '8px',
-                                      background: isInstAssigned ? '#eff6ff' : '#f8fafc',
-                                      border: isInstAssigned ? '1.5px solid #dbeafe' : '1.5px solid #e2e8f0',
-                                      cursor: isInstAssigned ? 'pointer' : 'grab',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 800,
-                                      color: isInstAssigned ? '#0b57d0' : '#475569',
-                                      fontFamily: 'Urbanist',
-                                      transition: 'all 0.15s',
-                                      flexShrink: 0,
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                    className="hover-scale-mini"
-                                    title={isInstAssigned ? "Klicken zum Bearbeiten des Modells in diesem Raum" : "Ziehe dieses freie Instrument auf einen Raum"}
-                                  >
-                                    {isInstAssigned ? (
-                                      <>
-                                        <span>🚪 {inst.roomName}</span>
-                                        <button
-                                          onClick={async (e) => {
-                                            e.stopPropagation();
-                                            await handleRemoveRoomInstrument(inst.roomId!, inst.roomInstIdx);
-                                          }}
-                                          style={{
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: '#ef4444',
-                                            fontWeight: 900,
-                                            marginLeft: '4px',
-                                            cursor: 'pointer',
-                                            padding: 0
-                                          }}
-                                          title="Freigeben (zurück in den Pool)"
-                                        >
-                                          ✕
-                                        </button>
-                                      </>
-                                    ) : (
-                                      <span>📦 Pool / Frei</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-
+                                    setSchoolEquipment(prev => prev.filter(eq => !group.instances.some(inst => inst.id === eq.id)));
+                                  }
+                                }}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px', flexShrink: 0 }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         );
                       });
