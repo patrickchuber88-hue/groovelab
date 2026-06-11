@@ -13934,7 +13934,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Unified Instruments List Widget */}
                 <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
-                  {/* Inline creation form (Always visible to add new instruments to the pool) */}
+                  {/* Search and Sort controls bar */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
+                      <Search size={16} color="#94a3b8" />
+                      <input
+                        value={equipmentSearchQuery}
+                        onChange={e => setEquipmentSearchQuery(e.target.value)}
+                        placeholder="Instrumente durchsuchen..."
+                        style={{ border: 'none', outline: 'none', fontSize: '0.8rem', fontWeight: 700, width: '100%', color: '#0f172a' }}
+                      />
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
+                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #e2e8f0',
+                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontFamily: 'Urbanist'
+                      }}
+                    >
+                      <span>📦 Freie Instrumente</span>
+                    </button>
+                  </div>
+
                   {/* Inline creation form (Always visible to add new instruments to the pool) */}
                   <form 
                     onSubmit={(e) => {
@@ -13979,41 +14013,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       Anlegen
                     </button>
                   </form>
-
-                  {/* Search and Sort controls bar */}
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
-                      <Search size={16} color="#94a3b8" />
-                      <input
-                        value={equipmentSearchQuery}
-                        onChange={e => setEquipmentSearchQuery(e.target.value)}
-                        placeholder="Instrumente durchsuchen..."
-                        style={{ border: 'none', outline: 'none', fontSize: '0.8rem', fontWeight: 700, width: '100%', color: '#0f172a' }}
-                      />
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
-                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #e2e8f0',
-                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
-                        padding: '8px 14px',
-                        borderRadius: '10px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        fontFamily: 'Urbanist'
-                      }}
-                    >
-                      <span>🔄 Freie zuerst</span>
-                    </button>
-                  </div>
 
                   {/* Unified List items list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
