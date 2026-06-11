@@ -6797,7 +6797,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           case 'crisis': return '🚨 Operations-Cockpit: Krisen-Dashboard';
           case 'equipment': return '🎸 Instrumente & Ausstattung';
           case 'employees': return '👥 Mitarbeiterverwaltung';
-          case 'licenses': return '🎫 Lizenzen & Abrechnung';
+          case 'licenses': return '💳 Abrechnung & Infrastruktur';
           case 'setup': return '⚙️ Setup & Systemeinstellungen';
           default: return '💼 Verwaltung';
         }
@@ -7090,7 +7090,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
-            { id: 'licenses', label: 'Lizenzen', icon: Award },
+            { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
             { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
             { id: 'setup', label: 'Setup & Design', icon: Settings }
           ].map((item) => {
@@ -11448,7 +11448,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <div className="google-kpi-bar bg-google-green" />
                     <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800 }}>Campus Modul aktivieren</h3>
                     <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>🎓 Campus System Lizenz aktivieren</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>🎓 Campus System aktivieren</span>
                       <input
                         type="checkbox"
                         checked={hasCampusSub}
@@ -13766,7 +13766,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                 {/* Module overview */}
                 <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lizensierte Module</span>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Aktivierte Module</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e6f4ea' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎓 Campus System</span>
@@ -13789,11 +13789,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div style={{ marginTop: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Kontingent-Limit (Aktiv):</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#0b57d0' }}>{activeUserQuota} Lizenzen</strong>
+                      <strong style={{ fontSize: '0.9rem', color: '#0b57d0' }}>{activeUserQuota} User</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Gewünscht (Regler):</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#e11d48' }}>{userQuota} Lizenzen</strong>
+                      <strong style={{ fontSize: '0.9rem', color: '#e11d48' }}>{userQuota} User</strong>
                     </div>
                     
                     <input 
@@ -13813,7 +13813,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     {pendingUserQuota !== null ? (
                       <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#6b21a8', marginTop: '10px', fontWeight: 700 }}>
-                        ⏳ Vormerkung für nächsten Monat: {pendingUserQuota} Lizenzen (kann bis zum 31. geändert werden)
+                        ⏳ Vormerkung für nächsten Monat: {pendingUserQuota} User (kann bis zum 31. geändert werden)
                       </div>
                     ) : (
                       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#64748b', marginTop: '10px', fontWeight: 650 }}>
@@ -13829,12 +13829,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div>
                   <strong style={{ display: 'block', fontSize: '0.92rem', color: '#991b1b' }}>Monatliche Gesamtkosten (Kalkulation)</strong>
                   <span style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
-                    Basisgebühr: 49,00 € (inkl. 50 User) + {(userQuota - 50)} zusätzliche User ({((userQuota - 50) * 1.20).toFixed(2)} €)
+                    Modul-Grundgebühr: 9,98 € (Campus + GrooveLab) + {(userQuota)} User ({((userQuota) * 0.49).toFixed(2)} €)
                   </span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <strong style={{ fontSize: '1.4rem', color: '#b91c1c', display: 'block' }}>
-                    {(49.00 + (userQuota - 50) * 1.20).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
+                    {(9.98 + (userQuota) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
                   </strong>
                   <button 
                     onClick={handleSaveQuota} 
