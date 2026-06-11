@@ -14321,6 +14321,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                              {/* Beautiful Custom Slider */}
                             <div>
                               <style>{`
+                                .custom-range-slider::-webkit-slider-runnable-track {
+                                  width: 100%;
+                                  height: 6px;
+                                  cursor: pointer;
+                                  background: linear-gradient(to right, #7c3aed 0%, #7c3aed var(--slider-val), #e2e8f0 var(--slider-val), #e2e8f0 100%);
+                                  border-radius: 100px;
+                                }
                                 .custom-range-slider::-webkit-slider-thumb {
                                   -webkit-appearance: none;
                                   appearance: none;
@@ -14336,6 +14343,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 }
                                 .custom-range-slider::-webkit-slider-thumb:hover {
                                   transform: scale(1.25);
+                                }
+                                .custom-range-slider::-moz-range-track {
+                                  width: 100%;
+                                  height: 6px;
+                                  cursor: pointer;
+                                  background: linear-gradient(to right, #7c3aed 0%, #7c3aed var(--slider-val), #e2e8f0 var(--slider-val), #e2e8f0 100%);
+                                  border-radius: 100px;
                                 }
                                 .custom-range-slider::-moz-range-thumb {
                                   width: 16px;
@@ -14389,11 +14403,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       width: '100%',
                                       WebkitAppearance: 'none',
                                       appearance: 'none',
-                                      height: '6px',
-                                      borderRadius: '100px',
+                                      height: '24px',
+                                      background: 'transparent',
+                                      margin: 0,
                                       outline: 'none',
-                                      background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${extraUsersSliderVal}%, #e2e8f0 ${extraUsersSliderVal}%, #e2e8f0 100%)`,
                                       cursor: 'pointer',
+                                      // @ts-ignore
+                                      '--slider-val': `${extraUsersSliderVal}%`,
                                       transition: 'background 0.1s'
                                     }} 
                                   />
