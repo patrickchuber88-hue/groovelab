@@ -14597,39 +14597,47 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </div>
 
                       {/* Custom Bottom Curved Arrow from B2C Card bottom to B2B highlighted card bottom */}
-                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
-                        position: 'absolute',
-                        bottom: '-30px',
-                        left: 0,
-                        width: '100%',
-                        height: '32px',
-                        overflow: 'visible',
-                        pointerEvents: 'none',
-                        zIndex: 5
-                      }}>
-                        <path
-                          d="M 87.5,0 L 87.5,65 L 23.5,65 L 23.5,0"
-                          fill="none"
-                          stroke="#7c3aed"
-                          strokeWidth="2"
-                          strokeDasharray="4,4"
-                          style={{ vectorEffect: 'non-scaling-stroke' }}
-                        />
-                      </svg>
-                      {/* Triangle arrowhead pointing up at the B2B target */}
-                      <div style={{
-                        position: 'absolute',
-                        left: '23.5%',
-                        bottom: '-4px',
-                        transform: 'translateX(-50%)',
-                        width: 0,
-                        height: 0,
-                        borderLeft: '5px solid transparent',
-                        borderRight: '5px solid transparent',
-                        borderBottom: '7px solid #7c3aed',
-                        pointerEvents: 'none',
-                        zIndex: 6
-                      }} />
+                      {(() => {
+                        const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                        const targetX = isAnnual ? 23.5 : 45.0;
+                        return (
+                          <>
+                            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
+                              position: 'absolute',
+                              bottom: '-30px',
+                              left: 0,
+                              width: '100%',
+                              height: '32px',
+                              overflow: 'visible',
+                              pointerEvents: 'none',
+                              zIndex: 5
+                            }}>
+                              <path
+                                d={`M 87.5,0 L 87.5,65 L ${targetX},65 L ${targetX},0`}
+                                fill="none"
+                                stroke="#7c3aed"
+                                strokeWidth="2"
+                                strokeDasharray="4,4"
+                                style={{ vectorEffect: 'non-scaling-stroke' }}
+                              />
+                            </svg>
+                            {/* Triangle arrowhead pointing up at the B2B target */}
+                            <div style={{
+                              position: 'absolute',
+                              left: `${targetX}%`,
+                              bottom: '-4px',
+                              transform: 'translateX(-50%)',
+                              width: 0,
+                              height: 0,
+                              borderLeft: '5px solid transparent',
+                              borderRight: '5px solid transparent',
+                              borderBottom: '7px solid #7c3aed',
+                              pointerEvents: 'none',
+                              zIndex: 6
+                            }} />
+                          </>
+                        );
+                      })()}
                     </div>
 
 
