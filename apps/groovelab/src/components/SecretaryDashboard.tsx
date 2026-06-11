@@ -14330,8 +14330,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           flexDirection: 'column',
                           minHeight: '190px',
                           marginTop: 'auto',
-                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)'
+                          boxShadow: '0 2px 8px rgba(107, 33, 168, 0.02)',
+                          position: 'relative'
                         }}>
+                          {/* Floating purple arrow in the gap pointing left */}
+                          <div style={{
+                            position: 'absolute',
+                            left: '-22px', // Centered in the 24px gap
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: '#7c3aed',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            boxShadow: '0 2px 5px rgba(124, 58, 237, 0.3)',
+                            border: '1.5px solid #ffffff',
+                            zIndex: 10,
+                            pointerEvents: 'none'
+                          }}>
+                            ◀
+                          </div>
+
                           <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Umlage pro Schüler B2C</span>
                           
                           {studentBillingOption === 'option1' && (() => {
