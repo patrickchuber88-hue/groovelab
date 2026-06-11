@@ -1545,6 +1545,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   }, [activeTab, secretarySubTab]);
 
+  useEffect(() => {
+    if (schoolId && matrixAllocations.length > 0) {
+      const draftMap: Record<string, string | null> = {};
+      matrixAllocations.forEach(p => {
+        draftMap[p.id] = p.roomId;
+      });
+      localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
+    }
+  }, [matrixAllocations, schoolId]);
+
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
     const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
@@ -1970,12 +1980,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setAlerts(mappedAlerts);
 
       // Fetch all schedules for this school to build the Room Planner Matrix
-      const { data: allSchedulesData, error: schedErr } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('school_id', schoolId);
+      let allSchedulesData = [];
+      try {
+        const { data, error: schedErr } = await supabase
+          .from('schedules')
+          .select('*')
+          .eq('school_id', schoolId);
+        if (schedErr) throw schedErr;
+        allSchedulesData = data || [];
+        localStorage.setItem(`groovelab_schedules_cache_${schoolId}`, JSON.stringify(allSchedulesData));
+      } catch (err) {
+        console.warn('Supabase schedules fetch failed, falling back to local cache:', err);
+        const cached = localStorage.getItem(`groovelab_schedules_cache_${schoolId}`);
+        if (cached) {
+          allSchedulesData = JSON.parse(cached);
+        }
+      }
 
-      if (schedErr) throw schedErr;
       const mappedSchedules = (allSchedulesData || [])
         .filter(s => s.status === 'ready_for_admin_review')
         .map(s => ({
@@ -1994,6 +2015,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         if (!teacherDays[key]) teacherDays[key] = [];
         teacherDays[key].push(s);
       });
+
+      const draftMap = (() => {
+        try {
+          return JSON.parse(localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`) || '{}');
+        } catch { return {}; }
+      })();
 
       const initialAllocations = Object.entries(teacherDays).map(([key, slots]) => {
         const [teacherId, dayOfWeekStr] = key.split('_');
@@ -2023,7 +2050,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : '15:00';
 
         const isPending = sortedSlots.some(s => s.status === 'ready_for_admin_review');
-        const roomId = sortedSlots.find(s => s.room_id)?.room_id || null;
+        const dbRoomId = sortedSlots.find(s => s.room_id)?.room_id || null;
+        const roomId = draftMap[key] !== undefined ? draftMap[key] : dbRoomId;
 
         const teacherProfile = campusTeachersList.find(t => t.id === teacherId);
         const teacherName = map[teacherId] || 'Unbekannte Lehrkraft';
@@ -5729,6 +5757,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
 
       await Promise.all(promises);
+      localStorage.removeItem(`groovelab_matrix_allocations_draft_${schoolId}`);
       alert('Raumzuteilung erfolgreich gespeichert und alle Stundenpläne freigegeben!');
       fetchDashboardData();
     } catch (err: any) {
