@@ -10512,9 +10512,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                       {/* Segmented Switch for Modes */}
-                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1' }}>
                         <button
                           type="button"
                           onClick={() => setSchedulesRoomsViewMode('live')}
@@ -10522,12 +10522,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             background: schedulesRoomsViewMode === 'live' ? '#34a853' : 'transparent',
                             color: schedulesRoomsViewMode === 'live' ? 'white' : '#475569',
                             border: 'none',
-                            padding: '6px 14px',
-                            borderRadius: '8px',
-                            fontSize: '0.75rem',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.15s'
                           }}
                         >
                           Raumplan (Live)
@@ -10539,12 +10539,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             background: schedulesRoomsViewMode === 'designer' ? '#34a853' : 'transparent',
                             color: schedulesRoomsViewMode === 'designer' ? 'white' : '#475569',
                             border: 'none',
-                            padding: '6px 14px',
-                            borderRadius: '8px',
-                            fontSize: '0.75rem',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.15s'
                           }}
                         >
                           Raumplan-Designer
@@ -10557,9 +10557,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             type="button"
                             onClick={runAutoRoomAllocation}
                             disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
-                            style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s' }}
+                            style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
-                            ⚡ Räume automatisch zuteilen
+                            ⚡ Auto
                           </button>
                           <button
                             type="button"
@@ -10568,16 +10568,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 setMatrixAllocations(prev => prev.map(p => ({ ...p, roomId: null })));
                               }
                             }}
-                            style={{ background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}
+                            style={{ background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
-                            🔄 Zuteilungen zurücksetzen
+                            🔄 Zurücksetzen
                           </button>
                           <button
                             type="button"
                             onClick={handleSaveAndApproveAll}
-                            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '11px 20px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
+                            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(16,185,129,0.15)', whiteSpace: 'nowrap' }}
                           >
-                            💾 Zuteilung speichern & freigeben
+                            💾 Speichern & Freigeben
                           </button>
                         </>
                       )}
