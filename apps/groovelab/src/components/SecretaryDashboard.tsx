@@ -13888,9 +13888,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               justifyContent: 'space-between',
                               padding: '12px',
                               borderRadius: '12px',
-                              border: '1px solid #e2e8f0',
-                              background: hasGroovelabSub ? '#eff6ff' : '#ffffff',
-                              borderColor: hasGroovelabSub ? '#3b82f6' : '#cbd5e1',
+                              border: '1px solid #cbd5e1',
+                              background: hasGroovelabSub ? '#fffbeb' : '#ffffff',
+                              borderColor: hasGroovelabSub ? '#f59e0b' : '#cbd5e1',
                               cursor: 'pointer',
                               transition: 'all 0.15s',
                               minHeight: '100px'
@@ -13904,12 +13904,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   type="checkbox"
                                   checked={hasGroovelabSub}
                                   onChange={(e) => handleToggleGroovelabSub(e.target.checked)}
-                                  style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                                  style={{ width: '16px', height: '16px', accentColor: '#f59e0b', cursor: 'pointer' }}
                                 />
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #f1f5f9', fontSize: '0.68rem' }}>
                                 <span style={{ fontWeight: 700 }}>4,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
-                                <span style={{ color: hasGroovelabSub ? '#1d4ed8' : '#64748b', fontWeight: 700 }}>{hasGroovelabSub ? 'Aktiv' : 'Bereit'}</span>
+                                <span style={{ color: hasGroovelabSub ? '#b45309' : '#64748b', fontWeight: 700 }}>{hasGroovelabSub ? 'Aktiv' : 'Bereit'}</span>
                               </div>
                             </label>
                           </div>
