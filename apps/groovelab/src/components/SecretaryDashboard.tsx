@@ -13479,9 +13479,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      {/* Modul-Aktivierung */}
+                      {/* Modul */}
                       <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul-Aktivierung</label>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul</label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
                             <input
@@ -13490,7 +13490,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               onChange={e => setRoomFormIsCampusActive(e.target.checked)}
                               style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
                             />
-                            Im Campus-Modul aktiv (Wochenpläne & Belegungen)
+                            Campus
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
                             <input
@@ -13499,7 +13499,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
                               style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
                             />
-                            Im GrooveLab-Modul aktiv (iPads / Live-Lab)
+                            Groovelab
                           </label>
                         </div>
                       </div>
