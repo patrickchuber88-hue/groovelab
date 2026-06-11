@@ -14026,23 +14026,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   background: '#ffffff',
                                   padding: '12px',
                                   borderRadius: '12px',
-                                  border: '2px solid #0284c7',
-                                  boxShadow: '0 4px 12px rgba(3, 105, 161, 0.08)',
+                                  border: '2px solid #16a34a',
+                                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)',
                                   marginTop: '-4px',
                                   marginBottom: '-4px'
                                 }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
-                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#0369a1', margin: '2px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                    <span style={{ fontSize: '0.55rem', color: '#16a34a', textTransform: 'uppercase', fontWeight: 800 }}>Gesamter Einzug (Mischpreis)</span>
+                                    <strong style={{ display: 'block', fontSize: '1.4rem', color: '#15803d', margin: '2px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
                                       {mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
                                     </strong>
                                     {!isBillingBooked && (studentSharePreview > 0 || studentLevyMonthly > 0) && (
-                                      <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
+                                      <span style={{ fontSize: '0.52rem', color: '#16a34a', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
                                         (Vorschau nach Einbuchung)
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontSize: '0.62rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <div style={{ fontSize: '0.62rem', color: '#16a34a', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                       <span>• Schule (B2B):</span>
                                       <strong>{currentTotalB2B.toFixed(2)} €</strong>
@@ -14056,7 +14056,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         ◀ fließt aus B2C Schüler-Modul ein
                                       </span>
                                     </div>
-                                    <div style={{ borderTop: '1px dashed #0284c7', paddingTop: '2.5px', marginTop: '2.5px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.66rem' }}>
+                                    <div style={{ borderTop: '1px dashed #16a34a', paddingTop: '2.5px', marginTop: '2.5px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.66rem', color: '#15803d' }}>
                                       <span>Gesamteinzug:</span>
                                       <span>{mixedTotal.toFixed(2)} €</span>
                                     </div>
