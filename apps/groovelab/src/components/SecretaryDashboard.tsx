@@ -13844,6 +13844,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Grundgebühren &amp; Infrastruktur für Mitarbeiter</span>
                         </div>
 
+                        {/* Widgets: Verwaltung & Lehrer */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>💼 Verwaltung</span>
+                            <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{employees.length} User</strong>
+                          </div>
+                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>🧑‍🏫 Lehrer</span>
+                            <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{allTeachers.length} User</strong>
+                          </div>
+                        </div>
+
                         {/* Card 1: Gebuchte Module */}
                         <div style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lizenzierte Module</span>
@@ -13960,6 +13972,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span>👥</span> Bereich Schüler (B2C)
                           </h4>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Umlage &amp; Finanzierung durch Schüler</span>
+                        </div>
+
+                        {/* Widget: Schüler */}
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>👥 Schüler</span>
+                          <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', marginTop: '2px' }}>{students.length} Schüler</strong>
                         </div>
 
                         {/* Card 1: Schüler-Abrechnungsmodell selector */}
@@ -14118,22 +14136,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     {/* Section 5: User Breakdown List */}
                     <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.01)' }}>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>User &amp; Zuweisung nach Lehrern</h4>
-                      
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                        <div style={{ flex: 1, background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Lehrer</span>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#0f172a', marginTop: '2px' }}>{allTeachers.length}</strong>
-                        </div>
-                        <div style={{ flex: 1, background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Verwaltung</span>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#0f172a', marginTop: '2px' }}>{employees.length}</strong>
-                        </div>
-                        <div style={{ flex: 1, background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Schüler</span>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#0f172a', marginTop: '2px' }}>{students.length}</strong>
-                        </div>
-                      </div>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>User &amp; Zuweisung nach Lehrern</h4>
 
                       <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', textAlign: 'left' }}>
