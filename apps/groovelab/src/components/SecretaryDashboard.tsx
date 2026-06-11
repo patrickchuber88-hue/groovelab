@@ -1557,6 +1557,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   }, [matrixAllocations, schoolId]);
 
+  // Global drag listener to reliably clear draggedPlanId state when drag ends
+  useEffect(() => {
+    const handleGlobalDragEnd = () => {
+      setDraggedPlanId(null);
+      setDraggedPlanDay(null);
+    };
+    window.addEventListener('dragend', handleGlobalDragEnd);
+    return () => {
+      window.removeEventListener('dragend', handleGlobalDragEnd);
+    };
+  }, []);
+
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
     const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
@@ -5829,6 +5841,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     setDraggedPlanId(planId);
     const plan = matrixAllocations.find(p => p.id === planId);
     setDraggedPlanDay(plan?.dayOfWeek ?? null);
+    setHoveredUnassignedDayNum(null);
   };
 
   const handleDropOnMatrix = (targetRoomId: string | null, targetDay: number) => {
