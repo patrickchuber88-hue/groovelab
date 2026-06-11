@@ -14898,7 +14898,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
 
                     {/* Modal Body / Scrollable Content */}
-                    <div style={{ padding: '28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{
+                      padding: '28px 28px 40px 28px',
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px',
+                      flex: 1
+                    }}>
                       {/* Name */}
                       <div>
                         <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
@@ -14937,13 +14944,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       {/* Modul */}
                       <div>
                         <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul</label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'center' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={roomFormIsCampusActive}
                               onChange={e => setRoomFormIsCampusActive(e.target.checked)}
-                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
+                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
                             />
                             Campus
                           </label>
@@ -14952,7 +14959,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               type="checkbox"
                               checked={roomFormIsGroovelabActive}
                               onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
-                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0' }}
+                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
                             />
                             Groovelab
                           </label>
@@ -15020,18 +15027,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         )}
 
                         {/* Add Instrument Form Inline */}
-                        <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px', alignItems: 'center' }}>
                           <input
                             placeholder="z.B. Klavier"
                             value={newInstrumentName}
                             onChange={e => setNewInstrumentName(e.target.value)}
-                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 750, color: '#0f172a', outline: 'none' }}
+                            style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
                           />
                           <input
                             placeholder="Typ: z.B. Yamaha U1"
                             value={newInstrumentModel}
                             onChange={e => setNewInstrumentModel(e.target.value)}
-                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 750, color: '#0f172a', outline: 'none' }}
+                            style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
                           />
                           <button
                             type="button"
@@ -15041,7 +15048,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               setNewInstrumentName('');
                               setNewInstrumentModel('');
                             }}
-                            style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                            style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                           >
                             +
                           </button>
