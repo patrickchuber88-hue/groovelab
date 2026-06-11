@@ -1010,7 +1010,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status'>('briefing');
-  const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('live');
+  const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
   const [adHocRoomId, setAdHocRoomId] = useState<string | null>(null);
@@ -10717,27 +10717,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', flex: 1.5 }}>
                         <button
                           type="button"
-                          onClick={() => setSchedulesRoomsViewMode('live')}
-                          style={{
-                            flex: 1,
-                            background: schedulesRoomsViewMode === 'live' ? '#34a853' : 'transparent',
-                            color: schedulesRoomsViewMode === 'live' ? 'white' : '#475569',
-                            border: 'none',
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                          }}
-                        >
-                          Raumplan (Live)
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => setSchedulesRoomsViewMode('designer')}
                           style={{
                             flex: 1,
@@ -10756,6 +10735,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }}
                         >
                           Raumplan-Designer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSchedulesRoomsViewMode('live')}
+                          style={{
+                            flex: 1,
+                            background: schedulesRoomsViewMode === 'live' ? '#34a853' : 'transparent',
+                            color: schedulesRoomsViewMode === 'live' ? 'white' : '#475569',
+                            border: 'none',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}
+                        >
+                          Raumplan (Live)
                         </button>
                       </div>
 
