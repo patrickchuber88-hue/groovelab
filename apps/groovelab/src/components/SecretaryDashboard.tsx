@@ -1266,6 +1266,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
   const [editRoomInstFormName, setEditRoomInstFormName] = useState<string>('');
   const [editRoomInstFormModel, setEditRoomInstFormModel] = useState<string>('');
+  const [editingEquipmentGroup, setEditingEquipmentGroup] = useState<any | null>(null);
+  const [editGroupName, setEditGroupName] = useState<string>('');
+  const [editGroupModel, setEditGroupModel] = useState<string>('');
+  const [editGroupCoupled, setEditGroupCoupled] = useState<boolean>(true);
+  const [editGroupInstancesData, setEditGroupInstancesData] = useState<any[]>([]);
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
@@ -6094,6 +6099,110 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setTimeout(() => equipmentNameInputRef.current?.focus(), 50);
     } catch (e: any) {
       console.error('Equipment save error:', e);
+      alert('Fehler beim Speichern der Ausstattung: ' + e.message);
+    } finally {
+      setEquipmentSaving(false);
+    }
+  };
+
+  const handleSaveEquipmentGroup = async () => {
+    if (!schoolId) return;
+    setEquipmentSaving(true);
+    try {
+      // Load global model mapping
+      let localModelMap: Record<string, string> = {};
+      try {
+        localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+      } catch {}
+
+      if (editGroupCoupled) {
+        // SCENARIO A: Coupled (all exemplars have the same name and model)
+        const newBaseName = editGroupName.trim();
+        const newModel = editGroupModel.trim();
+        
+        // Prepare renaming map and array of updates
+        const updatedInstances = editingEquipmentGroup.instances.map((inst: any, idx: number) => {
+          const newName = editingEquipmentGroup.instances.length > 1 
+            ? `${newBaseName} #${idx + 1}` 
+            : newBaseName;
+          return {
+            ...inst,
+            newName,
+            newModel
+          };
+        });
+
+        // 1. Update in school_equipment table
+        for (const inst of updatedInstances) {
+          await supabase.from('school_equipment').update({ name: inst.newName }).eq('id', inst.id);
+          localModelMap[inst.newName] = newModel;
+        }
+
+        // 2. Update local state
+        setSchoolEquipment(prev => prev.map(eq => {
+          const matched = updatedInstances.find((inst: any) => inst.id === eq.id);
+          return matched ? { ...eq, name: matched.newName } : eq;
+        }));
+
+        // 3. Update room instruments in all rooms where these instances are assigned
+        for (const inst of updatedInstances) {
+          if (inst.roomId) {
+            const targetRoom = rooms.find(r => r.id === inst.roomId);
+            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+              const updatedRoomInsts = [...targetRoom.room_instruments];
+              if (updatedRoomInsts[inst.roomInstIdx]) {
+                updatedRoomInsts[inst.roomInstIdx] = {
+                  name: inst.newName,
+                  model: newModel
+                };
+              }
+              // Update state
+              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+              // Update Supabase room
+              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+            }
+          }
+        }
+      } else {
+        // SCENARIO B: Decoupled (each exemplar can have a custom name and model)
+        // 1. Update each in school_equipment table and update local model mapping
+        for (const inst of editGroupInstancesData) {
+          await supabase.from('school_equipment').update({ name: inst.fullName.trim() }).eq('id', inst.id);
+          localModelMap[inst.fullName.trim()] = inst.model.trim();
+        }
+
+        // 2. Update local state
+        setSchoolEquipment(prev => prev.map(eq => {
+          const matched = editGroupInstancesData.find((inst: any) => inst.id === eq.id);
+          return matched ? { ...eq, name: matched.fullName.trim() } : eq;
+        }));
+
+        // 3. Update room instruments in all rooms where these instances are assigned
+        for (const inst of editGroupInstancesData) {
+          if (inst.roomId) {
+            const targetRoom = rooms.find(r => r.id === inst.roomId);
+            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+              const updatedRoomInsts = [...targetRoom.room_instruments];
+              if (updatedRoomInsts[inst.roomInstIdx]) {
+                updatedRoomInsts[inst.roomInstIdx] = {
+                  name: inst.fullName.trim(),
+                  model: inst.model.trim()
+                };
+              }
+              // Update state
+              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+              // Update Supabase room
+              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+            }
+          }
+        }
+      }
+
+      // Save model mapping to localStorage
+      localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
+      setEditingEquipmentGroup(null);
+    } catch (e: any) {
+      console.error('Equipment group save error:', e);
       alert('Fehler beim Speichern der Ausstattung: ' + e.message);
     } finally {
       setEquipmentSaving(false);
@@ -14024,7 +14133,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           rm.room_instruments.some((inst: any) => inst.name === eq.name)
                         );
                         const roomInst = assignedRm?.room_instruments?.find((inst: any) => inst.name === eq.name);
-                        const model = roomInst?.model || 'Standard';
+                        let model = 'Standard';
+                        try {
+                          const localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+                          if (localModelMap[eq.name]) {
+                            model = localModelMap[eq.name];
+                          } else if (roomInst?.model) {
+                            model = roomInst?.model;
+                          }
+                        } catch {
+                          if (roomInst?.model) {
+                            model = roomInst?.model;
+                          }
+                        }
                         const baseName = eq.name.replace(/\s+#\d+$/, '');
 
                         return {
@@ -14105,6 +14226,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               e.dataTransfer.setData("text/plain", firstFreeInstance.fullName);
                               e.dataTransfer.effectAllowed = "copyMove";
                             }}
+                            onClick={() => {
+                              setEditingEquipmentGroup(group);
+                              setEditGroupName(group.baseName);
+                              setEditGroupModel(group.model);
+                              setEditGroupCoupled(true);
+                              setEditGroupInstancesData(group.instances.map(inst => ({ ...inst })));
+                            }}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -14113,12 +14241,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               background: 'white',
                               border: '1px solid #f1f5f9',
                               borderRadius: '16px',
-                              cursor: (hasFree && !selectedRoom) ? 'grab' : 'default',
+                              cursor: 'pointer',
                               transition: 'all 0.2s',
                               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                               gap: '16px'
                             }}
-                            className={hasFree && !selectedRoom ? "hover-scale-mini" : ""}
+                            className="hover-scale-mini"
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
                               <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎹</span>
@@ -14296,6 +14424,127 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </button>
                         <button
                           onClick={() => setEditingRoomInstrument(null)}
+                          style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* EDIT EQUIPMENT GROUP MODAL */}
+                {editingEquipmentGroup && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(15, 23, 42, 0.3)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 99999
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      width: '420px',
+                      maxWidth: '90%',
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Ausstattung bearbeiten</h3>
+                        <button 
+                          onClick={() => setEditingEquipmentGroup(null)}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+                        >
+                          <X size={18} color="#64748b" />
+                        </button>
+                      </div>
+
+                      {/* Coupled Checkbox */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                        <input
+                          type="checkbox"
+                          checked={editGroupCoupled}
+                          onChange={(e) => setEditGroupCoupled(e.target.checked)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>Koppeln (Alle Exemplare zusammengruppieren)</span>
+                      </label>
+
+                      {editGroupCoupled ? (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Anzeigename</span>
+                            <input
+                              value={editGroupName}
+                              onChange={e => setEditGroupName(e.target.value)}
+                              placeholder="z.B. Schlagzeug"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Modell</span>
+                            <input
+                              value={editGroupModel}
+                              onChange={e => setEditGroupModel(e.target.value)}
+                              placeholder="z.B. Yamaha Stage Custom"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Exemplare einzeln bearbeiten</span>
+                          {editGroupInstancesData.map((inst, idx) => (
+                            <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>Exemplar #{idx + 1}</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Name</span>
+                                <input
+                                  value={inst.fullName}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, fullName: val } : p));
+                                  }}
+                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Modell</span>
+                                <input
+                                  value={inst.model}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setEditGroupInstancesData(prev => prev.map(p => p.id === inst.id ? { ...p, model: val } : p));
+                                  }}
+                                  style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                        <button
+                          onClick={handleSaveEquipmentGroup}
+                          disabled={editGroupCoupled ? !editGroupName.trim() : editGroupInstancesData.some(inst => !inst.fullName.trim())}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                        >
+                          Speichern
+                        </button>
+                        <button
+                          onClick={() => setEditingEquipmentGroup(null)}
                           style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Abbrechen
