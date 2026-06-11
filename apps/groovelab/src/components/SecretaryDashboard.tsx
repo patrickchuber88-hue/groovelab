@@ -14875,7 +14875,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div style={{
                     background: 'white',
                     borderRadius: '24px',
-                    width: '480px',
+                    width: '540px',
                     maxHeight: '90vh',
                     boxShadow: '0 24px 60px -15px rgba(15,23,42,0.25)',
                     border: '1px solid rgba(15,23,42,0.08)',
