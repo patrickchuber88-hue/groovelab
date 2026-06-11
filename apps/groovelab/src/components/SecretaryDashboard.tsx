@@ -1271,6 +1271,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [editGroupModel, setEditGroupModel] = useState<string>('');
   const [editGroupLink, setEditGroupLink] = useState<string>('');
   const [editGroupCoupled, setEditGroupCoupled] = useState<boolean>(true);
+  const [editGroupQty, setEditGroupQty] = useState<number>(1);
   const [editGroupInstancesData, setEditGroupInstancesData] = useState<any[]>([]);
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
@@ -6106,6 +6107,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     }
   };
 
+  const handleQtyChange = (newQty: number) => {
+    if (newQty < 1) return;
+    setEditGroupQty(newQty);
+    
+    // Adjust editGroupInstancesData
+    setEditGroupInstancesData(prev => {
+      if (newQty > prev.length) {
+        const added = [];
+        const base = editGroupName.trim() || 'Instrument';
+        const model = editGroupModel.trim() || 'Standard';
+        for (let i = prev.length; i < newQty; i++) {
+          added.push({
+            id: `temp_${Date.now()}_${i}`,
+            fullName: `${base} #${i + 1}`,
+            baseName: base,
+            model,
+            linkUrl: editGroupLink.trim(),
+            roomId: null,
+            roomName: null,
+            roomInstIdx: -1
+          });
+        }
+        return [...prev, ...added];
+      } else if (newQty < prev.length) {
+        return prev.slice(0, newQty);
+      }
+      return prev;
+    });
+  };
+
   const handleSaveEquipmentGroup = async () => {
     if (!schoolId) return;
     setEquipmentSaving(true);
@@ -6120,95 +6151,127 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
       } catch {}
 
+      // 1. Determine deletions
+      const originalIds = editingEquipmentGroup.instances.map((i: any) => i.id);
+      let idsToDelete: string[] = [];
+      if (editGroupCoupled) {
+        idsToDelete = originalIds.slice(editGroupQty);
+      } else {
+        const idsToKeep = editGroupInstancesData.filter(i => !i.id.startsWith('temp_')).map(i => i.id);
+        idsToDelete = originalIds.filter((id: string) => !idsToKeep.includes(id));
+      }
+
+      // Perform Deletions from DB & State/Rooms
+      if (idsToDelete.length > 0) {
+        await supabase.from('school_equipment').delete().in('id', idsToDelete);
+        for (const delId of idsToDelete) {
+          const inst = editingEquipmentGroup.instances.find((i: any) => i.id === delId);
+          if (inst && inst.roomId) {
+            const targetRoom = rooms.find(r => r.id === inst.roomId);
+            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+              const updatedRoomInsts = targetRoom.room_instruments.filter((_, idx) => idx !== inst.roomInstIdx);
+              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+            }
+          }
+        }
+      }
+
       if (editGroupCoupled) {
         // SCENARIO A: Coupled (all exemplars have the same name and model)
         const newBaseName = editGroupName.trim();
         const newModel = editGroupModel.trim();
         const newLink = editGroupLink.trim();
-        
-        // Prepare renaming map and array of updates
-        const updatedInstances = editingEquipmentGroup.instances.map((inst: any, idx: number) => {
-          const newName = editingEquipmentGroup.instances.length > 1 
-            ? `${newBaseName} #${idx + 1}` 
-            : newBaseName;
-          return {
-            ...inst,
-            newName,
-            newModel
-          };
-        });
 
-        // 1. Update in school_equipment table
-        for (const inst of updatedInstances) {
-          await supabase.from('school_equipment').update({ name: inst.newName }).eq('id', inst.id);
-          localModelMap[inst.newName] = newModel;
-          if (newLink) {
-            localLinkMap[inst.newName] = newLink;
-          } else {
-            delete localLinkMap[inst.newName];
-          }
-        }
+        for (let idx = 0; idx < editGroupQty; idx++) {
+          const newName = editGroupQty > 1 ? `${newBaseName} #${idx + 1}` : newBaseName;
 
-        // 2. Update local state
-        setSchoolEquipment(prev => prev.map(eq => {
-          const matched = updatedInstances.find((inst: any) => inst.id === eq.id);
-          return matched ? { ...eq, name: matched.newName } : eq;
-        }));
+          if (idx < originalIds.length) {
+            // Update existing row
+            const originalId = originalIds[idx];
+            await supabase.from('school_equipment').update({ name: newName }).eq('id', originalId);
+            localModelMap[newName] = newModel;
+            if (newLink) {
+              localLinkMap[newName] = newLink;
+            } else {
+              delete localLinkMap[newName];
+            }
 
-        // 3. Update room instruments in all rooms where these instances are assigned
-        for (const inst of updatedInstances) {
-          if (inst.roomId) {
-            const targetRoom = rooms.find(r => r.id === inst.roomId);
-            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-              const updatedRoomInsts = [...targetRoom.room_instruments];
-              if (updatedRoomInsts[inst.roomInstIdx]) {
-                updatedRoomInsts[inst.roomInstIdx] = {
-                  name: inst.newName,
-                  model: newModel
-                };
+            // Sync with assigned room
+            const inst = editingEquipmentGroup.instances.find((i: any) => i.id === originalId);
+            if (inst && inst.roomId) {
+              const targetRoom = rooms.find(r => r.id === inst.roomId);
+              if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+                const updatedRoomInsts = [...targetRoom.room_instruments];
+                if (updatedRoomInsts[inst.roomInstIdx]) {
+                  updatedRoomInsts[inst.roomInstIdx] = {
+                    name: newName,
+                    model: newModel
+                  };
+                }
+                setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+                await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
               }
-              // Update state
-              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
-              // Update Supabase room
-              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+            }
+          } else {
+            // Insert new row
+            await supabase.from('school_equipment').insert({
+              school_id: schoolId,
+              name: newName
+            });
+            localModelMap[newName] = newModel;
+            if (newLink) {
+              localLinkMap[newName] = newLink;
+            } else {
+              delete localLinkMap[newName];
             }
           }
         }
       } else {
         // SCENARIO B: Decoupled (each exemplar can have a custom name and model)
-        // 1. Update each in school_equipment table and update local model mapping
-        for (const inst of editGroupInstancesData) {
-          await supabase.from('school_equipment').update({ name: inst.fullName.trim() }).eq('id', inst.id);
-          localModelMap[inst.fullName.trim()] = inst.model.trim();
-          if (inst.linkUrl && inst.linkUrl.trim()) {
-            localLinkMap[inst.fullName.trim()] = inst.linkUrl.trim();
+        for (let idx = 0; idx < editGroupInstancesData.length; idx++) {
+          const inst = editGroupInstancesData[idx];
+          const name = inst.fullName.trim();
+          const model = inst.model.trim();
+          const link = inst.linkUrl?.trim() || '';
+
+          if (inst.id.startsWith('temp_')) {
+            // Insert new row
+            await supabase.from('school_equipment').insert({
+              school_id: schoolId,
+              name: name
+            });
+            localModelMap[name] = model;
+            if (link) {
+              localLinkMap[name] = link;
+            } else {
+              delete localLinkMap[name];
+            }
           } else {
-            delete localLinkMap[inst.fullName.trim()];
-          }
-        }
+            // Update existing row
+            await supabase.from('school_equipment').update({ name: name }).eq('id', inst.id);
+            localModelMap[name] = model;
+            if (link) {
+              localLinkMap[name] = link;
+            } else {
+              delete localLinkMap[name];
+            }
 
-        // 2. Update local state
-        setSchoolEquipment(prev => prev.map(eq => {
-          const matched = editGroupInstancesData.find((inst: any) => inst.id === eq.id);
-          return matched ? { ...eq, name: matched.fullName.trim() } : eq;
-        }));
-
-        // 3. Update room instruments in all rooms where these instances are assigned
-        for (const inst of editGroupInstancesData) {
-          if (inst.roomId) {
-            const targetRoom = rooms.find(r => r.id === inst.roomId);
-            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-              const updatedRoomInsts = [...targetRoom.room_instruments];
-              if (updatedRoomInsts[inst.roomInstIdx]) {
-                updatedRoomInsts[inst.roomInstIdx] = {
-                  name: inst.fullName.trim(),
-                  model: inst.model.trim()
-                };
+            // Sync with assigned room
+            const originalInst = editingEquipmentGroup.instances.find((i: any) => i.id === inst.id);
+            if (originalInst && originalInst.roomId) {
+              const targetRoom = rooms.find(r => r.id === originalInst.roomId);
+              if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+                const updatedRoomInsts = [...targetRoom.room_instruments];
+                if (updatedRoomInsts[originalInst.roomInstIdx]) {
+                  updatedRoomInsts[originalInst.roomInstIdx] = {
+                    name: name,
+                    model: model
+                  };
+                }
+                setRooms(prev => prev.map(r => r.id === originalInst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+                await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', originalInst.roomId);
               }
-              // Update state
-              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
-              // Update Supabase room
-              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
             }
           }
         }
@@ -6217,6 +6280,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Save model mapping and links to localStorage
       localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
       localStorage.setItem(`groovelab_instrument_links_${schoolId}`, JSON.stringify(localLinkMap));
+
+      // Reload list from Supabase
+      const { data: eqData } = await supabase.from('school_equipment').select('*').eq('school_id', schoolId);
+      if (eqData) {
+        setSchoolEquipment(eqData);
+      }
+
       setEditingEquipmentGroup(null);
     } catch (e: any) {
       console.error('Equipment group save error:', e);
@@ -14257,6 +14327,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               setEditGroupModel(group.model);
                               setEditGroupLink(group.instances[0]?.linkUrl || '');
                               setEditGroupCoupled(true);
+                              setEditGroupQty(group.instances.length);
                               setEditGroupInstancesData(group.instances.map(inst => ({ ...inst })));
                             }}
                             style={{
@@ -14518,6 +14589,76 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         />
                         <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>Koppeln (Alle Exemplare zusammengruppieren)</span>
                       </label>
+
+                      {/* Quantity Selector */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Anzahl Exemplare</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleQtyChange(Math.max(1, editGroupQty - 1))}
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              border: '1.5px solid #e2e8f0',
+                              background: 'white',
+                              fontSize: '1.2rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748b'
+                            }}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editGroupQty}
+                            onChange={e => handleQtyChange(Math.max(1, parseInt(e.target.value) || 1))}
+                            style={{
+                              width: '70px',
+                              height: '36px',
+                              textAlign: 'center',
+                              borderRadius: '10px',
+                              border: '1.5px solid #e2e8f0',
+                              fontSize: '0.85rem',
+                              fontWeight: 900,
+                              color: '#0f172a',
+                              outline: 'none'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleQtyChange(editGroupQty + 1)}
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              border: '1.5px solid #e2e8f0',
+                              background: 'white',
+                              fontSize: '1.2rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748b'
+                            }}
+                          >
+                            +
+                          </button>
+
+                          {editGroupQty < editingEquipmentGroup.instances.length && (
+                            <span style={{ fontSize: '0.64rem', color: '#ef4444', fontWeight: 800, flex: 1 }}>
+                              ⚠️ {editingEquipmentGroup.instances.length - editGroupQty} Exemplar(e) werden gelöscht
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       {editGroupCoupled ? (
                         <>
