@@ -5596,6 +5596,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       return p1.startTime < p2.endTime && p2.startTime < p1.endTime;
     };
 
+    const isRoomUnsuitable = (r: any, instrumentName: string) => {
+      if (!r || !instrumentName) return false;
+      const unsuitable = r.unsuitable_instruments || (() => {
+        try {
+          const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+          return map[r.id] || [];
+        } catch { return []; }
+      })();
+      return unsuitable.some((inst: string) => inst.toLowerCase() === instrumentName.toLowerCase());
+    };
+
     // Tracks current allocations during solver execution
     const assigned: Record<string, string> = {};
 
@@ -5638,21 +5649,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         if (candidates.length === 0) candidates = [...rooms];
       }
 
-      // Soft Constraint check: prioritize historically assigned rooms for this teacher
+      // Soft Constraint check: prioritize historically assigned rooms for this teacher (must be suitable)
       const historicalRoomId = teacherHistory[plan.teacherId];
       if (historicalRoomId) {
-        const hasConflict = sortedPlans.some(p => {
-          const allocatedRoom = assigned[p.id] || p.roomId;
-          return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-        });
-        if (!hasConflict) {
-          bestRoomId = historicalRoomId;
+        const histRoom = rooms.find(r => r.id === historicalRoomId);
+        if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
+          const hasConflict = sortedPlans.some(p => {
+            const allocatedRoom = assigned[p.id] || p.roomId;
+            return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+          });
+          if (!hasConflict) {
+            bestRoomId = historicalRoomId;
+          }
         }
       }
 
       // If no historical match, search candidate rooms first
       if (!bestRoomId) {
         for (const room of candidates) {
+          if (isRoomUnsuitable(room, plan.instrument)) continue;
+          
           const hasConflict = sortedPlans.some(p => {
             const allocatedRoom = assigned[p.id] || p.roomId;
             return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
@@ -5668,6 +5684,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fallback: search all rooms if candidate rooms are exhausted or full
       if (!bestRoomId) {
         for (const room of rooms) {
+          if (isRoomUnsuitable(room, plan.instrument)) continue;
+
           const hasConflict = sortedPlans.some(p => {
             const allocatedRoom = assigned[p.id] || p.roomId;
             return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
@@ -5789,6 +5807,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setDraggedPlanDay(null);
       return;
     }
+
+    if (targetRoomId) {
+      const room = rooms.find(r => r.id === targetRoomId);
+      const plan = matrixAllocations.find(p => p.id === draggedPlanId);
+      if (room && plan) {
+        const unsuitable = room.unsuitable_instruments || (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+            return map[room.id] || [];
+          } catch { return []; }
+        })();
+        if (unsuitable.some((inst: string) => inst.toLowerCase() === plan.instrument?.toLowerCase())) {
+          alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${plan.instrument}".`);
+          setDraggedPlanId(null);
+          setDraggedPlanDay(null);
+          return;
+        }
+      }
+    }
+
     setMatrixAllocations(prev => prev.map(p => {
       if (p.id === draggedPlanId) {
         return { ...p, roomId: targetRoomId };
@@ -12152,6 +12190,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             onChange={(e) => {
                                               const rId = e.target.value;
                                               if (rId) {
+                                                const room = rooms.find(r => r.id === rId);
+                                                if (room) {
+                                                  const unsuitable = room.unsuitable_instruments || (() => {
+                                                    try {
+                                                      const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                                      return map[room.id] || [];
+                                                    } catch { return []; }
+                                                  })();
+                                                  if (unsuitable.some((inst) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
+                                                    alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
+                                                    e.target.value = "";
+                                                    return;
+                                                  }
+                                                }
                                                 setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
                                               }
                                             }}
