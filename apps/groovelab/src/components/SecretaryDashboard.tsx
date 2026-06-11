@@ -1289,6 +1289,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
   // School Data & Subscription
   const [schoolName, setSchoolName] = useState<string>('');
+  const [schoolZipCode, setSchoolZipCode] = useState<string>('');
+  const [schoolCity, setSchoolCity] = useState<string>('');
+  const [schoolStreet, setSchoolStreet] = useState<string>('');
   const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
   const [hasCampusSub, setHasCampusSub] = useState<boolean>(false);
   const [hasGroovelabSub, setHasGroovelabSub] = useState<boolean>(false);
@@ -1749,13 +1752,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street')
         .eq('id', schoolId)
         .single();
 
       if (schoolErr) throw schoolErr;
       if (schoolData) {
         setSchoolName(schoolData.name);
+        setSchoolZipCode(schoolData.zip_code || '');
+        setSchoolCity(schoolData.city || '');
+        setSchoolStreet(schoolData.street || '');
         setEditColor(schoolData.primary_color || '#1a73e8');
         setLogoUrl(schoolData.logo_url || '');
         setCalendarUrl(schoolData.calendar_url || '');
@@ -18031,15 +18037,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', fontSize: '0.78rem' }}>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Rechnungsempfänger</span>
-                    <strong style={{ color: '#0f172a', display: 'block' }}>{selectedInvoice.recipient?.name}</strong>
-                    <span>{selectedInvoice.recipient?.contact}</span><br />
-                    <span>{selectedInvoice.recipient?.street}</span><br />
-                    <span>{selectedInvoice.recipient?.city}</span>
+                    <strong style={{ color: '#0f172a', display: 'block' }}>{schoolName}</strong>
+                    {schoolStreet && <span>{schoolStreet}<br /></span>}
+                    <span>{schoolZipCode} {schoolCity}</span>
                   </div>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-                    <strong style={{ color: '#0f172a', display: 'block' }}>Campus-Groovelab (hue-music)</strong>
-                    <span>Software &amp; Education Tech Solutions</span><br />
+                    <strong style={{ color: '#0f172a', display: 'block' }}>Simplified Work GbR</strong>
+                    <span>Patrick Huber</span><br />
                     <span>Karl-Fürstenberg-Str. 59</span><br />
                     <span>79618 Rheinfelden</span>
                   </div>
