@@ -14332,6 +14332,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   border: 2px solid #ffffff;
                                   box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
                                   transition: transform 0.1s;
+                                  margin-top: -5px;
                                 }
                                 .custom-range-slider::-webkit-slider-thumb:hover {
                                   transform: scale(1.25);
