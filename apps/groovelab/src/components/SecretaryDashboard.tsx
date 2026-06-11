@@ -14350,19 +14350,124 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </strong>
                             </div>
 
-                            {/* Slider */}
+                             {/* Beautiful Custom Slider */}
                             <div>
-                              <input 
-                                type="range" 
-                                min="0" 
-                                max="100" 
-                                value={extraUsersSliderVal} 
-                                onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
-                                style={{ width: '100%', accentColor: '#6b21a8', cursor: 'pointer', height: '6px', borderRadius: '4px' }} 
-                              />
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>
+                              <style>{`
+                                .custom-range-slider::-webkit-slider-thumb {
+                                  -webkit-appearance: none;
+                                  appearance: none;
+                                  width: 16px;
+                                  height: 16px;
+                                  border-radius: 50%;
+                                  background: #7c3aed;
+                                  cursor: pointer;
+                                  border: 2px solid #ffffff;
+                                  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+                                  transition: transform 0.1s;
+                                }
+                                .custom-range-slider::-webkit-slider-thumb:hover {
+                                  transform: scale(1.25);
+                                }
+                                .custom-range-slider::-moz-range-thumb {
+                                  width: 16px;
+                                  height: 16px;
+                                  border-radius: 50%;
+                                  background: #7c3aed;
+                                  cursor: pointer;
+                                  border: 2px solid #ffffff;
+                                  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+                                  transition: transform 0.1s;
+                                }
+                                .custom-range-slider::-moz-range-thumb:hover {
+                                  transform: scale(1.25);
+                                }
+                              `}</style>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                                {/* Minus Button */}
+                                <button 
+                                  onClick={() => setExtraUsersSliderVal(Math.max(0, extraUsersSliderVal - 5))}
+                                  className="hover-scale"
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    border: '1.5px solid #ddd6fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '1rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  −
+                                </button>
+                                
+                                {/* Slider track wrapper */}
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                                  <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="100" 
+                                    value={extraUsersSliderVal} 
+                                    onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
+                                    className="custom-range-slider"
+                                    style={{
+                                      width: '100%',
+                                      WebkitAppearance: 'none',
+                                      appearance: 'none',
+                                      height: '6px',
+                                      borderRadius: '100px',
+                                      outline: 'none',
+                                      background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${extraUsersSliderVal}%, #e2e8f0 ${extraUsersSliderVal}%, #e2e8f0 100%)`,
+                                      cursor: 'pointer',
+                                      transition: 'background 0.1s'
+                                    }} 
+                                  />
+                                </div>
+
+                                {/* Plus Button */}
+                                <button 
+                                  onClick={() => setExtraUsersSliderVal(Math.min(100, extraUsersSliderVal + 5))}
+                                  className="hover-scale"
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    border: '1.5px solid #ddd6fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '1rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', padding: '0 4px', alignItems: 'center' }}>
                                 <span>0</span>
-                                <span style={{ color: '#6b21a8', fontSize: '0.78rem' }}>+{extraUsersSliderVal} User</span>
+                                <span style={{ 
+                                  background: '#7c3aed', 
+                                  color: '#ffffff', 
+                                  padding: '3px 12px', 
+                                  borderRadius: '100px', 
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  boxShadow: '0 2px 5px rgba(124, 58, 237, 0.2)'
+                                }}>
+                                  +{extraUsersSliderVal} Schüler
+                                </span>
                                 <span>100</span>
                               </div>
                             </div>
