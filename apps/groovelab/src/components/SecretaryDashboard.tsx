@@ -1295,6 +1295,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
+  const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
+  const [sidebarTeacherSearch, setSidebarTeacherSearch] = useState<string>('');
+  const [expandedSidebarTeacherId, setExpandedSidebarTeacherId] = useState<string | null>(null);
 
   // Räume-Verwaltung State
   const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
