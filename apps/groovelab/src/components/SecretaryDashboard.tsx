@@ -14074,15 +14074,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span>Umlagemodell:</span>
                                   <strong>
-                                    {studentBillingOption === 'option1' ? 'Jahresbeitrag (5,29 €)' : studentBillingOption === 'option2' ? 'Monatsbeitrag (0,49 €)' : '50/50 Kofinanzierung'}
+                                    {studentBillingOption === 'option1' ? 'Jahresbeitrag (Jahreszahler)' : studentBillingOption === 'option2' ? 'Monatsbeitrag (Monatszahler)' : '50/50 Kofinanzierung'}
                                   </strong>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>Betrag pro Schüler:</span>
-                                  <strong>
-                                    {studentBillingOption === 'option1' ? '5,29 € / Jahr' : studentBillingOption === 'option2' ? '0,49 € / Mo.' : '0,24 € / Mo.'}
-                                  </strong>
-                                </div>
+                                {studentBillingOption === 'option1' ? (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Regulärer Beitrag:</span>
+                                      <span style={{ textDecoration: 'line-through', color: '#64748b' }}>5,88 € / Jahr</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#137333' }}>
+                                      <span>Rabatt (10% Jahreszahler):</span>
+                                      <strong>-0,59 € / Jahr</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
+                                      <span>Betrag pro Schüler (effektiv):</span>
+                                      <strong style={{ color: '#137333' }}>5,29 € / Jahr</strong>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Betrag pro Schüler:</span>
+                                    <strong>
+                                      {studentBillingOption === 'option2' ? '0,49 € / Mo.' : '0,24 € / Mo.'}
+                                    </strong>
+                                  </div>
+                                )}
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#0f172a' }}>
                                 <strong style={{ fontWeight: 750 }}>Erlöse Umlage gesamt:</strong>
