@@ -298,15 +298,25 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
 
         let schoolName = 'Musikschule';
+        let hasCampusSub = false;
+        let hasGroovelabSub = false;
         if (userData.school_id) {
           const { data: schoolData } = await supabase
             .from('schools')
-            .select('name')
+            .select('name, has_campus_subscription, has_groovelab_subscription')
             .eq('id', userData.school_id)
             .single();
           if (schoolData) {
             schoolName = schoolData.name;
+            hasCampusSub = schoolData.has_campus_subscription ?? false;
+            hasGroovelabSub = schoolData.has_groovelab_subscription ?? false;
           }
+        }
+
+        if (!hasCampusSub && !hasGroovelabSub) {
+          setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
+          setPageState('error');
+          return;
         }
 
         setProfile({

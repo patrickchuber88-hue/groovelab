@@ -1129,6 +1129,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       
       if (!isMaster) {
         if (!isAdminOrSecretary) {
+          // Check school's module subscriptions based on active login portal
+          const hasCampusSub = userSchool?.has_campus_subscription ?? false;
+          const hasGroovelabSub = userSchool?.has_groovelab_subscription ?? false;
+
+          if (isGroovelabKiosk) {
+            if (!hasGroovelabSub) {
+              alert("Login verweigert. Das GrooveLab App Modul ist für diese Schule aktuell nicht aktiv.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+          } else {
+            if (!hasCampusSub) {
+              alert("Login verweigert. Das Campus Modul ist für diese Schule aktuell nicht aktiv.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+          }
+
           // Enforce activation check (must have at least one active module)
           if (!user.is_campus_active && !user.is_groovelab_active) {
             alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
