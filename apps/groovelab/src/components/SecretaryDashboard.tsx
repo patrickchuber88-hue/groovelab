@@ -6169,7 +6169,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           if (inst && inst.roomId) {
             const targetRoom = rooms.find(r => r.id === inst.roomId);
             if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-              const updatedRoomInsts = targetRoom.room_instruments.filter((_, idx) => idx !== inst.roomInstIdx);
+              const updatedRoomInsts = targetRoom.room_instruments.filter((_: any, idx: number) => idx !== inst.roomInstIdx);
               setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
               await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
             }
