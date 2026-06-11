@@ -7114,6 +7114,31 @@ export function AdminDashboard({
                           />
                         </button>
                       </div>
+                      
+                      {/* Short summary of configured instruments */}
+                      {(() => {
+                        const schoolId = admin?.school_id || '';
+                        const roomInsts = room.room_instruments || (() => {
+                          try {
+                            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+                            return map[room.id] || [];
+                          } catch { return []; }
+                        })();
+                        
+                        if (roomInsts.length > 0) {
+                          return (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px', marginBottom: '6px' }}>
+                              {roomInsts.map((inst: any, idx: number) => (
+                                <span key={idx} style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 650, background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                  {inst.name}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
                         {occupiedNow ? (
                           <span style={{ padding: '3px 8px', background: '#ffebeb', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#ff453a' }}>
@@ -8338,176 +8363,159 @@ export function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Acoustics (unsuitable list dropdown/modal) */}
-                {selectedRoom.unsuitable_instruments && selectedRoom.unsuitable_instruments.length > 0 && (
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      onClick={() => setShowUnsuitableList(prev => !prev)}
-                      style={{
-                        width: '100%',
-                        background: '#fff5f5',
-                        border: '1px solid #fee2e2',
-                        borderRadius: '12px',
-                        padding: '8px 10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#fca5a5'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#fee2e2'; }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <VolumeX size={15} style={{ color: '#ef4444' }} />
-                        <span style={{ fontSize: '0.74rem', color: '#991b1b', fontWeight: 700 }}>
-                          Akustik ungeeignet für...
+                {/* Acoustics & Instruments */}
+                {(() => {
+                  const schoolId = admin?.school_id || '';
+                  const roomInsts = selectedRoom.room_instruments || (() => {
+                    try {
+                      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+                      return map[selectedRoom.id] || [];
+                    } catch { return []; }
+                  })();
+                  
+                  const unsuitableInsts = selectedRoom.unsuitable_instruments || (() => {
+                    try {
+                      const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                      return map[selectedRoom.id] || [];
+                    } catch { return []; }
+                  })();
+
+                  return (
+                    <>
+                      {/* Vorhandene Instrumente */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          Vorhandene Instrumente
                         </span>
-                      </div>
-                      <span style={{ fontSize: '0.72rem', background: '#fca5a550', color: '#b91c1c', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
-                        {selectedRoom.unsuitable_instruments.length}
-                      </span>
-                    </button>
+                        {roomInsts && roomInsts.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {roomInsts.map((inst: any, idx: number) => {
+                              let linkUrl = '';
+                              try {
+                                const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+                                linkUrl = localLinkMap[inst.name] || '';
+                              } catch {}
 
-                    {showUnsuitableList && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: '4px',
-                        background: 'white',
-                        border: '1px solid #f3f4f6',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        borderRadius: '12px',
-                        padding: '10px',
-                        zIndex: 40,
-                        maxHeight: '120px',
-                        overflowY: 'auto'
-                      }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {selectedRoom.unsuitable_instruments.map((inst: string, idx: number) => (
-                            <span 
-                              key={idx} 
-                              style={{ 
-                                fontSize: '0.68rem', 
-                                background: '#fee2e2', 
-                                color: '#b91c1c', 
-                                padding: '3px 8px', 
-                                borderRadius: '6px', 
-                                fontWeight: 700 
-                              }}
-                            >
-                              {inst}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                              return (
+                                <div 
+                                  key={idx} 
+                                  style={{ position: 'relative' }}
+                                  onMouseEnter={() => setHoveredInstrumentIdx(idx)}
+                                  onMouseLeave={() => setHoveredInstrumentIdx(null)}
+                                >
+                                  {linkUrl ? (
+                                    <a 
+                                      href={linkUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: 'inline-block',
+                                        fontSize: '0.74rem',
+                                        background: '#eff6ff',
+                                        color: '#0b57d0',
+                                        padding: '4px 10px',
+                                        borderRadius: '8px',
+                                        fontWeight: 700,
+                                        border: '1.5px solid #bfdbfe',
+                                        cursor: 'pointer',
+                                        textDecoration: 'none',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                    >
+                                      🔗 {inst.name}
+                                    </a>
+                                  ) : (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      fontSize: '0.74rem',
+                                      background: '#f1f5f9',
+                                      color: '#334155',
+                                      padding: '4px 10px',
+                                      borderRadius: '8px',
+                                      fontWeight: 700,
+                                      border: '1px solid #e2e8f0',
+                                      cursor: inst.model ? 'help' : 'default'
+                                    }}>
+                                      {inst.name}
+                                    </span>
+                                  )}
 
-                {/* Instruments List (with Tooltips) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    Vorhandene Instrumente
-                  </span>
-                  {selectedRoom.room_instruments && selectedRoom.room_instruments.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {selectedRoom.room_instruments.map((inst: any, idx: number) => {
-                        let linkUrl = '';
-                        try {
-                          const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${admin?.school_id || ''}`) || '{}');
-                          linkUrl = localLinkMap[inst.name] || '';
-                        } catch {}
-
-                        return (
-                          <div 
-                            key={idx} 
-                            style={{ position: 'relative' }}
-                            onMouseEnter={() => setHoveredInstrumentIdx(idx)}
-                            onMouseLeave={() => setHoveredInstrumentIdx(null)}
-                          >
-                            {linkUrl ? (
-                              <a 
-                                href={linkUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-block',
-                                  fontSize: '0.74rem',
-                                  background: '#eff6ff',
-                                  color: '#0b57d0',
-                                  padding: '4px 10px',
-                                  borderRadius: '8px',
-                                  fontWeight: 700,
-                                  border: '1.5px solid #bfdbfe',
-                                  cursor: 'pointer',
-                                  textDecoration: 'none',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                🔗 {inst.name}
-                              </a>
-                            ) : (
-                              <span style={{
-                                display: 'inline-block',
-                                fontSize: '0.74rem',
-                                background: '#f1f5f9',
-                                color: '#334155',
-                                padding: '4px 10px',
-                                borderRadius: '8px',
-                                fontWeight: 700,
-                                border: '1px solid #e2e8f0',
-                                cursor: inst.model ? 'help' : 'default'
-                              }}>
-                                {inst.name}
-                              </span>
-                            )}
-
-                            {/* Hover Tooltip showing the model info */}
-                            {inst.model && hoveredInstrumentIdx === idx && (
-                              <div style={{
-                                position: 'absolute',
-                                bottom: '100%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                marginBottom: '6px',
-                                background: '#0f172a',
-                                color: 'white',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                                zIndex: 50
-                              }}>
-                                {inst.model}
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
-                                  width: 0,
-                                  height: 0,
-                                  borderLeft: '4px solid transparent',
-                                  borderRight: '4px solid transparent',
-                                  borderTop: '4px solid #0f172a'
-                                }} />
-                              </div>
-                            )}
+                                  {inst.model && hoveredInstrumentIdx === idx && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      bottom: '100%',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      marginBottom: '6px',
+                                      background: '#0f172a',
+                                      color: 'white',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 700,
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      whiteSpace: 'nowrap',
+                                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                      zIndex: 50
+                                    }}>
+                                      {inst.model}
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '4px solid transparent',
+                                        borderRight: '4px solid transparent',
+                                        borderTop: '4px solid #0f172a'
+                                      }} />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', fontWeight: 600 }}>
-                      Keine Instrumente angegeben
-                    </span>
-                  )}
-                </div>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', fontWeight: 600 }}>
+                            Keine Instrumente angegeben
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Ungeeignete Instrumente */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          Akustisch ungeeignet für
+                        </span>
+                        {unsuitableInsts && unsuitableInsts.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {unsuitableInsts.map((inst: string, idx: number) => (
+                              <span 
+                                key={idx} 
+                                style={{ 
+                                  fontSize: '0.74rem', 
+                                  background: '#fef2f2', 
+                                  color: '#b91c1c', 
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px', 
+                                  fontWeight: 700,
+                                  border: '1px solid #fee2e2'
+                                }}
+                              >
+                                ❌ {inst}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', fontWeight: 650 }}>
+                            Keine Einschränkungen
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Sonstiges (Comments) */}
                 {selectedRoom.sonstiges && selectedRoom.sonstiges.trim() && (
