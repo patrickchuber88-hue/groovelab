@@ -18043,7 +18043,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-                    <strong style={{ color: '#0f172a', display: 'block' }}>Simplified Work GbR</strong>
+                    <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
+                    <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>Simplified Work GbR</strong>
                     <span>Patrick Huber</span><br />
                     <span>Karl-Fürstenberg-Str. 59</span><br />
                     <span>79618 Rheinfelden</span>
