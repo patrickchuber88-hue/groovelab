@@ -14050,9 +14050,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <strong style={{ display: 'block', fontSize: '1.6rem', color: '#6b21a8', margin: '6px 0', fontWeight: 800 }}>
                                   5,29 € <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>/ Jahr</span>
                                 </strong>
-                                <span style={{ fontSize: '0.68rem', color: '#7e22ce', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px' }}>
-                                  • 10% Rabatt berücksichtigt (statt 5,88 € / Jahr)<br />
-                                  • Gesamterlös: <strong>{(students.length * 5.29).toFixed(2)} € / Jahr</strong>
+                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px', lineHeight: '1.4' }}>
+                                  <strong>Rechenweg pro Schüler:</strong><br />
+                                  0,49 € / Mo. × 12 Monate = 5,88 €<br />
+                                  5,88 € − 10% Rabatt (−0,59 €) = <strong>5,29 € / Jahr</strong><br />
+                                  <span style={{ display: 'block', marginTop: '6px', borderTop: '1px dashed #e9d5ff', paddingTop: '4px' }}>
+                                    <strong>Gesamterlös ({students.length} Schüler):</strong><br />
+                                    {students.length} × 5,29 € = <strong style={{ color: '#6b21a8' }}>{(students.length * 5.29).toFixed(2)} € / Jahr</strong>
+                                  </span>
                                 </span>
                               </>
                             )}
@@ -14062,9 +14067,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <strong style={{ display: 'block', fontSize: '1.6rem', color: '#6b21a8', margin: '6px 0', fontWeight: 800 }}>
                                   0,49 € <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>/ Mo.</span>
                                 </strong>
-                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px' }}>
-                                  • Voller monatlicher Aufschlag per Lastschrift<br />
-                                  • Gesamterlös: <strong>{(students.length * 0.49).toFixed(2)} € / Monat</strong>
+                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px', lineHeight: '1.4' }}>
+                                  <strong>Rechenweg pro Schüler:</strong><br />
+                                  Volle Umlage der Infrastrukturkosten: <strong>0,49 € / Monat</strong><br />
+                                  <span style={{ display: 'block', marginTop: '6px', borderTop: '1px dashed #e9d5ff', paddingTop: '4px' }}>
+                                    <strong>Gesamterlös ({students.length} Schüler):</strong><br />
+                                    {students.length} × 0,49 € = <strong style={{ color: '#6b21a8' }}>{(students.length * 0.49).toFixed(2)} € / Monat</strong>
+                                  </span>
                                 </span>
                               </>
                             )}
@@ -14074,9 +14083,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <strong style={{ display: 'block', fontSize: '1.6rem', color: '#6b21a8', margin: '6px 0', fontWeight: 800 }}>
                                   0,24 € <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>/ Mo.</span>
                                 </strong>
-                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px' }}>
-                                  • 50/50 Kofinanzierungs-Schüleranteil monatlich<br />
-                                  • Gesamterlös: <strong>{(students.length * 0.24).toFixed(2)} € / Monat</strong>
+                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px', lineHeight: '1.4' }}>
+                                  <strong>Rechenweg pro Schüler:</strong><br />
+                                  50% Kofinanzierung: 0,49 € / 2 = 0,245 €<br />
+                                  Schüleranteil abgerundet: <strong>0,24 € / Monat</strong><br />
+                                  <span style={{ display: 'block', marginTop: '6px', borderTop: '1px dashed #e9d5ff', paddingTop: '4px' }}>
+                                    <strong>Gesamterlös ({students.length} Schüler):</strong><br />
+                                    {students.length} × 0,24 € = <strong style={{ color: '#6b21a8' }}>{(students.length * 0.24).toFixed(2)} € / Monat</strong>
+                                  </span>
                                 </span>
                               </>
                             )}
@@ -14086,9 +14100,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <strong style={{ display: 'block', fontSize: '1.6rem', color: '#6b21a8', margin: '6px 0', fontWeight: 800 }}>
                                   2,59 € <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>/ Jahr</span>
                                 </strong>
-                                <span style={{ fontSize: '0.68rem', color: '#7e22ce', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px' }}>
-                                  • Split-Anteil inkl. 10% Rabatt (statt 2,88 € / Jahr)<br />
-                                  • Gesamterlös: <strong>{(students.length * 2.59).toFixed(2)} € / Jahr</strong>
+                                <span style={{ fontSize: '0.68rem', color: '#6b21a8', display: 'block', borderTop: '1px solid #e9d5ff', paddingTop: '8px', marginTop: '6px', lineHeight: '1.4' }}>
+                                  <strong>Rechenweg pro Schüler:</strong><br />
+                                  Schüler-Split: 0,24 € / Monat × 12 Monate = 2,88 € / Jahr<br />
+                                  2,88 € − 10% Rabatt (−0,29 €) = <strong>2,59 € / Jahr</strong><br />
+                                  <span style={{ display: 'block', marginTop: '6px', borderTop: '1px dashed #e9d5ff', paddingTop: '4px' }}>
+                                    <strong>Gesamterlös ({students.length} Schüler):</strong><br />
+                                    {students.length} × 2,59 € = <strong style={{ color: '#6b21a8' }}>{(students.length * 2.59).toFixed(2)} € / Jahr</strong>
+                                  </span>
                                 </span>
                               </>
                             )}
