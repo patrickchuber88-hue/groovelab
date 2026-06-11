@@ -13830,140 +13830,278 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 const moduleCost = activeModulesCount * 4.99;
                 return (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-                      {/* Module overview */}
-                      <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Aktivierte Module</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎓 Campus System</span>
-                            <input 
-                              type="checkbox"
-                              checked={hasCampusSub}
-                              onChange={(e) => handleToggleCampusSub(e.target.checked)}
-                              style={{ width: '18px', height: '18px', accentColor: '#ea4335', cursor: 'pointer' }}
-                            />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', marginBottom: '28px' }}>
+                      {/* Section 1: Active Modules (Gebuchte Module) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gebuchte Module</span>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          {/* Module 1: Campus */}
+                          <label style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            padding: '18px',
+                            borderRadius: '20px',
+                            border: hasCampusSub ? '2px solid #34a853' : '1px solid #cbd5e1',
+                            background: hasCampusSub ? '#f6fdf8' : '#ffffff',
+                            boxShadow: hasCampusSub ? '0 8px 20px rgba(52, 168, 83, 0.06)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            minHeight: '130px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>🎓</span>
+                                <strong style={{ fontSize: '0.88rem', color: '#0f172a', display: 'block' }}>Campus System</strong>
+                                <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Digitale Musikschul-Verwaltung</span>
+                              </div>
+                              <input 
+                                type="checkbox"
+                                checked={hasCampusSub}
+                                onChange={(e) => handleToggleCampusSub(e.target.checked)}
+                                style={{ width: '20px', height: '20px', accentColor: '#34a853', cursor: 'pointer' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34a853' }}>4,99 € <span style={{ fontSize: '0.68rem', fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
+                              <span style={{
+                                fontSize: '0.62rem',
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                background: hasCampusSub ? '#e6f4ea' : '#f1f5f9',
+                                color: hasCampusSub ? '#137333' : '#64748b',
+                                fontWeight: 800
+                              }}>{hasCampusSub ? 'AKTIV' : 'BEREIT'}</span>
+                            </div>
                           </label>
-                          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎸 GrooveLab App</span>
-                            <input 
-                              type="checkbox"
-                              checked={hasGroovelabSub}
-                              onChange={(e) => handleToggleGroovelabSub(e.target.checked)}
-                              style={{ width: '18px', height: '18px', accentColor: '#ea4335', cursor: 'pointer' }}
-                            />
+
+                          {/* Module 2: GrooveLab */}
+                          <label style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            padding: '18px',
+                            borderRadius: '20px',
+                            border: hasGroovelabSub ? '2px solid #ea4335' : '1px solid #cbd5e1',
+                            background: hasGroovelabSub ? '#fffbfa' : '#ffffff',
+                            boxShadow: hasGroovelabSub ? '0 8px 20px rgba(234, 67, 53, 0.06)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            minHeight: '130px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>🎸</span>
+                                <strong style={{ fontSize: '0.88rem', color: '#0f172a', display: 'block' }}>GrooveLab App</strong>
+                                <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Übe-App &amp; Schüler-Motivation</span>
+                              </div>
+                              <input 
+                                type="checkbox"
+                                checked={hasGroovelabSub}
+                                onChange={(e) => handleToggleGroovelabSub(e.target.checked)}
+                                style={{ width: '20px', height: '20px', accentColor: '#ea4335', cursor: 'pointer' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ea4335' }}>4,99 € <span style={{ fontSize: '0.68rem', fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
+                              <span style={{
+                                fontSize: '0.62rem',
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                background: hasGroovelabSub ? '#fce8e6' : '#f1f5f9',
+                                color: hasGroovelabSub ? '#c5221f' : '#64748b',
+                                fontWeight: 800
+                              }}>{hasGroovelabSub ? 'AKTIV' : 'BEREIT'}</span>
+                            </div>
                           </label>
                         </div>
-                        <p style={{ margin: '12px 0 0 0', fontSize: '0.68rem', color: '#64748b', lineHeight: '1.4' }}>
-                          ℹ️ Sobald ein Modul im laufenden Monat einmal aktiviert wurde, bleibt es für diesen Abrechnungsmonat abrechnungsrelevant (auch bei Deaktivierung).
-                        </p>
                       </div>
 
-                      {/* User Quota Calculator */}
-                      <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zusätzliches Benutzerkontingent</span>
-                        <div style={{ marginTop: '12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Kontingent-Limit (Aktiv):</span>
-                            <strong style={{ fontSize: '0.9rem', color: '#0b57d0' }}>{activeUserQuota} User</strong>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Gewünscht (Regler):</span>
-                            <strong style={{ fontSize: '0.9rem', color: '#e11d48' }}>{userQuota} User</strong>
+                      {/* Section 2: School Monthly Costs (B2B) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatliche Kosten Schule</span>
+                        
+                        <div style={{
+                          background: '#fef2f2',
+                          border: '1.5px solid #fecaca',
+                          borderRadius: '20px',
+                          padding: '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '130px',
+                          boxShadow: '0 8px 24px rgba(239, 68, 68, 0.03)'
+                        }}>
+                          <div>
+                            <strong style={{ fontSize: '0.75rem', color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'block', marginBottom: '8px' }}>B2B Gesamtkosten (Monatlich)</strong>
+                            <strong style={{ fontSize: '1.8rem', color: '#991b1b', display: 'block', lineHeight: '1' }}>
+                              {(moduleCost + (allTeachers.length + employees.length) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.82rem', fontWeight: 500, color: '#b91c1c' }}>/ Mo.</span>
+                            </strong>
                           </div>
                           
-                          <input 
-                            type="range" 
-                            min="50" 
-                            max="500" 
-                            step="10" 
-                            value={userQuota} 
-                            onChange={(e) => setUserQuota(parseInt(e.target.value))}
-                            style={{ width: '100%', accentColor: '#ea4335', cursor: 'pointer' }}
-                          />
-                          
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
-                            <span>50 (Standard)</span>
-                            <span>500 (Maximum)</span>
+                          <div style={{ fontSize: '0.74rem', color: '#7f1d1d', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                            Modulgebühr: {moduleCost.toFixed(2)} €<br />
+                            User: {allTeachers.length + employees.length} (Lehrer/Verwaltung) × 0,49 € ({( (allTeachers.length + employees.length) * 0.49).toFixed(2)} €)
                           </div>
-
-                          {pendingUserQuota !== null ? (
-                            <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#6b21a8', marginTop: '10px', fontWeight: 700 }}>
-                              ⏳ Vormerkung für nächsten Monat: {pendingUserQuota} User (kann bis zum 31. geändert werden)
-                            </div>
-                          ) : (
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#64748b', marginTop: '10px', fontWeight: 650 }}>
-                              ℹ️ Keine ausstehenden Quoten-Änderungen für den nächsten Monat.
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Price Calculation Card */}
-                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#991b1b' }}>Monatliche B2B-Gesamtkosten (Kalkulation)</strong>
-                          <span style={{ fontSize: '0.78rem', color: '#7f1d1d', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
-                            • Modul-Grundgebühr: {moduleCost.toFixed(2)} € ({billedCampus ? 'Campus ' : ''}{billedCampus && billedGroovelab ? '+ ' : ''}{billedGroovelab ? 'GrooveLab' : ''}{activeModulesCount === 0 ? 'Keines' : ''})<br />
-                            • Lehrer-Infrastruktur: {allTeachers.length} Lehrer × 0,49 € = {(allTeachers.length * 0.49).toFixed(2)} €<br />
-                            • Verwaltungsmitarbeiter: {employees.length} User × 0,49 € = {(employees.length * 0.49).toFixed(2)} €
-                          </span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <strong style={{ fontSize: '1.6rem', color: '#b91c1c', display: 'block' }}>
-                            {(moduleCost + (allTeachers.length + employees.length) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* B2C Schüler-Abrechnung Optionen */}
-                    <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '24px' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Schüler-Abrechnungsmodell (B2C Optionen)</h4>
-                      <p style={{ margin: '0 0 16px 0', fontSize: '0.76rem', color: '#64748b' }}>
-                        Wähle aus, wie die Infrastrukturgebühr von 0,49 € pro Schüler abgerechnet wird:
+                    {/* Section 3: B2C Student Options */}
+                    <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '28px', boxShadow: '0 4px 18px rgba(15, 23, 42, 0.01)' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Schüler-Abrechnungsmodell (B2C Optionen)</h4>
+                      <p style={{ margin: '0 0 20px 0', fontSize: '0.76rem', color: '#64748b' }}>
+                        Wähle aus, wie die Infrastrukturkosten für deine Schüler verrechnet werden:
                       </p>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                         {[
-                          { id: 'option1', title: 'Option 1: Jahresbeitrag („Digitalkosten-Pauschale“)', desc: 'Einmalig 5,29 € pro Schüler/Jahr (inkl. 10% Rabatt). Über Kopier-/Digitalkosten pauschal einziehbar.', calc: `${students.length} Schüler × 5,29 € = ${(students.length * 5.29).toFixed(2)} € / Jahr` },
-                          { id: 'option2', title: 'Option 2: Monatliche Umlage auf die Unterrichtsgebühr', desc: 'Monatlich 0,49 € pro Schüler. Gebühren werden auf die Unterrichtsgebühr aufgeschlagen.', calc: `${students.length} Schüler × 0,49 € = ${(students.length * 0.49).toFixed(2)} € / Monat` },
-                          { id: 'option3', title: 'Option 3: 50/50 Kofinanzierung', desc: 'Monatlich 0,49 € pro Schüler. Schule trägt 0,25 €, Schüler 0,24 €.', calc: `${students.length} Schüler × 0,49 € = ${(students.length * 0.49).toFixed(2)} € / Monat (Schulanteil: ${(students.length * 0.25).toFixed(2)} €/Mo, Schüleranteil: ${(students.length * 0.24).toFixed(2)} €/Mo)` }
+                          {
+                            id: 'option1',
+                            emoji: '📅',
+                            title: 'Option 1: Jahrespauschale',
+                            tag: '10% Rabatt',
+                            desc: 'Einmalig 5,29 € pro Schüler/Jahr (5,88 € regulär). Komfortabel über Kopier- oder Digitalkosten einziehbar.',
+                            calcVal: students.length * 5.29,
+                            period: '/ Jahr'
+                          },
+                          {
+                            id: 'option2',
+                            emoji: '💸',
+                            title: 'Option 2: Monatsumlage',
+                            tag: 'Aufschlag',
+                            desc: 'Monatlich 0,49 € pro Schüler. Wird vollständig auf die Unterrichtsgebühr der Schüler umgelegt.',
+                            calcVal: students.length * 0.49,
+                            period: '/ Mo.'
+                          },
+                          {
+                            id: 'option3',
+                            emoji: '⚖️',
+                            title: 'Option 3: Kofinanzierung',
+                            tag: '50 / 50',
+                            desc: 'Monatlich 0,49 € pro Schüler. Die Schule trägt 25¢ und die Schüler 24¢ der Kosten.',
+                            calcVal: students.length * 0.49,
+                            period: '/ Mo.'
+                          }
                         ].map((opt) => (
                           <label key={opt.id} style={{
                             display: 'flex',
-                            gap: '12px',
-                            padding: '14px',
-                            borderRadius: '12px',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            padding: '16px',
+                            borderRadius: '16px',
                             border: studentBillingOption === opt.id ? '2px solid #ea4335' : '1px solid #e2e8f0',
                             background: studentBillingOption === opt.id ? '#fffbfa' : '#ffffff',
                             cursor: 'pointer',
-                            alignItems: 'flex-start',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            boxShadow: studentBillingOption === opt.id ? '0 6px 16px rgba(234, 67, 53, 0.04)' : 'none'
                           }}>
-                            <input 
-                              type="radio" 
-                              name="studentBillingOption" 
-                              checked={studentBillingOption === opt.id}
-                              onChange={() => handleUpdateStudentBillingOption(opt.id)}
-                              style={{ marginTop: '4px', accentColor: '#ea4335', cursor: 'pointer' }}
-                            />
-                            <div style={{ flex: 1 }}>
-                              <strong style={{ display: 'block', fontSize: '0.82rem', color: '#0f172a' }}>{opt.title}</strong>
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>{opt.desc}</span>
-                              <div style={{ display: 'inline-block', fontSize: '0.7rem', color: '#ea4335', fontWeight: 700, marginTop: '6px', background: '#fff1f2', padding: '2px 8px', borderRadius: '100px' }}>
-                                Kalkuliert: {opt.calc}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                <span style={{ fontSize: '1.25rem' }}>{opt.emoji}</span>
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px',
+                                  background: studentBillingOption === opt.id ? '#fce8e6' : '#f1f5f9',
+                                  color: studentBillingOption === opt.id ? '#c5221f' : '#64748b',
+                                  fontWeight: 800
+                                }}>{opt.tag}</span>
                               </div>
+                              <strong style={{ fontSize: '0.82rem', color: '#0f172a', display: 'block' }}>{opt.title}</strong>
+                              <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '6px 0 12px 0', lineHeight: '1.4' }}>{opt.desc}</p>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                              <input 
+                                type="radio" 
+                                name="studentBillingOption"
+                                checked={studentBillingOption === opt.id}
+                                onChange={() => handleUpdateStudentBillingOption(opt.id)}
+                                style={{ accentColor: '#ea4335', cursor: 'pointer' }}
+                              />
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>Auswählen</span>
                             </div>
                           </label>
                         ))}
                       </div>
                     </div>
 
+                    {/* Section 4: Live Invoice Cost Simulation Preview */}
+                    <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', background: '#f8fafc', marginBottom: '28px' }}>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>📊 Simulation der Gesamtkosten ({schoolName || 'Musikschule'})</h4>
+                      <p style={{ margin: '0 0 18px 0', fontSize: '0.76rem', color: '#64748b' }}>
+                        Simulierte Gesamtkostenstruktur basierend auf der aktuellen Schüleranzahl ({students.length} Schüler) und gewählten Optionen:
+                      </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        {/* Simulation Column 1: Paid by School */}
+                        <div style={{ background: '#ffffff', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                          <strong style={{ fontSize: '0.74rem', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>Anteil Schule (B2B Abbuchung)</strong>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Modul-Grundgebühr:</span>
+                              <strong>{moduleCost.toFixed(2)} € / Mo.</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Lehrer ({allTeachers.length}) &amp; Verwaltung ({employees.length}):</span>
+                              <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
+                            </div>
+                            
+                            {studentBillingOption === 'option3' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b91c1c', borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
+                                <span>Kofinanzierung Schüler-Anteil (25¢):</span>
+                                <strong>{(students.length * 0.25).toFixed(2)} € / Mo.</strong>
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '10px', marginTop: '6px', fontSize: '0.88rem', color: '#0f172a' }}>
+                              <strong style={{ fontWeight: 800 }}>Monatliche Lastschrift:</strong>
+                              <strong style={{ fontWeight: 800, color: '#0b57d0' }}>
+                                {(moduleCost + (allTeachers.length + employees.length) * 0.49 + (studentBillingOption === 'option3' ? students.length * 0.25 : 0)).toFixed(2)} € / Mo.
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Simulation Column 2: Paid by Students */}
+                        <div style={{ background: '#ffffff', padding: '16px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                          <strong style={{ fontSize: '0.74rem', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>Simulierte Schüler-Umlage (B2C)</strong>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Umlagemodell:</span>
+                              <span style={{ fontWeight: 700, color: '#ea4335' }}>
+                                {studentBillingOption === 'option1' ? 'Jahresbeitrag (5,29 € / Jahr)' : studentBillingOption === 'option2' ? 'Monatsumlage (0,49 € / Mo.)' : 'Kofinanzierung (24¢ / Mo.)'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Betrag pro Schüler:</span>
+                              <strong>
+                                {studentBillingOption === 'option1' ? '5,29 €' : studentBillingOption === 'option2' ? '0,49 €' : '0,24 €'}
+                              </strong>
+                            </div>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '10px', marginTop: '22px', fontSize: '0.88rem', color: '#0f172a' }}>
+                              <strong style={{ fontWeight: 800 }}>Erlöse über Umlage gesamt:</strong>
+                              <strong style={{ fontWeight: 800, color: '#137333' }}>
+                                {studentBillingOption === 'option1' 
+                                  ? `${(students.length * 5.29).toFixed(2)} € / Jahr` 
+                                  : studentBillingOption === 'option2' 
+                                    ? `${(students.length * 0.49).toFixed(2)} € / Monat` 
+                                    : `${(students.length * 0.24).toFixed(2)} € / Monat`
+                                }
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* User Aufteilung & Auslastung sortiert nach Lehrern */}
-                    <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '24px' }}>
+                    <div style={{ padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', background: 'white', marginBottom: '24px', boxShadow: '0 4px 18px rgba(15, 23, 42, 0.01)' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Registrierte User & Zuweisung nach Lehrern</h4>
                       
                       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
