@@ -15180,46 +15180,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   {/* Unified Search, Filter & Creation Row Widget */}
                   <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1.5px solid #cbd5e1', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     
-                    {/* Search & Filter */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.2, minWidth: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box' }}>
-                      <Search size={16} color="#94a3b8" />
-                      <input
-                        value={equipmentSearchQuery}
-                        onChange={e => setEquipmentSearchQuery(e.target.value)}
-                        placeholder="Instrumente durchsuchen..."
-                        style={{ border: 'none', outline: 'none', fontSize: '0.78rem', fontWeight: 700, width: '100%', color: '#0f172a', background: 'transparent' }}
-                      />
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
-                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #cbd5e1',
-                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
-                        padding: '0 14px',
-                        borderRadius: '10px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        fontFamily: 'Urbanist',
-                        height: '38px',
-                        boxSizing: 'border-box',
-                        flexShrink: 0
-                      }}
-                    >
-                      <span>Freie Instrumente</span>
-                    </button>
-
-                    {/* Vertical separator */}
-                    <div style={{ width: '1.5px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
-
-                    {/* Creation Form inline */}
+                    {/* Creation Form inline (Left) */}
                     <form 
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -15278,6 +15239,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {equipmentSaving ? 'Wird angelegt...' : 'Anlegen'}
                       </button>
                     </form>
+
+                    {/* Vertical separator */}
+                    <div style={{ width: '1.5px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
+
+                    {/* Search & Filter (Right) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.2, minWidth: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box' }}>
+                      <Search size={16} color="#94a3b8" />
+                      <input
+                        value={equipmentSearchQuery}
+                        onChange={e => setEquipmentSearchQuery(e.target.value)}
+                        placeholder="Instrumente durchsuchen..."
+                        style={{ border: 'none', outline: 'none', fontSize: '0.78rem', fontWeight: 700, width: '100%', color: '#0f172a', background: 'transparent' }}
+                      />
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentSortFreeFirst(prev => !prev)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
+                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #cbd5e1',
+                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
+                        padding: '0 14px',
+                        borderRadius: '10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontFamily: 'Urbanist',
+                        height: '38px',
+                        boxSizing: 'border-box',
+                        flexShrink: 0
+                      }}
+                    >
+                      <span>Freie Instrumente</span>
+                    </button>
                   </div>
 
                   {/* Unified List items list */}
