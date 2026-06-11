@@ -10902,7 +10902,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     onDrop={() => handleDropOnMatrix(null, dayNum)}
                                     style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px' }}
                                   >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '0', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
+                                    <div 
+                                      className="no-scrollbar"
+                                      style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', maxHeight: '192px', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '10px', border: draggedPlanDay === dayNum ? '2px dashed #fcd34d' : '2px dashed transparent', background: draggedPlanDay === dayNum ? 'rgba(253,211,77,0.06)' : draggedPlanId ? 'rgba(0,0,0,0.02)' : 'transparent', padding: draggedPlanDay === dayNum ? '4px' : '0', opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.4 : 1, transition: 'all 0.2s' }}>
                                       {unassigned.map(plan => (
                                         <div
                                           key={plan.id}
