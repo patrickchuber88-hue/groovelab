@@ -14034,7 +14034,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               badge: 'Split + 10% Rabatt',
                               desc: 'Schüler: 2,59 € / Jahr | Schule: 0,25 € / Mo.'
                             }
-                          ].map((opt) => (
+                          ].filter((opt) => !isBillingBooked || studentBillingOption === opt.id).map((opt) => (
                             <label key={opt.id} style={{
                               display: 'flex',
                               gap: '10px',
