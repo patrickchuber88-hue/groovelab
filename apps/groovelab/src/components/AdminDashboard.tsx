@@ -7114,30 +7114,7 @@ export function AdminDashboard({
                           />
                         </button>
                       </div>
-                      
-                      {/* Short summary of configured instruments */}
-                      {(() => {
-                        const schoolId = room.school_id || admin?.school_id || '';
-                        const roomInsts = room.room_instruments || (() => {
-                          try {
-                            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-                            return map[room.id] || [];
-                          } catch { return []; }
-                        })();
-                        
-                        if (roomInsts.length > 0) {
-                          return (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px', marginBottom: '6px' }}>
-                              {roomInsts.map((inst: any, idx: number) => (
-                                <span key={idx} style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 650, background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                                  {inst.name}
-                                </span>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+
 
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
                         {occupiedNow ? (
