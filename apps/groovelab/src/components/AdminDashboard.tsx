@@ -8417,7 +8417,7 @@ export function AdminDashboard({
                       {selectedRoom.room_instruments.map((inst: any, idx: number) => {
                         let linkUrl = '';
                         try {
-                          const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+                          const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${admin?.school_id || ''}`) || '{}');
                           linkUrl = localLinkMap[inst.name] || '';
                         } catch {}
 
