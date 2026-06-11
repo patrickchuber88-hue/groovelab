@@ -10714,7 +10714,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px', width: '100%' }}>
                       {/* Segmented Switch for Modes */}
-                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', flex: 1.5 }}>
+                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', width: '300px', flexShrink: 0 }}>
                         <button
                           type="button"
                           onClick={() => setSchedulesRoomsViewMode('designer')}
