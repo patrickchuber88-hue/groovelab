@@ -14168,14 +14168,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <strong style={{ fontSize: '0.72rem', color: '#1e293b' }}>{opt.emoji} {opt.title}</strong>
                                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                    <span style={{
-                                      fontSize: '0.52rem',
-                                      padding: '1px 5px',
-                                      borderRadius: '100px',
-                                      background: studentBillingOption === opt.id ? '#e9d5ff' : '#f1f5f9',
-                                      color: '#334155',
-                                      fontWeight: 700
-                                    }}>{opt.badge}</span>
+                                    {(() => {
+                                      const isDiscount = opt.badge.includes('Rabatt');
+                                      return (
+                                        <span style={{
+                                          fontSize: '0.52rem',
+                                          padding: '1.5px 6px',
+                                          borderRadius: '100px',
+                                          background: isDiscount ? '#fef3c7' : (studentBillingOption === opt.id ? '#e9d5ff' : '#f1f5f9'),
+                                          color: isDiscount ? '#b45309' : '#334155',
+                                          border: isDiscount ? '1px solid #fde68a' : 'none',
+                                          fontWeight: 800,
+                                          letterSpacing: '0.02em'
+                                        }}>{opt.badge}</span>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                                 <p style={{ fontSize: '0.62rem', color: '#64748b', margin: '1px 0 0 0', fontWeight: 600 }}>{opt.desc}</p>
@@ -14371,7 +14378,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const totalVal = (students.length * 5.29).toFixed(2);
                             return (
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', flex: 1, marginTop: '8px', alignItems: 'stretch' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', flex: 1, marginTop: '8px', alignItems: 'stretch' }}>
                                 {/* Left Side: Einzelpreis */}
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
@@ -14383,7 +14389,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
                                     <strong>Rechenweg:</strong> Jährlich einmalig<br />
                                     0,49 € × 12 Mo. = 5,88 €<br />
-                                    5,88 € − 10% Rabatt = 5,29 €
+                                    5,88 € <span style={{ color: '#16a34a', fontWeight: 800 }}>− 10% Rabatt</span> = 5,29 €
                                   </span>
                                 </div>
 
@@ -14404,7 +14410,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     = {totalVal} € / {period}
                                   </span>
                                 </div>
-                              </div>
                               </div>
                             );
                           })()}
@@ -14510,7 +14515,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
                                     <strong>Rechenweg:</strong> Jährlich einmalig<br />
                                     Split: 0,24 € × 12 = 2,88 €<br />
-                                    2,88 € − 10% Rabatt = 2,59 €
+                                    2,88 € <span style={{ color: '#16a34a', fontWeight: 800 }}>− 10% Rabatt</span> = 2,59 €
                                   </span>
                                 </div>
 
