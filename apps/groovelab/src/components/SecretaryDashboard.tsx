@@ -13939,8 +13939,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         {/* Card 2: B2B Bankeinzug Schule */}
                         {(() => {
+                          const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
+                          const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
                           const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
-                          const totalB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + ((studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0) + schoolShareBookedExtra;
+                          
+                          // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
+                          const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
+                          
                           return (
                             <div style={{
                               background: '#f0f9ff',
@@ -13957,8 +13962,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div>
                                 <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Monatlicher Bankeinzug B2B</span>
                                 <strong style={{ display: 'block', fontSize: '1.6rem', color: '#0369a1', margin: '6px 0', fontWeight: 800 }}>
-                                  {totalB2B.toFixed(2)} € <span style={{ fontSize: '0.78rem', fontWeight: 400 }}>/ Mo.</span>
+                                  {currentTotalB2B.toFixed(2)} € 
+                                  {!isBillingBooked && studentSharePreview > 0 && (
+                                    <span style={{ fontSize: '0.9rem', color: '#0284c7', fontWeight: 600, marginLeft: '6px' }}>
+                                      + {studentSharePreview.toFixed(2)} €
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#0369a1' }}> / Mo.</span>
                                 </strong>
+                                {!isBillingBooked && studentSharePreview > 0 && (
+                                  <span style={{ fontSize: '0.6rem', color: '#0284c7', display: 'block', marginTop: '-4px', fontWeight: 600 }}>
+                                    (zzgl. {studentSharePreview.toFixed(2)} € bei Einbuchung der Kofinanzierung)
+                                  </span>
+                                )}
                               </div>
 
                               <div style={{ fontSize: '0.7rem', color: '#0284c7', borderTop: '1px solid #bae6fd', paddingTop: '8px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -13970,10 +13986,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <span>• User-Infrastruktur ({allTeachers.length + employees.length} User):</span>
                                   <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
                                 </div>
-                                {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                {studentSharePreview > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: isBillingBooked ? 700 : 400 }}>
                                     <span>• Kofinanzierungs-Schulanteil (25¢):</span>
-                                    <strong>{(students.length * 0.25).toFixed(2)} €</strong>
+                                    <strong>
+                                      {isBillingBooked ? '' : '(Vorschau) '}{(students.length * 0.25).toFixed(2)} €
+                                    </strong>
                                   </div>
                                 )}
                                 {schoolShareBookedExtra > 0 && (
