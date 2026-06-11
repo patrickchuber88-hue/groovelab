@@ -14000,6 +14000,70 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </div>
                         </div>
 
+                        {/* Card 2: B2B Bankeinzug Schule (Reine Schul-Kosten) */}
+                        <div style={{
+                          background: '#f0f9ff',
+                          padding: '16px',
+                          borderRadius: '16px',
+                          border: '1.5px solid #bae6fd',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          minHeight: '225px',
+                          height: 'auto',
+                          marginTop: 'auto',
+                          boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
+                        }}>
+                          <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>Monatlicher Einzug B2B (Schule)</span>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1 }}>
+                            <div>
+                              <strong style={{ display: 'block', fontSize: '1.35rem', color: '#0369a1', margin: '4px 0', fontWeight: 800 }}>
+                                {currentTotalB2B.toFixed(2)} €
+                                {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
+                                  <span style={{ color: '#2563eb', fontSize: '0.85rem', marginLeft: '4px', fontWeight: 800 }}>
+                                    + {schoolShareAdditional.toFixed(2)} €
+                                  </span>
+                                )}
+                                <span style={{ fontSize: '0.7rem', fontWeight: 500, color: '#0369a1' }}> / Mo.</span>
+                              </strong>
+                              {!isBillingBooked && studentSharePreview > 0 && (
+                                <span style={{ fontSize: '0.52rem', color: '#0284c7', display: 'block', fontWeight: 700, lineHeight: '1.2' }}>
+                                  {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € (Vorschau)
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div style={{ fontSize: '0.65rem', color: '#0284c7', display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>• Module Grundpreis:</span>
+                                <strong>{moduleCost.toFixed(2)} €</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>• Team ({allTeachers.length + employees.length} Profile):</span>
+                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
+                              </div>
+                              {studentSharePreview > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                  <span>• Kofinanzierung (Schüler-Anteil):</span>
+                                  <strong>{studentSharePreview.toFixed(2)} €</strong>
+                                </div>
+                              )}
+                              {schoolShareBookedExtra > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                  <span>• Gebuchte Extra-Schüler:</span>
+                                  <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
+                                </div>
+                              )}
+                              {extraUsersSliderVal > 0 && schoolShareAdditional > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#2563eb' }}>
+                                  <span>• Neue Slider-Schüler:</span>
+                                  <strong>+{schoolShareAdditional.toFixed(2)} €</strong>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
 
                       {/* Right Column: 👥 Bereich Schüler (B2C) */}
