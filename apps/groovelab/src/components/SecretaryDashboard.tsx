@@ -14899,171 +14899,172 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     {/* Modal Body / Scrollable Content */}
                     <div style={{
-                      padding: '28px 28px 40px 28px',
+                      padding: '28px 18px 40px 28px',
                       overflowY: 'auto',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '20px',
                       flex: 1
                     }}>
-                      {/* Name */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
-                        <input
-                          value={roomFormName}
-                          onChange={e => setRoomFormName(e.target.value)}
-                          placeholder='z.B. „Raum 1 – Schlagzeug“ oder „Studio Nord“'
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
-                        />
-                      </div>
-
-                      {/* Max students & QM */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingRight: '10px' }}>
+                        {/* Name */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Schüler</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
                           <input
-                            type="number"
-                            value={roomFormMaxStudents}
-                            onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
-                            min="1"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                            value={roomFormName}
+                            onChange={e => setRoomFormName(e.target.value)}
+                            placeholder='z.B. „Raum 1 – Schlagzeug“ oder „Studio Nord“'
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc', transition: 'border-color 0.2s' }}
                           />
                         </div>
-                        <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in m²</label>
-                          <input
-                            type="number"
-                            value={roomFormQm}
-                            onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
-                            min="0"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
-                          />
-                        </div>
-                      </div>
 
-                      {/* Modul */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul</label>
-                        <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'center' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                        {/* Max students & QM */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Schüler</label>
                             <input
-                              type="checkbox"
-                              checked={roomFormIsCampusActive}
-                              onChange={e => setRoomFormIsCampusActive(e.target.checked)}
-                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
+                              type="number"
+                              value={roomFormMaxStudents}
+                              onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
+                              min="1"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
                             />
-                            Campus
-                          </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={roomFormIsGroovelabActive}
-                              onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
-                              style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
-                            />
-                            Groovelab
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Akustisch ungeeignete Instrumente */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Akustisch ungeeignet für</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {['Schlagzeug', 'Klavier', 'E-Piano', 'Gitarre', 'Bass', 'Gesang', 'Bläser', 'Keyboard'].map(inst => {
-                            const isUnsuitable = roomFormUnsuitableInstruments.includes(inst);
-                            return (
-                              <button
-                                key={inst}
-                                type="button"
-                                onClick={() => {
-                                  if (isUnsuitable) {
-                                    setRoomFormUnsuitableInstruments(prev => prev.filter(i => i !== inst));
-                                  } else {
-                                    setRoomFormUnsuitableInstruments(prev => [...prev, inst]);
-                                  }
-                                }}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: '8px',
-                                  border: isUnsuitable ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                                  background: isUnsuitable ? '#fef2f2' : 'white',
-                                  color: isUnsuitable ? '#ef4444' : '#475569',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s'
-                                }}
-                              >
-                                {inst}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Vorhandene Instrumente */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Vorhandene Instrumente (mit Modell)</label>
-                        
-                        {/* List of existing */}
-                        {roomFormRoomInstruments.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-                            {roomFormRoomInstruments.map((inst, idx) => (
-                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                                  {inst.name} <span style={{ color: '#64748b', fontWeight: 550 }}>({inst.model || 'Standard'})</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setRoomFormRoomInstruments(prev => prev.filter((_, i) => i !== idx))}
-                                  style={{ border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '2px' }}
-                                >
-                                  Löschen
-                                </button>
-                              </div>
-                            ))}
                           </div>
-                        )}
-
-                        {/* Add Instrument Form Inline */}
-                        <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px', alignItems: 'center' }}>
-                          <input
-                            placeholder="z.B. Klavier"
-                            value={newInstrumentName}
-                            onChange={e => setNewInstrumentName(e.target.value)}
-                            style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
-                          />
-                          <input
-                            placeholder="Typ: z.B. Yamaha U1"
-                            value={newInstrumentModel}
-                            onChange={e => setNewInstrumentModel(e.target.value)}
-                            style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!newInstrumentName.trim()) return;
-                              setRoomFormRoomInstruments(prev => [...prev, { name: newInstrumentName.trim(), model: newInstrumentModel.trim() }]);
-                              setNewInstrumentName('');
-                              setNewInstrumentModel('');
-                            }}
-                            style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
-                          >
-                            +
-                          </button>
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in m²</label>
+                            <input
+                              type="number"
+                              value={roomFormQm}
+                              onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
+                              min="0"
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Sonstiges */}
-                      <div>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Sonstiges (z.B. Bluetooth Box)</label>
-                        <input
-                          value={roomFormSonstiges}
-                          onChange={e => setRoomFormSonstiges(e.target.value)}
-                          placeholder='z.B. Bluetooth Box, Belüftung, Whiteboard...'
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
-                        />
+                        {/* Modul */}
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul</label>
+                          <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'center' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={roomFormIsCampusActive}
+                                onChange={e => setRoomFormIsCampusActive(e.target.checked)}
+                                style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
+                              />
+                              Campus
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={roomFormIsGroovelabActive}
+                                onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
+                                style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
+                              />
+                              Groovelab
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Akustisch ungeeignete Instrumente */}
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Akustisch ungeeignet für</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {['Schlagzeug', 'Klavier', 'E-Piano', 'Gitarre', 'Bass', 'Gesang', 'Bläser', 'Keyboard'].map(inst => {
+                              const isUnsuitable = roomFormUnsuitableInstruments.includes(inst);
+                              return (
+                                <button
+                                  key={inst}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isUnsuitable) {
+                                      setRoomFormUnsuitableInstruments(prev => prev.filter(i => i !== inst));
+                                    } else {
+                                      setRoomFormUnsuitableInstruments(prev => [...prev, inst]);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: isUnsuitable ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                                    background: isUnsuitable ? '#fef2f2' : 'white',
+                                    color: isUnsuitable ? '#ef4444' : '#475569',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {inst}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Vorhandene Instrumente */}
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Vorhandene Instrumente (mit Modell)</label>
+                          
+                          {/* List of existing */}
+                          {roomFormRoomInstruments.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                              {roomFormRoomInstruments.map((inst, idx) => (
+                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                                    {inst.name} <span style={{ color: '#64748b', fontWeight: 550 }}>({inst.model || 'Standard'})</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomFormRoomInstruments(prev => prev.filter((_, i) => i !== idx))}
+                                    style={{ border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '2px' }}
+                                  >
+                                    Löschen
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Add Instrument Form Inline */}
+                          <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px', alignItems: 'center' }}>
+                            <input
+                              placeholder="z.B. Klavier"
+                              value={newInstrumentName}
+                              onChange={e => setNewInstrumentName(e.target.value)}
+                              style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
+                            />
+                            <input
+                              placeholder="Typ: z.B. Yamaha U1"
+                              value={newInstrumentModel}
+                              onChange={e => setNewInstrumentModel(e.target.value)}
+                              style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!newInstrumentName.trim()) return;
+                                setRoomFormRoomInstruments(prev => [...prev, { name: newInstrumentName.trim(), model: newInstrumentModel.trim() }]);
+                                setNewInstrumentName('');
+                                setNewInstrumentModel('');
+                              }}
+                              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Sonstiges */}
+                        <div>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Sonstiges (z.B. Bluetooth Box)</label>
+                          <input
+                            value={roomFormSonstiges}
+                            onChange={e => setRoomFormSonstiges(e.target.value)}
+                            placeholder='z.B. Bluetooth Box, Belüftung, Whiteboard...'
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                          />
+                        </div>
                       </div>
                     </div>
 
