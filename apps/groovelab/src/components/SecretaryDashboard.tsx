@@ -12877,6 +12877,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           const initials = (room.name || 'RM').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
                           const rColor = getAlphabeticalColor(room.name || 'R');
                           const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
+                          const unsuitableInsts: string[] = Array.isArray(room.unsuitable_instruments) 
+                            ? room.unsuitable_instruments 
+                            : (() => {
+                                try {
+                                  const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                  return map[room.id] || [];
+                                } catch { return []; }
+                              })();
 
                           return (
                             <div 
@@ -12952,7 +12960,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
 
                               {/* Floor Badge pill */}
-                              <div style={{ display: 'flex', alignItems: 'center', minWidth: '100px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', marginRight: '20px' }}>
                                 <span style={{ 
                                   display: 'flex',
                                   alignItems: 'center',
@@ -13022,6 +13030,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 >
                                   Groovelab
                                 </button>
+
+                                {/* Unsuitable instruments display to the right of Groovelab */}
+                                {unsuitableInsts.length > 0 && (
+                                  <div style={{ display: 'flex', gap: '4px', marginLeft: '12px', alignItems: 'center' }}>
+                                    {unsuitableInsts.map((inst: string) => (
+                                      <span
+                                        key={inst}
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          padding: '4px 10px',
+                                          borderRadius: '8px',
+                                          background: '#fef2f2',
+                                          color: '#ef4444',
+                                          border: '1px solid #fee2e2',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontFamily: 'Urbanist',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                        title={`Akustisch ungeeignet für ${inst}`}
+                                      >
+                                        <AlertCircle size={10} color="#ef4444" />
+                                        {inst}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Actions: Only red X to delete */}
