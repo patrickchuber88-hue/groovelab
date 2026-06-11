@@ -10929,7 +10929,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         {room.name}
                                       </strong>
                                       <span style={{ fontSize: '0.6rem', color: draggedPlanId && !isCompatible ? '#ef4444' : '#94a3b8', fontWeight: 600 }}>
-                                        {draggedPlanId && !isCompatible ? '⚠️ Nicht Ideal' : (room.equipment?.join(' · ') || 'Alle Instrumente')}
+                                        {draggedPlanId && !isCompatible ? '⚠️ Nicht geeignet' : (room.equipment?.join(' · ') || 'Alle Instrumente')}
                                       </span>
                                     </div>
                                   </td>
