@@ -5653,10 +5653,20 @@ export function AdminDashboard({
         if (bDayIndex !== dayIdx) return false;
 
         const slotHour = parseInt(hourStr.split(':')[0]);
-        const startHour = parseInt(b.startTime.split(':')[0]);
-        const endHour = parseInt(b.endTime.split(':')[0]);
+        const slotStartMin = slotHour * 60;
+        const slotEndMin = (slotHour + 1) * 60;
+
+        const [shStr, smStr] = b.startTime.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const bStartMin = sh * 60 + sm;
+
+        const [ehStr, emStr] = b.endTime.split(':');
+        const eh = parseInt(ehStr) || 0;
+        const em = parseInt(emStr) || 0;
+        const bEndMin = eh * 60 + em;
         
-        return slotHour >= startHour && slotHour < endHour;
+        return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
 
       // 1b. Database manual bookings
@@ -5669,10 +5679,20 @@ export function AdminDashboard({
         if (bDayIndex !== dayIdx) return false;
 
         const slotHour = parseInt(hourStr.split(':')[0]);
-        const startHour = parseInt(b.startTime.split(':')[0]);
-        const endHour = parseInt(b.endTime.split(':')[0]);
+        const slotStartMin = slotHour * 60;
+        const slotEndMin = (slotHour + 1) * 60;
+
+        const [shStr, smStr] = b.startTime.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const bStartMin = sh * 60 + sm;
+
+        const [ehStr, emStr] = b.endTime.split(':');
+        const eh = parseInt(ehStr) || 0;
+        const em = parseInt(emStr) || 0;
+        const bEndMin = eh * 60 + em;
         
-        return slotHour >= startHour && slotHour < endHour;
+        return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
 
       // Combine local and DB manual bookings, de-duplicating by date + room + start_time

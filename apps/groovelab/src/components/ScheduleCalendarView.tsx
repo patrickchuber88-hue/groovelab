@@ -2011,6 +2011,7 @@ export function ScheduleCalendarView({
                   let cardBackground = '';
  
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
+                  const isCancelled = occ.status === 'cancelled';
                   const isRescheduled = !isBreak && !isVacant && !isSick && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
@@ -2066,7 +2067,7 @@ export function ScheduleCalendarView({
                             ? '1px dashed #10b981' 
                             : isBreak 
                               ? '1.5px dashed rgba(245, 158, 11, 0.25)' 
-                              : isSick 
+                              : (isSick || isCancelled)
                                 ? '1px solid rgba(239, 68, 68, 0.15)' 
                                 : '1px solid rgba(16, 185, 129, 0.15)',
                         borderLeft: isRescheduled 
@@ -2075,10 +2076,12 @@ export function ScheduleCalendarView({
                             ? '3px dashed #10b981' 
                             : isBreak 
                               ? '4px solid #f59e0b' 
-                              : `3px solid ${finalColors.border}`,
+                              : (isSick || isCancelled)
+                                ? '3px solid #ef4444'
+                                : `3px solid ${finalColors.border}`,
                         borderRadius: '8px', 
                         padding: (occ.duration || 30) < 30 ? '2px 8px' : '8px',
-                        cursor: isSick ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
+                        cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                         opacity: draggedId === occ.id ? 0.5 : 1,
                         position: 'relative',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
@@ -2105,9 +2108,9 @@ export function ScheduleCalendarView({
                               ) : null;
                             })()}
                           </span>
-                          {isSick && (
+                          {(isSick || isCancelled) && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid #fecaca' }}>
-                              Entfällt
+                              {isSick ? 'Entfällt' : 'Abgesagt'}
                             </span>
                           )}
                           {isRescheduled && (
@@ -2124,7 +2127,7 @@ export function ScheduleCalendarView({
                             />
                           )}
                         </div>
-                        {((!isBreak && !isVacant && !isSick) || (isBreak && occ.status !== 'cancelled')) && (
+                        {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
                           <button 
                             onClick={(e) => {
                               if (isBreak) {

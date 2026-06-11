@@ -2096,6 +2096,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     isPhoneFlatRef.current = isPhoneFlat;
   }, [isPhoneFlat]);
 
+  // Overhauled states for Fokus-Timer (grace period, flat detection types, fallback)
+  const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
+  const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
+  const [isGraceActive, setIsGraceActive] = useState(false);
+  const [isDesktopFallback, setIsDesktopFallback] = useState(false);
+  const wakeLockRef = useRef<any>(null);
+
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
   const [isExtraTime, setIsExtraTime] = useState(false);
   const isExtraTimeRef = useRef(isExtraTime);
@@ -2103,6 +2110,55 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     isExtraTimeRef.current = isExtraTime;
   }, [isExtraTime]);
+
+  // Screen Wake Lock API Integration
+  useEffect(() => {
+    const acquireWakeLock = async () => {
+      if (!('wakeLock' in navigator)) {
+        console.warn('Wake Lock not supported on this browser');
+        return;
+      }
+      try {
+        if (wakeLockRef.current) return;
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock acquired successfully');
+      } catch (err) {
+        console.error('Failed to acquire Wake Lock:', err);
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+          console.log('Wake Lock released successfully');
+        } catch (err) {
+          console.error('Failed to release Wake Lock:', err);
+        }
+      }
+    };
+
+    const handleVisibility = async () => {
+      if (document.visibilityState === 'visible' && sessionActive) {
+        await acquireWakeLock();
+      } else {
+        await releaseWakeLock();
+      }
+    };
+
+    if (sessionActive) {
+      acquireWakeLock();
+      document.addEventListener('visibilitychange', handleVisibility);
+    } else {
+      releaseWakeLock();
+    }
+
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [sessionActive]);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
@@ -2610,6 +2666,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     if (!sessionActive) {
       setIsPhoneFlat(false);
+      setFlatType('none');
+      setIsGraceActive(false);
+      setGraceSecondsLeft(10);
       return;
     }
 
@@ -2617,37 +2676,35 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const targetSeconds = getTargetMinutes(streak) * 60;
 
     let isOrientedFlat = false;
+    let currentFlatType: 'face-up' | 'face-down' | 'none' = 'none';
     let isMoving = false;
     let motionTimeout: any = null;
 
-    const updateFlatState = (newFlatState: boolean) => {
-      if (newFlatState === isPhoneFlatRef.current) return;
-      
-      setIsPhoneFlat(newFlatState);
-      
-      if (!newFlatState) {
-        if (!isExtraTimeRef.current) {
-          // Hard reset warning sound
-          playBeep(440, 400); 
-          if (navigator.vibrate) {
-            navigator.vibrate([300, 100, 300]);
-          }
-        } else {
-          // Soft pause warning sound
-          playBeep(880, 200);
-          if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
-          }
-        }
-      }
-    };
+    // Detect mobile and check if deviceorientation is available
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const usesSensors = isMobile && (typeof window.DeviceOrientationEvent !== 'undefined');
+    
+    setIsDesktopFallback(!usesSensors);
+
+    let graceWarningPlayed = false;
 
     // Timer interval
     const interval = setInterval(() => {
-      const isNowFlat = isOrientedFlat && !isMoving && !document.hidden;
-      updateFlatState(isNowFlat);
+      // In sensor mode, device must be flat, stable, and page must be visible.
+      // In desktop mode, only page visibility matters.
+      const isNowFlat = usesSensors 
+        ? (isOrientedFlat && !isMoving && !document.hidden)
+        : !document.hidden;
+
+      // Update local states
+      setIsPhoneFlat(isNowFlat);
+      setFlatType(isNowFlat ? currentFlatType : 'none');
 
       if (isNowFlat) {
+        setIsGraceActive(false);
+        setGraceSecondsLeft(10);
+        graceWarningPlayed = false;
+
         setSecondsElapsed(prev => {
           const nextVal = prev + 1;
           if (!isExtraTimeRef.current && nextVal >= targetSeconds) {
@@ -2657,21 +2714,60 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           return nextVal;
         });
       } else {
-        if (!isExtraTimeRef.current) {
-          setSecondsElapsed(0);
+        if (isExtraTimeRef.current) {
+          // In extra time, we don't reset to 0; we just pause the timer.
+          setIsGraceActive(false);
+        } else {
+          // Normal focus period -> Grace period active
+          setIsGraceActive(true);
+          
+          setGraceSecondsLeft(prevGrace => {
+            if (prevGrace <= 1) {
+              // Grace period expired! Reset timer to 0
+              setSecondsElapsed(0);
+              setIsGraceActive(false);
+              playBeep(330, 600); // Fail tone
+              if (navigator.vibrate) {
+                navigator.vibrate([400, 100, 400]);
+              }
+              return 10;
+            }
+            
+            // Still in grace period, play warning tone once
+            if (!graceWarningPlayed) {
+              playBeep(660, 200); // Warning tone
+              if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
+              }
+              graceWarningPlayed = true;
+            }
+            
+            return prevGrace - 1;
+          });
         }
       }
     }, 1000);
 
     // Orientation event handler
     const handleOrientation = (e: DeviceOrientationEvent) => {
-      const beta = e.beta || 0;
-      const gamma = e.gamma || 0;
+      const beta = e.beta;
+      const gamma = e.gamma;
+      
+      if (beta === null || gamma === null) {
+        // Fall back to flat if no orientation details
+        isOrientedFlat = true;
+        currentFlatType = 'face-up';
+        return;
+      }
 
-      // STRICT FACE-DOWN: screen must face the table/surface.
-      // When face-down, beta is near 180 (or -180) and gamma is near 0.
-      const faceDown = (Math.abs(Math.abs(beta) - 180) < 15 && Math.abs(gamma) < 15);
-      isOrientedFlat = faceDown;
+      // Flat Face-Up: screen up, beta and gamma near 0
+      const faceUp = Math.abs(beta) < 18 && Math.abs(gamma) < 18;
+      
+      // Flat Face-Down: screen down, beta near 180 (or -180) and gamma near 0
+      const faceDown = Math.abs(Math.abs(beta) - 180) < 18 && Math.abs(gamma) < 18;
+      
+      isOrientedFlat = faceUp || faceDown;
+      currentFlatType = faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none');
     };
 
     // Motion event handler
@@ -2683,8 +2779,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const z = acc.z || 0;
       const magnitude = Math.sqrt(x * x + y * y + z * z);
       
-      // Threshold 0.3 m/s^2 detects slight hand shake or screen taps
-      if (magnitude > 0.3) {
+      // Filter out lower magnitude instrument vibrations (use 1.8 m/s^2)
+      if (magnitude > 1.8) {
         isMoving = true;
         if (motionTimeout) clearTimeout(motionTimeout);
         motionTimeout = setTimeout(() => {
@@ -2697,19 +2793,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const handleVisibilityChange = () => {
       if (document.hidden) {
         isOrientedFlat = false;
-        updateFlatState(false);
+        currentFlatType = 'none';
+        setIsPhoneFlat(false);
       }
     };
 
-    window.addEventListener('deviceorientation', handleOrientation);
-    window.addEventListener('devicemotion', handleMotion);
+    if (usesSensors) {
+      window.addEventListener('deviceorientation', handleOrientation);
+      window.addEventListener('devicemotion', handleMotion);
+    } else {
+      isOrientedFlat = true;
+      currentFlatType = 'face-up';
+    }
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
       if (motionTimeout) clearTimeout(motionTimeout);
-      window.removeEventListener('deviceorientation', handleOrientation);
-      window.removeEventListener('devicemotion', handleMotion);
+      if (usesSensors) {
+        window.removeEventListener('deviceorientation', handleOrientation);
+        window.removeEventListener('devicemotion', handleMotion);
+      }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [sessionActive, avatar?.streak_flame]);
@@ -4464,30 +4568,324 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     )}
                   </div>
 
-                  {/* Fullscreen AMOLED Black Screen Overlay when Flat */}
-                  {sessionActive && isPhoneFlat && (
-                    <div 
-                      style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 9999,
-                        background: '#000000',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#1c1917',
-                        userSelect: 'none'
-                      }}
-                    >
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#292524', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
-                          {isExtraTime ? 'Extra-Zeit läuft...' : 'Fokus aktiv...'}
+                  {/* Style definitions for modern breathing and glowing animations */}
+                  <style dangerouslySetInnerHTML={{__html: `
+                    @keyframes breathGlow {
+                      0% { opacity: 0.15; transform: scale(0.95) translate(-50%, -50%); filter: blur(45px); }
+                      50% { opacity: 0.3; transform: scale(1.05) translate(-50%, -50%); filter: blur(65px); }
+                      100% { opacity: 0.15; transform: scale(0.95) translate(-50%, -50%); filter: blur(45px); }
+                    }
+                    @keyframes breathRing {
+                      0% { transform: scale(0.98); }
+                      50% { transform: scale(1.02); }
+                      100% { transform: scale(0.98); }
+                    }
+                    @keyframes pulseSoft {
+                      0%, 100% { opacity: 0.5; }
+                      50% { opacity: 1; }
+                    }
+                  `}} />
+
+                  {/* Fullscreen Active Timer Overlays */}
+                  {sessionActive && (
+                    <>
+                      {/* 1. Flat on Table Mode */}
+                      {isPhoneFlat && (
+                        <div 
+                          style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 9999,
+                            background: '#000000', // AMOLED Black base
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            userSelect: 'none',
+                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {flatType === 'face-down' ? (
+                            /* Pure battery-saving black layout with a extremely dim pulsing indicator */
+                            <div style={{ textAlign: 'center', opacity: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                              <Moon size={24} style={{ color: '#52525b', animation: 'pulseSoft 2s infinite' }} />
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3f3f46', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                                FOKUS AKTIV
+                              </div>
+                            </div>
+                          ) : (
+                            /* Premium Apple-like StandBy Screen for flat face-up / desktop */
+                            <div style={{
+                              position: 'relative',
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'radial-gradient(circle at center, rgba(17, 24, 39, 1) 0%, rgba(9, 9, 11, 1) 100%)'
+                            }}>
+                              {/* Glowing Radial Orb Underlay */}
+                              <div style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                width: '350px',
+                                height: '350px',
+                                borderRadius: '50%',
+                                background: isExtraTime 
+                                  ? 'radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(0,0,0,0) 70%)'
+                                  : 'radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, rgba(0,0,0,0) 70%)',
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 1,
+                                animation: 'breathGlow 6s ease-in-out infinite'
+                              }} />
+
+                              {/* Content Card container */}
+                              <div style={{
+                                zIndex: 2,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '32px',
+                                animation: 'breathRing 5s ease-in-out infinite'
+                              }}>
+                                {/* Pulsing Ring representing target progress */}
+                                <div style={{
+                                  position: 'relative',
+                                  width: '240px',
+                                  height: '240px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
+                                    <circle cx="120" cy="120" r="100" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
+                                    <circle 
+                                      cx="120" 
+                                      cy="120" 
+                                      r="100" 
+                                      fill="none" 
+                                      stroke={isExtraTime ? 'url(#glowGreenGradient)' : 'url(#glowBlueGradient)'} 
+                                      strokeWidth="8" 
+                                      strokeDasharray={2 * Math.PI * 100}
+                                      strokeDashoffset={
+                                        isExtraTime 
+                                          ? 0 
+                                          : 2 * Math.PI * 100 - (2 * Math.PI * 100 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
+                                      }
+                                      strokeLinecap="round"
+                                      style={{ transition: 'stroke-dashoffset 1s linear' }}
+                                    />
+                                    <defs>
+                                      <linearGradient id="glowBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#3b82f6" />
+                                        <stop offset="100%" stopColor="#8b5cf6" />
+                                      </linearGradient>
+                                      <linearGradient id="glowGreenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#10b981" />
+                                        <stop offset="100%" stopColor="#059669" />
+                                      </linearGradient>
+                                    </defs>
+                                  </svg>
+                                  <div style={{
+                                    position: 'absolute',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center'
+                                  }}>
+                                    <div style={{
+                                      fontSize: '3.6rem',
+                                      fontWeight: 200,
+                                      color: '#ffffff',
+                                      fontFamily: '"Plus Jakarta Sans", monospace',
+                                      letterSpacing: '-0.03em',
+                                      lineHeight: 1
+                                    }}>
+                                      {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
+                                      {String(secondsElapsed % 60).padStart(2, '0')}
+                                    </div>
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      marginTop: '8px',
+                                      fontSize: '0.62rem',
+                                      fontWeight: 800,
+                                      color: isExtraTime ? '#10b981' : '#64748b',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.08em'
+                                    }}>
+                                      {isExtraTime ? (
+                                        <>
+                                          <Zap size={10} fill="#10b981" style={{ animation: 'pulseSoft 1.5s infinite' }} />
+                                          <span>Extra-Zeit</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2563eb', animation: 'pulseSoft 1.5s infinite' }} />
+                                          <span>Fokus Aktiv</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Practice Topic Info */}
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#4b5563', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                    Übe-Thema
+                                  </div>
+                                  <div style={{
+                                    fontSize: '0.95rem',
+                                    fontWeight: 700,
+                                    color: '#f3f4f6',
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                                    padding: '6px 16px',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                  }}>
+                                    {selectedTopic || 'Allgemeines Üben'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Help note at the bottom */}
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '32px',
+                                fontSize: '0.72rem',
+                                color: '#374151',
+                                fontWeight: 600,
+                                letterSpacing: '0.05em',
+                                textTransform: 'uppercase'
+                              }}>
+                                {isDesktopFallback 
+                                  ? 'Wechsle den Tab nicht, um den Fokus fortzusetzen' 
+                                  : 'Nimm das Handy, um die Session zu beenden'}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: '1.4rem', color: '#1c1917', marginTop: '10px', fontWeight: 800 }}>
-                          {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:{String(secondsElapsed % 60).padStart(2, '0')}
+                      )}
+
+                      {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
+                      {isGraceActive && !isPhoneFlat && (
+                        <div 
+                          style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 10001, // Layered above the flat overlay
+                            background: 'rgba(9, 9, 11, 0.72)',
+                            backdropFilter: 'blur(24px)',
+                            WebkitBackdropFilter: 'blur(24px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '24px',
+                            color: '#ffffff',
+                            userSelect: 'none',
+                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
+                          }}
+                        >
+                          <div style={{
+                            width: '100%',
+                            maxWidth: '340px',
+                            background: 'rgba(24, 24, 27, 0.85)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '32px',
+                            padding: '40px 30px',
+                            textAlign: 'center',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '24px'
+                          }}>
+                            {/* Warning Sign */}
+                            <div style={{
+                              width: '72px',
+                              height: '72px',
+                              borderRadius: '22px',
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              border: '1px solid rgba(245, 158, 11, 0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fbbf24',
+                              animation: 'pulseSoft 1.5s infinite'
+                            }}>
+                              <Smartphone size={32} style={{ animation: 'bounce 2s infinite' }} />
+                            </div>
+
+                            <div>
+                              <h3 style={{ fontSize: '1.45rem', fontWeight: 850, color: '#f59e0b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                                Fokus unterbrochen!
+                              </h3>
+                              <p style={{ fontSize: '0.82rem', color: '#a1a1aa', fontWeight: 550, lineHeight: 1.5, margin: 0 }}>
+                                {isDesktopFallback 
+                                  ? 'Wechsle sofort zurück auf diese Seite, um den Fokus fortzusetzen.'
+                                  : 'Lege das Handy wieder flach auf den Tisch, um den Fokus fortzusetzen.'}
+                              </p>
+                            </div>
+
+                            {/* Big countdown number */}
+                            <div style={{
+                              fontSize: '4.8rem',
+                              fontWeight: 800,
+                              color: '#fbbf24',
+                              fontFamily: 'monospace, sans-serif',
+                              lineHeight: 1,
+                              margin: '4px 0'
+                            }}>
+                              {graceSecondsLeft}
+                            </div>
+
+                            {/* Animated shrinking progress bar */}
+                            <div style={{
+                              width: '100%',
+                              height: '6px',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              borderRadius: '3px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
+                                width: `${graceSecondsLeft * 10}%`,
+                                transition: 'width 1s linear',
+                                borderRadius: '3px'
+                              }} />
+                            </div>
+
+                            {/* Quick Action Buttons */}
+                            <button
+                              onClick={finishPracticeSession}
+                              style={{
+                                width: '100%',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.05)',
+                                color: '#ffffff',
+                                padding: '14px 20px',
+                                borderRadius: '16px',
+                                fontWeight: 700,
+                                fontSize: '0.88rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                            >
+                              Fokus beenden & Sichern
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
 
                   <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
