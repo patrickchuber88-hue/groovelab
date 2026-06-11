@@ -13986,11 +13986,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               desc: 'Monatlich 0,49 € pro Schüler. Wird vollständig auf die Unterrichtsgebühr aufgeschlagen.'
                             },
                             {
-                              id: 'option3',
+                              id: 'option3_1',
                               emoji: '⚖️',
-                              title: 'Option 3: Kofinanzierung',
-                              badge: '50/50 Split',
-                              desc: 'Monatlich 0,49 € pro Schüler. Die Schule übernimmt 25¢ und die Schüler zahlen 24¢.'
+                              title: 'Option 3.1: Kofinanzierung (Monatlich)',
+                              badge: 'Split Mo.',
+                              desc: 'Schüleranteil (0,24 €) wird monatlich gezahlt. Die Schule übernimmt 0,25 € monatlich.'
+                            },
+                            {
+                              id: 'option3_2',
+                              emoji: '🎓',
+                              title: 'Option 3.2: Kofinanzierung (Jahresbeitrag)',
+                              badge: 'Split + 10% Rabatt',
+                              desc: 'Schule zahlt monatlich 0,25 €. Schüler zahlt einmalig 2,59 €/Jahr (inkl. 10% Rabatt auf Schüleranteil).'
                             }
                           ].map((opt) => (
                             <label key={opt.id} style={{
@@ -14052,7 +14059,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <span>Infrastruktur ({allTeachers.length + employees.length} User):</span>
                                   <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
                                 </div>
-                                {studentBillingOption === 'option3' && (
+                                {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0284c7', borderTop: '1px dashed #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
                                     <span>Schüler-Anteil (Schule 25¢):</span>
                                     <strong>{(students.length * 0.25).toFixed(2)} € / Mo.</strong>
@@ -14062,7 +14069,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#0f172a' }}>
                                 <strong style={{ fontWeight: 750 }}>Bankeinzug:</strong>
                                 <strong style={{ fontWeight: 800 }}>
-                                  {(moduleCost + (allTeachers.length + employees.length) * 0.49 + (studentBillingOption === 'option3' ? students.length * 0.25 : 0)).toFixed(2)} € / Mo.
+                                  {(moduleCost + (allTeachers.length + employees.length) * 0.49 + ((studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0)).toFixed(2)} € / Mo.
                                 </strong>
                               </div>
                             </div>
@@ -14074,10 +14081,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span>Umlagemodell:</span>
                                   <strong>
-                                    {studentBillingOption === 'option1' ? 'Jahresbeitrag (Jahreszahler)' : studentBillingOption === 'option2' ? 'Monatsbeitrag (Monatszahler)' : '50/50 Kofinanzierung'}
+                                    {studentBillingOption === 'option1' ? 'Jahresbeitrag (Jahreszahler)' 
+                                      : studentBillingOption === 'option2' ? 'Monatsbeitrag (Monatszahler)' 
+                                      : studentBillingOption === 'option3_1' ? 'Kofinanzierung (Monatlicher Split)'
+                                      : 'Kofinanzierung (Mischmodell)'}
                                   </strong>
                                 </div>
-                                {studentBillingOption === 'option1' ? (
+                                
+                                {studentBillingOption === 'option1' && (
                                   <>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                       <span>Regulärer Beitrag:</span>
@@ -14092,24 +14103,46 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <strong style={{ color: '#137333' }}>5,29 € / Jahr</strong>
                                     </div>
                                   </>
-                                ) : (
+                                )}
+
+                                {studentBillingOption === 'option2' && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span>Betrag pro Schüler:</span>
-                                    <strong>
-                                      {studentBillingOption === 'option2' ? '0,49 € / Mo.' : '0,24 € / Mo.'}
-                                    </strong>
+                                    <strong>0,49 € / Mo.</strong>
                                   </div>
+                                )}
+
+                                {studentBillingOption === 'option3_1' && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Betrag pro Schüler:</span>
+                                    <strong>0,24 € / Mo.</strong>
+                                  </div>
+                                )}
+
+                                {studentBillingOption === 'option3_2' && (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Regulärer Split-Anteil:</span>
+                                      <span style={{ textDecoration: 'line-through', color: '#64748b' }}>2,88 € / Jahr</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#137333' }}>
+                                      <span>Rabatt (10% Jahreszahler):</span>
+                                      <strong>-0,29 € / Jahr</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
+                                      <span>Betrag pro Schüler (effektiv):</span>
+                                      <strong style={{ color: '#137333' }}>2,59 € / Jahr</strong>
+                                    </div>
+                                  </>
                                 )}
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#0f172a' }}>
                                 <strong style={{ fontWeight: 750 }}>Erlöse Umlage gesamt:</strong>
                                 <strong style={{ fontWeight: 800, color: '#137333' }}>
-                                  {studentBillingOption === 'option1' 
-                                    ? `${(students.length * 5.29).toFixed(2)} € / Jahr` 
-                                    : studentBillingOption === 'option2' 
-                                      ? `${(students.length * 0.49).toFixed(2)} € / Monat` 
-                                      : `${(students.length * 0.24).toFixed(2)} € / Monat`
-                                  }
+                                  {studentBillingOption === 'option1' && `${(students.length * 5.29).toFixed(2)} € / Jahr`}
+                                  {studentBillingOption === 'option2' && `${(students.length * 0.49).toFixed(2)} € / Monat`}
+                                  {studentBillingOption === 'option3_1' && `${(students.length * 0.24).toFixed(2)} € / Monat`}
+                                  {studentBillingOption === 'option3_2' && `${(students.length * 2.59).toFixed(2)} € / Jahr`}
                                 </strong>
                               </div>
                             </div>
