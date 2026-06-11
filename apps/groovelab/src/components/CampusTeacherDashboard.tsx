@@ -78,6 +78,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const [rawAllSchoolSchedules, setRawAllSchoolSchedules] = useState<any[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
+  const [preferredRoomIds, setPreferredRoomIds] = useState<string[]>([]);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingDay, setBookingDay] = useState<number | null>(null);
   const [bookingSlot, setBookingSlot] = useState<string>('');
@@ -393,6 +394,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         setSchool(tData.schools);
         setStartAnchor(tData.start_anchor || '13:00');
         setBreakTimes(tData.break_times || []);
+        setPreferredRoomIds(tData.preferred_room_ids || []);
         if (tData.sick_until) {
           setSickUntilDate(tData.sick_until.substring(0, 10));
         } else {
@@ -2607,24 +2609,36 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                             </div>
                             
                             <button
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                const favKey = `groovelab_favorite_room_id_${userId}`;
-                                if (favoriteRoomId === room.id) {
-                                  localStorage.removeItem(favKey);
-                                  setFavoriteRoomId(null);
-                                } else {
-                                  localStorage.setItem(favKey, room.id);
-                                  setFavoriteRoomId(room.id);
+                                const isFav = preferredRoomIds.includes(room.id);
+                                if (!isFav && preferredRoomIds.length >= 2) {
+                                  alert('Du kannst maximal 2 Lieblingsräume festlegen!');
+                                  return;
+                                }
+                                const newFavorites = isFav 
+                                  ? preferredRoomIds.filter(id => id !== room.id)
+                                  : [...preferredRoomIds, room.id];
+                                
+                                setPreferredRoomIds(newFavorites);
+                                try {
+                                  const { error } = await supabase
+                                    .from('users')
+                                    .update({ preferred_room_ids: newFavorites })
+                                    .eq('id', userId);
+                                  if (error) throw error;
+                                } catch (err: any) {
+                                  alert('Fehler beim Speichern der Lieblingsräume: ' + err.message);
                                 }
                               }}
                               className="p-1.5 rounded-lg hover:bg-slate-800 transition duration-150"
                               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                              title="Als Lieblingsraum markieren (max. 2)"
                             >
                               <Star
                                 size={16}
-                                fill={favoriteRoomId === room.id ? "#fbbf24" : "none"}
-                                color={favoriteRoomId === room.id ? "#fbbf24" : "#64748b"}
+                                fill={preferredRoomIds.includes(room.id) ? "#fbbf24" : "none"}
+                                color={preferredRoomIds.includes(room.id) ? "#fbbf24" : "#64748b"}
                               />
                             </button>
                           </div>
