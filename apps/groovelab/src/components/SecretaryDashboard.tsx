@@ -14072,9 +14072,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     )}
                                   </div>
                                   <div style={{ fontSize: '0.62rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>• Schule (B2B):</span>
-                                      <strong style={{ color: '#0f172a' }}>{(isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)).toFixed(2)} €</strong>
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>• Schule (B2B):</span>
+                                        <strong style={{ color: '#0f172a' }}>{(isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)).toFixed(2)} €</strong>
+                                      </div>
+                                      <span style={{ fontSize: '0.52rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-2px', whiteSpace: 'nowrap' }}>
+                                        ({(baseB2B + schoolShareBookedExtra).toFixed(2)} € Basis &amp; Team{studentSharePreview > 0 ? ` + ${studentSharePreview.toFixed(2)} € Kofinanz.` : ''})
+                                      </span>
                                     </div>
                                     <div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
