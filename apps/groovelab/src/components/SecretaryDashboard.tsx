@@ -1004,7 +1004,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'linking' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>('briefing');
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>('briefing');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
@@ -6797,7 +6797,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           case 'crisis': return '🚨 Operations-Cockpit: Krisen-Dashboard';
           case 'equipment': return '🎸 Instrumente & Ausstattung';
           case 'employees': return '👥 Mitarbeiterverwaltung';
-          case 'linking': return '🔗 Schüler-Profilverknüpfung';
           case 'licenses': return '🎫 Lizenzen & Abrechnung';
           case 'setup': return '⚙️ Setup & Systemeinstellungen';
           default: return '💼 Verwaltung';
@@ -7091,7 +7090,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
-            { id: 'linking', label: 'Profil-Verknüpfung', icon: LinkIcon },
             { id: 'licenses', label: 'Lizenzen', icon: Award },
             { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
             { id: 'setup', label: 'Setup & Design', icon: Settings }
@@ -7470,7 +7468,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees')) && (
+              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -9990,107 +9988,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           );
         })()}
 
-        {/* TAB 1.6: SECRETARY - LINKING */}
-        {activeTab === 'secretary' && secretarySubTab === 'linking' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Explanation & Form */}
-            <div className="google-card" style={{ paddingLeft: '44px' }}>
-              <div className="google-kpi-bar bg-google-blue" style={{ background: '#0b57d0' }} />
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.15rem', fontWeight: 800 }}>🔗 Profile manuell verknüpfen</h3>
-              <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
-                Führe ein reines Campus-Profil und ein reines GrooveLab-Profil desselben Schülers zusammen. 
-                Nach der Verknüpfung nutzt der Schüler ein einziges Profil für beide Plattformen. 
-                Sämtliche Aktivitäten und Stundenpläne bleiben erhalten und werden unter dem Campus-Profil zusammengeführt.
-              </p>
 
-              <form onSubmit={handleLinkProfiles} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px' }}>
-                    1. Campus-Profil auswählen (Verbleibendes Hauptprofil)
-                  </label>
-                  <select 
-                    value={selectedCampusStudentId} 
-                    onChange={(e) => setSelectedCampusStudentId(e.target.value)}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.85rem' }}
-                  >
-                    <option value="">-- Campus-Schüler auswählen (Nur Campus aktiv) --</option>
-                    {students
-                      .filter(s => s.is_campus_active && !s.is_groovelab_active)
-                      .map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.first_name} {s.last_name || ''} ({s.email || 'Keine E-Mail'})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'center', color: '#64748b', fontWeight: 800 }}>
-                  <span>➕</span>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px' }}>
-                    2. GrooveLab-Profil auswählen (Wird in Campus-Profil gemerged & gelöscht)
-                  </label>
-                  <select 
-                    value={selectedGroovelabStudentId} 
-                    onChange={(e) => setSelectedGroovelabStudentId(e.target.value)}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.85rem' }}
-                  >
-                    <option value="">-- GrooveLab-Schüler auswählen (Nur GrooveLab aktiv) --</option>
-                    {students
-                      .filter(s => s.is_groovelab_active && !s.is_campus_active)
-                      .map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.first_name} {s.last_name || ''} ({s.email || 'Keine E-Mail'})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={linkingInProgress}
-                  className="google-btn-primary" 
-                  style={{ alignSelf: 'flex-start', background: '#0b57d0' }}
-                >
-                  {linkingInProgress ? 'Verknüpfung läuft...' : 'Profile jetzt zusammenführen'}
-                </button>
-              </form>
-            </div>
-
-            {/* Quick Overview of already unified profiles */}
-            <div className="google-card">
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800 }}>✅ Bereits verknüpfte Schüler (Aktiv auf Campus & GrooveLab)</h3>
-              
-              {students.filter(s => s.is_campus_active && s.is_groovelab_active).length === 0 ? (
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Bisher keine Schüler auf beiden Plattformen aktiv.</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                  {students
-                    .filter(s => s.is_campus_active && s.is_groovelab_active)
-                    .map(s => (
-                      <div key={s.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                          {s.first_name?.[0] || 'S'}
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem' }}>{s.first_name} {s.last_name || ''}</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#137333', fontWeight: 700 }}>
-                            🎓 Campus & 🎸 GrooveLab Aktiv
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
 
         {/* TAB 2: CAMPUS */}
         {activeTab === 'campus' && (
