@@ -11955,66 +11955,315 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 );
               })()}
 
-              {/* Schedules Sidebar – Live Stats */}
+              {/* Schedules Sidebar – Live Stats & Submissions */}
               {campusSubTab === 'schedules' && (
-                <div className="google-card" style={{ padding: '20px' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#0b57d0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📊 Wochenauslastung
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.65rem', color: '#2563eb', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Review</span>
-                        <strong style={{ fontSize: '1.4rem', color: '#1d4ed8', lineHeight: 1 }}>{pendingSchedules.length}</strong>
-                      </div>
-                      <div style={{ background: matrixAllocations.some(p => !p.roomId) ? '#fffbeb' : '#f0fdf4', border: `1px solid ${matrixAllocations.some(p => !p.roomId) ? '#fde68a' : '#bbf7d0'}`, padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.65rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Offen</span>
-                        <strong style={{ fontSize: '1.4rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', lineHeight: 1 }}>{matrixAllocations.filter(p => !p.roomId).length}</strong>
-                      </div>
-                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.65rem', color: '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Verteilt</span>
-                        <strong style={{ fontSize: '1.4rem', color: '#15803d', lineHeight: 1 }}>{matrixAllocations.filter(p => p.roomId).length}</strong>
-                      </div>
-                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
-                        <span style={{ fontSize: '0.65rem', color: '#ef4444', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Konflikte</span>
-                        <strong style={{ fontSize: '1.4rem', color: '#ef4444', lineHeight: 1 }}>
-                          {(() => {
-                            let conflicts = 0;
-                            const byRoomDay: Record<string, any[]> = {};
-                            matrixAllocations.filter(p => p.roomId).forEach(p => {
-                              const k = `${p.roomId}_${p.dayOfWeek}`;
-                              if (!byRoomDay[k]) byRoomDay[k] = [];
-                              byRoomDay[k].push(p);
-                            });
-                            Object.values(byRoomDay).forEach(group => {
-                              if (group.length > 1) {
-                                group.forEach((p, i) => {
-                                  group.forEach((q, j) => {
-                                    if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) conflicts++;
-                                  });
-                                });
-                              }
-                            });
-                            return conflicts;
-                          })()}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#1f2937', fontSize: '0.78rem' }}>Räume verfügbar:</strong>
-                      <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.76rem' }}>
-                        {rooms.length} Räume · {rooms.length * 5} mögliche Tageszuteilungen pro Woche
-                      </p>
-                    </div>
-
-                    <div style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#7f1d1d' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>Hinweis:</strong>
-                      <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
-                        Abgelehnte Stundenpläne gehen zurück in den Draft-Zustand. Lehrkräfte können erneut einreichen.
-                      </p>
-                    </div>
+                <div className="google-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '320px' }}>
+                  
+                  {/* Segmented Control for Switchable Tabs */}
+                  <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSchedulesSidebarTab('submissions')}
+                      style={{
+                        flex: 1,
+                        background: schedulesSidebarTab === 'submissions' ? 'white' : 'transparent',
+                        color: schedulesSidebarTab === 'submissions' ? '#0f172a' : '#64748b',
+                        border: 'none',
+                        boxShadow: schedulesSidebarTab === 'submissions' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      📋 Einreichungen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSchedulesSidebarTab('stats')}
+                      style={{
+                        flex: 1,
+                        background: schedulesSidebarTab === 'stats' ? 'white' : 'transparent',
+                        color: schedulesSidebarTab === 'stats' ? '#0f172a' : '#64748b',
+                        border: 'none',
+                        boxShadow: schedulesSidebarTab === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      📊 Wochenauslastung
+                    </button>
                   </div>
+
+                  {schedulesSidebarTab === 'submissions' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Submissions header */}
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                        Offene Zuteilungen ({matrixAllocations.filter(p => !p.roomId).length} Tage offen)
+                      </h4>
+
+                      {/* Compact Search Filter for 50+ Teachers */}
+                      <input
+                        type="text"
+                        placeholder="Lehrkraft filtern..."
+                        value={sidebarTeacherSearch}
+                        onChange={(e) => setSidebarTeacherSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          fontSize: '0.78rem',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+
+                      {/* Group and render submissions */}
+                      {(() => {
+                        const unassigned = matrixAllocations.filter(p => !p.roomId);
+                        
+                        // Group by teacher
+                        const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[] }> = {};
+                        unassigned.forEach(p => {
+                          if (!grouped[p.teacherId]) {
+                            grouped[p.teacherId] = {
+                              teacherName: p.teacherName,
+                              instrument: p.instrument,
+                              blocks: []
+                            };
+                          }
+                          grouped[p.teacherId].blocks.push(p);
+                        });
+
+                        // Filter by search query
+                        const filteredTeachers = Object.entries(grouped).filter(([_, data]) => 
+                          data.teacherName.toLowerCase().includes(sidebarTeacherSearch.toLowerCase().trim())
+                        );
+
+                        if (filteredTeachers.length === 0) {
+                          return (
+                            <div style={{ padding: '32px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #e2e8f0' }}>
+                              <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>🎉</span>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>Alle Stundenpläne erfolgreich zugeteilt!</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {filteredTeachers.map(([tId, data]) => {
+                              const isExpanded = expandedSidebarTeacherId === tId;
+                              return (
+                                <div 
+                                  key={tId} 
+                                  style={{ 
+                                    background: isExpanded ? '#f8fafc' : 'white', 
+                                    border: isExpanded ? '1px solid #cbd5e1' : '1px solid #e2e8f0', 
+                                    borderRadius: '14px', 
+                                    overflow: 'hidden',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {/* Accordion Header */}
+                                  <div 
+                                    onClick={() => setExpandedSidebarTeacherId(isExpanded ? null : tId)}
+                                    style={{ 
+                                      padding: '10px 12px', 
+                                      cursor: 'pointer', 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'center',
+                                      background: isExpanded ? '#f1f5f9' : 'transparent',
+                                      borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{data.teacherName}</span>
+                                      <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>{data.instrument}</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#1d4ed8', fontWeight: 900, padding: '2px 8px', borderRadius: '8px' }}>
+                                      {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
+                                    </span>
+                                  </div>
+
+                                  {/* Collapsible content (Accordion Details) */}
+                                  {isExpanded && (
+                                    <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {data.blocks.map(block => (
+                                        <div 
+                                          key={block.id}
+                                          draggable
+                                          onDragStart={() => handleDragStartMatrix(block.id)}
+                                          style={{
+                                            background: 'white',
+                                            border: '1px solid #e2e8f0',
+                                            borderLeft: '4px solid #f59e0b',
+                                            borderRadius: '8px',
+                                            padding: '6px 8px',
+                                            cursor: 'grab',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px',
+                                            position: 'relative'
+                                          }}
+                                          className="hover-scale-mini"
+                                        >
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155' }}>
+                                              📅 {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
+                                            </span>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#d97706', fontFamily: 'monospace' }}>
+                                              {block.startTime}–{block.endTime}
+                                            </span>
+                                          </div>
+                                          
+                                          {/* Room quick selection dropdown */}
+                                          <select
+                                            defaultValue=""
+                                            onChange={(e) => {
+                                              const rId = e.target.value;
+                                              if (rId) {
+                                                setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
+                                              }
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              fontSize: '0.65rem',
+                                              padding: '3px',
+                                              borderRadius: '6px',
+                                              border: '1px solid #cbd5e1',
+                                              outline: 'none',
+                                              background: '#f8fafc',
+                                              color: '#475569'
+                                            }}
+                                          >
+                                            <option value="" disabled>Raum zuweisen...</option>
+                                            {rooms.map(rm => (
+                                              <option key={rm.id} value={rm.id}>{rm.name}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.65rem', color: '#2563eb', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Review</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#1d4ed8', lineHeight: 1 }}>{pendingSchedules.length}</strong>
+                        </div>
+                        <div style={{ background: matrixAllocations.some(p => !p.roomId) ? '#fffbeb' : '#f0fdf4', border: `1px solid ${matrixAllocations.some(p => !p.roomId) ? '#fde68a' : '#bbf7d0'}`, padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.65rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Offen</span>
+                          <strong style={{ fontSize: '1.4rem', color: matrixAllocations.some(p => !p.roomId) ? '#b45309' : '#16a34a', lineHeight: 1 }}>{matrixAllocations.filter(p => !p.roomId).length}</strong>
+                        </div>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.65rem', color: '#16a34a', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Verteilt</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#15803d', lineHeight: 1 }}>{matrixAllocations.filter(p => p.roomId).length}</strong>
+                        </div>
+                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 8px', borderRadius: '12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.65rem', color: '#ef4444', display: 'block', textTransform: 'uppercase', fontWeight: 800, marginBottom: '2px' }}>Konflikte</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#ef4444', lineHeight: 1 }}>
+                            {(() => {
+                              let conflicts = 0;
+                              const byRoomDay: Record<string, any[]> = {};
+                              matrixAllocations.filter(p => p.roomId).forEach(p => {
+                                const k = `${p.roomId}_${p.dayOfWeek}`;
+                                if (!byRoomDay[k]) byRoomDay[k] = [];
+                                byRoomDay[k].push(p);
+                              });
+                              Object.values(byRoomDay).forEach(group => {
+                                if (group.length > 1) {
+                                  group.forEach((p, i) => {
+                                    group.forEach((q, j) => {
+                                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) conflicts++;
+                                    });
+                                  });
+                                }
+                              });
+                              return conflicts;
+                            })()}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Conflict details log logger if there are conflicts */}
+                      {(() => {
+                        const conflictDetails: string[] = [];
+                        const byRoomDay: Record<string, any[]> = {};
+                        matrixAllocations.filter(p => p.roomId).forEach(p => {
+                          const k = `${p.roomId}_${p.dayOfWeek}`;
+                          if (!byRoomDay[k]) byRoomDay[k] = [];
+                          byRoomDay[k].push(p);
+                        });
+                        Object.entries(byRoomDay).forEach(([roomDayKey, group]) => {
+                          if (group.length > 1) {
+                            group.forEach((p, i) => {
+                              group.forEach((q, j) => {
+                                if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
+                                  const dayName = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][p.dayOfWeek];
+                                  const rName = rooms.find(rm => rm.id === p.roomId)?.name || 'Raum';
+                                  conflictDetails.push(`${dayName}, ${rName}: ${p.teacherName} und ${q.teacherName} überschneiden sich (${p.startTime}–${p.endTime} vs. ${q.startTime}–${q.endTime})`);
+                                }
+                              });
+                            });
+                          }
+                        });
+
+                        if (conflictDetails.length > 0) {
+                          return (
+                            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <strong style={{ color: '#b91c1c', fontSize: '0.74rem' }}>⚠️ Konflikte gefunden:</strong>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '100px', overflowY: 'auto' }}>
+                                {conflictDetails.map((det, idx) => (
+                                  <div key={idx} style={{ fontSize: '0.68rem', color: '#991b1b', lineHeight: '1.3' }}>
+                                    • {det}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
+                        <strong style={{ display: 'block', marginBottom: '4px', color: '#1f2937', fontSize: '0.78rem' }}>Räume verfügbar:</strong>
+                        <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.76rem' }}>
+                          {rooms.length} Räume · {rooms.length * 5} mögliche Tageszuteilungen pro Woche
+                        </p>
+                      </div>
+
+                      <div style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#7f1d1d' }}>
+                        <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem' }}>Hinweis:</strong>
+                        <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
+                          Abgelehnte Stundenpläne gehen zurück in den Draft-Zustand. Lehrkräfte können erneut einreichen.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
