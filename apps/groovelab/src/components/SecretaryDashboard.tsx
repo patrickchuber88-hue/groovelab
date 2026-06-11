@@ -14063,13 +14063,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         );
                       }
 
-                      // Apply sort: free first
+                      // Apply filter: only free
                       if (equipmentSortFreeFirst) {
-                        filteredGroups = [...filteredGroups].sort((a, b) => {
-                          const freeA = a.instances.filter(inst => !inst.roomId).length;
-                          const freeB = b.instances.filter(inst => !inst.roomId).length;
-                          return freeB - freeA;
-                        });
+                        filteredGroups = filteredGroups
+                          .map(g => ({
+                            ...g,
+                            instances: g.instances.filter(inst => !inst.roomId)
+                          }))
+                          .filter(g => g.instances.length > 0);
                       }
 
                       // 3. Filter groups based on selected room
