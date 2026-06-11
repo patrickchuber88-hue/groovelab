@@ -12198,7 +12198,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                       return map[room.id] || [];
                                                     } catch { return []; }
                                                   })();
-                                                  if (unsuitable.some((inst) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
+                                                  if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
                                                     alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
                                                     e.target.value = "";
                                                     return;
