@@ -40,6 +40,8 @@ interface ProfileData {
   is_campus_active: boolean;
   is_groovelab_active: boolean;
   app_usage_mode: string;
+  joker_used_at?: string | null;
+  created_at?: string;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -284,7 +286,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode')
+          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at')
           .eq('qr_token', token)
           .single();
 
@@ -317,7 +319,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           school_name: schoolName,
           is_campus_active: userData.is_campus_active ?? true,
           is_groovelab_active: userData.is_groovelab_active ?? true,
-          app_usage_mode: userData.app_usage_mode ?? 'student_only'
+          app_usage_mode: userData.app_usage_mode ?? 'student_only',
+          joker_used_at: userData.joker_used_at,
+          created_at: userData.created_at
         });
 
         // Prüfen ob Gerät bereits bekannt ist

@@ -1050,6 +1050,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Sofortiges Laden des eigenen Profils – unabhängig vom langen fetchDashboardData
+  useEffect(() => {
+    if (!userId) return;
+    const loadOwnProfile = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, nickname, photo_url, role, email, instrument')
+        .eq('id', userId)
+        .single();
+      if (data) setCurrentUserProfile(data);
+    };
+    loadOwnProfile();
+  }, [userId]);
+
   useEffect(() => {
     const migrateLocalStorageToSupabase = async () => {
       try {
@@ -1170,6 +1184,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedTeacherForOverride, setSelectedTeacherForOverride] = useState<any>(null);
   const [newPasswordOverride, setNewPasswordOverride] = useState<string>('');
   const [newRoleOverride, setNewRoleOverride] = useState<string>('');
+  const [overrideFavRoom1, setOverrideFavRoom1] = useState<string>('');
+  const [overrideFavRoom2, setOverrideFavRoom2] = useState<string>('');
 
   // Rooms and Stations States for Live Lab
   const [rooms, setRooms] = useState<any[]>([]);
@@ -1733,7 +1749,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -2439,17 +2455,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!selectedTeacherForOverride) return;
     
     try {
-      const updates: any = {};
+      const newFavs: string[] = [];
+      if (overrideFavRoom1) newFavs.push(overrideFavRoom1);
+      if (overrideFavRoom2) newFavs.push(overrideFavRoom2);
+
+      const updates: any = {
+        preferred_room_ids: newFavs
+      };
       if (newRoleOverride) {
         updates.role = newRoleOverride;
       }
       if (newPasswordOverride) {
         updates.personal_pin = newPasswordOverride;
-      }
-      
-      if (Object.keys(updates).length === 0) {
-        alert('Keine Änderungen ausgewählt.');
-        return;
       }
       
       const { error } = await supabase
@@ -2459,10 +2476,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         
       if (error) throw error;
       
-      alert('Lehrkraft-Details erfolgreich überschrieben.');
+      alert('Lehrkraft-Details und Favoriten-Räume erfolgreich überschrieben.');
       setSelectedTeacherForOverride(null);
       setNewPasswordOverride('');
       setNewRoleOverride('');
+      setOverrideFavRoom1('');
+      setOverrideFavRoom2('');
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Überschreiben: ' + err.message);
@@ -5692,17 +5711,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         if (candidates.length === 0) candidates = [...rooms];
       }
 
+      // Prioritize Teacher's favorite rooms (Lieblingsräume)
+      const teacherProfile = campusTeachers.find(t => t.id === plan.teacherId);
+      const preferredRooms = teacherProfile?.preferred_room_ids || [];
+      if (preferredRooms.length > 0) {
+        for (const prId of preferredRooms) {
+          const prRoom = rooms.find(r => r.id === prId);
+          if (prRoom && !isRoomUnsuitable(prRoom, plan.instrument)) {
+            const hasConflict = sortedPlans.some(p => {
+              const allocatedRoom = assigned[p.id] || p.roomId;
+              return allocatedRoom === prId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+            });
+            if (!hasConflict) {
+              bestRoomId = prId;
+              break;
+            }
+          }
+        }
+      }
+
       // Soft Constraint check: prioritize historically assigned rooms for this teacher (must be suitable)
-      const historicalRoomId = teacherHistory[plan.teacherId];
-      if (historicalRoomId) {
-        const histRoom = rooms.find(r => r.id === historicalRoomId);
-        if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
-          const hasConflict = sortedPlans.some(p => {
-            const allocatedRoom = assigned[p.id] || p.roomId;
-            return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-          });
-          if (!hasConflict) {
-            bestRoomId = historicalRoomId;
+      if (!bestRoomId) {
+        const historicalRoomId = teacherHistory[plan.teacherId];
+        if (historicalRoomId) {
+          const histRoom = rooms.find(r => r.id === historicalRoomId);
+          if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
+            const hasConflict = sortedPlans.some(p => {
+              const allocatedRoom = assigned[p.id] || p.roomId;
+              return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+            });
+            if (!hasConflict) {
+              bestRoomId = historicalRoomId;
+            }
           }
         }
       }
@@ -5801,6 +5841,147 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       console.error('Error rejecting plan:', err);
       alert('Fehler: ' + err.message);
     }
+  };
+
+  // Split points search: scan for pause slots >= 15 mins
+  const getSplitPoints = (plan: any) => {
+    if (!plan || !plan.slots || plan.slots.length <= 1) return [];
+    const points: Array<{ index: number; time: string; duration: number }> = [];
+    plan.slots.forEach((slot: any, idx: number) => {
+      if (idx > 0 && idx < plan.slots.length - 1) {
+        const isBreak = !slot.student_id && !plan.id.startsWith('adhoc_');
+        if (isBreak && (slot.duration || 0) >= 15) {
+          points.push({ index: idx, time: slot.time_slot, duration: slot.duration });
+        }
+      }
+    });
+    return points;
+  };
+
+  const handleSplitPlan = (plan: any, splitIdx: number) => {
+    const slotsBefore = plan.slots.slice(0, splitIdx);
+    const slotsAfter = plan.slots.slice(splitIdx);
+
+    if (slotsBefore.length === 0 || slotsAfter.length === 0) return;
+
+    const addMins = (t: string, m: number) => {
+      const [hStr, mStr] = t.split(':');
+      let h = parseInt(hStr) || 0;
+      let mVal = parseInt(mStr) || 0;
+      mVal += m;
+      h += Math.floor(mVal / 60);
+      mVal = mVal % 60;
+      h = h % 24;
+      return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
+    };
+
+    const lastSlot1 = slotsBefore[slotsBefore.length - 1];
+    const endTime1 = lastSlot1 ? addMins(lastSlot1.time_slot, lastSlot1.duration || 45) : plan.endTime;
+    const firstSlot2 = slotsAfter[0];
+    const startTime2 = firstSlot2 ? firstSlot2.time_slot : plan.startTime;
+
+    const plan1 = {
+      ...plan,
+      id: `${plan.id}_split1`,
+      endTime: endTime1,
+      slots: slotsBefore
+    };
+
+    const plan2 = {
+      ...plan,
+      id: `${plan.id}_split2`,
+      startTime: startTime2,
+      slots: slotsAfter
+    };
+
+    setMatrixAllocations(prev => {
+      const next = [];
+      for (const p of prev) {
+        if (p.id === plan.id) {
+          next.push(plan1, plan2);
+        } else {
+          next.push(p);
+        }
+      }
+      return next;
+    });
+
+    setSelectedDayPlan(null);
+    alert(`Unterrichtsblock erfolgreich in 2 Teile aufgeteilt!`);
+  };
+
+  const handleMergePlans = (splitPlan: any) => {
+    const baseId = splitPlan.id.split('_split')[0];
+    const relatedSplits = matrixAllocations.filter(p => p.id.startsWith(baseId + '_split') || p.id === baseId);
+    if (relatedSplits.length <= 1) return;
+
+    const sortedSplits = [...relatedSplits].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    const mergedSlots: any[] = [];
+    const slotIdsSeen = new Set();
+    for (const p of sortedSplits) {
+      for (const s of p.slots) {
+        if (!slotIdsSeen.has(s.id)) {
+          slotIdsSeen.add(s.id);
+          mergedSlots.push(s);
+        }
+      }
+    }
+    mergedSlots.sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
+
+    const addMins = (t: string, m: number) => {
+      const [hStr, mStr] = t.split(':');
+      let h = parseInt(hStr) || 0;
+      let mVal = parseInt(mStr) || 0;
+      mVal += m;
+      h += Math.floor(mVal / 60);
+      mVal = mVal % 60;
+      h = h % 24;
+      return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
+    };
+
+    const startTime = mergedSlots[0]?.time_slot || splitPlan.startTime;
+    const lastSlot = mergedSlots[mergedSlots.length - 1];
+    const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : splitPlan.endTime;
+
+    const mergedPlan = {
+      ...sortedSplits[0],
+      id: baseId,
+      startTime,
+      endTime,
+      slots: mergedSlots,
+      roomId: sortedSplits[0].roomId || null
+    };
+
+    setMatrixAllocations(prev => {
+      const next = [];
+      let inserted = false;
+      for (const p of prev) {
+        if (p.id.startsWith(baseId + '_split') || p.id === baseId) {
+          if (!inserted) {
+            next.push(mergedPlan);
+            inserted = true;
+          }
+        } else {
+          next.push(p);
+        }
+      }
+      return next;
+    });
+
+    setSelectedDayPlan(null);
+    alert(`Unterrichtsblöcke wieder erfolgreich zusammengefügt!`);
+  };
+
+  const getPlanDisplayName = (plan: any) => {
+    if (!plan) return '';
+    if (plan.id.includes('_split1')) {
+      return `${plan.teacherName} (Teil 1)`;
+    }
+    if (plan.id.includes('_split2')) {
+      return `${plan.teacherName} (Teil 2)`;
+    }
+    return plan.teacherName;
   };
 
   const handleApproveSingleSchedule = async (scheduleId: string) => {
@@ -10825,11 +11006,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               overflow: 'hidden'
                                             }}
                                             className="hover-scale-mini"
-                                            title={`${plan.teacherName} (${plan.instrument}) : ${plan.startTime} - ${plan.endTime}`}
+                                            title={`${getPlanDisplayName(plan)} (${plan.instrument}) : ${plan.startTime} - ${plan.endTime}`}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                               <span style={{ fontSize: '0.67rem', fontWeight: 900, color: themeText, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                                {plan.teacherName}
+                                                {getPlanDisplayName(plan)}
                                               </span>
                                               <span style={{ fontSize: '0.58rem', fontWeight: 900, fontFamily: 'monospace', color: themeText, opacity: 0.85 }}>
                                                 {plan.startTime} - {plan.endTime}
@@ -10970,7 +11151,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 boxShadow: '0 4px 8px rgba(245,158,11,0.06)'
                                               }}
                                             >
-                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{topPlan.teacherName}</span>
+                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(topPlan)}</span>
                                               <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{topPlan.instrument}</span>
                                               <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {topPlan.startTime}–{topPlan.endTime}</span>
                                               
@@ -11068,7 +11249,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {plan.teacherName}
+                                                    {getPlanDisplayName(plan)}
                                                   </span>
                                                   {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
                                                 </div>
@@ -11241,7 +11422,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
                             {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} Plan
                           </span>
-                          <h3 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
+                          <h3 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
                           <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
                         </div>
                         <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -11279,6 +11460,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             ↩ Zur Überarbeitung zurückweisen
                           </button>
                         )}
+
+                        {/* Split / Merge Block Controls */}
+                        {(() => {
+                          const splits = getSplitPoints(selectedDayPlan);
+                          const isAlreadySplit = selectedDayPlan.id.includes('_split');
+                          
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                              {isAlreadySplit && (
+                                <button
+                                  onClick={() => handleMergePlans(selectedDayPlan)}
+                                  style={{ background: 'rgba(16,185,129,0.05)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                >
+                                  🔗 Aufteilung aufheben (Zusammenfügen)
+                                </button>
+                              )}
+                              
+                              {!isAlreadySplit && splits.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Block aufteilen (Pause gefunden)</span>
+                                  {splits.map((pt, pIdx) => (
+                                    <button
+                                      key={pIdx}
+                                      onClick={() => handleSplitPlan(selectedDayPlan, pt.index)}
+                                      style={{ background: 'rgba(245,158,11,0.05)', color: '#d97706', border: '1px solid rgba(245,158,11,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
+                                    >
+                                      ✂️ Block teilen an Pause um {pt.time} ({pt.duration} Min.)
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Slot list */}
@@ -13343,12 +13558,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
                     <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>⚙️ Admin-Overrides (Rechte &amp; Passwort)</h3>
                     <form onSubmit={handleAdminOverride} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <select 
+                       <select 
                         required
                         value={selectedTeacherForOverride?.id || ''}
                         onChange={(e) => {
                           const selected = coaches.find(c => c.id === e.target.value) || campusTeachers.find(c => c.id === e.target.value);
                           setSelectedTeacherForOverride(selected || null);
+                          if (selected) {
+                            const favs = selected.preferred_room_ids || [];
+                            setOverrideFavRoom1(favs[0] || '');
+                            setOverrideFavRoom2(favs[1] || '');
+                          } else {
+                            setOverrideFavRoom1('');
+                            setOverrideFavRoom2('');
+                          }
                         }}
                         style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.85rem' }}
                       >
@@ -13376,6 +13599,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <option value="teacher">Lehrkraft / Coach</option>
                         <option value="admin">Administrator / Verwaltung</option>
                       </select>
+
+                      {/* Favorite rooms */}
+                      {selectedTeacherForOverride && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569' }}>⭐ Lieblingsräume (max. 2)</span>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <select
+                              value={overrideFavRoom1}
+                              onChange={(e) => setOverrideFavRoom1(e.target.value)}
+                              style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.8rem' }}
+                            >
+                              <option value="">-- Favorit 1 --</option>
+                              {rooms.filter(r => r.is_campus_active !== false).map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={overrideFavRoom2}
+                              onChange={(e) => setOverrideFavRoom2(e.target.value)}
+                              style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.8rem' }}
+                            >
+                              <option value="">-- Favorit 2 --</option>
+                              {rooms.filter(r => r.is_campus_active !== false).map(r => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
 
                       <button type="submit" className="google-btn-primary" style={{ background: '#eab308', color: '#ffffff' }}>Überschreiben speichern</button>
                     </form>
@@ -14313,7 +14565,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 onClick={() => setSelectedDayPlan(plan)}
                                                 style={{ background: bg, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '6px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
                                               >
-                                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{getPlanDisplayName(plan)}</span>
                                                 <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
                                                 <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                   <Clock size={10} />
@@ -14877,7 +15129,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
                         {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
                       </span>
-                      <h3 style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{selectedDayPlan.teacherName}</h3>
+                      <h3 style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
                       <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
                     </div>
                     <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
