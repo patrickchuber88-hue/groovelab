@@ -652,7 +652,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
-const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string }) => {
+const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -677,10 +677,10 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
           const offset = total > 1 ? (idx - (total - 1) / 2) * 54 : 0;
           const verticalOffset = total > 1 ? (idx % 2 === 0 ? -12 : 12) : 0;
           const labelAbove = total > 1 && idx % 2 === 0;
+          const isSelf = currentUserId && c.id === currentUserId;
           return (
             <div 
               key={c.id || idx} 
-              onClick={() => c.users && onProfileSelect(c.users)}
               style={{ 
                 position: 'absolute',
                 transform: `translate(${offset}px, ${verticalOffset}px)`,
@@ -689,15 +689,71 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
                 alignItems: 'center',
                 gap: '8px',
                 zIndex: 10 - idx,
-                cursor: 'pointer'
               }}
             >
-              <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}>
+              <div 
+                onClick={() => c.users && onProfileSelect(c.users)}
+                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '4px solid #22c55e' : '4px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.3)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
-              <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
+              <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name?.[0]}.</div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer'}</div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
+                {isSelf && onSelfCheckout ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelfCheckout(); }}
+                    title="Vom Lehrer iPad abmelden"
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      background: '#ef4444',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'white',
+                      fontSize: '10px',
+                      fontWeight: 900,
+                      boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
+                      flexShrink: 0,
+                      padding: 0
+                    }}
+                  >
+                    ✕
+                  </button>
+                ) : (!isSelf && onCoachCheckout) ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCoachCheckout(c); }}
+                    title="Lehrer abmelden"
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      background: '#ef4444',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'white',
+                      fontSize: '10px',
+                      fontWeight: 900,
+                      boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
+                      flexShrink: 0,
+                      padding: 0
+                    }}
+                  >
+                    ✕
+                  </button>
+                ) : null}
               </div>
             </div>
           );
@@ -710,6 +766,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
   const prevCoaches = (prev.coaches || []).filter(Boolean);
   const nextCoaches = (next.coaches || []).filter(Boolean);
   if (prevCoaches.length !== nextCoaches.length) return false;
+  if (prev.currentUserId !== next.currentUserId) return false;
   return prevCoaches.every((c, i) => {
     const nextCoach = nextCoaches[i];
     if (!nextCoach) return false;
@@ -761,7 +818,11 @@ export function TeacherDashboard({
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
   const isTeacher = viewMode === 'admin';
-  const isUserCheckedIn = locationMode === 'lab' && !!session && (!!session.station_id || isTeacher);
+  // localCheckedIn: flips immediately on check-in so the overlay hides without waiting for parent prop updates
+  const [localCheckedIn, setLocalCheckedIn] = useState(false);
+  // Ref mirrors the state so fetchData closures can read it synchronously (no stale closure problem)
+  const localCheckedInRef = useRef(false);
+  const isUserCheckedIn = localCheckedIn || (locationMode === 'lab' && !!session && (!!session.station_id || isTeacher));
   const [showKioskView, setShowKioskView] = useState(false);
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
   const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
@@ -906,9 +967,30 @@ export function TeacherDashboard({
       } else {
         console.log('[Teacher Check-in] Success:', sessData.id);
         setCheckingInStatus('success');
+        // Set sessionStorage immediately so fetchData can read it synchronously
+        sessionStorage.setItem('groovelab_location_mode', 'lab');
+        // Set ref SYNCHRONOUSLY (readable inside fetchData closure immediately)
+        localCheckedInRef.current = true;
+        // Also set state for re-render
+        setLocalCheckedIn(true);
+        // Optimistically add the teacher to coaches state right away
+        setCoaches(prev => {
+          if (!teacher) return prev;
+          const alreadyIn = prev.some(c => c && c.id === userId);
+          if (alreadyIn) return prev;
+          return [{ id: userId, users: teacher, session: sessData }, ...prev];
+        });
         if (onSessionChange) onSessionChange(sessData);
         if (onLocationModeChange) onLocationModeChange('lab');
         await fetchData();
+        // Re-apply after fetchData in case it overwrote the optimistic entry
+        if (localCheckedInRef.current && teacher) {
+          setCoaches(prev => {
+            const alreadyIn = prev.some(c => c && c.id === userId);
+            if (alreadyIn) return prev;
+            return [{ id: userId, users: teacher, session: sessData }, ...prev];
+          });
+        }
       }
     } catch (e: any) {
       console.error('[Teacher Check-in] Unexpected Error:', e);
@@ -3428,10 +3510,16 @@ export function TeacherDashboard({
         const schoolSess = (sessData || [])
           .filter(s => {
             const u = Array.isArray(s.users) ? s.users[0] : s.users;
+            if (!u) return false;
+
+            // Filter out students for whom GrooveLab is not active
+            const isStudent = u.role?.toLowerCase() === 'student';
+            if (isStudent && !u.is_groovelab_active) return false;
+
             // Only show students who are GPS verified (in the lab)
             // Teachers/Admins are shown regardless if they are logged in
-            const isStaff = u?.role?.toLowerCase() === 'teacher' || u?.role?.toLowerCase() === 'admin';
-            return u?.school_id === tData.school_id && (isStaff || s.gps_verified);
+            const isStaff = u.role?.toLowerCase() === 'teacher' || u.role?.toLowerCase() === 'admin';
+            return u.school_id === tData.school_id && (isStaff || s.gps_verified);
           })
           .map(s => ({
             ...s,
@@ -3444,38 +3532,38 @@ export function TeacherDashboard({
 
         // 4. Coaches
         const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
-        const isHomeMode = (locationMode || sessionStorage.getItem('groovelab_location_mode')) === 'home';
-        
+
+        // Determine if the currently logged-in teacher should be visible.
+        const isSelfCheckedIn =
+          localCheckedInRef.current ||
+          locationMode === 'lab' ||
+          sessionStorage.getItem('groovelab_location_mode') === 'lab' ||
+          trulyActive.some(s => s && s.user_id === userId);
+
+        const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' ||
+                                 tData?.role?.toLowerCase() === 'admin' ||
+                                 tData?.role?.toLowerCase() === 'secretary';
+
+        // Build the list. The current user goes through the SAME filter path as everyone else
+        // (no special exclusion+re-injection) so their data shape (photo_url etc.) is identical.
         const activeCoaches = (allCoaches || []).filter(c => {
           if (!c) return false;
-          if (c.is_observer) return false; // Hospitanten are never shown in Live Lab
-          if (c.id === userId) return false; // Handled separately below to guarantee inclusion
+          if (c.is_observer) return false;
+          if (c.id === userId) {
+            // Self: show when checked in, and always show if the board is visible (isUserCheckedIn is true)
+            return isCurrentTeacher && (isUserCheckedIn || isSelfCheckedIn);
+          }
+          // Others: require an actual active DB session
           return trulyActive.some(s => s && s.user_id === c.id);
         });
-
-        // Defensively guarantee the logged-in teacher/staff/admin/secretary is included when they are active in the lab
-        const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' || 
-                                 tData?.role?.toLowerCase() === 'admin' || 
-                                 tData?.role?.toLowerCase() === 'secretary' ||
-                                 locationMode === 'lab' ||
-                                 sessionStorage.getItem('groovelab_location_mode') === 'lab';
-        const isCurrentlyCheckedIn = locationMode === 'lab' || 
-                                     sessionStorage.getItem('groovelab_location_mode') === 'lab' || 
-                                     trulyActive.some(s => s && s.user_id === userId);
-
-        if (isCurrentTeacher && tData && !hidePresence && isCurrentlyCheckedIn) {
-          if (!activeCoaches.some(c => c && c.id === userId)) {
-            activeCoaches.unshift(tData);
-          }
-        }
 
         setCoaches(
           activeCoaches
             .filter(Boolean)
-            .map(c => ({ 
-              id: c.id, 
-              users: c, 
-              session: trulyActive.find(s => s && s.user_id === c.id) 
+            .map(c => ({
+              id: c.id,
+              users: c,
+              session: trulyActive.find(s => s && s.user_id === c.id)
             }))
         );
 
@@ -4221,6 +4309,32 @@ export function TeacherDashboard({
       setHelpRequests(prev => prev.filter(r => r.id !== requestId));
     }
   };
+
+  // Allows the logged-in teacher to remove themselves from "Coaches vor Ort" by checking out their session
+  const handleTeacherSelfCheckout = useCallback(async () => {
+    if (!window.confirm('Vom Lehrer iPad abmelden?')) return;
+    const now = new Date().toISOString();
+    await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
+    // Reset ref SYNCHRONOUSLY so fetchData doesn't re-add the teacher
+    localCheckedInRef.current = false;
+    // Immediately reset state so overlay reappears and self is removed from coaches
+    setLocalCheckedIn(false);
+    setCoaches(prev => prev.filter(c => c && c.id !== userId));
+    if (onSessionChange) onSessionChange(null);
+    if (onLocationModeChange) onLocationModeChange('home');
+    sessionStorage.setItem('groovelab_location_mode', 'home');
+    await fetchData();
+  }, [userId, onSessionChange, onLocationModeChange, teacher]);
+
+  // Allows manual checkout of other teachers
+  const handleTeacherCheckout = useCallback(async (coach: any) => {
+    if (!coach) return;
+    const coachName = `${coach.users?.first_name || ''} ${coach.users?.last_name || ''}`.trim();
+    if (!window.confirm(`Möchtest du Coach ${coachName} wirklich abmelden?`)) return;
+    const now = new Date().toISOString();
+    await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', coach.id).is('check_out_time', null);
+    await fetchData();
+  }, [fetchData]);
 
   const handleMarkAllAsRead = async () => {
     if (!userId || unreadShouts.length === 0) return;
@@ -8527,7 +8641,7 @@ export function TeacherDashboard({
                                   zIndex: 100
                                 }}
                               >
-                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
+                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} />
                               </div>
                             );
                           }
@@ -8707,7 +8821,7 @@ export function TeacherDashboard({
                   }}>
                     {/* Coaches Node */}
                     <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                      <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
+                      <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} />
                     </div>
                     {roomStations.filter(s => {
                       const sName = s.name || '';

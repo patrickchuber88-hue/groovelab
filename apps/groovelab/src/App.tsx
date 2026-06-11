@@ -2815,16 +2815,24 @@ function App() {
       // If a student is in GrooveLab (Lab) mode, they MUST have an active checked-in session in the database.
       // If there is no active session (sessionRes.data is null), they have bypassed the scanner or were checked out.
       // If this is a Kiosk device, we immediately force logout and wipe their tab state.
+      // Additionally, if the active session's station_id in the database does not match the kiosk's current station_id,
+      // it means the student has checked in at a different iPad station, so this station must log them out.
       // On personal devices, we remain logged in so the check-in frosted glass overlay can be shown.
       const isStudent = userData.role?.toLowerCase() === 'student';
-      if (isStudent && locationMode === 'lab' && !sessionRes.data && !sessionRes.error) {
-        if (isKioskMode) {
-          console.warn('[Dashboard] Student in Lab mode on Kiosk has no active database session! Force logout.');
-          setLoading(false);
-          handleLogout(false);
-          return;
-        } else {
-          console.log('[Dashboard] Student in Lab mode on Personal Device has no active session. Remain logged in.');
+      if (isStudent && locationMode === 'lab') {
+        const storedStationId = localStorage.getItem('groovelab_station_id');
+        const hasNoSession = !sessionRes.data && !sessionRes.error;
+        const hasDifferentStation = sessionRes.data && storedStationId && sessionRes.data.station_id !== storedStationId;
+
+        if (hasNoSession || (hasDifferentStation && isKioskMode)) {
+          if (isKioskMode) {
+            console.warn('[Dashboard] Student in Lab mode on Kiosk has no active database session or is checked in at another station! Force logout.');
+            setLoading(false);
+            handleLogout(false);
+            return;
+          } else {
+            console.log('[Dashboard] Student in Lab mode on Personal Device has no active session. Remain logged in.');
+          }
         }
       }
 
