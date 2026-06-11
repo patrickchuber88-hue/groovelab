@@ -1301,7 +1301,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [bookedExtraUsers, setBookedExtraUsers] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const val = localStorage.getItem('bookedExtraUsers');
-    return val ? parseInt(val, 10) : 0;
+    let baseVal = val ? parseInt(val, 10) : 0;
+    const hasUnbooked = localStorage.getItem('unbooked_52_temp');
+    if (!hasUnbooked) {
+      baseVal = Math.max(0, baseVal - 52);
+      localStorage.setItem('bookedExtraUsers', baseVal.toString());
+      localStorage.setItem('unbooked_52_temp', 'true');
+    }
+    return baseVal;
   });
   const [extraUsersSliderVal, setExtraUsersSliderVal] = useState<number>(0);
   const [extraBillingOption, setExtraBillingOption] = useState<string>('option1');
@@ -14408,10 +14415,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             boxShadow: '0 2px 8px rgba(107, 33, 168, 0.01)'
                           }}>
                             <div>
-                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Zusätzliche User hinzubuchen</span>
-                              <strong style={{ display: 'block', fontSize: '0.86rem', color: '#1e293b', marginTop: '2px' }}>
-                                Aktuell gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
-                              </strong>
+                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Zusätzliche Schüler buchen / reduzieren</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                                <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>
+                                  Aktuell gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
+                                </strong>
+                                {bookedExtraUsers > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      const toRemove = prompt(`Wie viele der ${bookedExtraUsers} Extra-Schüler möchtest du stornieren/ausbuchen?`, '52');
+                                      if (toRemove) {
+                                        const count = parseInt(toRemove, 10);
+                                        if (!isNaN(count) && count > 0) {
+                                          const newVal = Math.max(0, bookedExtraUsers - count);
+                                          setBookedExtraUsers(newVal);
+                                          localStorage.setItem('bookedExtraUsers', newVal.toString());
+                                          alert(`${Math.min(count, bookedExtraUsers)} Extra-Schüler wurden erfolgreich ausgebucht.`);
+                                        }
+                                      }
+                                    }}
+                                    style={{
+                                      background: '#ef4444',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '4px 8px',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 3px rgba(239, 68, 68, 0.2)'
+                                    }}
+                                  >
+                                    Ausbuchen
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                              {/* Beautiful Custom Slider */}
