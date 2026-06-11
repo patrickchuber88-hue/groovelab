@@ -7476,6 +7476,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           flexShrink: 0
         }} />
 
+        {!hasCampusSub && !hasGroovelabSub && (
+          <div style={{
+            background: '#e8f0fe',
+            borderBottom: '1px solid #d2e3fc',
+            padding: '10px 40px',
+            fontSize: '0.82rem',
+            color: '#1967d2',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 500,
+            fontFamily: 'Inter, sans-serif',
+            flexShrink: 0
+          }}>
+            <span>🛠️</span>
+            <span><strong>Setup-Modus aktiv:</strong> Die {schoolName || 'Musikschule'} befindet sich in der Konfigurationsphase. Aktuell entstehen für Ihre Schule keine Infrastruktur- oder Nutzungsgebühren.</span>
+          </div>
+        )}
+
         {/* Main scrollable body content */}
         <div style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
 
