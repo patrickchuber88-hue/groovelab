@@ -13971,8 +13971,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#0369a1' }}> / Mo.</span>
                                 </strong>
                                 {!isBillingBooked && studentSharePreview > 0 && (
-                                  <span style={{ fontSize: '0.6rem', color: '#0284c7', display: 'block', marginTop: '-4px', fontWeight: 600 }}>
-                                    (zzgl. {studentSharePreview.toFixed(2)} € bei Einbuchung der Kofinanzierung)
+                                  <span style={{ fontSize: '0.66rem', color: '#0284c7', display: 'block', marginTop: '-4px', fontWeight: 700 }}>
+                                    {baseB2B.toFixed(2)} € + {studentSharePreview.toFixed(2)} € = {(baseB2B + studentSharePreview).toFixed(2)} € / Mo. (nach Einbuchung)
                                   </span>
                                 )}
                               </div>
