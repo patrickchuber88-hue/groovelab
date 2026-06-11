@@ -10489,6 +10489,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </button>
                           <button
                             type="button"
+                            onClick={() => {
+                              if (window.confirm('Möchtest du wirklich alle Zuteilungen zurücksetzen? Alle Termine werden wieder in die Liste der offenen Zuteilungen verschoben.')) {
+                                setMatrixAllocations(prev => prev.map(p => ({ ...p, roomId: null })));
+                              }
+                            }}
+                            style={{ background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '10px 18px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}
+                          >
+                            🔄 Zuteilungen zurücksetzen
+                          </button>
+                          <button
+                            type="button"
                             onClick={handleSaveAndApproveAll}
                             style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '11px 20px', borderRadius: '12px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
                           >
