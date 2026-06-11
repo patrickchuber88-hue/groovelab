@@ -1296,6 +1296,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
   const [hoveredUnassignedDayNum, setHoveredUnassignedDayNum] = useState<number | null>(null);
+  const [clickedUnassignedDayNum, setClickedUnassignedDayNum] = useState<number | null>(null);
   const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
   const [sidebarTeacherSearch, setSidebarTeacherSearch] = useState<string>('');
   const [expandedSidebarTeacherId, setExpandedSidebarTeacherId] = useState<string | null>(null);
@@ -1556,6 +1557,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
     }
   }, [matrixAllocations, schoolId]);
+
+  // Click-away listener to close iPad unassigned popovers when tapping outside
+  useEffect(() => {
+    const handleDocumentClick = () => {
+      setClickedUnassignedDayNum(null);
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, []);
+
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
     const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
@@ -10910,7 +10923,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         setHoveredUnassignedDayNum(null);
                                       }
                                     }}
-                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative' }}
+                                    onClick={(e) => {
+                                      if (!draggedPlanId) {
+                                        setClickedUnassignedDayNum(prev => prev === dayNum ? null : dayNum);
+                                      }
+                                      e.stopPropagation();
+                                    }}
+                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative', cursor: unassigned.length > 0 ? 'pointer' : 'default' }}
                                   >
                                     {unassigned.length === 0 ? (
                                       <div style={{
@@ -10948,8 +10967,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 setDraggedPlanId(null);
                                                 setDraggedPlanDay(null);
                                                 setHoveredUnassignedDayNum(null);
+                                                setClickedUnassignedDayNum(null);
                                               }}
-                                              onClick={() => setSelectedDayPlan(topPlan)}
+                                              onClick={(e) => {
+                                                setSelectedDayPlan(topPlan);
+                                                setClickedUnassignedDayNum(null);
+                                                setHoveredUnassignedDayNum(null);
+                                                e.stopPropagation();
+                                              }}
                                               style={{
                                                 position: 'relative',
                                                 zIndex: 2,
@@ -10994,7 +11019,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     )}
 
                                     {/* Flyout Popover */}
-                                    {hoveredUnassignedDayNum === dayNum && unassigned.length > 0 && (
+                                    {(hoveredUnassignedDayNum === dayNum || clickedUnassignedDayNum === dayNum) && unassigned.length > 0 && (
                                       <div style={{
                                         position: 'absolute',
                                         top: '100%',
@@ -11030,8 +11055,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 setDraggedPlanId(null);
                                                 setDraggedPlanDay(null);
                                                 setHoveredUnassignedDayNum(null);
+                                                setClickedUnassignedDayNum(null);
                                               }}
-                                              onClick={() => setSelectedDayPlan(plan)}
+                                              onClick={(e) => {
+                                                setSelectedDayPlan(plan);
+                                                setClickedUnassignedDayNum(null);
+                                                setHoveredUnassignedDayNum(null);
+                                                e.stopPropagation();
+                                              }}
                                               style={{
                                                 background: 'rgba(254, 243, 199, 0.7)',
                                                 border: '1px solid #fde68a',
