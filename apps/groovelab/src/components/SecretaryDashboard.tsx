@@ -14549,7 +14549,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         zIndex: 5
                       }}>
                         <path
-                          d="M 87.5,0 L 87.5,65 L 37.5,65 L 37.5,0"
+                          d="M 87.5,0 L 87.5,65 L 23.5,65 L 23.5,0"
                           fill="none"
                           stroke="#7c3aed"
                           strokeWidth="2"
@@ -14560,7 +14560,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       {/* Triangle arrowhead pointing up at the B2B target */}
                       <div style={{
                         position: 'absolute',
-                        left: '37.5%',
+                        left: '23.5%',
                         bottom: '-4px',
                         transform: 'translateX(-50%)',
                         width: 0,
