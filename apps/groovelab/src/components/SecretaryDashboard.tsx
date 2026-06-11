@@ -12150,7 +12150,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         }
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
                             {/* "Alle Lehrer" Button */}
                             <button
                               onClick={() => {
@@ -12159,23 +12159,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               }}
                               style={{
                                 padding: '10px 14px',
-                                borderRadius: '12px',
-                                border: '1.5px solid',
-                                borderColor: selectedFilterTeacherId === null ? '#f59e0b' : '#e2e8f0',
-                                background: selectedFilterTeacherId === null ? '#fffbeb' : '#ffffff',
-                                color: selectedFilterTeacherId === null ? '#b45309' : '#334155',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: selectedFilterTeacherId === null ? '#007aff' : '#f2f2f7',
+                                color: selectedFilterTeacherId === null ? '#ffffff' : '#1c1c1e',
                                 fontSize: '0.78rem',
-                                fontWeight: 800,
+                                fontWeight: 600,
                                 textAlign: 'left',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                transition: 'all 0.15s'
+                                transition: 'all 0.15s',
+                                boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(0,122,255,0.3)' : 'none'
                               }}
                             >
-                              <span>👥 Alle Lehrer anzeigen</span>
-                              <span style={{ fontSize: '0.65rem', background: selectedFilterTeacherId === null ? '#fde68a' : '#f1f5f9', padding: '2px 6px', borderRadius: '6px', color: '#64748b' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.9rem' }}>👥</span> Alle Lehrer anzeigen
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.68rem', 
+                                background: selectedFilterTeacherId === null ? 'rgba(255,255,255,0.25)' : '#e5e5ea', 
+                                padding: '2px 7px', 
+                                borderRadius: '10px', 
+                                color: selectedFilterTeacherId === null ? '#ffffff' : '#3a3a3c',
+                                fontWeight: 700 
+                              }}>
                                 {unassigned.length}
                               </span>
                             </button>
@@ -12187,11 +12196,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div 
                                   key={tId} 
                                   style={{ 
-                                    background: isSelected ? '#fffbeb' : (isExpanded ? '#f8fafc' : 'white'), 
-                                    border: isSelected ? '1px solid #f59e0b' : (isExpanded ? '1px solid #cbd5e1' : '1px solid #e2e8f0'), 
-                                    borderRadius: '14px', 
+                                    background: '#ffffff', 
+                                    border: isSelected ? '1px solid #007aff' : '1px solid #e5e5ea', 
+                                    borderRadius: '12px', 
                                     overflow: 'hidden',
-                                    transition: 'all 0.15s'
+                                    transition: 'all 0.15s',
+                                    boxShadow: isSelected ? '0 3px 12px rgba(0,122,255,0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
+                                    borderLeft: isSelected ? '4px solid #007aff' : '1px solid #e5e5ea'
                                   }}
                                 >
                                   {/* Accordion Header */}
@@ -12201,96 +12212,121 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       setExpandedSidebarTeacherId(isExpanded ? null : tId);
                                     }}
                                     style={{ 
-                                      padding: '10px 12px', 
+                                      padding: '11px 14px', 
                                       cursor: 'pointer', 
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
-                                      background: isSelected ? '#fffbeb' : (isExpanded ? '#f1f5f9' : 'transparent'),
-                                      borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none'
+                                      background: isSelected ? '#f2f8ff' : '#ffffff',
+                                      borderBottom: isExpanded ? '1px solid #e5e5ea' : 'none'
                                     }}
                                   >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isSelected ? '#b45309' : '#0f172a' }}>{data.teacherName}</span>
-                                      <span style={{ fontSize: '0.62rem', color: isSelected ? '#d97706' : '#64748b', fontWeight: 700 }}>{data.instrument}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                      <span style={{ 
+                                        display: 'inline-block', 
+                                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
+                                        transition: 'transform 0.15s ease-out', 
+                                        marginRight: '8px', 
+                                        fontSize: '0.62rem', 
+                                        color: isSelected ? '#007aff' : '#8e8e93' 
+                                      }}>
+                                        ▶
+                                      </span>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? '#007aff' : '#1c1c1e' }}>{data.teacherName}</span>
+                                        <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 500 }}>{data.instrument}</span>
+                                      </div>
                                     </div>
-                                    <span style={{ fontSize: '0.65rem', background: isSelected ? '#fde68a' : '#eff6ff', color: isSelected ? '#b45309' : '#1d4ed8', fontWeight: 900, padding: '2px 8px', borderRadius: '8px' }}>
+                                    <span style={{ 
+                                      fontSize: '0.68rem', 
+                                      background: isSelected ? 'rgba(0,122,255,0.1)' : '#f2f2f7', 
+                                      color: isSelected ? '#007aff' : '#8e8e93', 
+                                      fontWeight: 700, 
+                                      padding: '2px 7px', 
+                                      borderRadius: '10px' 
+                                    }}>
                                       {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
                                     </span>
                                   </div>
 
                                   {/* Collapsible content (Accordion Details) */}
                                   {isExpanded && (
-                                    <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      {data.blocks.map(block => (
-                                        <div 
-                                          key={block.id}
-                                          draggable
-                                          onDragStart={() => handleDragStartMatrix(block.id)}
-                                          style={{
-                                            background: 'white',
-                                            border: '1px solid #e2e8f0',
-                                            borderLeft: '4px solid #f59e0b',
-                                            borderRadius: '8px',
-                                            padding: '6px 8px',
-                                            cursor: 'grab',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            position: 'relative'
-                                          }}
-                                          className="hover-scale-mini"
-                                        >
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155' }}>
-                                              📅 {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
-                                            </span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#d97706', fontFamily: 'monospace' }}>
-                                              {block.startTime}–{block.endTime}
-                                            </span>
-                                          </div>
-                                          
-                                          {/* Room quick selection dropdown */}
-                                          <select
-                                            defaultValue=""
-                                            onChange={(e) => {
-                                              const rId = e.target.value;
-                                              if (rId) {
-                                                const room = rooms.find(r => r.id === rId);
-                                                if (room) {
-                                                  const unsuitable = room.unsuitable_instruments || (() => {
-                                                    try {
-                                                      const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-                                                      return map[room.id] || [];
-                                                    } catch { return []; }
-                                                  })();
-                                                  if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
-                                                    alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
-                                                    e.target.value = "";
-                                                    return;
-                                                  }
-                                                }
-                                                setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
-                                              }
-                                            }}
+                                    <div style={{ padding: '8px 12px 12px 12px', background: '#f2f2f7', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ border: '1px solid #d1d1d6', borderRadius: '10px', overflow: 'hidden', background: '#ffffff' }}>
+                                        {data.blocks.map((block, idx) => (
+                                          <div 
+                                            key={block.id}
+                                            draggable
+                                            onDragStart={() => handleDragStartMatrix(block.id)}
                                             style={{
-                                              width: '100%',
-                                              fontSize: '0.65rem',
-                                              padding: '3px',
-                                              borderRadius: '6px',
-                                              border: '1px solid #cbd5e1',
-                                              outline: 'none',
-                                              background: '#f8fafc',
-                                              color: '#475569'
+                                              background: '#ffffff',
+                                              borderBottom: idx < data.blocks.length - 1 ? '1px solid #e5e5ea' : 'none',
+                                              padding: '10px 12px',
+                                              cursor: 'grab',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '6px'
                                             }}
                                           >
-                                            <option value="" disabled>Raum zuweisen...</option>
-                                            {rooms.map(rm => (
-                                              <option key={rm.id} value={rm.id}>{rm.name}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      ))}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                📅 {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
+                                              </span>
+                                              <span style={{ fontSize: '0.66rem', fontWeight: 500, color: '#8e8e93' }}>
+                                                {block.startTime}–{block.endTime}
+                                              </span>
+                                            </div>
+                                            
+                                            {/* Room quick selection dropdown (Apple Select style) */}
+                                            <select
+                                              defaultValue=""
+                                              onChange={(e) => {
+                                                const rId = e.target.value;
+                                                if (rId) {
+                                                  const room = rooms.find(r => r.id === rId);
+                                                  if (room) {
+                                                    const unsuitable = room.unsuitable_instruments || (() => {
+                                                      try {
+                                                        const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                                        return map[room.id] || [];
+                                                      } catch { return []; }
+                                                    })();
+                                                    if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
+                                                      alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
+                                                      e.target.value = "";
+                                                      return;
+                                                    }
+                                                  }
+                                                  setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
+                                                }
+                                              }}
+                                              style={{
+                                                width: '100%',
+                                                fontSize: '0.68rem',
+                                                padding: '6px 24px 6px 8px',
+                                                borderRadius: '6px',
+                                                border: 'none',
+                                                outline: 'none',
+                                                background: '#f2f2f7',
+                                                color: '#1c1c1e',
+                                                fontWeight: 500,
+                                                appearance: 'none',
+                                                WebkitAppearance: 'none',
+                                                backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'%238e8e93\' height=\'16\' viewBox=\'0 0 24 24\' width=\'16\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>")',
+                                                backgroundRepeat: 'no-repeat',
+                                                backgroundPositionX: '97%',
+                                                backgroundPositionY: '50%',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              <option value="" disabled>Raum zuweisen...</option>
+                                              {rooms.map(rm => (
+                                                <option key={rm.id} value={rm.id}>{rm.name}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
