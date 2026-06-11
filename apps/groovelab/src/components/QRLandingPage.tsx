@@ -300,20 +300,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         let schoolName = 'Musikschule';
         let hasCampusSub = false;
         let hasGroovelabSub = false;
+        let isTrial = false;
         if (userData.school_id) {
           const { data: schoolData } = await supabase
             .from('schools')
-            .select('name, has_campus_subscription, has_groovelab_subscription')
+            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial')
             .eq('id', userData.school_id)
             .single();
           if (schoolData) {
             schoolName = schoolData.name;
             hasCampusSub = schoolData.has_campus_subscription ?? false;
             hasGroovelabSub = schoolData.has_groovelab_subscription ?? false;
+            isTrial = schoolData.is_trial ?? false;
           }
         }
 
-        if (!hasCampusSub && !hasGroovelabSub) {
+        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
           setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
           setPageState('error');
           return;

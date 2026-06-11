@@ -1133,15 +1133,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const hasCampusSub = userSchool?.has_campus_subscription ?? false;
           const hasGroovelabSub = userSchool?.has_groovelab_subscription ?? false;
 
+          const isTrial = userSchool?.is_trial ?? false;
+
           if (isGroovelabKiosk) {
-            if (!hasGroovelabSub) {
+            if (!hasGroovelabSub && !isTrial) {
               alert("Login verweigert. Das GrooveLab App Modul ist für diese Schule aktuell nicht aktiv.");
               await supabase.auth.signOut();
               setLoading(false);
               return;
             }
           } else {
-            if (!hasCampusSub) {
+            if (!hasCampusSub && !isTrial) {
               alert("Login verweigert. Das Campus Modul ist für diese Schule aktuell nicht aktiv.");
               await supabase.auth.signOut();
               setLoading(false);
