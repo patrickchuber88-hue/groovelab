@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -1022,6 +1022,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [tickets, setTickets] = useState<any[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
@@ -9513,7 +9514,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             {/* Monospace PIN */}
                             <div style={{ flex: '1', minWidth: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontSize: '0.58rem', color: '#86868b', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
-                              <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>{emp.ausweis_nummer || 'Keine'}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>
+                                  {emp.ausweis_nummer 
+                                    ? (revealedPins[emp.id] ? emp.ausweis_nummer : '••••') 
+                                    : 'Keine'}
+                                </strong>
+                                {emp.ausweis_nummer && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRevealedPins(prev => ({ ...prev, [emp.id]: !prev[emp.id] }));
+                                    }}
+                                    style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#94a3b8' }}
+                                    title={revealedPins[emp.id] ? 'PIN verbergen' : 'PIN anzeigen'}
+                                  >
+                                    {revealedPins[emp.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {/* Action Buttons */}
@@ -9556,7 +9576,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               >
                                 Pass teilen
                               </button>
-                              {emp.id !== userId && (
+                              {emp.id !== userId && (currentUserProfile?.role === 'admin' || emp.role !== 'admin') && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
