@@ -14906,27 +14906,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ border: '1px solid #f1f5f9', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
                         {(() => {
                           const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
-                          const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
-                          const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
                           
-                          const isAnnualB2C = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                          const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
-                          
-                          // Schule Basis B2B Annual (excl. extra users)
-                          const b2bRegularAnnual = (baseB2B + (isBillingBooked ? studentSharePreview : 0)) * 12;
-                          
-                          // Schüler Basis B2C Annual (excl. extra users)
-                          const b2cRegularAnnual = isAnnualB2C 
-                            ? (students.length * pricePerStudent)
-                            : (studentLevyMonthly * 12);
+                          // School student cost depending on billing option
+                          const schoolStudentCost = (() => {
+                            if (studentBillingOption === 'option2') return students.length * 0.49;
+                            if (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') return students.length * 0.25;
+                            return 0; // option1: 0 € for school
+                          })();
 
-                          // Extra-User portion (Separate Position)
-                          const extraShareB2C = (extraBillingOption === 'option1' || extraBillingOption === 'option3_2') 
-                            ? (bookedExtraUsers * (extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0))
-                            : (extraLevyMonthly * 12);
-                          const extraAnnual = (schoolShareBookedExtra * 12) + extraShareB2C;
-                             
-                          const total2026 = b2bRegularAnnual + b2cRegularAnnual + extraAnnual;
+                          // School extra student cost depending on billing option
+                          const schoolExtraCost = (() => {
+                            if (extraBillingOption === 'option2') return bookedExtraUsers * 0.49;
+                            if (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') return bookedExtraUsers * 0.25;
+                            return 0; // option1: 0 € for school
+                          })();
+
+                          const currentMonthSchoolTotal = baseB2B + schoolStudentCost + schoolExtraCost;
+                          const annualSchoolTotal = currentMonthSchoolTotal * 12;
 
                           const recipientDetails = {
                             name: 'Simplified Work GbR',
@@ -14940,10 +14936,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               id: 'RE-2026-06', 
                               year: 'Juni 2026',
                               date: '12. Juni 2026', 
-                              b2b: baseB2B + (isBillingBooked ? studentSharePreview : 0), 
-                              b2c: studentLevyMonthly, 
-                              extra: schoolShareBookedExtra + extraLevyMonthly,
-                              amount: (baseB2B + (isBillingBooked ? studentSharePreview : 0)) + studentLevyMonthly + (schoolShareBookedExtra + extraLevyMonthly), 
+                              b2b: baseB2B, 
+                              schoolStudentCost: schoolStudentCost, 
+                              schoolExtraCost: schoolExtraCost,
+                              amount: currentMonthSchoolTotal, 
                               status: 'Entwurf',
                               recipient: recipientDetails,
                               isCurrentMonth: true
@@ -14952,10 +14948,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               id: 'RE-2026-0001', 
                               year: '2026',
                               date: '01. Jan. 2026', 
-                              b2b: b2bRegularAnnual, 
-                              b2c: b2cRegularAnnual, 
-                              extra: extraAnnual,
-                              amount: total2026, 
+                              b2b: baseB2B * 12, 
+                              schoolStudentCost: schoolStudentCost * 12, 
+                              schoolExtraCost: schoolExtraCost * 12,
+                              amount: annualSchoolTotal, 
                               status: isBillingBooked ? 'Bezahlt' : 'Entwurf',
                               recipient: recipientDetails
                             },
@@ -14964,9 +14960,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               year: '2025',
                               date: '01. Jan. 2025', 
                               b2b: 920.50, 
-                              b2c: 745.20, 
-                              extra: 300.00,
-                              amount: 1965.70, 
+                              schoolStudentCost: 0, 
+                              schoolExtraCost: 0,
+                              amount: 920.50, 
                               status: 'Bezahlt',
                               recipient: recipientDetails
                             },
@@ -14975,9 +14971,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               year: '2024',
                               date: '01. Jan. 2024', 
                               b2b: 830.00, 
-                              b2c: 650.00, 
-                              extra: 150.00,
-                              amount: 1630.00, 
+                              schoolStudentCost: 0, 
+                              schoolExtraCost: 0,
+                              amount: 830.00, 
                               status: 'Bezahlt',
                               recipient: recipientDetails
                             }
@@ -14988,7 +14984,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div>
                                 <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
                                 <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                                  Abrechnungszeitraum: {inv.year} | B2B (Schule): {inv.b2b.toFixed(2).replace('.', ',')} € | B2C (Schüler): {inv.b2c.toFixed(2).replace('.', ',')} € | Zusätzliche Schüler: {inv.extra.toFixed(2).replace('.', ',')} €
+                                  Abrechnungszeitraum: {inv.year} | Netto: {(inv.amount / 1.19).toFixed(2).replace('.', ',')} € | Zzgl. 19% MwSt.: {(inv.amount - (inv.amount / 1.19)).toFixed(2).replace('.', ',')} €
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
@@ -18086,7 +18082,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
                         <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>1</td>
+                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
+                      </td>
                       <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
                       <td style={{ padding: '12px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
                     </tr>
@@ -18129,40 +18127,48 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </tr>
                     )}
 
-                    {/* Position 4: Student Base Umlage (B2C) */}
-                    {selectedInvoice.b2c > 0 && (
+                    {/* Position 4: Schüler-Umlage (Schule-Anteil) */}
+                    {selectedInvoice.schoolStudentCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Basis Umlage (B2C Schüler-Anteil)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Direkt-Umlage für Schüler-Konten</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Umlage (Schule-Anteil)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            {studentBillingOption === 'option2' 
+                              ? `${students.length} Schüler (Schule zahlt 100% = 0,49 €)`
+                              : `${students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 €)`}
+                          </span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? (selectedInvoice.b2c).toFixed(2).replace('.', ',') : (selectedInvoice.b2c / 12).toFixed(2).replace('.', ',')} €
+                          {(selectedInvoice.schoolStudentCost / (selectedInvoice.isCurrentMonth ? 1 : 12) / students.length).toFixed(2).replace('.', ',')} €
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.b2c.toFixed(2).replace('.', ',')} €
+                          {selectedInvoice.schoolStudentCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
 
-                    {/* Position 5: Additional Students (Extra-User) */}
-                    {selectedInvoice.extra > 0 && (
+                    {/* Position 5: Zusätzliche Schüler-Zugänge (Schule-Anteil) */}
+                    {selectedInvoice.schoolExtraCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Zusätzliche Schüler-Zugänge (Zusatzbuchung)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{bookedExtraUsers} aktiv gebuchte Extra-Schüler</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Zusätzliche Schüler-Zugänge (Schule-Anteil)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            {extraBillingOption === 'option2'
+                              ? `${bookedExtraUsers} Extra-Schüler (Schule zahlt 100% = 0,49 €)`
+                              : `${bookedExtraUsers} Extra-Schüler (Kofinanzierung = Schule zahlt 0,25 €)`}
+                          </span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
-                          {(selectedInvoice.extra / (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                          {(selectedInvoice.schoolExtraCost / (selectedInvoice.isCurrentMonth ? 1 : 12) / bookedExtraUsers).toFixed(2).replace('.', ',')} €
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.extra.toFixed(2).replace('.', ',')} €
+                          {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
