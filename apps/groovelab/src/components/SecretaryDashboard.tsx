@@ -13961,7 +13961,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
                           
                           // Mixed Total B2B + B2C
-                          const mixedTotal = currentTotalB2B + studentLevyMonthly + extraLevyMonthly;
+                          const mixedTotal = (isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)) + studentLevyMonthly + extraLevyMonthly;
                           
                           return (
                             <div style={{
@@ -14000,9 +14000,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span>• Team ({allTeachers.length + employees.length}):</span>
                                       <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
                                     </div>
-                                    {isBillingBooked && studentSharePreview > 0 && (
+                                    {studentSharePreview > 0 && (
                                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                        <span>• Kofinanzierung:</span>
+                                        <span>• Kofinanzierung {!isBillingBooked && '(Vorschau)'}:</span>
                                         <strong>{studentSharePreview.toFixed(2)} €</strong>
                                       </div>
                                     )}
@@ -14074,7 +14074,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <div style={{ fontSize: '0.62rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                       <span>• Schule (B2B):</span>
-                                      <strong style={{ color: '#0f172a' }}>{currentTotalB2B.toFixed(2)} €</strong>
+                                      <strong style={{ color: '#0f172a' }}>{(isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)).toFixed(2)} €</strong>
                                     </div>
                                     <div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8', fontWeight: 700 }}>
