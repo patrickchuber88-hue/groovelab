@@ -15200,7 +15200,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           }
                         }}
                         placeholder='Neues Instrument anlegen...'
-                        style={{ flex: 1.5, height: '38px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, outline: 'none', background: 'white' }}
+                        style={{ width: '280px', height: '38px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, outline: 'none', background: 'white' }}
                       />
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box', flexShrink: 0 }}>
@@ -15244,7 +15244,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <div style={{ width: '1.5px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
 
                     {/* Search & Filter (Right) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.2, minWidth: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box', flexShrink: 0 }}>
                       <Search size={16} color="#94a3b8" />
                       <input
                         value={equipmentSearchQuery}
