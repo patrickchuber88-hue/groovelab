@@ -13994,33 +13994,54 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   {/* Unified List items list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {(() => {
-                      const filteredInstruments = selectedRoom 
-                        ? (selectedRoom.room_instruments || []).map((inst: any, idx: number) => ({
-                            id: `room-${selectedRoom.id}-${idx}`,
-                            name: inst.name,
-                            model: inst.model || '',
-                            assignedToRoomId: selectedRoom.id,
-                            assignedToRoomName: selectedRoom.name,
-                            indexInRoom: idx,
-                            isGlobalPoolItem: false
-                          }))
-                        : schoolEquipment.map((eq: any) => {
-                            const assignedRm = rooms.find(rm => 
-                              Array.isArray(rm.room_instruments) && 
-                              rm.room_instruments.some((inst: any) => inst.name === eq.name)
-                            );
-                            return {
-                              id: eq.id,
-                              name: eq.name,
-                              model: assignedRm?.room_instruments?.find((inst: any) => inst.name === eq.name)?.model || '',
-                              assignedToRoomId: assignedRm?.id || null,
-                              assignedToRoomName: assignedRm?.name || null,
-                              isGlobalPoolItem: true,
-                              globalItem: eq
-                            };
-                          });
+                      // 1. Gather all equipment instances with assignment info
+                      const allInstances = schoolEquipment.map((eq: any) => {
+                        const assignedRm = rooms.find(rm => 
+                          Array.isArray(rm.room_instruments) && 
+                          rm.room_instruments.some((inst: any) => inst.name === eq.name)
+                        );
+                        const roomInst = assignedRm?.room_instruments?.find((inst: any) => inst.name === eq.name);
+                        const model = roomInst?.model || 'Standard';
+                        const baseName = eq.name.replace(/\s+#\d+$/, '');
 
-                      if (filteredInstruments.length === 0) {
+                        return {
+                          id: eq.id,
+                          fullName: eq.name,
+                          baseName,
+                          model,
+                          roomId: assignedRm?.id || null,
+                          roomName: assignedRm?.name || null,
+                          roomInstIdx: assignedRm ? assignedRm.room_instruments.findIndex((inst: any) => inst.name === eq.name) : -1
+                        };
+                      });
+
+                      // 2. Group by baseName + model
+                      const groupsMap: Record<string, { baseName: string, model: string, instances: typeof allInstances }> = {};
+                      allInstances.forEach(inst => {
+                        const key = `${inst.baseName}:::${inst.model}`;
+                        if (!groupsMap[key]) {
+                          groupsMap[key] = {
+                            baseName: inst.baseName,
+                            model: inst.model,
+                            instances: []
+                          };
+                        }
+                        groupsMap[key].instances.push(inst);
+                      });
+
+                      let filteredGroups = Object.values(groupsMap);
+
+                      // 3. Filter groups based on selected room
+                      if (selectedRoom) {
+                        filteredGroups = filteredGroups
+                          .map(g => ({
+                            ...g,
+                            instances: g.instances.filter(inst => inst.roomId === selectedRoom.id)
+                          }))
+                          .filter(g => g.instances.length > 0);
+                      }
+
+                      if (filteredGroups.length === 0) {
                         return (
                           <p style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.78rem', fontWeight: 700, padding: '24px 0', margin: 0 }}>
                             {selectedRoom ? 'Keine Instrumente in diesem Raum' : 'Keine Instrumente im Pool'}
@@ -14028,152 +14049,134 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         );
                       }
 
-                      return filteredInstruments.map((item: any) => {
-                        const isAssigned = !!item.assignedToRoomId;
-                        
+                      return filteredGroups.map((group) => {
+                        // Find first free instance in this group for dragging
+                        const firstFreeInstance = group.instances.find(inst => !inst.roomId);
+                        const hasFree = !!firstFreeInstance;
+
                         return (
                           <div 
-                            key={item.id}
-                            draggable={!isAssigned}
+                            key={`${group.baseName}:::${group.model}`}
+                            draggable={hasFree && !selectedRoom}
                             onDragStart={(e) => {
-                              if (isAssigned) return;
-                              e.dataTransfer.setData("text/plain", item.name);
+                              if (!firstFreeInstance) return;
+                              e.dataTransfer.setData("text/plain", firstFreeInstance.fullName);
                               e.dataTransfer.effectAllowed = "copyMove";
-                            }}
-                            onClick={() => {
-                              if (item.assignedToRoomId) {
-                                const targetRoomId = item.assignedToRoomId;
-                                const targetIdx = item.isGlobalPoolItem ? 
-                                  (rooms.find(r => r.id === targetRoomId)?.room_instruments || []).findIndex((inst: any) => inst.name === item.name) : 
-                                  item.indexInRoom;
-                                
-                                if (targetIdx !== -1) {
-                                  setEditingRoomInstrument({ 
-                                    roomId: targetRoomId, 
-                                    index: targetIdx, 
-                                    name: item.name, 
-                                    model: item.model || '' 
-                                  });
-                                  setEditRoomInstFormName(item.name);
-                                  setEditRoomInstFormModel(item.model || '');
-                                }
-                              }
                             }}
                             style={{
                               display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '12px 16px',
+                              flexDirection: 'column',
+                              gap: '10px',
+                              padding: '16px',
                               background: 'white',
                               border: '1px solid #f1f5f9',
-                              borderRadius: '12px',
-                              cursor: isAssigned ? (selectedRoom ? 'pointer' : 'default') : 'grab',
+                              borderRadius: '16px',
+                              cursor: (hasFree && !selectedRoom) ? 'grab' : 'default',
                               transition: 'all 0.2s',
-                              opacity: (!selectedRoom && isAssigned) ? 0.65 : 1,
                               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                             }}
-                            className={isAssigned && !selectedRoom ? "" : "hover-scale-mini"}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: '1.2rem' }}>🎹</span>
-                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {item.name}
-                                </span>
-                                {item.model && (
-                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
-                                    Modell: {item.model}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '1.3rem' }}>🎹</span>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>
+                                    {group.baseName}
                                   </span>
-                                )}
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
+                                    Modell: {group.model} ({group.instances.length} {group.instances.length === 1 ? 'Exemplar' : 'Exemplare'})
+                                  </span>
+                                </div>
                               </div>
+
+                              {/* Delete group action if completely unassigned */}
+                              {!selectedRoom && group.instances.every(inst => !inst.roomId) && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`Möchtest du alle ${group.instances.length} Exemplare von „${group.baseName}“ löschen?`)) {
+                                      for (const inst of group.instances) {
+                                        await supabase.from('school_equipment').delete().eq('id', inst.id);
+                                      }
+                                      setSchoolEquipment(prev => prev.filter(eq => !group.instances.some(inst => inst.id === eq.id)));
+                                    }
+                                  }}
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                              {/* Room assignment badge */}
-                              {isAssigned ? (
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: 800, 
-                                  color: '#0b57d0', 
-                                  background: '#eff6ff', 
-                                  border: '1.5px solid #dbeafe',
-                                  padding: '4px 10px', 
-                                  borderRadius: '8px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontFamily: 'Urbanist'
-                                }}>
-                                  🚪 {item.assignedToRoomName}
-                                </span>
-                              ) : (
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: 800, 
-                                  color: '#475569', 
-                                  background: '#f8fafc', 
-                                  border: '1.5px solid #e2e8f0',
-                                  padding: '4px 10px', 
-                                  borderRadius: '8px',
-                                  fontFamily: 'Urbanist'
-                                }}>
-                                  📦 Im Pool / Frei
-                                </span>
-                              )}
-
-                              {/* Actions */}
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {isAssigned ? (
-                                  <button
-                                    onClick={async (e) => {
+                            {/* ASSIGNED INSTANCES FIELD / BADGES ROW */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Standorte:</span>
+                              
+                              {group.instances.map((inst) => {
+                                const isInstAssigned = !!inst.roomId;
+                                
+                                return (
+                                  <div 
+                                    key={inst.id}
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      const targetRoomId = item.assignedToRoomId;
-                                      const targetIdx = item.isGlobalPoolItem ? 
-                                        (rooms.find(r => r.id === targetRoomId)?.room_instruments || []).findIndex((inst: any) => inst.name === item.name) : 
-                                        item.indexInRoom;
-                                      if (targetIdx !== -1) {
-                                        await handleRemoveRoomInstrument(targetRoomId, targetIdx);
+                                      if (isInstAssigned) {
+                                        setEditingRoomInstrument({ 
+                                          roomId: inst.roomId!, 
+                                          index: inst.roomInstIdx, 
+                                          name: inst.fullName, 
+                                          model: inst.model || '' 
+                                        });
+                                        setEditRoomInstFormName(inst.fullName);
+                                        setEditRoomInstFormModel(inst.model || '');
                                       }
                                     }}
                                     style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#ef4444',
-                                      fontSize: '0.72rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '4px 10px',
+                                      borderRadius: '8px',
+                                      background: isInstAssigned ? '#eff6ff' : '#f8fafc',
+                                      border: isInstAssigned ? '1.5px solid #dbeafe' : '1.5px solid #e2e8f0',
+                                      cursor: isInstAssigned ? 'pointer' : 'grab',
+                                      fontSize: '0.68rem',
                                       fontWeight: 800,
-                                      cursor: 'pointer',
-                                      padding: '4px 8px',
-                                      borderRadius: '6px',
-                                      transition: 'all 0.2s',
-                                      fontFamily: 'Urbanist'
+                                      color: isInstAssigned ? '#0b57d0' : '#475569',
+                                      fontFamily: 'Urbanist',
+                                      transition: 'all 0.15s'
                                     }}
                                     className="hover-scale-mini"
-                                    title="Freigeben (zurück in den Pool legen)"
+                                    title={isInstAssigned ? "Klicken zum Bearbeiten des Modells in diesem Raum" : "Ziehe dieses freie Instrument auf einen Raum"}
                                   >
-                                    Freigeben
-                                  </button>
-                                ) : (
-                                  !selectedRoom && (
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        await handleDeleteEquipment(item.id);
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#ef4444',
-                                        cursor: 'pointer',
-                                        padding: '4px'
-                                      }}
-                                      className="hover-scale-mini"
-                                      title="Löschen"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )
-                                )}
-                              </div>
+                                    {isInstAssigned ? (
+                                      <>
+                                        <span>🚪 {inst.roomName}</span>
+                                        <button
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            await handleRemoveRoomInstrument(inst.roomId!, inst.roomInstIdx);
+                                          }}
+                                          style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: '#ef4444',
+                                            fontWeight: 900,
+                                            marginLeft: '4px',
+                                            cursor: 'pointer',
+                                            padding: 0
+                                          }}
+                                          title="Freigeben (zurück in den Pool)"
+                                        >
+                                          ✕
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <span>📦 Pool / Frei</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
 
                           </div>
