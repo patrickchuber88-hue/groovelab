@@ -1254,10 +1254,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   // Equipment State
   const [schoolEquipment, setSchoolEquipment] = useState<any[]>([]);
   const [equipmentFormName, setEquipmentFormName] = useState('');
+  const [equipmentFormQty, setEquipmentFormQty] = useState<number>(1);
   const [editingEquipment, setEditingEquipment] = useState<any | null>(null);
   const [equipmentSaving, setEquipmentSaving] = useState(false);
   const [selectedEquipmentRoomId, setSelectedEquipmentRoomId] = useState<string>('All');
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+  const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
+  const [editRoomInstFormName, setEditRoomInstFormName] = useState<string>('');
+  const [editRoomInstFormModel, setEditRoomInstFormModel] = useState<string>('');
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
@@ -6066,15 +6070,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         if (error) throw error;
         setSchoolEquipment(prev => prev.map(e => e.id === editingEquipment.id ? { ...e, name: equipmentFormName.trim() } : e));
       } else {
-        const { data, error } = await supabase.from('school_equipment').insert({
-          school_id: schoolId,
-          name: equipmentFormName.trim()
-        }).select().single();
+        const qty = Math.max(1, Math.min(50, equipmentFormQty));
+        const inserts = [];
+        if (qty === 1) {
+          inserts.push({ school_id: schoolId, name: equipmentFormName.trim() });
+        } else {
+          for (let i = 1; i <= qty; i++) {
+            inserts.push({ school_id: schoolId, name: `${equipmentFormName.trim()} #${i}` });
+          }
+        }
+
+        const { data, error } = await supabase.from('school_equipment').insert(inserts).select();
         if (error) throw error;
-        if (data) setSchoolEquipment(prev => [...prev, data]);
+        if (data) setSchoolEquipment(prev => [...prev, ...data]);
       }
       setEditingEquipment(null);
       setEquipmentFormName('');
+      setEquipmentFormQty(1);
     } catch (e: any) {
       console.error('Equipment save error:', e);
       alert('Fehler beim Speichern der Ausstattung: ' + e.message);
@@ -6192,6 +6204,51 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     } catch (err: any) {
       console.error("Error removing room instrument:", err);
     }
+  };
+
+  const handleSaveRoomInstrumentEdit = async (name: string, model: string) => {
+    if (!editingRoomInstrument) return;
+    const { roomId, index } = editingRoomInstrument;
+
+    const targetRoom = rooms.find(r => r.id === roomId);
+    if (!targetRoom) return;
+
+    const currentInsts = Array.isArray(targetRoom.room_instruments) 
+      ? [...targetRoom.room_instruments]
+      : [];
+
+    if (currentInsts[index]) {
+      currentInsts[index] = { name: name.trim(), model: model.trim() };
+    }
+
+    // Update LocalStorage first
+    try {
+      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+      map[roomId] = currentInsts;
+      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Update state
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: currentInsts } : r));
+
+    // Update Supabase
+    try {
+      const { error } = await supabase.from('rooms').update({
+        room_instruments: currentInsts
+      }).eq('id', roomId);
+
+      if (error && error.message.includes("room_instruments")) {
+        console.warn("Supabase room_instruments column missing, using local storage fallback.");
+      } else if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      console.error("Error saving room instrument edit:", err);
+    }
+
+    setEditingRoomInstrument(null);
   };
 
   const getTabTitle = () => {
@@ -13912,6 +13969,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {selectedRoom.room_instruments.map((inst: any, idx: number) => (
                           <div 
                             key={idx} 
+                            onClick={() => {
+                              setEditingRoomInstrument({ roomId: selectedRoom.id, index: idx, name: inst.name, model: inst.model || '' });
+                              setEditRoomInstFormName(inst.name);
+                              setEditRoomInstFormModel(inst.model || '');
+                            }}
                             style={{ 
                               display: 'flex', 
                               alignItems: 'center', 
@@ -13919,8 +13981,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               padding: '10px 14px', 
                               borderRadius: '12px', 
                               border: '1px solid #f1f5f9', 
-                              background: '#f8fafc' 
+                              background: '#f8fafc',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
                             }}
+                            className="hover-scale-mini"
                           >
                             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                               <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>🎹 {inst.name}</span>
@@ -13948,13 +14013,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
 
                   {/* Inline creation form */}
-                  <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1' }}>
+                  <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center' }}>
                     <input
                       value={equipmentFormName}
                       onChange={e => setEquipmentFormName(e.target.value)}
                       placeholder='Neues Instrument anlegen (z.B. „Schlagzeug“)'
                       style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }}
                     />
+                    
+                    {/* Quantity Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={equipmentFormQty}
+                        onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{ width: '50px', padding: '8px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none' }}
+                      />
+                    </div>
+
                     <button
                       onClick={handleSaveEquipment}
                       disabled={equipmentSaving || !equipmentFormName.trim()}
@@ -13966,43 +14045,142 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                   {/* Instruments tags grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '4px' }}>
-                    {schoolEquipment.map(eq => (
-                      <div 
-                        key={eq.id} 
-                        draggable={true}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", eq.name);
-                          e.dataTransfer.effectAllowed = "copyMove";
-                        }}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'space-between', 
-                          padding: '10px 14px', 
-                          borderRadius: '12px', 
-                          border: '1.5px solid #e2e8f0', 
-                          background: 'white', 
-                          cursor: 'grab', 
-                          transition: 'all 0.15s' 
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155' }}>🎸 {eq.name}</span>
-                        {!selectedRoom && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} 
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                    {schoolEquipment.map(eq => {
+                      const assignedRoom = rooms.find(rm => 
+                        Array.isArray(rm.room_instruments) && 
+                        rm.room_instruments.some((inst: any) => inst.name === eq.name)
+                      );
+                      
+                      return (
+                        <div 
+                          key={eq.id} 
+                          draggable={!assignedRoom}
+                          onDragStart={(e) => {
+                            if (assignedRoom) return;
+                            e.dataTransfer.setData("text/plain", eq.name);
+                            e.dataTransfer.effectAllowed = "copyMove";
+                          }}
+                          style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            gap: '4px',
+                            padding: '10px 14px', 
+                            borderRadius: '12px', 
+                            border: assignedRoom ? '1.5px solid #e2e8f0' : '1.5px solid #0b57d0', 
+                            background: assignedRoom ? '#f1f5f9' : 'white', 
+                            opacity: assignedRoom ? 0.65 : 1,
+                            cursor: assignedRoom ? 'not-allowed' : 'grab', 
+                            transition: 'all 0.15s' 
+                          }}
+                          className={assignedRoom ? "" : "hover-scale-mini"}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155' }}>🎸 {eq.name}</span>
+                            {!selectedRoom && !assignedRoom && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteEquipment(eq.id); }} 
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                          {assignedRoom && (
+                            <span style={{ 
+                              fontSize: '0.62rem', 
+                              fontWeight: 800, 
+                              color: '#475569', 
+                              background: '#e2e8f0', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px',
+                              alignSelf: 'flex-start',
+                              marginTop: '2px'
+                            }}>
+                              🚪 {assignedRoom.name}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                     {schoolEquipment.length === 0 && (
                       <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 700, padding: '12px 0' }}>Noch keine Instrumente im Pool</p>
                     )}
                   </div>
                 </div>
+
+                {/* EDIT ROOM INSTRUMENT MODAL */}
+                {editingRoomInstrument && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(15, 23, 42, 0.3)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      padding: '28px',
+                      width: '400px',
+                      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px'
+                    }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          🔧 Instrument bearbeiten
+                        </h3>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
+                          Passe den Anzeigenamen und die genaue Modellbezeichnung für diesen Raum an.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Anzeigename</label>
+                        <input
+                          value={editRoomInstFormName}
+                          onChange={e => setEditRoomInstFormName(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Modellbezeichnung</label>
+                        <input
+                          value={editRoomInstFormModel}
+                          onChange={e => setEditRoomInstFormModel(e.target.value)}
+                          placeholder="z.B. Yamaha U1, Roland FP-30..."
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                        <button
+                          onClick={() => handleSaveRoomInstrumentEdit(editRoomInstFormName, editRoomInstFormModel)}
+                          disabled={!editRoomInstFormName.trim()}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                        >
+                          Speichern
+                        </button>
+                        <button
+                          onClick={() => setEditingRoomInstrument(null)}
+                          style={{ padding: '12px 18px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
 
