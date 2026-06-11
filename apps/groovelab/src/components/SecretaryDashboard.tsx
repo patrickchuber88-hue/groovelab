@@ -1980,7 +1980,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setAlerts(mappedAlerts);
 
       // Fetch all schedules for this school to build the Room Planner Matrix
-      let allSchedulesData = [];
+      let allSchedulesData: any[] = [];
       try {
         const { data, error: schedErr } = await supabase
           .from('schedules')
