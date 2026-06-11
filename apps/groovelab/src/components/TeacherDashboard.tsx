@@ -797,7 +797,8 @@ export function TeacherDashboard({
     status: 'active',
     is_trial: false,
     trial_ends_at: '',
-    contract_ends_at: ''
+    contract_ends_at: '',
+    app_usage_mode: 'student_only'
   });
   const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -4420,7 +4421,8 @@ export function TeacherDashboard({
       contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
       is_campus_active: activePlatform === 'campus',
       is_groovelab_active: activePlatform === 'groovelab',
-      teacher_id: userId
+      teacher_id: userId,
+      app_usage_mode: newStudent.app_usage_mode || 'student_only'
     }).select().single();
     
     if (error) {
@@ -4438,7 +4440,8 @@ export function TeacherDashboard({
         status: 'active',
         is_trial: false,
         trial_ends_at: '',
-        contract_ends_at: ''
+        contract_ends_at: '',
+        app_usage_mode: 'student_only'
       }); 
       fetchData();
     }
@@ -4456,7 +4459,8 @@ export function TeacherDashboard({
       trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
       contract_ends_at: editingStudent.contract_ends_at || null,
       is_external_vocalist: editingStudent.is_external_vocalist || false,
-      instrument: editingStudent.is_external_vocalist ? 'Vocals' : 'Musiker'
+      instrument: editingStudent.is_external_vocalist ? 'Vocals' : 'Musiker',
+      app_usage_mode: editingStudent.app_usage_mode || 'student_only'
     }).eq('id', editingStudent.id);
     
     if (error) {
@@ -10672,6 +10676,41 @@ export function TeacherDashboard({
                 />
               </div>
 
+              {/* Campus app_usage_mode Toggle (Only for Campus) */}
+              {activePlatform === 'campus' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'student_only'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
+                        color: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#8b5cf6' : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      📱 Selbstnutzer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'parent_hybrid'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: newStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                        color: newStudent.app_usage_mode === 'parent_hybrid' ? '#8b5cf6' : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: newStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      👪 Eltern-Hybrid
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                 <button 
                   type="button" 
@@ -10803,6 +10842,41 @@ export function TeacherDashboard({
                   style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
                 />
               </div>
+
+              {/* Campus app_usage_mode Toggle (Only for Campus) */}
+              {activePlatform === 'campus' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'student_only'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
+                        color: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#8b5cf6' : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      📱 Selbstnutzer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'parent_hybrid'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: editingStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                        color: editingStudent.app_usage_mode === 'parent_hybrid' ? '#8b5cf6' : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: editingStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      👪 Eltern-Hybrid
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                 <button 

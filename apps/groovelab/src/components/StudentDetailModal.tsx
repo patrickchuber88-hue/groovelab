@@ -134,6 +134,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
+  const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
   const [campusRequestSent, setCampusRequestSent] = useState<boolean>(() => {
     return localStorage.getItem(`req_campus_${student.id}`) === 'true';
   });
@@ -519,6 +520,20 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleUpdateAppUsageMode = async (mode: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ app_usage_mode: mode })
+        .eq('id', student.id);
+      if (error) throw error;
+      setAppUsageMode(mode);
+      student.app_usage_mode = mode;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Nutzungsmodus: ' + err.message);
+    }
+  };
+
   const handleUpdateEvolutionLevel = async (level: number) => {
     try {
       const { error } = await supabase
@@ -663,13 +678,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // Fetch latest user details (e.g. is_campus_active, is_groovelab_active) directly to prevent stale dashboard props
       const { data: latestUser } = await supabase
         .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration')
+        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode')
         .eq('id', student.id)
         .single();
       if (latestUser) {
         setIsCampusActive(latestUser.is_campus_active ?? false);
         setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
         setLessonDuration(latestUser.lesson_duration || 30);
+        setAppUsageMode(latestUser.app_usage_mode || 'student_only');
       }
 
       // Fetch avatar details
@@ -1793,6 +1809,44 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     </div>
                   )}
                 </div>
+
+                {isCampusActive && (
+                  <>
+                    <div style={{ height: '1px', background: '#f1f5f9' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
+                      </div>
+                      {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
+                        <select
+                          value={appUsageMode}
+                          onChange={(e) => handleUpdateAppUsageMode(e.target.value)}
+                          style={{
+                            background: '#f8fafc',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            padding: '6px 12px',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            color: '#1e293b',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="student_only">📱 Selbstnutzer</option>
+                          <option value="parent_hybrid">👪 Eltern-Hybrid</option>
+                        </select>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                            {appUsageMode === 'parent_hybrid' ? '👪 Eltern-Hybrid' : '📱 Selbstnutzer'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
               </div>
             </section>
 

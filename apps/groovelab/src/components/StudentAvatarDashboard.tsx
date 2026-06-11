@@ -2101,6 +2101,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
   const [isGraceActive, setIsGraceActive] = useState(false);
   const [isDesktopFallback, setIsDesktopFallback] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationDetails, setCelebrationDetails] = useState<{
+    xpGained: number;
+    streakFlame: number;
+    sessionCompletedTarget: boolean;
+    usedJokerThisSession: boolean;
+    streak: number;
+  } | null>(null);
+  const [lastFinishedTimestamp, setLastFinishedTimestamp] = useState<number | null>(null);
   const wakeLockRef = useRef<any>(null);
 
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
@@ -2973,22 +2982,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .eq('id', studentId);
       }
 
-      let successMsg = xpActive 
-        ? `Klasse geübt! Du hast +${totalMinutes * 10} XP erhalten! ⚡`
-        : `Klasse geübt! Du hast erfolgreich geübt! ⚡`;
-      if (sessionCompletedTarget) {
-        if (usedJokerThisSession) {
-          successMsg += ` 🎯 Dein wöchentlicher Joker wurde eingesetzt, um deinen Streak von ${streak} Tagen zu retten! Dein Streak liegt jetzt bei ${streakFlame} Flammen! 🔥`;
-        } else {
-          successMsg += ` Du hast die tägliche Fokuszeit gemeistert! Dein Streak ist bei ${streakFlame} Flammen! 🔥`;
-        }
-      }
-      alert(successMsg);
+      setCelebrationDetails({
+        xpGained: totalMinutes * 10,
+        streakFlame: streakFlame,
+        sessionCompletedTarget: sessionCompletedTarget,
+        usedJokerThisSession: usedJokerThisSession,
+        streak: streak
+      });
+      setShowCelebration(true);
+      setLastFinishedTimestamp(Date.now());
+      
+      // Clear highlight after 8 seconds
+      setTimeout(() => {
+        setLastFinishedTimestamp(null);
+      }, 8000);
 
       setSecondsElapsed(0);
       setIsExtraTime(false);
       fetchStudentAndAvatar();
       fetchStudentProgress();
+      fetchFokusLogs();
+      setSidebarTab('logbook');
 
     } catch (err: any) {
       console.error('Error finishing session:', err);
@@ -4592,6 +4606,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {/* 1. Flat on Table Mode */}
                       {isPhoneFlat && (
                         <div 
+                          className="fokus-overlay-container"
                           style={{
                             position: 'fixed',
                             inset: 0,
@@ -4607,166 +4622,99 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             overflow: 'hidden'
                           }}
                         >
-                          {flatType === 'face-down' ? (
-                            /* Pure battery-saving black layout with a extremely dim pulsing indicator */
-                            <div style={{ textAlign: 'center', opacity: 0.25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                              <Moon size={24} style={{ color: '#52525b', animation: 'pulseSoft 2s infinite' }} />
-                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3f3f46', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                                FOKUS AKTIV
-                              </div>
-                            </div>
-                          ) : (
-                            /* Premium Apple-like StandBy Screen for flat face-up / desktop */
-                            <div style={{
-                              position: 'relative',
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: 'radial-gradient(circle at center, rgba(17, 24, 39, 1) 0%, rgba(9, 9, 11, 1) 100%)'
+                          {/* CSS for hover buttons and breathing effect */}
+                          <style dangerouslySetInnerHTML={{__html: `
+                            @keyframes timerBreathe {
+                              0%, 100% { opacity: 0.8; text-shadow: 0 0 10px rgba(255,255,255,0.05); }
+                              50% { opacity: 1; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
+                            }
+                            .fokus-digits {
+                              animation: timerBreathe 4s ease-in-out infinite;
+                            }
+                            .fokus-controls {
+                              opacity: 0;
+                              transform: translateY(10px);
+                              transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                            }
+                            .fokus-overlay-container:hover .fokus-controls {
+                              opacity: 1;
+                              transform: translateY(0);
+                            }
+                          `}} />
+
+                          {/* Large Timer digits only */}
+                          <div className="fokus-digits" style={{
+                            fontSize: 'clamp(5.5rem, 18vw, 10rem)',
+                            fontWeight: 100,
+                            fontFamily: 'system-ui, -apple-system, monospace',
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1,
+                            color: '#ffffff',
+                            textAlign: 'center',
+                            zIndex: 10
+                          }}>
+                            {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
+                            {String(secondsElapsed % 60).padStart(2, '0')}
+                          </div>
+
+                          {/* Action buttons only visible on desktop fallback or hovered */}
+                          {isDesktopFallback && (
+                            <div className="fokus-controls" style={{ 
+                              position: 'absolute',
+                              bottom: '60px',
+                              display: 'flex', 
+                              gap: '16px', 
+                              zIndex: 100 
                             }}>
-                              {/* Glowing Radial Orb Underlay */}
-                              <div style={{
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                width: '350px',
-                                height: '350px',
-                                borderRadius: '50%',
-                                background: isExtraTime 
-                                  ? 'radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(0,0,0,0) 70%)'
-                                  : 'radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, rgba(0,0,0,0) 70%)',
-                                transform: 'translate(-50%, -50%)',
-                                zIndex: 1,
-                                animation: 'breathGlow 6s ease-in-out infinite'
-                              }} />
-
-                              {/* Content Card container */}
-                              <div style={{
-                                zIndex: 2,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '32px',
-                                animation: 'breathRing 5s ease-in-out infinite'
-                              }}>
-                                {/* Pulsing Ring representing target progress */}
-                                <div style={{
-                                  position: 'relative',
-                                  width: '240px',
-                                  height: '240px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
-                                    <circle cx="120" cy="120" r="100" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
-                                    <circle 
-                                      cx="120" 
-                                      cy="120" 
-                                      r="100" 
-                                      fill="none" 
-                                      stroke={isExtraTime ? 'url(#glowGreenGradient)' : 'url(#glowBlueGradient)'} 
-                                      strokeWidth="8" 
-                                      strokeDasharray={2 * Math.PI * 100}
-                                      strokeDashoffset={
-                                        isExtraTime 
-                                          ? 0 
-                                          : 2 * Math.PI * 100 - (2 * Math.PI * 100 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
-                                      }
-                                      strokeLinecap="round"
-                                      style={{ transition: 'stroke-dashoffset 1s linear' }}
-                                    />
-                                    <defs>
-                                      <linearGradient id="glowBlueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stopColor="#3b82f6" />
-                                        <stop offset="100%" stopColor="#8b5cf6" />
-                                      </linearGradient>
-                                      <linearGradient id="glowGreenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stopColor="#10b981" />
-                                        <stop offset="100%" stopColor="#059669" />
-                                      </linearGradient>
-                                    </defs>
-                                  </svg>
-                                  <div style={{
-                                    position: 'absolute',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center'
-                                  }}>
-                                    <div style={{
-                                      fontSize: '3.6rem',
-                                      fontWeight: 200,
-                                      color: '#ffffff',
-                                      fontFamily: '"Plus Jakarta Sans", monospace',
-                                      letterSpacing: '-0.03em',
-                                      lineHeight: 1
-                                    }}>
-                                      {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
-                                      {String(secondsElapsed % 60).padStart(2, '0')}
-                                    </div>
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      marginTop: '8px',
-                                      fontSize: '0.62rem',
-                                      fontWeight: 800,
-                                      color: isExtraTime ? '#10b981' : '#64748b',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.08em'
-                                    }}>
-                                      {isExtraTime ? (
-                                        <>
-                                          <Zap size={10} fill="#10b981" style={{ animation: 'pulseSoft 1.5s infinite' }} />
-                                          <span>Extra-Zeit</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2563eb', animation: 'pulseSoft 1.5s infinite' }} />
-                                          <span>Fokus Aktiv</span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Practice Topic Info */}
-                                <div style={{ textAlign: 'center' }}>
-                                  <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#4b5563', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px' }}>
-                                    Übe-Thema
-                                  </div>
-                                  <div style={{
-                                    fontSize: '0.95rem',
-                                    fontWeight: 700,
-                                    color: '#f3f4f6',
-                                    background: 'rgba(255, 255, 255, 0.03)',
-                                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                                    padding: '6px 16px',
-                                    borderRadius: '12px',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                                  }}>
-                                    {selectedTopic || 'Allgemeines Üben'}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Help note at the bottom */}
-                              <div style={{
-                                position: 'absolute',
-                                bottom: '32px',
-                                fontSize: '0.72rem',
-                                color: '#374151',
-                                fontWeight: 600,
-                                letterSpacing: '0.05em',
-                                textTransform: 'uppercase'
-                              }}>
-                                {isDesktopFallback 
-                                  ? 'Wechsle den Tab nicht, um den Fokus fortzusetzen' 
-                                  : 'Nimm das Handy, um die Session zu beenden'}
-                              </div>
+                              <button
+                                onClick={finishPracticeSession}
+                                style={{
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '12px 28px',
+                                  borderRadius: '14px',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.2)',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
+                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                              >
+                                🏁 Beenden
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                                    setSecondsElapsed(0);
+                                    setSessionActive(false);
+                                    setIsExtraTime(false);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  color: '#ffffff',
+                                  padding: '12px 24px',
+                                  borderRadius: '14px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                  e.currentTarget.style.transform = 'scale(1.03)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                Abbrechen
+                              </button>
                             </div>
                           )}
                         </div>
@@ -4886,6 +4834,126 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* 3. Celebration / Success Logbook Overlay */}
+                  {showCelebration && celebrationDetails && (
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 10003, // Topmost layer
+                        background: 'rgba(9, 9, 11, 0.75)',
+                        backdropFilter: 'blur(20px)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '24px',
+                        color: '#ffffff',
+                        userSelect: 'none',
+                        fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
+                      }}
+                    >
+                      <div style={{
+                        width: '100%',
+                        maxWidth: '360px',
+                        background: 'rgba(24, 24, 27, 0.9)',
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                        borderRadius: '32px',
+                        padding: '40px 30px',
+                        textAlign: 'center',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '24px',
+                        position: 'relative'
+                      }}>
+                        {/* Golden Flame Sparkle Effect */}
+                        <div style={{
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '26px',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#10b981',
+                          fontSize: '2rem'
+                        }}>
+                          🔥
+                        </div>
+
+                        <div>
+                          <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                            Großartig geübt!
+                          </h3>
+                          <p style={{ fontSize: '0.88rem', color: '#a1a1aa', fontWeight: 500, lineHeight: 1.5, margin: 0 }}>
+                            Deine Übe-Session wurde erfolgreich im Log-Buch gespeichert!
+                          </p>
+                        </div>
+
+                        <div style={{
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: '20px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#71717a', fontWeight: 600 }}>XP erhalten:</span>
+                            <span style={{ color: '#38bdf8', fontWeight: 800 }}>+{celebrationDetails.xpGained} XP ⚡</span>
+                          </div>
+                          
+                          {celebrationDetails.sessionCompletedTarget && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                              <span style={{ color: '#71717a', fontWeight: 600 }}>Tagesziel:</span>
+                              <span style={{ color: '#10b981', fontWeight: 800 }}>Erreicht! 🏆</span>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                            <span style={{ color: '#71717a', fontWeight: 600 }}>Streak:</span>
+                            <span style={{ color: '#fb923c', fontWeight: 800 }}>{celebrationDetails.streakFlame} Tage 🔥</span>
+                          </div>
+
+                          {celebrationDetails.usedJokerThisSession && (
+                            <div style={{ fontSize: '0.78rem', color: '#fb923c', fontWeight: 600, marginTop: '4px', textAlign: 'center', background: 'rgba(251, 146, 60, 0.08)', padding: '6px 12px', borderRadius: '10px' }}>
+                              🎯 Joker eingesetzt, um deinen Streak von {celebrationDetails.streak} Tagen zu retten!
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setShowCelebration(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '14px 20px',
+                            borderRadius: '16px',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.2)',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          Log-Buch ansehen
+                        </button>
+                      </div>
+                    </div>
                   )}
 
                   <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
@@ -5574,6 +5642,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     );
                                   }
                                 } else if (hasMastered) {
+                                  const isJustFinished = isToday && lastFinishedTimestamp && (Date.now() - lastFinishedTimestamp < 8000);
                                   return (
                                     <div 
                                       style={{ 
@@ -5586,10 +5655,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
                                         gap: '12px',
-                                        boxShadow: '0 4px 12px rgba(4, 120, 87, 0.12)'
+                                        boxShadow: isJustFinished ? '0 0 16px rgba(16, 185, 129, 0.6)' : '0 4px 12px rgba(4, 120, 87, 0.12)',
+                                        animation: isJustFinished ? 'logPulseGlow 2s infinite' : 'none'
                                       }}
                                     >
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                        {isJustFinished && (
+                                          <span style={{ 
+                                            fontSize: '0.55rem', 
+                                            fontWeight: 900, 
+                                            background: '#ffffff', 
+                                            color: '#10b981', 
+                                            padding: '2px 6px', 
+                                            borderRadius: '100px', 
+                                            letterSpacing: '0.04em',
+                                            textTransform: 'uppercase',
+                                            animation: 'pulseSoft 1.5s infinite'
+                                          }}>
+                                            Neu!
+                                          </span>
+                                        )}
                                         <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
                                           {group.date}
                                         </span>
@@ -5610,6 +5695,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   );
                                 }
 
+                                const isJustFinished = isToday && lastFinishedTimestamp && (Date.now() - lastFinishedTimestamp < 8000);
                                 return (
                                   <div 
                                     style={{ 
@@ -5622,10 +5708,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
                                       gap: '12px',
-                                      borderLeft: `4px solid ${borderLeftColor}`
+                                      borderLeft: `4px solid ${borderLeftColor}`,
+                                      boxShadow: isJustFinished ? '0 0 16px rgba(234, 179, 8, 0.6)' : 'none',
+                                      animation: isJustFinished ? 'logPulseGlowYellow 2s infinite' : 'none'
                                     }}
                                   >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                      {isJustFinished && (
+                                        <span style={{ 
+                                          fontSize: '0.55rem', 
+                                          fontWeight: 900, 
+                                          background: '#eab308', 
+                                          color: '#ffffff', 
+                                          padding: '2px 6px', 
+                                          borderRadius: '100px', 
+                                          letterSpacing: '0.04em',
+                                          textTransform: 'uppercase',
+                                          animation: 'pulseSoft 1.5s infinite'
+                                        }}>
+                                          Neu!
+                                        </span>
+                                      )}
                                       <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
                                         {group.date}
                                       </span>

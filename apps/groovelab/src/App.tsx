@@ -1404,7 +1404,18 @@ if (typeof window !== 'undefined') {
     const isSuccess = msgLower.includes('erfolg') || msgLower.includes('erfolgreich') || msgLower.includes('glückwunsch') || msgLower.includes('kopiert') || msgLower.includes('bereit') || msgLower.includes('gespeichert') || msgLower.includes('zurückgesetzt') || msgLower.includes('gelöscht') || msgLower.includes('gesendet') || msgLower.includes('eingereicht') || msgLower.includes('akzeptiert') || msgLower.includes('✅') || msgLower.includes('🎉') || msgLower.includes('🤘') || msgLower.includes('🚀');
 
     let iconHtml = '';
-    let titleText = 'GrooveLab';
+    const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab';
+    let isCampus = activePlat === 'campus';
+    if (typeof window !== 'undefined' && !isCampus) {
+      if (document.body && (
+        document.body.innerText.includes('Campus Räumlichkeiten') ||
+        document.body.innerText.includes('Campus Stundenplan') ||
+        document.body.innerText.includes('Campus')
+      )) {
+        isCampus = true;
+      }
+    }
+    let titleText = isCampus ? 'Campus' : 'GrooveLab';
     let btnBackground = 'linear-gradient(135deg, #10b981, #059669)';
     let btnShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
     
@@ -1828,6 +1839,7 @@ function App() {
   const setActivePlatform = React.useCallback((val: any) => {
     React.startTransition(() => {
       setActivePlatformRaw(val);
+      localStorage.setItem('groovelab_active_platform', val);
     });
   }, []);
 

@@ -17,6 +17,20 @@ const escapeText = (str: string): string => {
     .replace(/\n/g, '\\n');
 }
 
+// Helper to get privacy-safe initials from a full name (e.g. Jonas Müller -> J. M.)
+const getInitials = (firstName: string, lastName: string): string => {
+  const getPartInitials = (nameStr: string) => {
+    if (!nameStr) return '';
+    return nameStr.trim().split(/\s+/).map(part => {
+      return part.split('-').map(subPart => subPart ? subPart[0].toUpperCase() + '.' : '').join('-');
+    }).join(' ');
+  };
+  const firstInit = getPartInitials(firstName);
+  const lastInit = getPartInitials(lastName);
+  return [firstInit, lastInit].filter(Boolean).join(' ');
+}
+
+
 // Main Edge Function Handler
 Deno.serve(async (req) => {
   // Handle CORS Preflight
@@ -249,24 +263,24 @@ Deno.serve(async (req) => {
       const statusText = isCanceled ? 'CANCELLED' : 'CONFIRMED'
 
       const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
-      const studentName = occ.student ? `${occ.student.first_name} ${occ.student.last_name}` : 'Schüler'
+      const studentInitials = occ.student ? getInitials(occ.student.first_name, occ.student.last_name) : 'Schüler'
 
       // Set elegant, customized calendar titles depending on whether user is student or teacher
       let summary = ''
       if (role === 'student') {
         summary = isCanceled 
-          ? `❌ ABSAGE: Unterricht bei ${teacherName}`
-          : `🎸 Unterricht bei ${teacherName}`
+          ? `❌ ABSAGE: ${studentInitials} - Unterricht bei ${teacherName}`
+          : `🎵 ${studentInitials} - Unterricht bei ${teacherName}`
       } else {
         summary = isCanceled
-          ? `❌ ABSAGE: Unterricht mit ${studentName}`
-          : `🥁 Unterricht mit ${studentName}`
+          ? `❌ ABSAGE: Unterricht mit ${studentInitials}`
+          : `🎵 Unterricht mit ${studentInitials}`
       }
 
       // Add detailed description for convenient smartphone viewing
       let descriptionLines = []
       descriptionLines.push(`Status: ${isCanceled ? 'Abgesagt ❌' : 'Bestätigt 📅'}`)
-      descriptionLines.push(`Schüler: ${studentName}`)
+      descriptionLines.push(`Schüler: ${studentInitials}`)
       descriptionLines.push(`Lehrer: ${teacherName}`)
       descriptionLines.push(`Raum: ${occ.room_name}`)
       if (occ.duration) descriptionLines.push(`Dauer: ${occ.duration} Minuten`)

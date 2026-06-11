@@ -1394,7 +1394,7 @@ export function AdminDashboard({
   const [parsedStudents, setParsedStudents] = useState<{ firstName: string; lastName: string; instrument: string }[]>([]);
   const [defaultInstrumentForBulk, setDefaultInstrumentForBulk] = useState('Gitarre');
   const [isBulkSaving, setIsBulkSaving] = useState(false);
-  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' });
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' });
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
@@ -2836,7 +2836,8 @@ export function AdminDashboard({
       is_external_vocalist: newStudent.isExternalVocalist,
       instrument: studentInstrument,
       is_campus_active: activePlatform === 'campus',
-      is_groovelab_active: activePlatform === 'groovelab'
+      is_groovelab_active: activePlatform === 'groovelab',
+      app_usage_mode: newStudent.app_usage_mode || 'student_only'
     }).select().single();
     
     if (error) alert('Fehler: ' + error.message);
@@ -2854,7 +2855,7 @@ export function AdminDashboard({
 
       setStudents([...students, data]); 
       setShowAddStudent(false); 
-      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre' }); 
+      setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' }); 
     }
   };
 
@@ -2905,7 +2906,8 @@ export function AdminDashboard({
         is_external_vocalist: isVocalist,
         instrument: studentInstrument,
         is_campus_active: activePlatform === 'campus',
-        is_groovelab_active: activePlatform === 'groovelab'
+        is_groovelab_active: activePlatform === 'groovelab',
+        app_usage_mode: 'student_only'
       };
     });
 
@@ -2958,7 +2960,8 @@ export function AdminDashboard({
       trial_ends_at: editingStudent.trial_ends_at || null,
       contract_ends_at: editingStudent.contract_ends_at || null,
       instrument: studentInstrument,
-      avatar_url: studentAvatarUrl
+      avatar_url: studentAvatarUrl,
+      app_usage_mode: editingStudent.app_usage_mode || 'student_only'
     }).eq('id', editingStudent.id);
     
     if (error) alert('Fehler: ' + error.message);
@@ -4687,6 +4690,41 @@ export function AdminDashboard({
                 </select>
               </div>
 
+              {/* Campus app_usage_mode Toggle (Only for Campus) */}
+              {activePlatform === 'campus' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'student_only'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
+                        color: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? brandColor : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      📱 Selbstnutzer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'parent_hybrid'})}
+                      style={{
+                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                        background: newStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                        color: newStudent.app_usage_mode === 'parent_hybrid' ? brandColor : '#64748b',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                        boxShadow: newStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      👪 Eltern-Hybrid
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* External Vocalist Toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                  <div 
@@ -4911,6 +4949,41 @@ export function AdminDashboard({
                     </button>
                   </div>
                 </div>
+
+                {/* Campus app_usage_mode Toggle (Only for Campus) */}
+                {activePlatform === 'campus' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Campus-Nutzungsmodus</label>
+                    <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'student_only'})}
+                        style={{
+                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                          background: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
+                          color: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? brandColor : '#64748b',
+                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        📱 Selbstnutzer (Student)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'parent_hybrid'})}
+                        style={{
+                          flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                          background: editingStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                          color: editingStudent.app_usage_mode === 'parent_hybrid' ? brandColor : '#64748b',
+                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: editingStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        👪 Eltern-Hybrid
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
@@ -5692,7 +5765,20 @@ export function AdminDashboard({
         const em = parseInt(emStr) || 0;
         const bEndMin = eh * 60 + em;
         
-        return bStartMin < slotEndMin && bEndMin > slotStartMin;
+        const matchesSlot = bStartMin < slotEndMin && bEndMin > slotStartMin;
+        if (!matchesSlot) return false;
+
+        // Exclude manual DB room bookings that correspond to a rescheduled occurrence to avoid duplicates
+        // and let the occurrence render with proper rescheduled styling and details.
+        const hasRescheduledOcc = scheduleOccurrences.some((occ: any) => 
+          occ.date === b.date &&
+          occ.start_time.substring(0, 5) === b.startTime.substring(0, 5) &&
+          occ.teacher_id === b.teacherId &&
+          (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed')
+        );
+        if (hasRescheduledOcc) return false;
+
+        return true;
       });
 
       // Combine local and DB manual bookings, de-duplicating by date + room + start_time
@@ -5798,32 +5884,29 @@ export function AdminDashboard({
       });
 
       // 3. Dynamic rescheduled occurrences
-      const targetReschedDate = new Date(mondayOfSelectedWeek);
-      targetReschedDate.setDate(mondayOfSelectedWeek.getDate() + dayIdx);
-      const targetReschedDateStr = `${targetReschedDate.getFullYear()}-${String(targetReschedDate.getMonth() + 1).padStart(2, '0')}-${String(targetReschedDate.getDate()).padStart(2, '0')}`;
-
       const dynamicForSlot = scheduleOccurrences.filter((occ: any) => {
         const roomId = occ.schedules?.room_id || null;
         if (roomId !== selectedRoom.id) return false;
-        if (occ.date !== targetReschedDateStr) return false;
+        if (occ.date !== targetDateStr) return false;
 
         if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
           return false;
         }
 
         // Exclude if there's already a manual DB room booking for this teacher's lesson at this slot to avoid duplicates
+        // But NOT if it's a reschedule, since we want to prioritize the rescheduled occurrence block.
         const hasDbBooking = dbRoomBookings.some((b: any) => 
           b.date === occ.date && 
           b.startTime.substring(0, 5) === occ.start_time.substring(0, 5) &&
           b.teacherId === occ.teacher_id
         );
-        if (hasDbBooking) return false;
+        if (hasDbBooking && !(occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed')) return false;
 
         const templateTime = occ.schedules?.time_slot || '';
         const templateDay = occ.schedules?.day_of_week || 0;
 
-        const occDate = new Date(occ.date);
-        const rawDay = occDate.getDay();
+        const occDate = parseLocalDate(occ.date);
+        const rawDay = occDate.getUTCDay();
         const actualDayOfWeek = rawDay === 0 ? 7 : rawDay;
 
         const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
@@ -5832,9 +5915,11 @@ export function AdminDashboard({
         const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
         const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
 
-        const hasMoved = occ.schedules 
-          ? (hasTimeMoved || hasDayMoved)
-          : (hasFallbackDateMoved || hasFallbackTimeMoved);
+        const hasMoved = (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed') || (
+          (occ.schedules && occ.schedules.time_slot)
+            ? (hasTimeMoved || hasDayMoved)
+            : (hasFallbackDateMoved || hasFallbackTimeMoved)
+        );
 
         if (!hasMoved) return false;
 
@@ -5928,6 +6013,17 @@ export function AdminDashboard({
         return [...combinedManuals, ...allowedDynamics, ...draftPreviewBooking];
       }
 
+      if (dayIdx === 4 && hourStr.startsWith('16:00')) {
+        console.log("Friday 16:00 getBookingsForSlot debug:", {
+          selectedRoomId: selectedRoom.id,
+          dbRoomBookingsCount: dbRoomBookings.length,
+          dbRoomBookings: dbRoomBookings,
+          combinedManuals,
+          mappedSchedules,
+          mappedDynamics,
+        });
+      }
+
       return [...combinedManuals, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
     };
 
@@ -6011,9 +6107,11 @@ export function AdminDashboard({
         const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
         const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
 
-        const hasMoved = occ.schedules 
-          ? (hasTimeMoved || hasDayMoved)
-          : (hasFallbackDateMoved || hasFallbackTimeMoved);
+        const hasMoved = (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed') || (
+          (occ.schedules && occ.schedules.time_slot)
+            ? (hasTimeMoved || hasDayMoved)
+            : (hasFallbackDateMoved || hasFallbackTimeMoved)
+        );
 
         if (!hasMoved) return false;
 
