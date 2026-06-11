@@ -1556,19 +1556,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
     }
   }, [matrixAllocations, schoolId]);
-
-  // Global drag listener to reliably clear draggedPlanId state when drag ends
-  useEffect(() => {
-    const handleGlobalDragEnd = () => {
-      setDraggedPlanId(null);
-      setDraggedPlanDay(null);
-    };
-    window.addEventListener('dragend', handleGlobalDragEnd);
-    return () => {
-      window.removeEventListener('dragend', handleGlobalDragEnd);
-    };
-  }, []);
-
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
     const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
@@ -10941,6 +10928,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                           key={plan.id}
                                           draggable
                                           onDragStart={() => handleDragStartMatrix(plan.id)}
+                                          onDragEnd={() => {
+                                            setDraggedPlanId(null);
+                                            setDraggedPlanDay(null);
+                                          }}
                                           onClick={() => setSelectedDayPlan(plan)}
                                           style={{ background: 'rgba(254, 243, 199, 0.45)', border: '1px solid #fde68a', borderLeft: '4px solid #f59e0b', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 4px rgba(245,158,11,0.08)', transition: 'all 0.15s' }}
                                         >
