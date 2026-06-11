@@ -15177,15 +15177,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Unified Instruments List Widget */}
                 <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
-                  {/* Search and Sort controls bar */}
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
+                  {/* Unified Search, Filter & Creation Row Widget */}
+                  <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1.5px solid #cbd5e1', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    
+                    {/* Search & Filter */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.2, minWidth: '180px', background: 'white', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box' }}>
                       <Search size={16} color="#94a3b8" />
                       <input
                         value={equipmentSearchQuery}
                         onChange={e => setEquipmentSearchQuery(e.target.value)}
                         placeholder="Instrumente durchsuchen..."
-                        style={{ border: 'none', outline: 'none', fontSize: '0.8rem', fontWeight: 700, width: '100%', color: '#0f172a' }}
+                        style={{ border: 'none', outline: 'none', fontSize: '0.78rem', fontWeight: 700, width: '100%', color: '#0f172a', background: 'transparent' }}
                       />
                     </div>
                     
@@ -15197,65 +15199,86 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         alignItems: 'center',
                         gap: '6px',
                         background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
-                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #e2e8f0',
+                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #cbd5e1',
                         color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
-                        padding: '8px 14px',
+                        padding: '0 14px',
                         borderRadius: '10px',
                         fontSize: '0.78rem',
                         fontWeight: 800,
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        fontFamily: 'Urbanist'
+                        fontFamily: 'Urbanist',
+                        height: '38px',
+                        boxSizing: 'border-box',
+                        flexShrink: 0
                       }}
                     >
                       <span>Freie Instrumente</span>
                     </button>
-                  </div>
 
-                  {/* Inline creation form (Always visible to add new instruments to the pool) */}
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSaveEquipment();
-                    }}
-                    style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}
-                  >
-                    <input
-                      ref={equipmentNameInputRef}
-                      value={equipmentFormName}
-                      onChange={e => setEquipmentFormName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && equipmentFormName.trim()) {
-                          e.preventDefault();
-                          equipmentQtyInputRef.current?.focus();
-                          equipmentQtyInputRef.current?.select();
-                        }
+                    {/* Vertical separator */}
+                    <div style={{ width: '1.5px', height: '24px', background: '#cbd5e1', margin: '0 4px', flexShrink: 0 }} />
+
+                    {/* Creation Form inline */}
+                    <form 
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveEquipment();
                       }}
-                      placeholder='Neues Instrument anlegen (z.B. „Schlagzeug“)'
-                      style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }}
-                    />
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
-                      <input
-                        ref={equipmentQtyInputRef}
-                        type="number"
-                        min="1"
-                        max="50"
-                        value={equipmentFormQty}
-                        onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
-                        style={{ width: '50px', padding: '8px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none' }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={equipmentSaving || !equipmentFormName.trim()}
-                      style={{ padding: '8px 16px', background: '#0b57d0', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '0.74rem', cursor: 'pointer', opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1 }}
+                      style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: 0, flex: 2, minWidth: '320px' }}
                     >
-                      Anlegen
-                    </button>
-                  </form>
+                      <input
+                        ref={equipmentNameInputRef}
+                        value={equipmentFormName}
+                        onChange={e => setEquipmentFormName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && equipmentFormName.trim()) {
+                            e.preventDefault();
+                            equipmentQtyInputRef.current?.focus();
+                            equipmentQtyInputRef.current?.select();
+                          }
+                        }}
+                        placeholder='Neues Instrument anlegen...'
+                        style={{ flex: 1.5, height: '38px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, outline: 'none', background: 'white' }}
+                      />
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '0 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', height: '38px', boxSizing: 'border-box', flexShrink: 0 }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
+                        <input
+                          ref={equipmentQtyInputRef}
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={equipmentFormQty}
+                          onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
+                          style={{ width: '30px', border: 'none', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none', background: 'transparent' }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={equipmentSaving || !equipmentFormName.trim()}
+                        style={{
+                          height: '38px',
+                          padding: '0 16px',
+                          background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontWeight: 800,
+                          fontSize: '0.74rem',
+                          cursor: 'pointer',
+                          opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1,
+                          boxShadow: '0 2px 6px rgba(11,87,208,0.15)',
+                          transition: 'all 0.2s',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
+                        }}
+                      >
+                        {equipmentSaving ? 'Wird angelegt...' : 'Anlegen'}
+                      </button>
+                    </form>
+                  </div>
 
                   {/* Unified List items list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
