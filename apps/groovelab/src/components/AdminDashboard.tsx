@@ -8414,61 +8414,93 @@ export function AdminDashboard({
                   </span>
                   {selectedRoom.room_instruments && selectedRoom.room_instruments.length > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {selectedRoom.room_instruments.map((inst: any, idx: number) => (
-                        <div 
-                          key={idx} 
-                          style={{ position: 'relative' }}
-                          onMouseEnter={() => setHoveredInstrumentIdx(idx)}
-                          onMouseLeave={() => setHoveredInstrumentIdx(null)}
-                        >
-                          <span style={{
-                            display: 'inline-block',
-                            fontSize: '0.74rem',
-                            background: '#f1f5f9',
-                            color: '#334155',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            fontWeight: 700,
-                            border: '1px solid #e2e8f0',
-                            cursor: inst.model ? 'help' : 'default'
-                          }}>
-                            {inst.name}
-                          </span>
+                      {selectedRoom.room_instruments.map((inst: any, idx: number) => {
+                        let linkUrl = '';
+                        try {
+                          const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+                          linkUrl = localLinkMap[inst.name] || '';
+                        } catch {}
 
-                          {/* Hover Tooltip showing the model info */}
-                          {inst.model && hoveredInstrumentIdx === idx && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '100%',
-                              left: '50%',
-                              transform: 'translateX(-50%)',
-                              marginBottom: '6px',
-                              background: '#0f172a',
-                              color: 'white',
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              whiteSpace: 'nowrap',
-                              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                              zIndex: 50
-                            }}>
-                              {inst.model}
+                        return (
+                          <div 
+                            key={idx} 
+                            style={{ position: 'relative' }}
+                            onMouseEnter={() => setHoveredInstrumentIdx(idx)}
+                            onMouseLeave={() => setHoveredInstrumentIdx(null)}
+                          >
+                            {linkUrl ? (
+                              <a 
+                                href={linkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: '0.74rem',
+                                  background: '#eff6ff',
+                                  color: '#0b57d0',
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  fontWeight: 700,
+                                  border: '1.5px solid #bfdbfe',
+                                  cursor: 'pointer',
+                                  textDecoration: 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                🔗 {inst.name}
+                              </a>
+                            ) : (
+                              <span style={{
+                                display: 'inline-block',
+                                fontSize: '0.74rem',
+                                background: '#f1f5f9',
+                                color: '#334155',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                fontWeight: 700,
+                                border: '1px solid #e2e8f0',
+                                cursor: inst.model ? 'help' : 'default'
+                              }}>
+                                {inst.name}
+                              </span>
+                            )}
+
+                            {/* Hover Tooltip showing the model info */}
+                            {inst.model && hoveredInstrumentIdx === idx && (
                               <div style={{
                                 position: 'absolute',
-                                top: '100%',
+                                bottom: '100%',
                                 left: '50%',
                                 transform: 'translateX(-50%)',
-                                width: 0,
-                                height: 0,
-                                borderLeft: '4px solid transparent',
-                                borderRight: '4px solid transparent',
-                                borderTop: '4px solid #0f172a'
-                              }} />
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                                marginBottom: '6px',
+                                background: '#0f172a',
+                                color: 'white',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                zIndex: 50
+                              }}>
+                                {inst.model}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  width: 0,
+                                  height: 0,
+                                  borderLeft: '4px solid transparent',
+                                  borderRight: '4px solid transparent',
+                                  borderTop: '4px solid #0f172a'
+                                }} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', fontWeight: 600 }}>
