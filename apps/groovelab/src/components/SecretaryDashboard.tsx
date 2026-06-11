@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -694,6 +694,57 @@ const getAlphabeticalColor = (name: string) => {
   return { avatarBg, avatarColor };
 };
 
+const getAlphabeticalUniColor = (name: string) => {
+  const trimmed = (name || '').trim();
+  const firstChar = trimmed.charAt(0).toUpperCase();
+  const charCode = firstChar.charCodeAt(0) || 65;
+  const clampedCode = Math.max(65, Math.min(90, charCode));
+  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  const avatarBg = `hsl(${hue}, 80%, 93%)`;
+  const avatarColor = `hsl(${hue}, 90%, 25%)`;
+  return { avatarBg, avatarColor };
+};
+
+const getFloorColor = (name: string) => {
+  const trimmed = (name || '').trim();
+  const normalized = trimmed.toLowerCase();
+  
+  // Check if it has a number or is EG/UG
+  const hasNumber = /\d+/.test(normalized);
+  const isEg = normalized.includes('eg') || normalized.includes('erdgeschoss');
+  const isUg = normalized.includes('ug') || normalized.includes('untergeschoss') || normalized.includes('keller') || normalized.includes('-');
+  
+  if (hasNumber || isEg || isUg) {
+    // Parse floor number N
+    let N = 0;
+    if (isEg) {
+      N = 0;
+    } else {
+      const isNegative = isUg;
+      const match = normalized.match(/\d+/);
+      if (match) {
+        const val = parseInt(match[0]);
+        N = isNegative ? -val : val;
+      } else {
+        N = isNegative ? -1 : 0;
+      }
+    }
+    
+    // Clamp N to [-3, 8]
+    const clampedN = Math.max(-3, Math.min(8, N));
+    // Map [-3, 8] to index [0, 11]
+    const mappedIndex = clampedN + 3;
+    // Map [0, 11] to [65, 90] (A-Z)
+    const clampedCode = 65 + Math.round((mappedIndex / 11) * 25);
+    const hue = Math.round(((clampedCode - 65) / 25) * 360);
+    const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+    const avatarColor = `hsl(${hue}, 90%, 25%)`;
+    return { avatarBg, avatarColor };
+  }
+  
+  return getAlphabeticalColor(name);
+};
+
 interface AppleStyleTokenFieldProps {
   label: string;
   selectedString: string;
@@ -1193,6 +1244,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [roomFormIsGroovelabActive, setRoomFormIsGroovelabActive] = useState(false);
   const [roomFormFloor, setRoomFormFloor] = useState('Allgemein');
   const [roomSaving, setRoomSaving] = useState(false);
+  const [roomFormUnsuitableInstruments, setRoomFormUnsuitableInstruments] = useState<string[]>([]);
+  const [roomFormRoomInstruments, setRoomFormRoomInstruments] = useState<Array<{ name: string, model: string }>>([]);
+  const [roomFormSonstiges, setRoomFormSonstiges] = useState('');
+  const [newInstrumentName, setNewInstrumentName] = useState('');
+  const [newInstrumentModel, setNewInstrumentModel] = useState('');
   const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
 
   // Equipment State
@@ -5646,11 +5702,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
           mappings[editingRoom.id] = roomFormFloor;
           localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+
+          const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+          unsuitable[editingRoom.id] = roomFormUnsuitableInstruments;
+          localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
+
+          const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+          instruments[editingRoom.id] = roomFormRoomInstruments;
+          localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+
+          const sonstiges = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
+          sonstiges[editingRoom.id] = roomFormSonstiges;
+          localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
         } catch (err) {
           console.error(err);
         }
 
-        // Try updating including floor
+        // Try updating including floor and new fields
         let { error } = await supabase.from('rooms').update({
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
@@ -5659,12 +5727,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           qm: roomFormQm,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
-          floor: roomFormFloor
+          floor: roomFormFloor,
+          unsuitable_instruments: roomFormUnsuitableInstruments,
+          room_instruments: roomFormRoomInstruments,
+          sonstiges: roomFormSonstiges
         }).eq('id', editingRoom.id);
         
-        // Fallback: If floor column not found in schema cache, retry without it
-        if (error && (error.message.includes("floor") || error.message.includes("column"))) {
-          console.warn("Supabase floor column missing, retrying edit save without floor field...");
+        // Fallback: If floor column or new properties columns are missing
+        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+          console.warn("Supabase floor/new columns missing, retrying edit save without them...");
           const { error: retryError } = await supabase.from('rooms').update({
             name: roomFormName.trim(),
             allowed_instruments: roomFormEquipment,
@@ -5690,7 +5761,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               qm: roomFormQm,
               is_campus_active: roomFormIsCampusActive,
               is_groovelab_active: roomFormIsGroovelabActive,
-              floor: roomFormFloor
+              floor: roomFormFloor,
+              unsuitable_instruments: roomFormUnsuitableInstruments,
+              room_instruments: roomFormRoomInstruments,
+              sonstiges: roomFormSonstiges
             }
           : r));
       } else {
@@ -5704,17 +5778,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           sort_order: rooms.length,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
-          floor: roomFormFloor
+          floor: roomFormFloor,
+          unsuitable_instruments: roomFormUnsuitableInstruments,
+          room_instruments: roomFormRoomInstruments,
+          sonstiges: roomFormSonstiges
         };
 
         let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();
         
-        // Fallback: If floor column not found in schema cache, retry without it
-        if (error && (error.message.includes("floor") || error.message.includes("column"))) {
-          console.warn("Supabase floor column missing, retrying insert save without floor field...");
-          const insertPayloadWithoutFloor = { ...insertPayload };
-          delete insertPayloadWithoutFloor.floor;
-          const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutFloor).select().single();
+        // Fallback: If floor column or new columns are missing
+        if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+          console.warn("Supabase floor/new columns missing, retrying insert save without them...");
+          const insertPayloadWithoutNewFields = {
+            school_id: schoolId,
+            name: roomFormName.trim(),
+            allowed_instruments: roomFormEquipment,
+            max_teachers: roomFormMaxTeachers,
+            max_students: roomFormMaxStudents,
+            qm: roomFormQm,
+            sort_order: rooms.length,
+            is_campus_active: roomFormIsCampusActive,
+            is_groovelab_active: roomFormIsGroovelabActive
+          };
+          const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutNewFields).select().single();
           data = retryData;
           error = retryError;
         }
@@ -5726,13 +5812,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
             mappings[data.id] = roomFormFloor;
             localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+
+            const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+            unsuitable[data.id] = roomFormUnsuitableInstruments;
+            localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
+
+            const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+            instruments[data.id] = roomFormRoomInstruments;
+            localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+
+            const sonstiges = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
+            sonstiges[data.id] = roomFormSonstiges;
+            localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
           } catch (err) {
             console.error(err);
           }
 
           setRooms(prev => [...prev, {
             ...data,
-            equipment: data.allowed_instruments || []
+            equipment: data.allowed_instruments || [],
+            floor: data.floor || roomFormFloor,
+            unsuitable_instruments: data.unsuitable_instruments || roomFormUnsuitableInstruments || [],
+            room_instruments: data.room_instruments || roomFormRoomInstruments || [],
+            sonstiges: data.sonstiges || roomFormSonstiges || ''
           }]);
         }
       }
@@ -5743,6 +5845,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormMaxStudents(1);
       setRoomFormQm(0);
       setRoomFormFloor('Allgemein');
+      setRoomFormUnsuitableInstruments([]);
+      setRoomFormRoomInstruments([]);
+      setRoomFormSonstiges('');
       setRoomsSubView('overview');
     } catch (e: any) {
       console.error('Room save error:', e);
@@ -5879,6 +5984,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormIsCampusActive(room.is_campus_active !== false);
       setRoomFormIsGroovelabActive(!!room.is_groovelab_active);
       setRoomFormFloor(room.floor || 'Allgemein');
+
+      const localUnsuitable = (() => {
+        try {
+          const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+          return map[room.id] || [];
+        } catch { return []; }
+      })();
+      const localInstruments = (() => {
+        try {
+          const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+          return map[room.id] || [];
+        } catch { return []; }
+      })();
+      const localSonstiges = (() => {
+        try {
+          const map = JSON.parse(localStorage.getItem(`groovelab_room_sonstiges_mappings_${schoolId}`) || '{}');
+          return map[room.id] || '';
+        } catch { return ''; }
+      })();
+
+      setRoomFormUnsuitableInstruments(Array.isArray(room.unsuitable_instruments) ? room.unsuitable_instruments : localUnsuitable);
+      setRoomFormRoomInstruments(Array.isArray(room.room_instruments) ? room.room_instruments : localInstruments);
+      setRoomFormSonstiges(room.sonstiges || localSonstiges || '');
+      setNewInstrumentName('');
+      setNewInstrumentModel('');
     } else {
       setEditingRoom(null);
       setRoomFormName('');
@@ -5889,6 +6019,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setRoomFormIsCampusActive(true);
       setRoomFormIsGroovelabActive(false);
       setRoomFormFloor('Allgemein');
+      setRoomFormUnsuitableInstruments([]);
+      setRoomFormRoomInstruments([]);
+      setRoomFormSonstiges('');
+      setNewInstrumentName('');
+      setNewInstrumentModel('');
     }
     setRoomsSubView('settings');
   };
@@ -12722,10 +12857,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         onChange={(e) => setRoomFilterStatus(e.target.value as any)}
                         style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                       >
-                        <option value="all">⚡ Alle Tarife</option>
-                        <option value="campus">🎓 Campus Aktiv</option>
-                        <option value="groovelab">🎸 GrooveLab Aktiv</option>
-                        <option value="inactive">⚪ Inaktiv</option>
+                        <option value="all">Alle Räume</option>
+                        <option value="campus">Campus</option>
+                        <option value="groovelab">Groovelab</option>
+                        <option value="inactive">inaktiv</option>
                       </select>
                     </div>
                   </div>
@@ -12802,13 +12937,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <div style={{ display: 'flex', gap: '14px', marginTop: '6px' }}>
                                     {/* Column 1: Max. Schüler */}
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: '32px' }}>
-                                      <span style={{ fontSize: '0.95rem', lineHeight: '1.1' }}>👥</span>
+                                      <Users size={16} style={{ color: '#64748b' }} />
                                       <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px', fontWeight: 550, fontFamily: 'Inter' }}>Max.</span>
                                       <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', fontFamily: 'Inter' }}>{room.max_students || 1}</span>
                                     </div>
                                     {/* Column 2: QM Größe */}
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: '32px' }}>
-                                      <span style={{ fontSize: '0.95rem', lineHeight: '1.1' }}>📐</span>
+                                      <Ruler size={16} style={{ color: '#64748b' }} />
                                       <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', marginTop: '2px', fontFamily: 'Inter' }}>{room.qm || 0}</span>
                                       <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 550, fontFamily: 'Inter' }}>qm</span>
                                     </div>
@@ -12912,7 +13047,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <div style={{ background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', overflowX: 'auto' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>📅 Wöchentlicher Belegungsplan</h4>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={15} style={{ color: '#0f172a' }} />
+                            Wöchentlicher Belegungsplan
+                          </h4>
                           <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
                         </div>
                       </div>
@@ -12936,16 +13074,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </thead>
                           <tbody>
                             {filteredRooms.map((room, rIdx) => {
-                              const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
                               return (
                                 <tr key={room.id} style={{ borderBottom: rIdx < filteredRooms.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                                   <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>
                                     <strong style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, display: 'block' }}>{room.name}</strong>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
-                                      {equipment.map(tag => (
-                                        <span key={tag} style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 5px', borderRadius: '5px', background: `${INSTRUMENT_COLOR[tag] || '#94a3b8'}18`, color: INSTRUMENT_COLOR[tag] || '#64748b' }}>{tag}</span>
-                                      ))}
-                                    </div>
                                   </td>
                                   {[1,2,3,4,5].map(dayNum => {
                                     const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
@@ -12953,16 +13085,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <td key={dayNum} style={{ padding: '6px', verticalAlign: 'top' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '50px' }}>
                                           {cellPlans.map(plan => {
-                                            const color = INSTRUMENT_COLOR[plan.instrument] || '#64748b';
+                                            const { avatarBg: bg, avatarColor: color } = getAlphabeticalUniColor(plan.instrument);
                                             return (
                                               <div
                                                 key={plan.id}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: `${color}10`, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '6px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
+                                                style={{ background: bg, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '6px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
                                               >
                                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{plan.teacherName}</span>
                                                 <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
-                                                <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                                <span style={{ fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 900, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                  <Clock size={10} />
+                                                  {plan.startTime}–{plan.endTime}
+                                                </span>
                                               </div>
                                             );
                                           })}
@@ -13141,7 +13276,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     const isHovered = dragHoveredFloor === flName;
                     const floorRoomCount = uniqueRooms.filter(r => (r.floor || localFloorMappings[r.id] || 'Allgemein') === flName).length;
                     const avatarInitials = flName.substring(0, 2).toUpperCase();
-                    const colorSet = getAlphabeticalColor(flName);
+                    const colorSet = getFloorColor(flName);
 
                     return (
                       <div
@@ -13367,6 +13502,106 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             Im GrooveLab-Modul aktiv (iPads / Live-Lab)
                           </label>
                         </div>
+                      </div>
+
+                      {/* Akustisch ungeeignete Instrumente */}
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Akustisch ungeeignet für</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {['Schlagzeug', 'Klavier', 'E-Piano', 'Gitarre', 'Bass', 'Gesang', 'Bläser', 'Keyboard'].map(inst => {
+                            const isUnsuitable = roomFormUnsuitableInstruments.includes(inst);
+                            return (
+                              <button
+                                key={inst}
+                                type="button"
+                                onClick={() => {
+                                  if (isUnsuitable) {
+                                    setRoomFormUnsuitableInstruments(prev => prev.filter(i => i !== inst));
+                                  } else {
+                                    setRoomFormUnsuitableInstruments(prev => [...prev, inst]);
+                                  }
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  border: isUnsuitable ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                                  background: isUnsuitable ? '#fef2f2' : 'white',
+                                  color: isUnsuitable ? '#ef4444' : '#475569',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {inst}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Vorhandene Instrumente */}
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Vorhandene Instrumente (mit Modell)</label>
+                        
+                        {/* List of existing */}
+                        {roomFormRoomInstruments.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                            {roomFormRoomInstruments.map((inst, idx) => (
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                                  🎸 {inst.name} <span style={{ color: '#64748b', fontWeight: 550 }}>({inst.model || 'Standard'})</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setRoomFormRoomInstruments(prev => prev.filter((_, i) => i !== idx))}
+                                  style={{ border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '2px' }}
+                                >
+                                  Löschen
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add Instrument Form Inline */}
+                        <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px' }}>
+                          <input
+                            placeholder="z.B. Klavier"
+                            value={newInstrumentName}
+                            onChange={e => setNewInstrumentName(e.target.value)}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 750, color: '#0f172a', outline: 'none' }}
+                          />
+                          <input
+                            placeholder="Typ: z.B. Yamaha U1"
+                            value={newInstrumentModel}
+                            onChange={e => setNewInstrumentModel(e.target.value)}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 750, color: '#0f172a', outline: 'none' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newInstrumentName.trim()) return;
+                              setRoomFormRoomInstruments(prev => [...prev, { name: newInstrumentName.trim(), model: newInstrumentModel.trim() }]);
+                              setNewInstrumentName('');
+                              setNewInstrumentModel('');
+                            }}
+                            style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sonstiges */}
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Sonstiges (z.B. Bluetooth Box)</label>
+                        <input
+                          value={roomFormSonstiges}
+                          onChange={e => setRoomFormSonstiges(e.target.value)}
+                          placeholder='z.B. Bluetooth Box, Belüftung, Whiteboard...'
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
+                        />
                       </div>
                     </div>
 
