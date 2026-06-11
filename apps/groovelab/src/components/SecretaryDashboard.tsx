@@ -14091,7 +14091,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               emoji: '📅',
                               title: 'Option 1: Jahrespauschale',
                               badge: '10% Rabatt',
-                              desc: 'Schüler: 5,29 € / Jahr | Schule: 0,00 €'
+                              secondaryBadge: 'Einmalig',
+                              desc: 'Schüler: 5,29 € einmalig pro Jahr | Schule: 0,00 €'
                             },
                             {
                               id: 'option2',
@@ -14112,7 +14113,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               emoji: '🎓',
                               title: 'Option 3.2: Kofinanzierung (Jahresbeitrag)',
                               badge: 'Split + 10% Rabatt',
-                              desc: 'Schüler: 2,59 € / Jahr | Schule: 0,25 € / Mo.'
+                              secondaryBadge: 'Einmalig',
+                              desc: 'Schüler: 2,59 € einmalig pro Jahr | Schule: 0,25 € / Mo.'
                             }
                           ].filter((opt) => !isBillingBooked || studentBillingOption === opt.id).map((opt) => (
                             <label key={opt.id} style={{
@@ -14138,14 +14140,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <strong style={{ fontSize: '0.72rem', color: '#1e293b' }}>{opt.emoji} {opt.title}</strong>
-                                  <span style={{
-                                    fontSize: '0.52rem',
-                                    padding: '1px 5px',
-                                    borderRadius: '100px',
-                                    background: studentBillingOption === opt.id ? '#e9d5ff' : '#f1f5f9',
-                                    color: '#334155',
-                                    fontWeight: 700
-                                  }}>{opt.badge}</span>
+                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <span style={{
+                                      fontSize: '0.52rem',
+                                      padding: '1px 5px',
+                                      borderRadius: '100px',
+                                      background: studentBillingOption === opt.id ? '#e9d5ff' : '#f1f5f9',
+                                      color: '#334155',
+                                      fontWeight: 700
+                                    }}>{opt.badge}</span>
+                                    {opt.secondaryBadge && (
+                                      <span style={{
+                                        fontSize: '0.52rem',
+                                        padding: '1.5px 6px',
+                                        borderRadius: '100px',
+                                        background: '#ffedd5',
+                                        color: '#c2410c',
+                                        fontWeight: 800,
+                                        border: '1px solid #fed7aa',
+                                        letterSpacing: '0.02em'
+                                      }}>{opt.secondaryBadge}</span>
+                                    )}
+                                  </div>
                                 </div>
                                 <p style={{ fontSize: '0.62rem', color: '#64748b', margin: '1px 0 0 0', fontWeight: 600 }}>{opt.desc}</p>
                               </div>
@@ -14343,13 +14359,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {/* Left Side: Einzelpreis */}
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Einzelpreis</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Einzelpreis</span>
+                                      <span style={{ fontSize: '0.5rem', background: '#ffedd5', color: '#c2410c', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>Einmalig</span>
+                                    </div>
                                     <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
                                       {singlePrice} <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
                                     </strong>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
-                                    <strong>Rechenweg:</strong><br />
+                                    <strong>Rechenweg:</strong> Jährlich einmalig<br />
                                     0,49 € × 12 Mo. = 5,88 €<br />
                                     5,88 € − 10% Rabatt = 5,29 €
                                   </span>
@@ -14361,13 +14380,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {/* Right Side: Gesamtkosten */}
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Kosten alle Schüler</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Kosten alle Schüler</span>
+                                      <span style={{ fontSize: '0.5rem', background: '#ffedd5', color: '#c2410c', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>Einmalig</span>
+                                    </div>
                                     <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
                                       {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
                                     </strong>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
-                                    <strong>Rechnung:</strong><br />
+                                    <strong>Rechnung (Einmalig):</strong><br />
                                     {students.length} Schüler × {singlePrice}<br />
                                     = {totalVal} € / {period}
                                   </span>
@@ -14469,13 +14491,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {/* Left Side: Einzelpreis */}
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Einzelpreis</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Einzelpreis</span>
+                                      <span style={{ fontSize: '0.5rem', background: '#ffedd5', color: '#c2410c', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>Einmalig</span>
+                                    </div>
                                     <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
                                       {singlePrice} <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
                                     </strong>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
-                                    <strong>Rechenweg:</strong><br />
+                                    <strong>Rechenweg:</strong> Jährlich einmalig<br />
                                     Split: 0,24 € × 12 = 2,88 €<br />
                                     2,88 € − 10% Rabatt = 2,59 €
                                   </span>
@@ -14487,13 +14512,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 {/* Right Side: Gesamtkosten */}
                                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
-                                    <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Kosten alle Schüler</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.55rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 700 }}>Kosten alle Schüler</span>
+                                      <span style={{ fontSize: '0.5rem', background: '#ffedd5', color: '#c2410c', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>Einmalig</span>
+                                    </div>
                                     <strong style={{ display: 'block', fontSize: '1.4rem', color: '#6b21a8', margin: '4px 0', fontWeight: 800 }}>
                                       {totalVal} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ {period}</span>
                                     </strong>
                                   </div>
                                   <span style={{ fontSize: '0.65rem', color: '#6b21a8', lineHeight: '1.3' }}>
-                                    <strong>Rechnung:</strong><br />
+                                    <strong>Rechnung (Einmalig):</strong><br />
                                     {students.length} Schüler × {singlePrice}<br />
                                     = {totalVal} € / {period}
                                   </span>
