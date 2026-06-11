@@ -13899,11 +13899,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * 5.29 : extraBillingOption === 'option3_2' ? extraUsersSliderVal * 2.59 : 0);
                 const isAnnualAdditional = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
 
-                // If booked, sum everything up. Otherwise, only sum base and booked extra users, and keep student share preview separate.
-                const currentTotalB2B = baseB2B + schoolShareBookedExtra + (isBillingBooked ? studentSharePreview : 0);
+                // B2B total including kofinanzierung preview
+                const currentTotalB2B = baseB2B + schoolShareBookedExtra + studentSharePreview;
                 
                 // Mixed Total B2B + B2C
-                const mixedTotal = (isBillingBooked ? currentTotalB2B : (baseB2B + schoolShareBookedExtra + studentSharePreview)) + studentLevyMonthly + extraLevyMonthly;
+                const mixedTotal = currentTotalB2B + studentLevyMonthly + extraLevyMonthly;
 
                 return (
                   <>
