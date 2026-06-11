@@ -1295,6 +1295,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [campusActivatedThisMonth, setCampusActivatedThisMonth] = useState<boolean>(false);
   const [groovelabActivatedThisMonth, setGroovelabActivatedThisMonth] = useState<boolean>(false);
   const [studentBillingOption, setStudentBillingOption] = useState<string>('option1');
+  const [isBillingBooked, setIsBillingBooked] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('isBillingBooked') === 'true';
+  });
+  const [bookedExtraUsers, setBookedExtraUsers] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const val = localStorage.getItem('bookedExtraUsers');
+    return val ? parseInt(val, 10) : 0;
+  });
+  const [extraUsersSliderVal, setExtraUsersSliderVal] = useState<number>(0);
+  const [extraBillingOption, setExtraBillingOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -13928,42 +13938,54 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
 
                         {/* Card 2: B2B Bankeinzug Schule */}
-                        <div style={{
-                          background: '#f0f9ff',
-                          padding: '16px',
-                          borderRadius: '16px',
-                          border: '1.5px solid #bae6fd',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          minHeight: '190px',
-                          marginTop: 'auto',
-                          boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
-                        }}>
-                          <div>
-                            <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Monatlicher Bankeinzug B2B</span>
-                            <strong style={{ display: 'block', fontSize: '1.6rem', color: '#0369a1', margin: '6px 0', fontWeight: 800 }}>
-                              {(moduleCost + (allTeachers.length + employees.length) * 0.49 + ((studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0)).toFixed(2)} € <span style={{ fontSize: '0.78rem', fontWeight: 400 }}>/ Mo.</span>
-                            </strong>
-                          </div>
-
-                          <div style={{ fontSize: '0.7rem', color: '#0284c7', borderTop: '1px solid #bae6fd', paddingTop: '8px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>• Modul-Grundgebühr:</span>
-                              <strong>{moduleCost.toFixed(2)} €</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>• User-Infrastruktur ({allTeachers.length + employees.length} User):</span>
-                              <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
-                            </div>
-                            {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                <span>• Kofinanzierungs-Schulanteil (25¢):</span>
-                                <strong>{(students.length * 0.25).toFixed(2)} €</strong>
+                        {(() => {
+                          const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
+                          const totalB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + ((studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0) + schoolShareBookedExtra;
+                          return (
+                            <div style={{
+                              background: '#f0f9ff',
+                              padding: '16px',
+                              borderRadius: '16px',
+                              border: '1.5px solid #bae6fd',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              minHeight: '190px',
+                              marginTop: 'auto',
+                              boxShadow: '0 2px 8px rgba(3, 105, 161, 0.02)'
+                            }}>
+                              <div>
+                                <span style={{ fontSize: '0.62rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Monatlicher Bankeinzug B2B</span>
+                                <strong style={{ display: 'block', fontSize: '1.6rem', color: '#0369a1', margin: '6px 0', fontWeight: 800 }}>
+                                  {totalB2B.toFixed(2)} € <span style={{ fontSize: '0.78rem', fontWeight: 400 }}>/ Mo.</span>
+                                </strong>
                               </div>
-                            )}
-                          </div>
-                        </div>
+
+                              <div style={{ fontSize: '0.7rem', color: '#0284c7', borderTop: '1px solid #bae6fd', paddingTop: '8px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>• Modul-Grundgebühr:</span>
+                                  <strong>{moduleCost.toFixed(2)} €</strong>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>• User-Infrastruktur ({allTeachers.length + employees.length} User):</span>
+                                  <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} €</strong>
+                                </div>
+                                {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>• Kofinanzierungs-Schulanteil (25¢):</span>
+                                    <strong>{(students.length * 0.25).toFixed(2)} €</strong>
+                                  </div>
+                                )}
+                                {schoolShareBookedExtra > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                    <span>• Extra-User Kofinanzierungsanteil ({bookedExtraUsers} Schüler):</span>
+                                    <strong>{schoolShareBookedExtra.toFixed(2)} €</strong>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Right Column: 👥 Bereich Schüler (B2C) */}
@@ -13982,7 +14004,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
 
                         {/* Card 1: Schüler-Abrechnungsmodell selector */}
-                        <div style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {[
                             {
                               id: 'option1',
@@ -14019,17 +14041,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               padding: '8px 10px',
                               borderRadius: '8px',
                               border: '1px solid #cbd5e1',
-                              background: '#ffffff',
-                              cursor: 'pointer',
+                              background: studentBillingOption === opt.id ? '#faf5ff' : '#ffffff',
+                              cursor: isBillingBooked ? 'not-allowed' : 'pointer',
+                              opacity: isBillingBooked && studentBillingOption !== opt.id ? 0.6 : 1,
                               transition: 'all 0.15s',
-                              ...(studentBillingOption === opt.id ? { borderColor: '#6b21a8', background: '#faf5ff', boxShadow: '0 1px 4px rgba(107, 33, 168, 0.03)' } : {})
+                              ...(studentBillingOption === opt.id ? { borderColor: '#6b21a8', boxShadow: '0 1px 4px rgba(107, 33, 168, 0.03)' } : {})
                             }}>
                               <input 
                                 type="radio" 
                                 name="studentBillingOption"
                                 checked={studentBillingOption === opt.id}
+                                disabled={isBillingBooked}
                                 onChange={() => handleUpdateStudentBillingOption(opt.id)}
-                                style={{ accentColor: '#6b21a8', cursor: 'pointer', width: '13px', height: '13px', marginTop: '2px' }}
+                                style={{ accentColor: '#6b21a8', cursor: isBillingBooked ? 'not-allowed' : 'pointer', width: '13px', height: '13px', marginTop: '2px' }}
                               />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -14047,7 +14071,174 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
                             </label>
                           ))}
+
+                          {!isBillingBooked ? (
+                            <button
+                              onClick={() => {
+                                setIsBillingBooked(true);
+                                localStorage.setItem('isBillingBooked', 'true');
+                              }}
+                              className="hover-scale font-bold"
+                              style={{
+                                background: '#6b21a8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '10px 14px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                marginTop: '6px',
+                                width: '100%',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 6px rgba(107, 33, 168, 0.2)'
+                              }}
+                            >
+                              🔒 Abrechnungssystem einbuchen (für Schuljahr sperren)
+                            </button>
+                          ) : (
+                            <div style={{
+                              background: '#f5f3ff',
+                              border: '1.5px solid #ddd6fe',
+                              borderRadius: '10px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              fontSize: '0.74rem',
+                              color: '#5b21b6',
+                              fontWeight: 700,
+                              marginTop: '6px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>🔒 System für dieses Schuljahr eingebucht</span>
+                                <button 
+                                  onClick={() => {
+                                    setIsBillingBooked(false);
+                                    localStorage.removeItem('isBillingBooked');
+                                  }} 
+                                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '0.68rem', textDecoration: 'underline', fontWeight: 600 }}
+                                >
+                                  (Ändern)
+                                </button>
+                              </div>
+                              <span style={{ fontSize: '0.65rem', color: '#7c3aed', fontWeight: 500 }}>
+                                Tarifänderungen sind gesperrt. Du kannst unten zusätzliche Schüler buchen.
+                              </span>
+                            </div>
+                          )}
                         </div>
+
+                        {/* Card 1.5: Zusätzliche Schüler (Extra-User) Slider */}
+                        {isBillingBooked && (
+                          <div style={{
+                            padding: '16px',
+                            borderRadius: '16px',
+                            border: '1.5px solid #ddd6fe',
+                            background: '#faf5ff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: '0 2px 8px rgba(107, 33, 168, 0.01)'
+                          }}>
+                            <div>
+                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Zusätzliche User hinzubuchen</span>
+                              <strong style={{ display: 'block', fontSize: '0.86rem', color: '#1e293b', marginTop: '2px' }}>
+                                Aktuell gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
+                              </strong>
+                            </div>
+
+                            {/* Slider */}
+                            <div>
+                              <input 
+                                type="range" 
+                                min="0" 
+                                max="100" 
+                                value={extraUsersSliderVal} 
+                                onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
+                                style={{ width: '100%', accentColor: '#6b21a8', cursor: 'pointer', height: '6px', borderRadius: '4px' }} 
+                              />
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>
+                                <span>0</span>
+                                <span style={{ color: '#6b21a8', fontSize: '0.78rem' }}>+{extraUsersSliderVal} User</span>
+                                <span>100</span>
+                              </div>
+                            </div>
+
+                            {/* Variant selector for extra users */}
+                            <div>
+                              <label style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                                Abrechnungsvariante für Extra-User:
+                              </label>
+                              <select 
+                                value={extraBillingOption} 
+                                onChange={(e) => setExtraBillingOption(e.target.value)} 
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', background: '#ffffff', color: '#1e293b', fontWeight: 650, cursor: 'pointer' }}
+                              >
+                                <option value="option1">Option 1: Jahrespauschale (5,29 € / Jahr)</option>
+                                <option value="option2">Option 2: Monatsumlage (0,49 € / Mo.)</option>
+                                <option value="option3_1">Option 3.1: Kofinanzierung Mo. (Schüler 0,24 € / Schule 0,25 €)</option>
+                                <option value="option3_2">Option 3.2: Kofinanzierung Jahr (Schüler 2,59 € / Schule 0,25 €)</option>
+                              </select>
+                            </div>
+
+                            {/* Live preview cost of this booking */}
+                            {extraUsersSliderVal > 0 && (() => {
+                              let unitCost = "";
+                              let schoolShare = "";
+                              if (extraBillingOption === 'option1') { unitCost = "5,29 € / Jahr"; }
+                              else if (extraBillingOption === 'option2') { unitCost = "0,49 € / Monat"; }
+                              else if (extraBillingOption === 'option3_1') { unitCost = "0,24 € / Monat"; schoolShare = " + Schule: " + (extraUsersSliderVal * 0.25).toFixed(2) + " € / Mo."; }
+                              else if (extraBillingOption === 'option3_2') { unitCost = "2,59 € / Jahr"; schoolShare = " + Schule: " + (extraUsersSliderVal * 0.25).toFixed(2) + " € / Mo."; }
+
+                              return (
+                                <div style={{ fontSize: '0.68rem', color: '#6b21a8', borderTop: '1px dashed #ddd6fe', paddingTop: '8px', background: '#faf5ff', lineHeight: '1.4' }}>
+                                  <strong>Zusätzliche Belastung:</strong><br />
+                                  • Schüler-Umlage: {extraUsersSliderVal} × {unitCost.split(' ')[0]} € = <strong>{
+                                    (extraUsersSliderVal * (extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option2' ? 0.49 : extraBillingOption === 'option3_1' ? 0.24 : 2.59)).toFixed(2)
+                                  } € / {extraBillingOption === 'option1' || extraBillingOption === 'option3_2' ? 'Jahr' : 'Monat'}</strong>
+                                  {schoolShare && <><br />• Schulanteil B2B: <strong>{schoolShare.split(': ')[1]}</strong></>}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Book button */}
+                            <button
+                              onClick={() => {
+                                const newVal = bookedExtraUsers + extraUsersSliderVal;
+                                setBookedExtraUsers(newVal);
+                                localStorage.setItem('bookedExtraUsers', newVal.toString());
+                                alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich für das Schuljahr gebucht!`);
+                                setExtraUsersSliderVal(0);
+                              }}
+                              disabled={extraUsersSliderVal === 0}
+                              className="hover-scale font-bold"
+                              style={{
+                                background: extraUsersSliderVal === 0 ? '#cbd5e1' : '#6b21a8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '10px 14px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                cursor: extraUsersSliderVal === 0 ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                width: '100%',
+                                transition: 'all 0.2s',
+                                boxShadow: extraUsersSliderVal === 0 ? 'none' : '0 2px 6px rgba(107, 33, 168, 0.15)'
+                              }}
+                            >
+                              ➕ {extraUsersSliderVal} User zahlungspflichtig einbuchen
+                            </button>
+                          </div>
+                        )}
 
                         {/* Card 2: Umlage pro Schüler */}
                         <div style={{
