@@ -1261,6 +1261,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
   const [equipmentSearchQuery, setEquipmentSearchQuery] = useState<string>('');
   const [equipmentSortFreeFirst, setEquipmentSortFreeFirst] = useState<boolean>(false);
+  const equipmentNameInputRef = useRef<HTMLInputElement>(null);
+  const equipmentQtyInputRef = useRef<HTMLInputElement>(null);
   const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
   const [editRoomInstFormName, setEditRoomInstFormName] = useState<string>('');
   const [editRoomInstFormModel, setEditRoomInstFormModel] = useState<string>('');
@@ -6089,6 +6091,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setEditingEquipment(null);
       setEquipmentFormName('');
       setEquipmentFormQty(1);
+      setTimeout(() => equipmentNameInputRef.current?.focus(), 50);
     } catch (e: any) {
       console.error('Equipment save error:', e);
       alert('Fehler beim Speichern der Ausstattung: ' + e.message);
@@ -13941,8 +13944,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}
                   >
                     <input
+                      ref={equipmentNameInputRef}
                       value={equipmentFormName}
                       onChange={e => setEquipmentFormName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && equipmentFormName.trim()) {
+                          e.preventDefault();
+                          equipmentQtyInputRef.current?.focus();
+                          equipmentQtyInputRef.current?.select();
+                        }
+                      }}
                       placeholder='Neues Instrument anlegen (z.B. „Schlagzeug“)'
                       style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 700, outline: 'none' }}
                     />
@@ -13950,11 +13961,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Menge:</span>
                       <input
+                        ref={equipmentQtyInputRef}
                         type="number"
                         min="1"
                         max="50"
                         value={equipmentFormQty}
                         onChange={e => setEquipmentFormQty(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{ width: '50px', padding: '8px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, textAlign: 'center', outline: 'none' }}
                       />
                     </div>
 
