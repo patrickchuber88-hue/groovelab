@@ -15164,7 +15164,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Selected Room Header or Title */}
                 <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {selectedRoom ? `🏢 Instrumente in „${selectedRoom.name}“` : '🎸 Alle Instrumente & Ausstattungen'}
+                    {selectedRoom ? `🏢 Instrumente in „${selectedRoom.name}“` : 'Alle Instrumente & Ausstattungen'}
                   </h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
                     {selectedRoom 
@@ -15392,8 +15392,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             }}
                             className="hover-scale-mini"
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎹</span>
+                            <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                               
                               {/* Horizontal wrapper for name/model and locations */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
