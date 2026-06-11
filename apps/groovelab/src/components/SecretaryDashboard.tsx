@@ -10678,7 +10678,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                             {/* Room Timeline Rows */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                              {rooms.map(room => {
+                              {rooms.filter(room => room.is_campus_active !== false).map(room => {
                                 const roomAllocations = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === liveViewDay);
                                 
                                 // Conflict checker inside the timeline
@@ -10918,7 +10918,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             </tr>
 
                             {/* ── Room rows ── */}
-                            {rooms.map((room, rIdx) => {
+                            {rooms.filter(room => room.is_campus_active !== false).map((room, rIdx) => {
                               // Smart instrument compatibility check for visual highlighting
                               const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
                               
@@ -11183,7 +11183,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontSize: '0.8rem', fontWeight: 700, color: '#475569', outline: 'none', cursor: 'pointer' }}
                         >
                           <option value="">— Kein Raum (zurücksetzen) —</option>
-                          {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                          {rooms.filter(r => r.is_campus_active !== false).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                         
                         {!selectedDayPlan.id.startsWith('adhoc_') && (
@@ -12380,7 +12380,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               }}
                                             >
                                               <option value="" disabled>Raum zuweisen...</option>
-                                              {rooms.map(rm => (
+                                              {rooms.filter(rm => rm.is_campus_active !== false).map(rm => (
                                                 <option key={rm.id} value={rm.id}>{rm.name}</option>
                                               ))}
                                             </select>
@@ -14054,15 +14054,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 550, fontFamily: 'Inter' }}>qm</span>
                                     </div>
                                   </div>
-                                  {Array.isArray(room.room_instruments) && room.room_instruments.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-                                      {room.room_instruments.map((inst: any, idx: number) => (
-                                        <span key={idx} style={{ fontSize: '0.65rem', fontWeight: 750, padding: '2px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontFamily: 'Urbanist' }}>
-                                          🎹 {inst.name} {inst.model ? `(${inst.model})` : ''}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
+
                                 </div>
                               </div>
 
