@@ -1,0 +1,1766 @@
+[
+  {
+    "file": "App.tsx",
+    "line": 1813,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update(updateData).eq('id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 2735,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ last_seen: now }).eq('id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3239,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_members').insert({ band_id: band.id, user_id: candidate.user_id, instrument: inst });"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3241,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: candidate.user_id, instrument: inst, status: 'joined' });"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3752,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().eq('band_id', bandId).eq('user_id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3755,
+    "table": "band_songs",
+    "operation": "delete",
+    "snippet": "const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId); if (bandSongs && bandSongs.length > 0) { const songIds = bandSongs.map(s => s.id); await supabase.from('band_song_slots').delete().in('band_song_id', songIds).eq('user_id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3758,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('band_song_id', songIds).eq('user_id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3856,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "result = await supabase.from('lab_planning') .delete()"
+  },
+  {
+    "file": "App.tsx",
+    "line": 3862,
+    "table": "lab_planning",
+    "operation": "insert",
+    "snippet": "result = await supabase.from('lab_planning').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4107,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4252,
+    "table": "band_shoutbox",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('band_shoutbox').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4283,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('band_shoutbox').delete().eq('id', msgId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4472,
+    "table": "bands",
+    "operation": "delete",
+    "snippet": "await supabase.from('bands').delete().eq('id', existingGroupBand.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4617,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: memErr } = await supabase.from('band_members').insert(memberInserts);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4621,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error: slotErr } = await supabase.from('band_song_slots').insert(slotInserts);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4856,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: membersErr } = await supabase.from('band_members').insert(memberInserts);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4860,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ band_id: band.id, status: 'active' }).eq('id', pendingFounding.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4879,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('user_song_skills').delete().eq('song_id', songId).eq('user_id', loggedInUserId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4928,
+    "table": "user_song_skills",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('user_song_skills').insert(insertData);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4971,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "updateResult = await supabase.from('user_song_skills').update({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 4977,
+    "table": "user_song_skills",
+    "operation": "insert",
+    "snippet": "updateResult = await supabase.from('user_song_skills').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5056,
+    "table": "band_shoutbox",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_shoutbox').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5064,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ status: 'active' }).eq('id', bsData.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5065,
+    "table": "band_shoutbox",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_shoutbox').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5084,
+    "table": "band_members",
+    "operation": "update",
+    "snippet": "await supabase.from('band_members').update({ confetti_seen: true }).eq('id', showConfetti.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5106,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5233,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5531,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ delete_after_contract: true, contract_decision_made: true }).eq('id', deletionPromptUserId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 5542,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ delete_after_contract: false, contract_decision_made: true }).eq('id', deletionPromptUserId);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 7776,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('lab_planning').delete().eq('school_id', schoolData.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 8223,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('lab_planning').delete().eq('school_id', schoolData.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 9997,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('band_song_slots').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10011,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ formation_group: newFormId }).eq('id', mySkill.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10015,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ formation_group: form.id }).eq('id', mySkill.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10147,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10198,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ formation_group: newId }).eq('id', mySkill.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10486,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: memErr } = await supabase.from('band_members').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10501,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_song_slots').insert({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10555,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_members').insert({ band_id: band.id, user_id: ev.id, instrument: 'Vocals' });"
+  },
+  {
+    "file": "App.tsx",
+    "line": 10556,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: ev.id, instrument: 'Vocals', part_number: nextPartNumber, status: 'accepted' });"
+  },
+  {
+    "file": "App.tsx",
+    "line": 12260,
+    "table": "bands",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('bands').update({"
+  },
+  {
+    "file": "App.tsx",
+    "line": 12508,
+    "table": "bands",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('bands').update({ photo_url: av.url }).eq('id', selectedBandForProfile.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 12515,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update({ photo_url: av.url, avatar_url: av.url }).eq('id', user.id);"
+  },
+  {
+    "file": "App.tsx",
+    "line": 12517,
+    "table": "avatars",
+    "operation": "update",
+    "snippet": "await supabase.from('avatars').update({ asset_path: av.url }).eq('user_id', user.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1455,
+    "table": "stations",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('stations').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1675,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1682,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('band_members').delete().eq('id', memberId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1707,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "let { error } = await supabase.from('band_members').insert(insertData);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1714,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: retryErr } = await supabase.from('band_members').insert(fallbackData);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1749,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1759,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error: retrySlotErr } = await supabase.from('band_song_slots').insert(cleanedSlots);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1810,
+    "table": "bands",
+    "operation": "update",
+    "snippet": "await supabase.from('bands').update({ coach_id: topTid }).eq('id', bandId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1820,
+    "table": "bands",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('bands').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1950,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().in('user_id', expiredIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1955,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "await supabase.from('user_song_skills').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1956,
+    "table": "sessions",
+    "operation": "delete",
+    "snippet": "await supabase.from('sessions').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1957,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1958,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "await supabase.from('lab_planning').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1959,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1960,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1961,
+    "table": "help_requests",
+    "operation": "delete",
+    "snippet": "await supabase.from('help_requests').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1962,
+    "table": "avatars",
+    "operation": "delete",
+    "snippet": "await supabase.from('avatars').delete().in('user_id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 1963,
+    "table": "users",
+    "operation": "delete",
+    "snippet": "await supabase.from('users').delete().in('id', toDelete);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2163,
+    "table": "stations",
+    "operation": "insert",
+    "snippet": "const { data: newStations } = await supabase.from('stations').insert(missingLehrerInserts).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2309,
+    "table": "mission_templates",
+    "operation": "insert",
+    "snippet": "const { data: inserted } = await supabase.from('mission_templates').insert([defaultTemp]).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2419,
+    "table": "kiosks",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('kiosks').insert(missingKiosks);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2827,
+    "table": "users",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('users').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2846,
+    "table": "avatars",
+    "operation": "upsert",
+    "snippet": "await supabase.from('avatars').upsert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2915,
+    "table": "users",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('users').insert(studentsToInsert).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2934,
+    "table": "avatars",
+    "operation": "upsert",
+    "snippet": "await supabase.from('avatars').upsert(avatarsToInsert);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2954,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 2970,
+    "table": "avatars",
+    "operation": "upsert",
+    "snippet": "await supabase.from('avatars').upsert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3004,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update(updatePayload).eq('id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3008,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "await supabase.from('user_song_skills').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3009,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3010,
+    "table": "sessions",
+    "operation": "delete",
+    "snippet": "await supabase.from('sessions').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3011,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3012,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "await supabase.from('lab_planning').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3013,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3014,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3015,
+    "table": "help_requests",
+    "operation": "delete",
+    "snippet": "await supabase.from('help_requests').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3016,
+    "table": "users",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('users').delete().eq('id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3046,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('lab_planning').delete().in('id', orphaned.map(o => o.id));"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3059,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('lab_planning').delete().eq('school_id', admin.school_id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3069,
+    "table": "bands",
+    "operation": "insert",
+    "snippet": "const { data: band, error: bErr } = await supabase.from('bands').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3084,
+    "table": "band_songs",
+    "operation": "insert",
+    "snippet": "const { data: bs, error: bsErr } = await supabase.from('band_songs').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3093,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_song_slots').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3113,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: coachErr } = await supabase.from('band_members').insert(coachInsertData);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3117,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_members').insert(fallbackCoach);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3129,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: memErr } = await supabase.from('band_members').insert(memberInsertData);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3133,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_members').insert(fallbackMember);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3157,
+    "table": "users",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('users').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3175,
+    "table": "sessions",
+    "operation": "delete",
+    "snippet": "await supabase.from('sessions').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3176,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3177,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3178,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "await supabase.from('lab_planning').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3179,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3180,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3181,
+    "table": "help_requests",
+    "operation": "delete",
+    "snippet": "await supabase.from('help_requests').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3183,
+    "table": "users",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('users').delete().eq('id', id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3198,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update({ is_observer: newValue }).eq('id', t.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3209,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3234,
+    "table": "rooms",
+    "operation": "insert",
+    "snippet": "const { data: roomData, error: roomError } = await supabase.from('rooms').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3269,
+    "table": "stations",
+    "operation": "insert",
+    "snippet": "await supabase.from('stations').insert(stationsToInsert);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3295,
+    "table": "stations",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('stations').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3349,
+    "table": "stations",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('stations').insert(stationsToInsert).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3362,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({ name: editingRoomName }).eq('id', roomId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3372,
+    "table": "rooms",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('rooms').delete().eq('id', roomId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3468,
+    "table": "stations",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('stations').delete().eq('id', stationId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3489,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('stations').update({ color: newColor }).in('id', idsToUpdate);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3515,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3569,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error: updateError } = await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3606,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3618,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3725,
+    "table": "songs",
+    "operation": "insert",
+    "snippet": "let { data, error } = await supabase.from('songs').insert(insertPayloads).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3730,
+    "table": "songs",
+    "operation": "insert",
+    "snippet": "const retryResult = await supabase.from('songs').insert(strippedPayloads).select();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3775,
+    "table": "songs",
+    "operation": "insert",
+    "snippet": "let { data, error } = await supabase.from('songs').insert(insertPayload).select().single();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3780,
+    "table": "songs",
+    "operation": "insert",
+    "snippet": "const retryResult = await supabase.from('songs').insert(strippedPayload).select().single();"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3815,
+    "table": "songs",
+    "operation": "update",
+    "snippet": "let { error } = await supabase.from('songs').update(updatePayload).eq('id', editingSong.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3821,
+    "table": "songs",
+    "operation": "update",
+    "snippet": "const retryResult = await supabase.from('songs').update(strippedPayload).eq('id', editingSong.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3840,
+    "table": "rejection_history",
+    "operation": "delete",
+    "snippet": "await supabase.from('rejection_history').delete().eq('song_id', songId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3848,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().in('band_id', bandIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3849,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().in('band_id', bandIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3852,
+    "table": "band_songs",
+    "operation": "delete",
+    "snippet": "const { data: bandSongs } = await supabase.from('band_songs').select('id').in('band_id', bandIds); if (bandSongs && bandSongs.length > 0) { await supabase.from('band_song_slots').delete().in('band_song_id', bandSongs.map(bs => bs.id));"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3854,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('band_song_id', bandSongs.map(bs => bs.id));"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3858,
+    "table": "bands",
+    "operation": "delete",
+    "snippet": "await supabase.from('bands').delete().in('id', bandIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3862,
+    "table": "band_songs",
+    "operation": "delete",
+    "snippet": "const { data: allBS } = await supabase.from('band_songs').select('id').eq('song_id', songId); if (allBS && allBS.length > 0) { await supabase.from('band_song_slots').delete().in('band_song_id', allBS.map(bs => bs.id));"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3864,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('band_song_id', allBS.map(bs => bs.id));"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3868,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "await supabase.from('user_song_skills').delete().eq('song_id', songId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3869,
+    "table": "band_songs",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_songs').delete().eq('song_id', songId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 3872,
+    "table": "songs",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('songs').delete().eq('id', songId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4447,
+    "table": "bands",
+    "operation": "delete",
+    "snippet": "await supabase.from('bands').delete().eq('id', band.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4518,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4521,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_song_slots').insert({ band_song_id: activeProject.id, user_id: s.id, instrument: 'Vocals', status: 'joined' });"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4569,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4570,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "await supabase.from('user_song_skills').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4571,
+    "table": "sessions",
+    "operation": "delete",
+    "snippet": "await supabase.from('sessions').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4572,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4573,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "await supabase.from('lab_planning').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4574,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4575,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4576,
+    "table": "help_requests",
+    "operation": "delete",
+    "snippet": "await supabase.from('help_requests').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4577,
+    "table": "avatars",
+    "operation": "delete",
+    "snippet": "await supabase.from('avatars').delete().in('user_id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 4578,
+    "table": "users",
+    "operation": "delete",
+    "snippet": "await supabase.from('users').delete().in('id', studentIds);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 10089,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();  await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 10091,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 10120,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 10139,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ is_pending_approval: false, progress_percent: 85 }).eq('id', subId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 10199,
+    "table": "one_time_upload_pins",
+    "operation": "insert",
+    "snippet": "await supabase.from('one_time_upload_pins').insert({"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 11338,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "await supabase.from('stations').update({ instrument: val }).eq('id', activeEditStationId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 11345,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "await supabase.from('stations').update({ color: val }).eq('id', activeEditStationId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 11351,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('stations').update({ name: editingStationName }).eq('id', activeEditStationId);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 11394,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "await supabase.from('stations').update({ pos_x: us.pos_x, pos_y: us.pos_y }).eq('id', us.id);"
+  },
+  {
+    "file": "components/AdminDashboard.tsx",
+    "line": 11521,
+    "table": "stations",
+    "operation": "update",
+    "snippet": "await supabase.from('stations').update({ pos_x: finalX, pos_y: finalY }).eq('id', station.id);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 473,
+    "table": "band_shoutbox",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('band_shoutbox').insert({"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 519,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "supabase.from('band_songs').update({ status: 'proposal' }).eq('id', prop.id).then(() => {"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 524,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "supabase.from('band_songs').update({ status: 'active' }).eq('id', prop.id).then(() => {"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 551,
+    "table": "band_song_slots",
+    "operation": "update",
+    "snippet": "await supabase.from('band_song_slots').update({ user_id: user.id, status: 'accepted' }).eq('id', slot.id);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 650,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ status: 'active' }).eq('id', proposalId);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 651,
+    "table": "band_shoutbox",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_shoutbox').insert({"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 872,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().in('id', idsToDelete);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 896,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().in('id', slotIdsToDelete);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 946,
+    "table": "band_rehearsals",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_rehearsals').delete().eq('id', existing.id);"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 948,
+    "table": "band_rehearsals",
+    "operation": "insert",
+    "snippet": "await supabase.from('band_rehearsals').insert({"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 1566,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('band_song_slots').insert({"
+  },
+  {
+    "file": "components/BandProfileContent.tsx",
+    "line": 1583,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('band_song_slots').insert({"
+  },
+  {
+    "file": "components/CampusEventsBoard.tsx",
+    "line": 295,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/CampusEventsBoard.tsx",
+    "line": 1029,
+    "table": "room_bookings",
+    "operation": "insert",
+    "snippet": "await supabase.from('room_bookings').insert({"
+  },
+  {
+    "file": "components/CampusTeacherDashboard.tsx",
+    "line": 615,
+    "table": "student_cascades",
+    "operation": "insert",
+    "snippet": "await supabase.from('student_cascades').insert({"
+  },
+  {
+    "file": "components/DeviceSetupScreen.tsx",
+    "line": 243,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busySession.id);"
+  },
+  {
+    "file": "components/EnsembleDashboard.tsx",
+    "line": 179,
+    "table": "ensembles",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('ensembles').delete().eq('id', id);"
+  },
+  {
+    "file": "components/EnsembleDashboard.tsx",
+    "line": 240,
+    "table": "ensemble_members",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('ensemble_members').delete().eq('id', memberId);"
+  },
+  {
+    "file": "components/EnsembleDashboard.tsx",
+    "line": 292,
+    "table": "ensemble_songs",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('ensemble_songs').delete().eq('id', ensembleSongId);"
+  },
+  {
+    "file": "components/LoginScreen.tsx",
+    "line": 1319,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null),"
+  },
+  {
+    "file": "components/LoginScreen.tsx",
+    "line": 1321,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null)"
+  },
+  {
+    "file": "components/QRLandingPage.tsx",
+    "line": 734,
+    "table": "fokus_logs",
+    "operation": "insert",
+    "snippet": "await supabase.from('fokus_logs').insert({"
+  },
+  {
+    "file": "components/QRLandingPage.tsx",
+    "line": 744,
+    "table": "student_stats",
+    "operation": "upsert",
+    "snippet": "await supabase.from('student_stats').upsert({"
+  },
+  {
+    "file": "components/QRLandingPage.tsx",
+    "line": 762,
+    "table": "avatars",
+    "operation": "update",
+    "snippet": "await supabase.from('avatars').update({"
+  },
+  {
+    "file": "components/ScheduleBoard.tsx",
+    "line": 1270,
+    "table": "system_alerts",
+    "operation": "insert",
+    "snippet": "await supabase.from('system_alerts').insert({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 529,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1047,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1077,
+    "table": "room_bookings",
+    "operation": "delete",
+    "snippet": "supabase.from('room_bookings') .delete()"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1389,
+    "table": "schedule_occurrences",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('schedule_occurrences').insert(insertData);"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1400,
+    "table": "schedule_occurrences",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('schedule_occurrences') .update({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1420,
+    "table": "room_bookings",
+    "operation": "delete",
+    "snippet": "await supabase.from('room_bookings') .delete()"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1450,
+    "table": "room_bookings",
+    "operation": "insert",
+    "snippet": "await supabase.from('room_bookings').insert({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 1510,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 2477,
+    "table": "room_bookings",
+    "operation": "delete",
+    "snippet": "await supabase.from('room_bookings') .delete()"
+  },
+  {
+    "file": "components/ScheduleCalendarView.tsx",
+    "line": 2498,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 1528,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 2969,
+    "table": "avatars",
+    "operation": "insert",
+    "snippet": "await supabase.from('avatars').insert({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5654,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "let { error } = await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5668,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error: retryError } = await supabase.from('rooms').update({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5710,
+    "table": "rooms",
+    "operation": "insert",
+    "snippet": "let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5717,
+    "table": "rooms",
+    "operation": "insert",
+    "snippet": "const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutFloor).select().single();"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5763,
+    "table": "rooms",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('rooms').delete().eq('id', roomId);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5822,
+    "table": "rooms",
+    "operation": "insert",
+    "snippet": "let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5828,
+    "table": "rooms",
+    "operation": "insert",
+    "snippet": "const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutFloor).select().single();"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5902,
+    "table": "school_equipment",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('school_equipment').update({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5908,
+    "table": "school_equipment",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('school_equipment').insert({"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 5928,
+    "table": "school_equipment",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('school_equipment').delete().eq('id', id);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 12842,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', room.id);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 12868,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', room.id);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 13171,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('rooms').update({ floor: flName }).eq('id', roomId);"
+  },
+  {
+    "file": "components/SecretaryDashboard.tsx",
+    "line": 13227,
+    "table": "rooms",
+    "operation": "update",
+    "snippet": "supabase.from('rooms').update({ floor: 'Allgemein' }).eq('floor', flName).then(() => {"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 1489,
+    "table": "campus_direct_messages",
+    "operation": "insert",
+    "snippet": "const { error } = await supabase.from('campus_direct_messages').insert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 1898,
+    "table": "system_alerts",
+    "operation": "insert",
+    "snippet": "await supabase.from('system_alerts').insert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 1946,
+    "table": "system_alerts",
+    "operation": "insert",
+    "snippet": "await supabase.from('system_alerts').insert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3093,
+    "table": "fokus_logs",
+    "operation": "insert",
+    "snippet": "await supabase.from('fokus_logs').insert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3105,
+    "table": "fokus_logs",
+    "operation": "insert",
+    "snippet": "await supabase.from('fokus_logs').insert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3116,
+    "table": "student_stats",
+    "operation": "upsert",
+    "snippet": "await supabase.from('student_stats').upsert({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3134,
+    "table": "avatars",
+    "operation": "update",
+    "snippet": "await supabase.from('avatars').update({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3585,
+    "table": "avatars",
+    "operation": "update",
+    "snippet": "await supabase.from('avatars').update({ streak_flame: currentDecayedStreak }).eq('user_id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3586,
+    "table": "student_stats",
+    "operation": "update",
+    "snippet": "await supabase.from('student_stats').update({ streak_flame: currentDecayedStreak }).eq('student_id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3589,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ joker_used_at: latestJokerDate.toISOString() }).eq('id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 3929,
+    "table": "avatars",
+    "operation": "update",
+    "snippet": "await supabase.from('avatars').update({"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 4068,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ avatar_url: fallbackAvatar.asset_path }).eq('id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 9610,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 9635,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);"
+  },
+  {
+    "file": "components/StudentAvatarDashboard.tsx",
+    "line": 9660,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 864,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 1037,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "supabase.from('sessions').update({"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 1042,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null)"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 1412,
+    "table": "crisis_notifications",
+    "operation": "insert",
+    "snippet": "await supabase.from('crisis_notifications').insert(notifs);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 1416,
+    "table": "system_alerts",
+    "operation": "insert",
+    "snippet": "await supabase.from('system_alerts').insert({"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 3302,
+    "table": "users",
+    "operation": "update",
+    "snippet": "supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4203,
+    "table": "band_shoutbox",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('band_shoutbox').update({ read_by: newReadBy }).eq('id', shoutId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4232,
+    "table": "band_shoutbox",
+    "operation": "update",
+    "snippet": "await supabase.from('band_shoutbox').update({ read_by: update.read_by }).eq('id', update.id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4247,
+    "table": "sessions",
+    "operation": "update",
+    "snippet": "await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4253,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().eq('id', memberId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4269,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "let { error } = await supabase.from('band_members').insert(insertData);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4276,
+    "table": "band_members",
+    "operation": "insert",
+    "snippet": "const { error: retryErr } = await supabase.from('band_members').insert(fallbackData);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4311,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4321,
+    "table": "band_song_slots",
+    "operation": "insert",
+    "snippet": "const { error: retrySlotErr } = await supabase.from('band_song_slots').insert(cleanedSlots);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4337,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();  await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4339,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4372,
+    "table": "users",
+    "operation": "update",
+    "snippet": "await supabase.from('users').update({"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4387,
+    "table": "user_song_skills",
+    "operation": "update",
+    "snippet": "await supabase.from('user_song_skills').update({ is_pending_approval: false, progress_percent: 85 }).eq('id', subId);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4407,
+    "table": "users",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('users').insert({"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4453,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update({"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4493,
+    "table": "users",
+    "operation": "update",
+    "snippet": "const { error } = await supabase.from('users').update(updatePayload).eq('id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4496,
+    "table": "user_song_skills",
+    "operation": "delete",
+    "snippet": "await supabase.from('user_song_skills').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4497,
+    "table": "band_members",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_members').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4498,
+    "table": "sessions",
+    "operation": "delete",
+    "snippet": "await supabase.from('sessions').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4499,
+    "table": "band_songs",
+    "operation": "update",
+    "snippet": "await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4500,
+    "table": "lab_planning",
+    "operation": "delete",
+    "snippet": "await supabase.from('lab_planning').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4501,
+    "table": "band_shoutbox",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_shoutbox').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4502,
+    "table": "band_song_slots",
+    "operation": "delete",
+    "snippet": "await supabase.from('band_song_slots').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4503,
+    "table": "help_requests",
+    "operation": "delete",
+    "snippet": "await supabase.from('help_requests').delete().eq('user_id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4505,
+    "table": "users",
+    "operation": "delete",
+    "snippet": "const { error } = await supabase.from('users').delete().eq('id', id);"
+  },
+  {
+    "file": "components/TeacherDashboard.tsx",
+    "line": 4532,
+    "table": "users",
+    "operation": "insert",
+    "snippet": "const { data, error } = await supabase.from('users').insert({"
+  },
+  {
+    "file": "components/TeacherStudentManagement.tsx",
+    "line": 161,
+    "table": "avatars",
+    "operation": "insert",
+    "snippet": "await supabase.from('avatars').insert({"
+  }
+]

@@ -3337,7 +3337,11 @@ export function TeacherDashboard({
 
       if (tData?.school_id) {
         // Prepare Student Query depending on platform
-        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
+        // For student viewMode: fetch all students in school (userId is the student's own ID, NOT a teacher_id)
+        // For admin/teacher viewMode: fetch only the teacher's own students filtered by teacher_id
+        let studentQuery = viewMode === 'student'
+          ? supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student')
+          : supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
 
         // Prepare dynamic matching board songs query
         let wallSongsQuery = supabase.from('songs').select(`
@@ -3370,7 +3374,8 @@ export function TeacherDashboard({
           Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin', 'Teacher', 'Admin', 'TEACHER', 'ADMIN']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
+          // Only use valid enum values (lowercase) — Postgres user_role enum rejects any other casing
+          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e })),
           Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e })),
           Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),

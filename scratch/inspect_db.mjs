@@ -1,22 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
 
-const supabaseUrl = 'https://supabase.campus-groovelab.de';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
+const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.env.local', 'utf-8');
+const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
+const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
+const supabase = createClient(url, key);
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-async function run() {
-  const { data: boris, error: err1 } = await supabase
-    .from('users')
-    .select('*')
-    .ilike('first_name', '%Boris%');
-  console.log('Boris:', boris, err1);
-
-  const { data: felix, error: err2 } = await supabase
-    .from('users')
-    .select('*')
-    .ilike('first_name', '%Felix%');
-  console.log('Felix:', felix, err2);
+async function runCheck() {
+  const sql = `
+    SELECT column_name, data_type 
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'users';
+  `;
+  
+  const { data, error } = await supabase.rpc('exec_sql', { query: sql });
+  if (error) {
+    console.error("Error executing query via exec_sql:", error);
+    // try fallback
+    const { data: dataFallback, error: errorFallback } = await supabase.rpc('execute_sql', { sql_query: sql });
+    console.log("Fallback result:", dataFallback, errorFallback);
+  } else {
+    console.log("Columns in users table:", data);
+  }
 }
 
-run();
+runCheck();

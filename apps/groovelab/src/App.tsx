@@ -1851,7 +1851,7 @@ function App() {
     if (platform === 'ensembles') {
       return localStorage.getItem('ensembles_active_tab') || 'overview';
     }
-    return localStorage.getItem('groovelab_active_tab') || 'profile';
+    return localStorage.getItem('groovelab_active_tab') || 'live';
   });
   const setActiveStudentTab = React.useCallback((val: any) => {
     React.startTransition(() => {
@@ -2589,6 +2589,8 @@ function App() {
   // If a student is on the 'campus' platform but the activeStudentTab is not a valid campus tab (e.g. 'live'),
   // we immediately redirect/correct them to 'briefing' to keep the modules strictly isolated.
   useEffect(() => {
+    // Only enforce campus tab restrictions when on the campus platform
+    if (activePlatform !== 'campus') return;
     if (user && user.role?.toLowerCase() === 'student') {
         const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
         const showLeaderboard = campusSettings.show_leaderboard !== false;
@@ -5289,6 +5291,16 @@ function App() {
             console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
             setActiveStudentTab(fallbackTab);
             localStorage.setItem(storageKey, fallbackTab);
+          }
+        }
+        // Auto-correct if a student on groovelab has an invalid campus-only tab saved (e.g. 'briefing' from old Safety Hook bug)
+        const isStudent = user.role?.toLowerCase() === 'student';
+        if (isStudent && activePlatform === 'groovelab') {
+          const validGroovelabStudentTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages'];
+          if (!validGroovelabStudentTabs.includes(activeStudentTab)) {
+            console.log('[Tab Sync] Auto-correcting invalid groovelab student tab to live:', activeStudentTab);
+            setActiveStudentTab('live');
+            localStorage.setItem('groovelab_active_tab', 'live');
           }
         }
       }
