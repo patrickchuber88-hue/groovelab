@@ -2500,6 +2500,30 @@ export function ScheduleCalendarView({
                                       recipient_id: occ.student_id,
                                       content: notificationMessage
                                     });
+
+                                    // Create a notification record in the DB for push tracking
+                                    const { data: dbNotif } = await supabase
+                                      .from('notifications')
+                                      .insert({
+                                        user_id: occ.student_id,
+                                        title: 'Termin-Update 📅',
+                                        message: notificationMessage,
+                                        metadata: { occurrence_id: editOccState.id, type: 'reschedule_reset' }
+                                      })
+                                      .select('id')
+                                      .single();
+
+                                    // Invoke send-push Edge Function
+                                    await supabase.functions.invoke('send-push', {
+                                      body: {
+                                        userId: occ.student_id,
+                                        title: 'Termin-Update 📅',
+                                        body: notificationMessage,
+                                        url: '/',
+                                        notificationId: dbNotif ? dbNotif.id : null
+                                      }
+                                    });
+                                    console.log('[Push] Sent real-time revert push to student:', occ.student_id);
                                   }
                                 } catch (notifErr) {
                                   console.warn('Could not send revert notification:', notifErr);
