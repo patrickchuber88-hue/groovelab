@@ -5997,25 +5997,19 @@ function App() {
           pointerEvents: 'auto',
           boxSizing: 'border-box'
         }}>
-          {/* App Icon (BILD-style red square with white serif text) */}
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '8px',
-            background: '#ef4444',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontFamily: '"Georgia", "Times New Roman", serif',
-            fontSize: '1.25rem',
-            fontWeight: 950,
-            letterSpacing: '-1px',
-            boxShadow: '0 3px 8px rgba(239, 68, 68, 0.2)',
-            flexShrink: 0
-          }}>
-            {activePlatform === 'campus' ? 'C' : 'GL'}
-          </div>
+          {/* App Icon (Actual App Logo) */}
+          <img 
+            src="/pwa-icon.png" 
+            alt="App Logo" 
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              objectFit: 'cover',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+              flexShrink: 0
+            }}
+          />
 
           {/* 2-line Text content */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
