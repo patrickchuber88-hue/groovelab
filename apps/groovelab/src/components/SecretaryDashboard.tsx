@@ -17982,7 +17982,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       }
                     }}
                     style={{
-                      background: '#7c3aed',
+                      background: '#16a34a',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
@@ -17990,7 +17990,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       fontSize: '0.72rem',
                       fontWeight: 750,
                       cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(124, 58, 237, 0.15)'
+                      boxShadow: '0 2px 4px rgba(22, 163, 74, 0.15)'
                     }}
                   >
                     Drucken / PDF
@@ -18018,8 +18018,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Invoice Meta */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
                   <div>
-                    <h2 style={{ margin: 0, color: '#7c3aed', fontFamily: 'Urbanist', fontSize: '1.6rem', fontWeight: 900 }}>Groovelab</h2>
-                    <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Simplified Work GbR Billing System</span>
+                    <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.6rem', fontWeight: 900 }}>Campus-Groovelab</h2>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
                     <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>RECHNUNG</strong>
@@ -18038,7 +18038,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-                    <strong style={{ color: '#0f172a', display: 'block' }}>Groovelab app (hue-music)</strong>
+                    <strong style={{ color: '#0f172a', display: 'block' }}>Campus-Groovelab (hue-music)</strong>
                     <span>Software &amp; Education Tech Solutions</span><br />
                     <span>Karl-Fürstenberg-Str. 59</span><br />
                     <span>79618 Rheinfelden</span>
@@ -18077,7 +18077,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 1: 100% Kostenlose Software Lizenz */}
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Groovelab Musikschul-Software</strong>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
                         <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>1</td>
@@ -18089,7 +18089,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Aktive Zusatz-Module (Campus/Groovelab)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Module: Campus / Groovelab</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastruktur &amp; Plattform-Zugang</span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
@@ -18176,7 +18176,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '0.92rem', color: '#0f172a' }}>
                       <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
-                      <strong style={{ fontWeight: 900, color: '#7c3aed' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                      <strong style={{ fontWeight: 900, color: '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
                     </div>
                   </div>
                 </div>
