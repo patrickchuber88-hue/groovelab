@@ -10913,23 +10913,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     key={dayNum}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={() => handleDropOnMatrix(null, dayNum)}
-                                    onMouseEnter={() => {
-                                      if (!draggedPlanId) {
-                                        setHoveredUnassignedDayNum(dayNum);
-                                      }
-                                    }}
-                                    onMouseLeave={() => {
-                                      if (!draggedPlanId) {
-                                        setHoveredUnassignedDayNum(null);
-                                      }
-                                    }}
-                                    onClick={(e) => {
-                                      if (!draggedPlanId) {
-                                        setClickedUnassignedDayNum(prev => prev === dayNum ? null : dayNum);
-                                      }
-                                      e.stopPropagation();
-                                    }}
-                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative', cursor: unassigned.length > 0 ? 'pointer' : 'default' }}
+                                    style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative' }}
                                   >
                                     {unassigned.length === 0 ? (
                                       <div style={{
@@ -10966,13 +10950,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               onDragEnd={() => {
                                                 setDraggedPlanId(null);
                                                 setDraggedPlanDay(null);
-                                                setHoveredUnassignedDayNum(null);
-                                                setClickedUnassignedDayNum(null);
                                               }}
                                               onClick={(e) => {
                                                 setSelectedDayPlan(topPlan);
-                                                setClickedUnassignedDayNum(null);
-                                                setHoveredUnassignedDayNum(null);
                                                 e.stopPropagation();
                                               }}
                                               style={{
@@ -11015,84 +10995,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             </div>
                                           );
                                         })()}
-                                      </div>
-                                    )}
-
-                                    {/* Flyout Popover */}
-                                    {(hoveredUnassignedDayNum === dayNum || clickedUnassignedDayNum === dayNum) && unassigned.length > 0 && (
-                                      <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: '8px',
-                                        width: '210px',
-                                        background: 'rgba(255, 255, 255, 0.96)',
-                                        backdropFilter: 'blur(16px)',
-                                        WebkitBackdropFilter: 'blur(16px)',
-                                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                                        borderRadius: '16px',
-                                        padding: '10px',
-                                        boxShadow: '0 12px 30px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.02)',
-                                        zIndex: 9999,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        marginTop: '4px',
-                                        pointerEvents: draggedPlanId ? 'none' : 'auto',
-                                        opacity: draggedPlanId ? 0 : 1,
-                                        transition: 'opacity 0.2s ease'
-                                      }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px', marginBottom: '2px' }}>
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase' }}>Offene Termine</span>
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: '6px' }}>{unassigned.length}</span>
-                                        </div>
-                                        <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-                                          {unassigned.map(plan => (
-                                            <div
-                                              key={plan.id}
-                                              draggable
-                                              onDragStart={() => handleDragStartMatrix(plan.id)}
-                                              onDragEnd={() => {
-                                                setDraggedPlanId(null);
-                                                setDraggedPlanDay(null);
-                                                setHoveredUnassignedDayNum(null);
-                                                setClickedUnassignedDayNum(null);
-                                              }}
-                                              onClick={(e) => {
-                                                setSelectedDayPlan(plan);
-                                                setClickedUnassignedDayNum(null);
-                                                setHoveredUnassignedDayNum(null);
-                                                e.stopPropagation();
-                                              }}
-                                              style={{
-                                                background: 'rgba(254, 243, 199, 0.7)',
-                                                border: '1px solid #fde68a',
-                                                borderLeft: '4px solid #f59e0b',
-                                                borderRadius: '10px',
-                                                padding: '7px 9px',
-                                                cursor: 'grab',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '2px',
-                                                boxShadow: '0 1px 3px rgba(245,158,11,0.04)',
-                                                transition: 'all 0.15s'
-                                              }}
-                                              onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                                e.currentTarget.style.boxShadow = '0 3px 6px rgba(245,158,11,0.08)';
-                                              }}
-                                              onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = 'none';
-                                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(245,158,11,0.04)';
-                                              }}
-                                            >
-                                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={plan.teacherName}>
-                                                {plan.teacherName}
-                                              </span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
-                                            </div>
-                                          ))}
-                                        </div>
                                       </div>
                                     )}
                                   </td>
