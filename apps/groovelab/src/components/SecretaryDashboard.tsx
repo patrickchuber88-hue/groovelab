@@ -14116,8 +14116,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             </div>
 
                             {/* ASSIGNED INSTANCES FIELD / BADGES ROW */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Standorte:</span>
+                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>Standorte:</span>
                               
                               {group.instances.map((inst) => {
                                 const isInstAssigned = !!inst.roomId;
@@ -14151,7 +14151,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       fontWeight: 800,
                                       color: isInstAssigned ? '#0b57d0' : '#475569',
                                       fontFamily: 'Urbanist',
-                                      transition: 'all 0.15s'
+                                      transition: 'all 0.15s',
+                                      flexShrink: 0,
+                                      whiteSpace: 'nowrap'
                                     }}
                                     className="hover-scale-mini"
                                     title={isInstAssigned ? "Klicken zum Bearbeiten des Modells in diesem Raum" : "Ziehe dieses freie Instrument auf einen Raum"}
