@@ -1292,6 +1292,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
   const [hasCampusSub, setHasCampusSub] = useState<boolean>(false);
   const [hasGroovelabSub, setHasGroovelabSub] = useState<boolean>(false);
+  const [campusActivatedThisMonth, setCampusActivatedThisMonth] = useState<boolean>(false);
+  const [groovelabActivatedThisMonth, setGroovelabActivatedThisMonth] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -1719,7 +1721,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month')
         .eq('id', schoolId)
         .single();
 
@@ -1736,6 +1738,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const hasGroove = schoolData.has_groovelab_subscription ?? false;
         setHasCampusSub(hasCampus);
         setHasGroovelabSub(hasGroove);
+        setCampusActivatedThisMonth(schoolData.campus_activated_this_month ?? false);
+        setGroovelabActivatedThisMonth(schoolData.groovelab_activated_this_month ?? false);
         if (!hasCampus && hasGroove) {
           setActiveTab('groovelab');
         } else if (hasCampus && !hasGroove) {
@@ -2588,9 +2592,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const handleToggleCampusSub = async (newValue: boolean) => {
     try {
       setHasCampusSub(newValue);
+      const updateData: any = { has_campus_subscription: newValue };
+      if (newValue) {
+        updateData.campus_activated_this_month = true;
+        setCampusActivatedThisMonth(true);
+      }
       const { error } = await supabase
         .from('schools')
-        .update({ has_campus_subscription: newValue })
+        .update(updateData)
         .eq('id', schoolId);
       if (error) throw error;
     } catch (err: any) {
@@ -2601,9 +2610,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const handleToggleGroovelabSub = async (newValue: boolean) => {
     try {
       setHasGroovelabSub(newValue);
+      const updateData: any = { has_groovelab_subscription: newValue };
+      if (newValue) {
+        updateData.groovelab_activated_this_month = true;
+        setGroovelabActivatedThisMonth(true);
+      }
       const { error } = await supabase
         .from('schools')
-        .update({ has_groovelab_subscription: newValue })
+        .update(updateData)
         .eq('id', schoolId);
       if (error) throw error;
     } catch (err: any) {
@@ -13763,88 +13777,107 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 Verwalte deine lizenzierten Module und buche zusätzliche Benutzerkontingente.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-                {/* Module overview */}
-                <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Aktivierte Module</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e6f4ea' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎓 Campus System</span>
-                      <span style={{ fontSize: '0.72rem', background: '#e6f4ea', color: '#137333', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                        {hasCampusSub ? 'AKTIV' : 'INAKTIV'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e6f4ea' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎸 GrooveLab App</span>
-                      <span style={{ fontSize: '0.72rem', background: '#e6f4ea', color: '#137333', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                        {hasGroovelabSub ? 'AKTIV' : 'INAKTIV'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* User Quota Calculator */}
-                <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zusätzliches Benutzerkontingent</span>
-                  <div style={{ marginTop: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Kontingent-Limit (Aktiv):</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#0b57d0' }}>{activeUserQuota} User</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Gewünscht (Regler):</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#e11d48' }}>{userQuota} User</strong>
-                    </div>
-                    
-                    <input 
-                      type="range" 
-                      min="50" 
-                      max="500" 
-                      step="10" 
-                      value={userQuota} 
-                      onChange={(e) => setUserQuota(parseInt(e.target.value))}
-                      style={{ width: '100%', accentColor: '#ea4335', cursor: 'pointer' }}
-                    />
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
-                      <span>50 (Standard)</span>
-                      <span>500 (Maximum)</span>
-                    </div>
-
-                    {pendingUserQuota !== null ? (
-                      <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#6b21a8', marginTop: '10px', fontWeight: 700 }}>
-                        ⏳ Vormerkung für nächsten Monat: {pendingUserQuota} User (kann bis zum 31. geändert werden)
+              {(() => {
+                const billedCampus = hasCampusSub || campusActivatedThisMonth;
+                const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
+                const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
+                const moduleCost = activeModulesCount * 4.99;
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                      {/* Module overview */}
+                      <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Aktivierte Module</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
+                          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎓 Campus System</span>
+                            <input 
+                              type="checkbox"
+                              checked={hasCampusSub}
+                              onChange={(e) => handleToggleCampusSub(e.target.checked)}
+                              style={{ width: '18px', height: '18px', accentColor: '#ea4335', cursor: 'pointer' }}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>🎸 GrooveLab App</span>
+                            <input 
+                              type="checkbox"
+                              checked={hasGroovelabSub}
+                              onChange={(e) => handleToggleGroovelabSub(e.target.checked)}
+                              style={{ width: '18px', height: '18px', accentColor: '#ea4335', cursor: 'pointer' }}
+                            />
+                          </label>
+                        </div>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '0.68rem', color: '#64748b', lineHeight: '1.4' }}>
+                          ℹ️ Sobald ein Modul im laufenden Monat einmal aktiviert wurde, bleibt es für diesen Abrechnungsmonat abrechnungsrelevant (auch bei Deaktivierung).
+                        </p>
                       </div>
-                    ) : (
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#64748b', marginTop: '10px', fontWeight: 650 }}>
-                        ℹ️ Keine ausstehenden Quoten-Änderungen für den nächsten Monat.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
 
-              {/* Price Calculation Card */}
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '20px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <strong style={{ display: 'block', fontSize: '0.92rem', color: '#991b1b' }}>Monatliche Gesamtkosten (Kalkulation)</strong>
-                  <span style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
-                    Modul-Grundgebühr: 9,98 € (Campus + GrooveLab) + {(userQuota)} User ({((userQuota) * 0.49).toFixed(2)} €)
-                  </span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <strong style={{ fontSize: '1.4rem', color: '#b91c1c', display: 'block' }}>
-                    {(9.98 + (userQuota) * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
-                  </strong>
-                  <button 
-                    onClick={handleSaveQuota} 
-                    className="google-btn-primary" 
-                    style={{ background: '#ea4335', padding: '6px 14px', fontSize: '0.72rem', marginTop: '8px' }}
-                  >
-                    Kontingent speichern
-                  </button>
-                </div>
-              </div>
+                      {/* User Quota Calculator */}
+                      <div style={{ padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zusätzliches Benutzerkontingent</span>
+                        <div style={{ marginTop: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Kontingent-Limit (Aktiv):</span>
+                            <strong style={{ fontSize: '0.9rem', color: '#0b57d0' }}>{activeUserQuota} User</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Gewünscht (Regler):</span>
+                            <strong style={{ fontSize: '0.9rem', color: '#e11d48' }}>{userQuota} User</strong>
+                          </div>
+                          
+                          <input 
+                            type="range" 
+                            min="50" 
+                            max="500" 
+                            step="10" 
+                            value={userQuota} 
+                            onChange={(e) => setUserQuota(parseInt(e.target.value))}
+                            style={{ width: '100%', accentColor: '#ea4335', cursor: 'pointer' }}
+                          />
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
+                            <span>50 (Standard)</span>
+                            <span>500 (Maximum)</span>
+                          </div>
+
+                          {pendingUserQuota !== null ? (
+                            <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#6b21a8', marginTop: '10px', fontWeight: 700 }}>
+                              ⏳ Vormerkung für nächsten Monat: {pendingUserQuota} User (kann bis zum 31. geändert werden)
+                            </div>
+                          ) : (
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#64748b', marginTop: '10px', fontWeight: 650 }}>
+                              ℹ️ Keine ausstehenden Quoten-Änderungen für den nächsten Monat.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price Calculation Card */}
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '20px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '0.92rem', color: '#991b1b' }}>Monatliche Gesamtkosten (Kalkulation)</strong>
+                        <span style={{ fontSize: '0.78rem', color: '#7f1d1d' }}>
+                          Modul-Grundgebühr: {moduleCost.toFixed(2)} € ({billedCampus ? 'Campus ' : ''}{billedCampus && billedGroovelab ? '+ ' : ''}{billedGroovelab ? 'GrooveLab' : ''}{activeModulesCount === 0 ? 'Keines' : ''}) + {userQuota} User ({((userQuota) * 0.49).toFixed(2)} €)
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <strong style={{ fontSize: '1.4rem', color: '#b91c1c', display: 'block' }}>
+                          {(moduleCost + userQuota * 0.49).toFixed(2)} € <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>/ Mo.</span>
+                        </strong>
+                        <button 
+                          onClick={handleSaveQuota} 
+                          className="google-btn-primary" 
+                          style={{ background: '#ea4335', padding: '6px 14px', fontSize: '0.72rem', marginTop: '8px' }}
+                        >
+                          Kontingent speichern
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Invoice list */}
               <div>
