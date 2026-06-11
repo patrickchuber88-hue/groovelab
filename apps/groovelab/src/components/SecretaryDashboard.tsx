@@ -5717,7 +5717,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
 
       // Prioritize Teacher's favorite rooms (Lieblingsräume)
-      const teacherProfile = campusTeachers.find(t => t.id === plan.teacherId);
+      const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
+      const teacherProfile = allTeachersList.find(t => t.id === plan.teacherId);
       const preferredRooms = teacherProfile?.preferred_room_ids || [];
       if (preferredRooms.length > 0) {
         for (const prId of preferredRooms) {
