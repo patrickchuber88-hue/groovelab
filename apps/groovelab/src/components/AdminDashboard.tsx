@@ -7117,7 +7117,7 @@ export function AdminDashboard({
                       
                       {/* Short summary of configured instruments */}
                       {(() => {
-                        const schoolId = admin?.school_id || '';
+                        const schoolId = room.school_id || admin?.school_id || '';
                         const roomInsts = room.room_instruments || (() => {
                           try {
                             const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
@@ -8365,7 +8365,7 @@ export function AdminDashboard({
 
                 {/* Acoustics & Instruments */}
                 {(() => {
-                  const schoolId = admin?.school_id || '';
+                  const schoolId = selectedRoom.school_id || admin?.school_id || '';
                   const roomInsts = selectedRoom.room_instruments || (() => {
                     try {
                       const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
