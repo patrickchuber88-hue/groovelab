@@ -14599,7 +14599,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       {/* Custom Bottom Curved Arrow from B2C Card bottom to B2B highlighted card bottom */}
                       {(() => {
                         const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                        const targetX = isAnnual ? 23.5 : 45.0;
+                        const targetX = isAnnual ? 23.5 : 45.5;
                         return (
                           <>
                             <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
