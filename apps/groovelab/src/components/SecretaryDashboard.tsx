@@ -10500,7 +10500,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
 
                   {/* Action Toolbar */}
-                  <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
+                  <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         🎓 Campus Raum-Koordinationsboard
@@ -10512,13 +10512,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px', width: '100%' }}>
                       {/* Segmented Switch for Modes */}
-                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', flex: 1.5 }}>
                         <button
                           type="button"
                           onClick={() => setSchedulesRoomsViewMode('live')}
                           style={{
+                            flex: 1,
                             background: schedulesRoomsViewMode === 'live' ? '#34a853' : 'transparent',
                             color: schedulesRoomsViewMode === 'live' ? 'white' : '#475569',
                             border: 'none',
@@ -10527,7 +10528,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             fontSize: '0.72rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            transition: 'all 0.15s'
+                            transition: 'all 0.15s',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
                           }}
                         >
                           Raumplan (Live)
@@ -10536,6 +10540,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           type="button"
                           onClick={() => setSchedulesRoomsViewMode('designer')}
                           style={{
+                            flex: 1,
                             background: schedulesRoomsViewMode === 'designer' ? '#34a853' : 'transparent',
                             color: schedulesRoomsViewMode === 'designer' ? 'white' : '#475569',
                             border: 'none',
@@ -10544,7 +10549,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             fontSize: '0.72rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            transition: 'all 0.15s'
+                            transition: 'all 0.15s',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
                           }}
                         >
                           Raumplan-Designer
@@ -10557,7 +10565,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             type="button"
                             onClick={runAutoRoomAllocation}
                             disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
-                            style={{ background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
+                            style={{ flex: 1, background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
                             ⚡ Auto
                           </button>
@@ -10568,14 +10576,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 setMatrixAllocations(prev => prev.map(p => ({ ...p, roomId: null })));
                               }
                             }}
-                            style={{ background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
+                            style={{ flex: 1, background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
                             🔄 Zurücksetzen
                           </button>
                           <button
                             type="button"
                             onClick={handleSaveAndApproveAll}
-                            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(16,185,129,0.15)', whiteSpace: 'nowrap' }}
+                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(16,185,129,0.15)', whiteSpace: 'nowrap' }}
                           >
                             💾 Speichern & Freigeben
                           </button>
