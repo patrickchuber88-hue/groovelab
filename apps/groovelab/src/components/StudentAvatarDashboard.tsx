@@ -47,6 +47,17 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   return '/avatars/gitarre_avatar_new.png';
 };
 
+const maskEmail = (email: string | null | undefined): string => {
+  if (!email) return 'Nicht hinterlegt';
+  const parts = email.split('@');
+  if (parts.length !== 2) return email;
+  const [prefix, domain] = parts;
+  if (prefix.length <= 2) {
+    return `${prefix.charAt(0)}...@${domain}`;
+  }
+  return `${prefix.substring(0, 2)}...${prefix.charAt(prefix.length - 1)}@${domain}`;
+};
+
 const STUDENT_AVATARS = [
   // E-Gitarre
   { id: 'student_boy_guitar_1', label: 'E-Gitarre (Boy Black)', url: '/avatars/student_boy_black_guitar.png', category: 'E-Gitarre' },
@@ -9276,7 +9287,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             {/* General details and contacts */}
             <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Urbanist', sans-serif" }}>
-                Kontaktdaten & Adresse
+                Kontaktdaten
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -9284,19 +9295,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <Mail size={16} color="#64748b" />
                   <div>
                     <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>E-Mail-Adresse</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.email || 'Nicht hinterlegt'}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{maskEmail(studentUser.email)}</div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <User size={16} color="#64748b" />
-                  <div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Eltern E-Mail</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.parent_email || 'Nicht hinterlegt'}</div>
+                {studentUser.parent_email && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Mail size={16} color="#64748b" />
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Weitere E-Mail-Adresse</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{maskEmail(studentUser.parent_email)}</div>
+                    </div>
                   </div>
-                </div>
-
-
+                )}
 
                 {(studentUser.street || studentUser.city) && (
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -9478,7 +9489,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   {showSecondEmail && (
                     <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Zusätzliche E-Mail (Eltern)</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Weitere E-Mail-Adresse</label>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <input 
                           type="email" 
