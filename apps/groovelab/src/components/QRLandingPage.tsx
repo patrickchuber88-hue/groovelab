@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, Car, Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen } from 'lucide-react';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -60,6 +60,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [stats, setStats] = useState<any | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
+  const [avatar, setAvatar] = useState<any | null>(null);
+  const [loggedMinutesToday, setLoggedMinutesToday] = useState<number>(0);
+  const [ringProgress, setRingProgress] = useState<number>(0);
+  const [hasExploded, setHasExploded] = useState<boolean>(false);
+
+  // Ref for canvas particle explosion
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /*
   const [activeDriver, setActiveDriver] = useState<'Du' | 'Mama' | 'Papa' | 'Oma'>('Du');
 
   // Chauffeur-info Klick-Wechsel
@@ -71,6 +79,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return 'Du';
     });
   };
+  */
 
   // Multi-Mode specific states
   const [progressItems, setProgressItems] = useState<any[]>([]);
@@ -189,65 +198,108 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   }, []);
 
   // ── Dashboard-Daten laden ──────────────────────────────────────────────────
-  useEffect(() => {
+  const fetchDashboardData = useCallback(async () => {
     if (pageState !== 'profile' || !profile) return;
+    setLoadingDashboard(true);
+    try {
+      const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
 
-    const fetchDashboardData = async () => {
-      setLoadingDashboard(true);
-      try {
-        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+      // 1. Wochenpläne holen
+      const { data: schData } = await supabase
+        .from('schedules')
+        .select(`
+          *,
+          teacher:teacher_id(first_name, last_name),
+          room:room_id(name)
+        `)
+        .eq('student_id', profile.id);
 
-        // 1. Wochenpläne holen
-        const { data: schData } = await supabase
-          .from('schedules')
-          .select(`
-            *,
-            teacher:teacher_id(first_name, last_name),
-            room:room_id(name)
-          `)
-          .eq('student_id', profile.id);
+      // 2. Heutige Termine/Overrides holen
+      const { data: occData } = await supabase
+        .from('schedule_occurrences')
+        .select(`
+          *,
+          teacher:teacher_id(first_name, last_name)
+        `)
+        .eq('student_id', profile.id)
+        .eq('date', todayStr);
 
-        // 2. Heutige Termine/Overrides holen
-        const { data: occData } = await supabase
-          .from('schedule_occurrences')
-          .select(`
-            *,
-            teacher:teacher_id(first_name, last_name)
-          `)
-          .eq('student_id', profile.id)
-          .eq('date', todayStr);
+      // 3. Statistiken holen
+      const { data: statsData } = await supabase
+        .from('student_stats')
+        .select('*')
+        .eq('student_id', profile.id)
+        .maybeSingle();
 
-        // 3. Statistiken holen
-        const { data: statsData } = await supabase
-          .from('student_stats')
-          .select('*')
-          .eq('student_id', profile.id)
+      // 3b. Avatar holen
+      const { data: avatarData } = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      // 4. Hausaufgaben (progress_matrix) holen
+      const { data: matrixItems } = await supabase
+        .from('progress_matrix')
+        .select('*')
+        .eq('student_id', profile.id)
+        .order('updated_at', { ascending: false });
+
+      setSchedules(schData || []);
+      setOccurrences(occData || []);
+      setStats(statsData || null);
+      setAvatar(avatarData || null);
+      setProgressItems(matrixItems || []);
+
+      if (statsData && statsData.last_practice_date === todayStr) {
+        setPracticeLoggedToday(true);
+        // Get today's logged minutes
+        const { data: latestLog } = await supabase
+          .from('fokus_logs')
+          .select('duration_minutes')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
-
-        // 4. Hausaufgaben (progress_matrix) holen
-        const { data: matrixItems } = await supabase
-          .from('progress_matrix')
-          .select('*')
-          .eq('student_id', profile.id)
-          .order('updated_at', { ascending: false });
-
-        setSchedules(schData || []);
-        setOccurrences(occData || []);
-        setStats(statsData || null);
-        setProgressItems(matrixItems || []);
-
-        if (statsData && statsData.last_practice_date === todayStr) {
-          setPracticeLoggedToday(true);
+        if (latestLog) {
+          setLoggedMinutesToday(latestLog.duration_minutes);
         }
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        setLoadingDashboard(false);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [pageState, profile]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Realtime synchronization for teacher homework edits
+  useEffect(() => {
+    if (pageState !== 'profile' || !profile?.id) return;
+
+    const channel = supabase.channel(`realtime_student_progress_${profile.id}`);
+    channel
+      .on('broadcast', { event: 'homework-changed' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
+    const handleHomeworkUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.studentId === profile.id) {
+        fetchDashboardData();
       }
     };
+    window.addEventListener('homework-updated', handleHomeworkUpdate);
 
-    fetchDashboardData();
-  }, [pageState, profile]);
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('homework-updated', handleHomeworkUpdate);
+    };
+  }, [pageState, profile?.id, fetchDashboardData]);
 
   // Synthetischer Audio-Erfolgston (HTML5 AudioContext)
   const playSuccessChime = () => {
@@ -275,6 +327,174 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     } catch (e) {
       console.warn("AudioContext success chime failed:", e);
     }
+  };
+
+  // Daily goal based on evolution level (Level 1 = 10m, Level 2 = 15m, Level 3 = 20m)
+  const dailyGoal = avatar?.evolution_level === 3 ? 20 : (avatar?.evolution_level === 2 ? 15 : 10);
+
+  // Animate SVG circular ring
+  useEffect(() => {
+    if (practiceLoggedToday && loggedMinutesToday > 0) {
+      const timer = setTimeout(() => {
+        const target = Math.min(1.0, loggedMinutesToday / dailyGoal);
+        setRingProgress(target);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setRingProgress(0);
+    }
+  }, [practiceLoggedToday, loggedMinutesToday, dailyGoal]);
+
+  // Trigger HTML5 Canvas particle explosion once the circular ring finishes animating
+  useEffect(() => {
+    if (practiceLoggedToday && loggedMinutesToday >= dailyGoal && !hasExploded && ringProgress >= 1.0) {
+      const timer = setTimeout(() => {
+        triggerExplosion();
+        setHasExploded(true);
+      }, 1200); // Trigger near the end of the 1.5s ring animation
+      return () => clearTimeout(timer);
+    }
+  }, [practiceLoggedToday, loggedMinutesToday, dailyGoal, ringProgress, hasExploded]);
+
+  // Canvas particle explosion logic (stars, circles, music notes, sparkles)
+  const triggerExplosion = () => {
+    // Trigger mechanisches haptisches Feedback (50ms - 30ms - 50ms)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    let animationFrameId: number;
+    const particles: any[] = [];
+    const particleCount = 100;
+    
+    const noteSymbols = ['♪', '♫', '♬', '♩'];
+    const colors = ['#fbbf24', '#10b981', '#6366f1', '#ec4899', '#3b82f6', '#f59e0b', '#a855f7'];
+
+    const drawStar = (c: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) => {
+      let rot = Math.PI / 2 * 3;
+      let x = cx;
+      let y = cy;
+      let step = Math.PI / spikes;
+
+      c.beginPath();
+      c.moveTo(cx, cy - outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        c.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        c.lineTo(x, y);
+        rot += step;
+      }
+      c.lineTo(cx, cy - outerRadius);
+      c.closePath();
+      c.fill();
+    };
+
+    const drawSparkle = (c: CanvasRenderingContext2D, cx: number, cy: number, size: number) => {
+      c.beginPath();
+      c.moveTo(cx - size, cy);
+      c.quadraticCurveTo(cx, cy, cx, cy - size);
+      c.quadraticCurveTo(cx, cy, cx + size, cy);
+      c.quadraticCurveTo(cx, cy, cx, cy + size);
+      c.quadraticCurveTo(cx, cy, cx - size, cy);
+      c.closePath();
+      c.fill();
+    };
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 8;
+      const typeRand = Math.random();
+      let type: 'star' | 'circle' | 'note' | 'sparkle' = 'circle';
+      if (typeRand < 0.25) type = 'star';
+      else if (typeRand < 0.5) type = 'note';
+      else if (typeRand < 0.75) type = 'sparkle';
+
+      particles.push({
+        x: centerX,
+        y: centerY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (Math.random() * 2),
+        size: 5 + Math.random() * 7,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1,
+        decay: 0.01 + Math.random() * 0.015,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.15,
+        type,
+        noteSymbol: type === 'note' ? noteSymbols[Math.floor(Math.random() * noteSymbols.length)] : undefined,
+        gravity: 0.1 + Math.random() * 0.08,
+        friction: 0.96 + Math.random() * 0.02
+      });
+    }
+
+    const renderFrame = () => {
+      ctx.clearRect(0, 0, width, height);
+      let activeParticles = 0;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (p.alpha <= 0) continue;
+
+        activeParticles++;
+        p.vx *= p.friction;
+        p.vy *= p.friction;
+        p.vy += p.gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.rotationSpeed;
+        p.alpha -= p.decay;
+
+        if (p.alpha < 0) p.alpha = 0;
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+
+        if (p.type === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'star') {
+          drawStar(ctx, 0, 0, 5, p.size, p.size / 2.5);
+        } else if (p.type === 'sparkle') {
+          drawSparkle(ctx, 0, 0, p.size);
+        } else if (p.type === 'note') {
+          ctx.font = `bold ${Math.round(p.size * 1.6)}px sans-serif`;
+          ctx.fillText(p.noteSymbol!, 0, 0);
+        }
+
+        ctx.restore();
+      }
+
+      if (activeParticles > 0) {
+        animationFrameId = requestAnimationFrame(renderFrame);
+      } else {
+        ctx.clearRect(0, 0, width, height);
+      }
+    };
+
+    renderFrame();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   };
 
   // Blitz-Übung loggen
@@ -351,12 +571,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       playSuccessChime();
 
       setStats({
+        student_id: profile.id,
         total_focus_minutes: totalMins,
         monthly_focus_minutes: monthlyMins,
         streak_flame: newStreak,
         last_practice_date: todayStr,
         current_xp: newXp
       });
+      if (avatarRecord) {
+        setAvatar({
+          ...avatarRecord,
+          xp: newXp,
+          streak_flame: newStreak,
+          last_focus_date: todayStr
+        });
+      }
+      setLoggedMinutesToday(minutes);
+      setHasExploded(false);
       setPracticeLoggedToday(true);
 
     } catch (err) {
@@ -628,7 +859,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           </div>
 
-          {/* Chauffeur info toggle */}
+          {/* Chauffeur info toggle (deactivated for now)
           <button
             type="button"
             onClick={handleDriverCycle}
@@ -672,6 +903,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             </div>
           </button>
+          */}
         </div>
       );
     }
@@ -786,36 +1018,116 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const renderPracticeLoggedDone = () => {
+    const isGoalMet = loggedMinutesToday >= dailyGoal;
+
     return (
       <div style={{
         background: '#f0fdf4',
         border: '1.5px solid #bbf7d0',
         borderRadius: '24px',
-        padding: '24px 16px',
+        padding: '28px 16px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '12px',
+        gap: '20px',
         textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(22, 163, 74, 0.06)'
+        boxShadow: '0 10px 25px rgba(22, 163, 74, 0.06)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          background: '#dcfce7',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <Check size={26} color="#16a34a" strokeWidth={3} />
+        {/* Animated Progress Ring Container */}
+        <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Canvas for Particle Explosion */}
+          <canvas
+            ref={canvasRef}
+            width={320}
+            height={320}
+            style={{
+              position: 'absolute',
+              top: '-80px',
+              left: '-80px',
+              width: '320px',
+              height: '320px',
+              pointerEvents: 'none',
+              zIndex: 10
+            }}
+          />
+
+          {/* SVG circular progress bar */}
+          <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+            {/* Background Track */}
+            <circle
+              cx="80"
+              cy="80"
+              r="70"
+              fill="transparent"
+              stroke="#e2e8f0"
+              strokeWidth="8"
+            />
+            {/* Foreground Progress */}
+            <circle
+              cx="80"
+              cy="80"
+              r="70"
+              fill="transparent"
+              stroke="url(#progressGrad)"
+              strokeWidth="8"
+              strokeDasharray="439.82"
+              strokeDashoffset={439.82 - 439.82 * ringProgress}
+              strokeLinecap="round"
+              style={{
+                transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            />
+            <defs>
+              <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="100%" stopColor="#059669" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Flame Icon & Streak Count in Center */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 5
+          }}>
+            <Flame
+              size={36}
+              color="#ea580c"
+              fill="#ea580c"
+              style={{
+                filter: 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.35))',
+                transform: 'scale(1)',
+                animation: 'pulse 2s infinite ease-in-out'
+              }}
+            />
+            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', marginTop: '2px', lineHeight: 1 }}>
+              {stats?.streak_flame || avatar?.streak_flame || 0}
+            </span>
+            <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '1px' }}>
+              Tage Streak
+            </span>
+          </div>
         </div>
+
+        {/* Text descriptions */}
         <div>
-          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#14532d' }}>
-            Üben erledigt! 🎉
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#14532d' }}>
+            {isGoalMet ? 'Tagesziel erreicht! 🎉' : 'Übung eingetragen! 🚀'}
           </h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
-            Deine Übungszeit wurde heute erfolgreich eingetragen und dein Streak ist gesichert. Weiter so!
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
+            Heute geübt: <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
+          </p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#4f5e53', fontWeight: 650, lineHeight: 1.4 }}>
+            {isGoalMet 
+              ? 'Hervorragend! Du hast dein Tagesziel voll erreicht und die Funken sprühen lassen! ✨' 
+              : 'Super! Jede Minute zählt. Dein täglicher Streak ist für heute gesichert! 🔥'}
           </p>
         </div>
       </div>
@@ -1171,7 +1483,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       }}>
                         <Flame size={24} color="#ea580c" fill="#ea580c" />
                         <span style={{ fontSize: '1rem', fontWeight: 900, color: '#c2410c' }}>
-                          {stats?.streak_flame || 0} Tage
+                          {stats?.streak_flame || avatar?.streak_flame || 0} Tage
                         </span>
                         <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>
                           Übungs-Streak

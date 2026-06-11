@@ -670,6 +670,23 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
     setDocModalOpen(true);
   };
 
+  const notifyHomeworkChange = async (studentId: string) => {
+    // 1. Dispatch custom DOM event for same-window / local sync
+    window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId } }));
+
+    // 2. Broadcast on Supabase channel for cross-browser / cross-device real-time websocket sync
+    try {
+      const channel = supabase.channel(`realtime_student_progress_${studentId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'homework-changed',
+        payload: { studentId }
+      });
+    } catch (e) {
+      console.warn('Realtime broadcast error:', e);
+    }
+  };
+
   // Save Meisterwerk progress bypass logic (teacher always has full write permissions)
   const handleSaveMeisterwerk = async () => {
     if (!selectedStudentForDoc || !newDocTopic) return;
@@ -696,6 +713,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
         const result = await resp.json();
         // Refresh local history list
         setDocHistory(prev => [result.progress, ...prev.filter(p => p.topic_name !== newDocTopic)]);
+        notifyHomeworkChange(selectedStudentForDoc.id);
       } else {
         // Direct write fallback (Rollen-Asymmetrie: teacher bypasses RLS/restrictions)
         const { data: existing } = await supabase
@@ -739,6 +757,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           .eq('student_id', selectedStudentForDoc.id)
           .order('updated_at', { ascending: false });
         setDocHistory(hist || []);
+        notifyHomeworkChange(selectedStudentForDoc.id);
       }
       setNewDocTopic('');
       setNewDocNotes('');
@@ -2977,6 +2996,78 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
                     onChange={(e) => setNewDocHomework(e.target.checked)}
                     className="h-5 w-5 rounded border-slate-800 bg-slate-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-950 transition"
                   />
+                </div>
+
+                {/* Hausaufgaben-Schnellbaukasten Presets */}
+                <div className="space-y-2 pt-2.5 border-t border-slate-850">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">⚡ Hausaufgaben-Schnellbaukasten:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                        const bpmText = bpm ? `${bpm} BPM` : "X BPM";
+                        const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                        setNewDocNotes(prev => prev ? `${prev}\n${text}` : text);
+                        setNewDocHomework(true);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
+                    >
+                      <span className="text-sm">⏱️</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold">Tempo halten</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Metronom BPM</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = "Achte auf sauberen Klang, kein Schnarren.";
+                        setNewDocNotes(prev => prev ? `${prev}\n${text}` : text);
+                        setNewDocHomework(true);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
+                    >
+                      <span className="text-sm">✨</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold">Sauber greifen</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Sauberer Klang</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
+                        setNewDocNotes(prev => prev ? `${prev}\n${text}` : text);
+                        setNewDocHomework(true);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
+                    >
+                      <span className="text-sm">🥁</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold">Rhythmus-Metronom</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Timing & Takt</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
+                        setNewDocNotes(prev => prev ? `${prev}\n${text}` : text);
+                        setNewDocHomework(true);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
+                    >
+                      <span className="text-sm">🖖</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold">Fingersatz üben</span>
+                        <span className="text-[9px] text-slate-500 font-medium">Fingersatz einhalten</span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Free text notes */}
