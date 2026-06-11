@@ -69,6 +69,7 @@ interface BypassTeacher {
   role?: string;
   isPinActivated?: boolean;
   sick_until?: string | null;
+  preferred_room_ids?: string[];
 }
 
 interface GrooveLabCoach {
@@ -87,6 +88,7 @@ interface GrooveLabCoach {
   studentCount?: number;
   contractEndsAt?: string | null;
   sick_until?: string | null;
+  preferred_room_ids?: string[];
 }
 
 interface SecretaryBriefingData {
@@ -1835,7 +1837,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               isActive: u.is_active ?? false,
               role: u.role,
               isPinActivated: u.is_pin_activated,
-              sick_until: u.sick_until
+              sick_until: u.sick_until,
+              preferred_room_ids: u.preferred_room_ids || []
             });
           } else {
             if (u.is_groovelab_active) {
@@ -1853,7 +1856,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
-                sick_until: u.sick_until
+                sick_until: u.sick_until,
+                preferred_room_ids: u.preferred_room_ids || []
               });
             }
             if (u.is_campus_active) {
@@ -1871,7 +1875,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
-                sick_until: u.sick_until
+                sick_until: u.sick_until,
+                preferred_room_ids: u.preferred_room_ids || []
               });
             }
           }
