@@ -1146,6 +1146,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
+  const [showSecondEmail, setShowSecondEmail] = useState(false);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushNotifScheduleChanges, setPushNotifScheduleChanges] = useState(true);
@@ -1175,6 +1177,78 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [timeUntilMidnight, setTimeUntilMidnight] = useState('');
   const [unreadCrisisNotifs, setUnreadCrisisNotifs] = useState<any[]>([]);
   const [confirmingCrisisId, setConfirmingCrisisId] = useState<string | null>(null);
+
+  const getSelectableAvatars = () => {
+    if (!editingProfile) return [];
+    const assigned = (editingProfile.resolved_instrument || editingProfile.instrument || '')
+      .split(',')
+      .map((i: string) => i.trim())
+      .filter(Boolean);
+
+    const CAMPUS_INSTRUMENT_AVATARS = [
+      // Gitarre
+      { id: 'inst_gitarre_acoustic', label: 'Gitarre', url: '/avatars/gitarre_avatar_new.png', category: 'Gitarre' },
+      { id: 'inst_gitarre_electric', label: 'E-Gitarre', url: '/avatars/egitarre_avatar.png', category: 'Gitarre' },
+      
+      // Piano
+      { id: 'inst_piano_acoustic', label: 'Klavier', url: '/avatars/klavier_avatar_new.png', category: 'Piano' },
+      { id: 'inst_piano_electric', label: 'E-Piano', url: '/avatars/piano_avatar.png', category: 'Piano' },
+      
+      // Drums
+      { id: 'inst_drums_acoustic', label: 'Schlagzeug', url: '/avatars/schlagzeug_avatar.png', category: 'Schlagzeug' },
+      { id: 'inst_drums_electric', label: 'E-Drums', url: '/avatars/drums_avatar.png', category: 'Schlagzeug' },
+      
+      // Bass
+      { id: 'inst_bass_acoustic', label: 'Kontrabass', url: '/avatars/kontrabass_avatar.png', category: 'Bass' },
+      { id: 'inst_bass_electric', label: 'E-Bass', url: '/avatars/ebass_avatar.png', category: 'Bass' },
+      
+      // Gesang
+      { id: 'inst_vocals', label: 'Gesang', url: '/avatars/gesang_avatar.png', category: 'Gesang' }
+    ];
+
+    if (assigned.length === 0) {
+      const defaultUrl = getInstrumentAvatarUrl('');
+      return [{ id: 'default_inst', label: 'Standard-Avatar', url: defaultUrl, category: 'Alle' }];
+    }
+
+    const list: Array<{ id: string; label: string; url: string; category?: string }> = [];
+
+    assigned.forEach((inst: string) => {
+      const lowerInst = inst.toLowerCase();
+      let matchedCategory = '';
+      if (lowerInst.includes('guitar') || lowerInst.includes('gitarre')) {
+        matchedCategory = 'Gitarre';
+      } else if (lowerInst.includes('piano') || lowerInst.includes('klavier') || lowerInst.includes('keyboard') || lowerInst.includes('keys')) {
+        matchedCategory = 'Piano';
+      } else if (lowerInst.includes('drum') || lowerInst.includes('schlagzeug')) {
+        matchedCategory = 'Schlagzeug';
+      } else if (lowerInst.includes('bass')) {
+        matchedCategory = 'Bass';
+      } else if (lowerInst.includes('vocal') || lowerInst.includes('gesang') || lowerInst.includes('stimme') || lowerInst.includes('singer')) {
+        matchedCategory = 'Gesang';
+      }
+
+      if (matchedCategory) {
+        const matching = CAMPUS_INSTRUMENT_AVATARS.filter(av => av.category === matchedCategory);
+        list.push(...matching);
+      } else {
+        const url = getInstrumentAvatarUrl(inst);
+        list.push({
+          id: `inst_${inst}`,
+          label: inst,
+          url: url,
+          category: inst
+        });
+      }
+    });
+
+    const seen = new Set();
+    return list.filter(item => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+  };
 
   useEffect(() => {
     const updateCountdown = () => {
@@ -3188,7 +3262,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .update({
           first_name: editingProfile.first_name,
           last_name: editingProfile.last_name,
-          email: editingProfile.email,
           phone: editingProfile.phone,
           instrument: editingProfile.instrument,
           photo_url: editingProfile.photo_url
@@ -3196,6 +3269,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('id', studentId);
       
       if (error) throw error;
+
+      // Update encrypted emails via RPC
+      const { error: emailError } = await supabase.rpc('update_student_emails', {
+        student_id_param: studentId,
+        input_student_email: editingProfile.email || null,
+        input_parent_email: editingProfile.parent_email || null
+      });
+      if (emailError) throw emailError;
       
       // Update local state
       setStudentUser((prev: any) => prev ? { ...prev, ...editingProfile } : null);
@@ -3206,6 +3287,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           first_name: editingProfile.first_name,
           last_name: editingProfile.last_name,
           email: editingProfile.email,
+          parent_email: editingProfile.parent_email,
           phone: editingProfile.phone,
           instrument: editingProfile.instrument,
           photo_url: editingProfile.photo_url
@@ -3535,6 +3617,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
       user.resolved_instrument = resolvedInst;
+
+      // Fetch decrypted student/parent emails
+      try {
+        const { data: emailData, error: emailError } = await supabase.rpc('get_student_emails', { student_id_param: studentId });
+        if (!emailError && emailData && emailData.length > 0) {
+          user.email = emailData[0].email;
+          user.parent_email = emailData[0].parent_email;
+        }
+      } catch (emailErr) {
+        console.error('Error fetching student emails:', emailErr);
+      }
 
       setStudentUser(user);
       setIsAppUser(user.is_app_user ?? false);
@@ -9047,6 +9140,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               onClick={() => {
                 setEditingProfile({ ...studentUser });
                 setAvatarCategoryFilter('Alle');
+                setShowSecondEmail(!!studentUser?.parent_email);
+                setShowAvatarSelector(false);
                 setShowEditProfile(true);
               }} 
               style={{ 
@@ -9194,22 +9289,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <Phone size={16} color="#64748b" />
+                  <User size={16} color="#64748b" />
                   <div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Telefonnummer</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.phone || 'Nicht hinterlegt'}</div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Eltern E-Mail</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.parent_email || 'Nicht hinterlegt'}</div>
                   </div>
                 </div>
 
-                {studentUser.parent_email && (
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <User size={16} color="#64748b" />
-                    <div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Eltern E-Mail</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{studentUser.parent_email}</div>
-                    </div>
-                  </div>
-                )}
+
 
                 {(studentUser.street || studentUser.city) && (
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -9266,6 +9353,67 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   Profil bearbeiten
                 </h3>
 
+                {/* Big Avatar Preview & Edit Button */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', margin: '4px 0' }}>
+                  <div style={{
+                    width: '110px',
+                    height: '110px',
+                    borderRadius: '50%',
+                    border: '5px solid #ffffff',
+                    boxShadow: '0 8px 24px rgba(52, 168, 83, 0.12)',
+                    background: '#ffffff',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative'
+                  }}>
+                    <img 
+                      src={
+                        editingProfile.photo_url && editingProfile.photo_url.includes('_avatar')
+                          ? editingProfile.photo_url
+                          : getInstrumentAvatarUrl(editingProfile.resolved_instrument || editingProfile.instrument)
+                      } 
+                      alt="" 
+                      style={{ width: '92%', height: '92%', objectFit: 'contain' }} 
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarSelector(!showAvatarSelector)}
+                    style={{
+                      background: showAvatarSelector ? '#34a8530c' : '#ffffff',
+                      border: `1.5px solid ${showAvatarSelector ? '#34a853' : 'rgba(0,0,0,0.08)'}`,
+                      color: showAvatarSelector ? '#34a853' : '#0f172a',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!showAvatarSelector) {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.transform = 'scale(1.02)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!showAvatarSelector) {
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }
+                    }}
+                  >
+                    <Camera size={14} />
+                    <span>Profilbild bearbeiten</span>
+                  </button>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
@@ -9292,206 +9440,222 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   <div>
                     <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse</label>
-                    <input 
-                      type="email" 
-                      required
-                      value={editingProfile.email || ''} 
-                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, email: e.target.value }))}
-                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Telefonnummer</label>
-                    <input 
-                      type="text" 
-                      value={editingProfile.phone || ''} 
-                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, phone: e.target.value }))}
-                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Instrumente (durch Komma getrennt)</label>
-                    <input 
-                      type="text" 
-                      value={editingProfile.instrument || ''} 
-                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, instrument: e.target.value }))}
-                      placeholder="z.B. Gitarre, Schlagzeug"
-                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Profilbild wählen (Avatar)</label>
-                    
-                    {/* Category Filter Tabs */}
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                      {['Alle', 'E-Gitarre', 'E-Piano', 'E-Drum', 'E-Bass', 'Gesang'].map(cat => {
-                        const isCatSelected = avatarCategoryFilter === cat;
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setAvatarCategoryFilter(cat)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              border: `1.5px solid ${isCatSelected ? '#34a853' : '#e2e8f0'}`,
-                              background: isCatSelected ? '#34a853' : 'white',
-                              color: isCatSelected ? 'white' : '#64748b',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Scrollable Grid of Avatars */}
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', 
-                      gap: '12px', 
-                      maxHeight: '220px', 
-                      overflowY: 'auto',
-                      padding: '8px',
-                      background: '#f8fafc',
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      {STUDENT_AVATARS.filter(av => avatarCategoryFilter === 'Alle' || av.category === avatarCategoryFilter).map((avatarItem) => {
-                        const isSelected = editingProfile.photo_url === avatarItem.url;
-                        return (
-                          <button
-                            key={avatarItem.id}
-                            type="button"
-                            onClick={() => setEditingProfile((prev: any) => ({ ...prev, photo_url: avatarItem.url }))}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '8px',
-                              borderRadius: '12px',
-                              border: `2.5px solid ${isSelected ? '#34a853' : 'transparent'}`,
-                              background: isSelected ? 'white' : 'transparent',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              outline: 'none',
-                              boxShadow: isSelected ? '0 4px 10px rgba(52, 168, 83, 0.15)' : 'none'
-                            }}
-                          >
-                            <div style={{ 
-                              width: '56px', 
-                              height: '56px', 
-                              borderRadius: '10px', 
-                              overflow: 'hidden', 
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                              background: 'white',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <img src={avatarItem.url} style={{ width: '90%', height: '90%', objectFit: 'contain' }} alt={avatarItem.label} />
-                            </div>
-                            <span style={{ 
-                              fontSize: '0.62rem', 
-                              fontWeight: 750, 
-                              color: isSelected ? '#1e293b' : '#64748b',
-                              textAlign: 'center',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              width: '100%'
-                            }} title={avatarItem.label}>
-                              {avatarItem.label.split(' (')[0]}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Push-Benachrichtigungen Sektion */}
-                <div style={{
-                  borderTop: '1px solid #e2e8f0',
-                  paddingTop: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <h4 style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', margin: 0, letterSpacing: '0.03em' }}>
-                    System & Benachrichtigungen
-                  </h4>
-                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
-                    Lass dich in Echtzeit direkt auf dein Smartphone-Display benachrichtigen, wenn sich deine Unterrichtszeiten verschieben oder Unterricht ausfällt.
-                  </p>
-
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: '#f8fafc',
-                    padding: '12px 16px',
-                    borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
-                    marginTop: '6px',
-                    opacity: isPremiumUser ? 1 : 0.6
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.2rem' }}>🔔</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
-                        Push-Benachrichtigungen aktivieren
-                      </span>
-                    </div>
-
-                    {isPremiumUser ? (
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={pushEnabled}
-                          onChange={async (e) => {
-                            const checked = e.target.checked;
-                            setPushEnabled(checked);
-                            if (checked) {
-                              const success = await subscribeUserToPush(studentId);
-                              if (!success) {
-                                setPushEnabled(false);
-                                alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
-                              } else {
-                                alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
-                              }
-                            } else {
-                              const success = await unsubscribeUserFromPush(studentId);
-                              if (!success) {
-                                setPushEnabled(true);
-                                alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                              } else {
-                                alert('Push-Benachrichtigungen deaktiviert.');
-                              }
-                            }
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input 
+                        type="email" 
+                        value={editingProfile.email || ''} 
+                        onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, email: e.target.value }))}
+                        placeholder="z.B. schueler@example.com"
+                        style={{ flex: 1, padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                      {!showSecondEmail && (
+                        <button
+                          type="button"
+                          onClick={() => setShowSecondEmail(true)}
+                          style={{
+                            background: 'rgba(52, 168, 83, 0.08)',
+                            border: 'none',
+                            color: '#34a853',
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s',
+                            flexShrink: 0
                           }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34a853]"></div>
-                      </label>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '4px 8px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 800 }}>
-                        <span>🔒 Nur für Premium</span>
-                      </div>
-                    )}
+                          title="Weitere E-Mail hinzufügen"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {!isPremiumUser && (
-                    <p style={{ fontSize: '0.65rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
-                      * Schalte die GrooveLab-Premium-Mitgliedschaft frei, um diese Echtzeit-Funktion nutzen zu können.
-                    </p>
+
+                  {showSecondEmail && (
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Zusätzliche E-Mail (Eltern)</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="email" 
+                          value={editingProfile.parent_email || ''} 
+                          onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, parent_email: e.target.value }))}
+                          placeholder="z.B. eltern@example.com"
+                          style={{ flex: 1, padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowSecondEmail(false);
+                            setEditingProfile((prev: any) => ({ ...prev, parent_email: '' }));
+                          }}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: 'none',
+                            color: '#ef4444',
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s',
+                            flexShrink: 0
+                          }}
+                          title="E-Mail entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Instrumente</label>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      border: '1px solid #e2e8f0',
+                      background: '#f8fafc',
+                      fontSize: '0.88rem',
+                      color: '#64748b',
+                      boxSizing: 'border-box'
+                    }}>
+                      <Lock size={14} style={{ color: '#94a3b8' }} />
+                      <span style={{ fontWeight: 600 }}>{editingProfile.instrument || 'Keine Instrumente hinterlegt'}</span>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                      Die Verwaltung legt deine Instrumente fest. Du kannst sie nicht selbst ändern.
+                    </span>
+                  </div>
+
+                  {showAvatarSelector && (
+                    <div className="animation-slide-down" style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '12px', 
+                      marginTop: '4px',
+                      padding: '16px',
+                      background: 'rgba(52, 168, 83, 0.03)',
+                      borderRadius: '20px',
+                      border: '1.5px dashed rgba(52, 168, 83, 0.15)'
+                    }}>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', display: 'block' }}>Wähle deinen neuen Instrumenten-Avatar</label>
+                      
+                      {/* Category Filter Tabs */}
+                      {(() => {
+                        const selectableAvatars = getSelectableAvatars();
+                        const selectableCategories = Array.from(new Set(selectableAvatars.map(av => av.category).filter(Boolean))) as string[];
+                        
+                        if (selectableCategories.length <= 1) return null;
+                        
+                        return (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                            {['Alle', ...selectableCategories].map(cat => {
+                              const isCatSelected = avatarCategoryFilter === cat;
+                              return (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => setAvatarCategoryFilter(cat)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    border: `1.5px solid ${isCatSelected ? '#34a853' : '#e2e8f0'}`,
+                                    background: isCatSelected ? '#34a853' : 'white',
+                                    color: isCatSelected ? 'white' : '#64748b',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  {cat}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Scrollable Grid of Avatars */}
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', 
+                        gap: '12px', 
+                        maxHeight: '180px', 
+                        overflowY: 'auto',
+                        padding: '8px',
+                        background: 'white',
+                        borderRadius: '14px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        {(() => {
+                          const selectableAvatars = getSelectableAvatars();
+                          return selectableAvatars.filter(av => avatarCategoryFilter === 'Alle' || av.category === avatarCategoryFilter).map((avatarItem) => {
+                            const isSelected = editingProfile.photo_url === avatarItem.url;
+                            return (
+                              <button
+                                key={avatarItem.id}
+                                type="button"
+                                onClick={() => setEditingProfile((prev: any) => ({ ...prev, photo_url: avatarItem.url }))}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px',
+                                  borderRadius: '12px',
+                                  border: `2.5px solid ${isSelected ? '#34a853' : 'transparent'}`,
+                                  background: isSelected ? 'white' : 'transparent',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s',
+                                  outline: 'none',
+                                  boxShadow: isSelected ? '0 4px 10px rgba(52, 168, 83, 0.15)' : 'none'
+                                }}
+                              >
+                                <div style={{ 
+                                  width: '56px', 
+                                  height: '56px', 
+                                  borderRadius: '10px', 
+                                  overflow: 'hidden', 
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                  background: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <img src={avatarItem.url} style={{ width: '90%', height: '90%', objectFit: 'contain' }} alt={avatarItem.label} />
+                                </div>
+                                <span style={{ 
+                                  fontSize: '0.62rem', 
+                                  fontWeight: 750, 
+                                  color: isSelected ? '#1e293b' : '#64748b',
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  width: '100%'
+                                }} title={avatarItem.label}>
+                                  {avatarItem.label.split(' (')[0]}
+                                </span>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
                   )}
                 </div>
 
