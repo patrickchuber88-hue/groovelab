@@ -12205,7 +12205,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         }
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '2px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {/* "Alle Lehrer" Button */}
                             <button
                               onClick={() => {
@@ -12223,7 +12223,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 textAlign: 'left',
                                 cursor: 'pointer',
                                 display: 'flex',
-                                justifyContainer: 'space-between',
+                                justifyContent: 'space-between',
                                 alignItems: 'center',
                                 transition: 'all 0.15s ease',
                                 boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(0, 122, 255, 0.2)' : 'none'
