@@ -13930,7 +13930,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
                   {/* Inline creation form (Always visible to add new instruments to the pool) */}
-                  <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center' }}>
+                  {/* Inline creation form (Always visible to add new instruments to the pool) */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveEquipment();
+                    }}
+                    style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1.5px dashed #cbd5e1', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}
+                  >
                     <input
                       value={equipmentFormName}
                       onChange={e => setEquipmentFormName(e.target.value)}
@@ -13951,13 +13958,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
 
                     <button
-                      onClick={handleSaveEquipment}
+                      type="submit"
                       disabled={equipmentSaving || !equipmentFormName.trim()}
                       style={{ padding: '8px 16px', background: '#0b57d0', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 800, fontSize: '0.74rem', cursor: 'pointer', opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1 }}
                     >
                       Anlegen
                     </button>
-                  </div>
+                  </form>
 
                   {/* Drop zone inside active room list header */}
                   {selectedRoom && (
