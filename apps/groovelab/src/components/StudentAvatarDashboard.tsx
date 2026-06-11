@@ -5,7 +5,7 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send,
-  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings
+  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -8785,57 +8785,46 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       {/* Settings Tab */}
       {activeTab === 'settings' && studentUser && (
-        <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
-            backdropFilter: 'blur(24px) saturate(1.8)',
-            WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-            border: '1px solid rgba(255, 255, 255, 0.5)',
-            borderRadius: '32px',
-            boxShadow: '0 12px 40px rgba(52, 168, 83, 0.03)',
-            padding: '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px'
-          }}>
+        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
+          
+          <div style={{ background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,0.02)', padding: '36px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            {/* Title and General Settings */}
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0', fontFamily: '"Outfit", sans-serif' }}>
-                Einstellungen ⚙️
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Settings size={20} color="#34a853" /> Einstellungen
               </h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, fontWeight: 600 }}>
                 Hier kannst du deine Benachrichtigungen und App-Einstellungen verwalten.
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#f8fafc',
-                padding: '16px 20px',
-                borderRadius: '20px',
-                border: '1px solid #e2e8f0',
-                opacity: isPremiumUser ? 1 : 0.6
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                    Push-Benachrichtigungen aktivieren
-                  </span>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.
-                  </span>
-                </div>
-
-                {isPremiumUser ? (
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pushEnabled}
-                      onChange={async (e) => {
-                        const checked = e.target.checked;
-                        setPushEnabled(checked);
-                        if (checked) {
+            {/* Section 1: Benachrichtigungen */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={18} color="#34a853" /> 1. System & Benachrichtigungen
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Push-Benachrichtigungen Haupt-Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                      <Bell size={18} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
+                    </div>
+                  </div>
+                  
+                  {isPremiumUser ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextVal = !pushEnabled;
+                        setPushEnabled(nextVal);
+                        if (nextVal) {
                           const success = await subscribeUserToPush(studentId);
                           if (!success) {
                             setPushEnabled(false);
@@ -8853,113 +8842,127 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           }
                         }
                       }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34a853]"></div>
-                  </label>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                    <span>🔒 Nur für aktive Schüler</span>
+                      className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
+                      style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
+                    >
+                      <div className="app-binary-switch-knob" />
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      <span>🔒 Nur für aktive Schüler</span>
+                    </div>
+                  )}
+                </div>
+
+                {!isPremiumUser && (
+                  <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
+                    * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
+                  </p>
+                )}
+
+                {/* iOS Helper Alert */}
+                {isIOS && !isStandalone && (
+                  <div style={{
+                    padding: '12px 16px',
+                    background: '#fffbeb',
+                    border: '1px solid #fef3c7',
+                    borderRadius: '16px',
+                    fontSize: '0.75rem',
+                    color: '#b45309',
+                    lineHeight: '1.4',
+                    fontWeight: 600
+                  }}>
+                    <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
                   </div>
                 )}
               </div>
-
-              {!isPremiumUser && (
-                <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '0 0 8px 0', fontWeight: 700 }}>
-                  * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
-                </p>
-              )}
-
-              {isIOS && !isStandalone && (
-                <div style={{
-                  padding: '12px 16px',
-                  background: '#fef3c7',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '16px',
-                  fontSize: '0.75rem',
-                  color: '#b45309',
-                  lineHeight: '1.4',
-                  fontWeight: 600
-                }}>
-                  <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
-                </div>
-              )}
-
-              {pushEnabled && isPremiumUser && (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  paddingLeft: '20px',
-                  borderLeft: '3px solid #34a853',
-                  marginTop: '12px'
-                }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Ich möchte benachrichtigt werden bei:
-                  </span>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Terminänderungen 📅</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Verschiebungen, Ausfälle oder Lehrerwechsel</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={pushNotifScheduleChanges}
-                        onChange={async (e) => {
-                          const checked = e.target.checked;
-                          setPushNotifScheduleChanges(checked);
-                          await supabase.from('users').update({ push_notif_schedule_changes: checked }).eq('id', studentId);
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#34a853]"></div>
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Hausaufgaben 📝</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Neue Übe-Aufgaben oder Feedback deiner Lehrkraft</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={pushNotifHomework}
-                        onChange={async (e) => {
-                          const checked = e.target.checked;
-                          setPushNotifHomework(checked);
-                          await supabase.from('users').update({ push_notif_homework: checked }).eq('id', studentId);
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#34a853]"></div>
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Neuigkeiten & Aktionen 🚀</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Mitteilungen der Musikschule und interessante Aktionen</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={pushNotifAllFeatures}
-                        onChange={async (e) => {
-                          const checked = e.target.checked;
-                          setPushNotifAllFeatures(checked);
-                          await supabase.from('users').update({ push_notif_all_features: checked }).eq('id', studentId);
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#34a853]"></div>
-                    </label>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Section 2: Detaillierte Einstellungen */}
+            {pushEnabled && isPremiumUser && (
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Settings size={18} color="#34a853" /> 2. Ich möchte benachrichtigt werden bei:
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Terminänderungen */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#34a85315' : '#f1f5f9', color: pushNotifScheduleChanges ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                        <Calendar size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Terminänderungen 📅</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Verschiebungen, Ausfälle oder Lehrerwechsel</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextVal = !pushNotifScheduleChanges;
+                        setPushNotifScheduleChanges(nextVal);
+                        await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);
+                      }}
+                      className={`app-binary-switch ${pushNotifScheduleChanges ? 'active' : ''}`}
+                      style={{ backgroundColor: pushNotifScheduleChanges ? '#34a853' : undefined }}
+                    >
+                      <div className="app-binary-switch-knob" />
+                    </button>
+                  </div>
+
+                  {/* Hausaufgaben */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#34a85315' : '#f1f5f9', color: pushNotifHomework ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                        <Pencil size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben 📝</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Neue Übe-Aufgaben oder Feedback deiner Lehrkraft</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextVal = !pushNotifHomework;
+                        setPushNotifHomework(nextVal);
+                        await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);
+                      }}
+                      className={`app-binary-switch ${pushNotifHomework ? 'active' : ''}`}
+                      style={{ backgroundColor: pushNotifHomework ? '#34a853' : undefined }}
+                    >
+                      <div className="app-binary-switch-knob" />
+                    </button>
+                  </div>
+
+                  {/* Neuigkeiten & Aktionen */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#34a85315' : '#f1f5f9', color: pushNotifAllFeatures ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                        <Users size={18} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Neuigkeiten & Aktionen 🚀</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Mitteilungen der Musikschule und interessante Aktionen</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextVal = !pushNotifAllFeatures;
+                        setPushNotifAllFeatures(nextVal);
+                        await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);
+                      }}
+                      className={`app-binary-switch ${pushNotifAllFeatures ? 'active' : ''}`}
+                      style={{ backgroundColor: pushNotifAllFeatures ? '#34a853' : undefined }}
+                    >
+                      <div className="app-binary-switch-knob" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

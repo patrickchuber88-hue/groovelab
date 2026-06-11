@@ -2170,6 +2170,57 @@ export function TeacherDashboard({
           allBookings = JSON.parse(stored);
         }
 
+        // Fetch room_bookings from database for the logged-in teacher
+        const { data: dbBookings } = await supabase
+          .from('room_bookings')
+          .select(`
+            id,
+            room_id,
+            date,
+            start_time,
+            end_time,
+            title,
+            rooms (
+              id,
+              name
+            )
+          `)
+          .eq('booked_by', userId);
+
+        if (dbBookings && dbBookings.length > 0) {
+          dbBookings.forEach((db: any) => {
+            const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
+            const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
+            
+            const isDup = allBookings.some((b: any) => 
+              b.date === db.date && 
+              b.startTime === startTimeStr && 
+              b.roomId === db.room_id
+            );
+
+            if (!isDup) {
+              const studentName = db.title && db.title.startsWith('Unterricht: ') 
+                ? db.title.substring('Unterricht: '.length) 
+                : null;
+
+              allBookings.push({
+                id: db.id,
+                roomId: db.room_id,
+                roomName: db.rooms?.name || 'Raum',
+                date: db.date,
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                purpose: db.title || 'Unterricht',
+                teacherId: userId,
+                teacherName: '',
+                isSchedule: false,
+                status: 'approved',
+                studentName: studentName
+              });
+            }
+          });
+        }
+
         const { data: occurs } = await supabase
           .from('schedule_occurrences')
           .select(`
@@ -2215,26 +2266,31 @@ export function TeacherDashboard({
           };
         });
 
+        const getLocalYYYYMMDD = (d: Date) => {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const todayStr = getLocalYYYYMMDD(today);
         
         const twoWeeksLater = new Date(today);
         twoWeeksLater.setDate(today.getDate() + 14);
+        const twoWeeksLaterStr = getLocalYYYYMMDD(twoWeeksLater);
 
         const filteredBookings = allBookings.filter((b: any) => {
           if (b.teacherId !== userId) return false;
           if (!b.date) return false;
-          const bDate = new Date(b.date);
-          bDate.setHours(0, 0, 0, 0);
-          return bDate >= today && bDate <= twoWeeksLater;
+          return b.date >= todayStr && b.date <= twoWeeksLaterStr;
         });
 
         const filteredOccurs = mappedOccurs.filter((b: any) => {
           if (b.teacherId !== userId) return false;
           if (!b.date) return false;
-          const bDate = new Date(b.date);
-          bDate.setHours(0, 0, 0, 0);
-          return bDate >= today && bDate <= twoWeeksLater;
+          return b.date >= todayStr && b.date <= twoWeeksLaterStr;
         });
 
         // Sort both by date then start time
@@ -2259,8 +2315,10 @@ export function TeacherDashboard({
 
     loadMyBookings();
     window.addEventListener('storage', loadMyBookings);
+    window.addEventListener('refresh-bookings', loadMyBookings);
     return () => {
       window.removeEventListener('storage', loadMyBookings);
+      window.removeEventListener('refresh-bookings', loadMyBookings);
     };
   }, [userId, ticker]);
 
@@ -2273,6 +2331,102 @@ export function TeacherDashboard({
     
     if (onTabChange) {
       onTabChange('rooms');
+    }
+  };
+
+  const handleDeleteMyBooking = async (b: any) => {
+    if (!confirm('Möchtest du diese Buchung wirklich löschen/stornieren?')) {
+      return;
+    }
+    
+    try {
+      // 1. Check if the booking is term-coupled (has a schedule occurrence)
+      const { data: occ, error: occErr } = await supabase
+        .from('schedule_occurrences')
+        .select('*, schedules(*)')
+        .eq('teacher_id', userId)
+        .eq('date', b.date)
+        .eq('start_time', b.startTime.length === 5 ? `${b.startTime}:00` : b.startTime)
+        .maybeSingle();
+
+      if (occErr) {
+        console.warn('Error checking schedule occurrence:', occErr);
+      }
+
+      if (occ) {
+        // This is a term-coupled room booking
+        const regularRoomId = occ.schedules?.room_id;
+        
+        if (regularRoomId) {
+          if (b.roomId === regularRoomId) {
+            // Revert the occurrence back to its original date/time
+            if (occ.original_date && occ.original_start_time) {
+              const { error: updErr } = await supabase
+                .from('schedule_occurrences')
+                .update({
+                  date: occ.original_date,
+                  start_time: occ.original_start_time,
+                  status: 'scheduled'
+                })
+                .eq('id', occ.id);
+              if (updErr) throw updErr;
+            } else {
+              const { error: delErr } = await supabase
+                .from('schedule_occurrences')
+                .delete()
+                .eq('id', occ.id);
+              if (delErr) throw delErr;
+            }
+            
+            // Delete the room booking completely
+            const { error: delErr } = await supabase
+              .from('room_bookings')
+              .delete()
+              .eq('id', b.id);
+            if (delErr) throw delErr;
+            
+            alert('Die Terminverschiebung wurde storniert und auf die ursprüngliche Zeit zurückgesetzt.');
+          } else {
+            // Re-assign the regular classroom by updating the room booking row
+            const { error: updateErr } = await supabase
+              .from('room_bookings')
+              .update({ room_id: regularRoomId })
+              .eq('id', b.id);
+              
+            if (updateErr) throw updateErr;
+            
+            // Fetch the room name for the alert
+            const { data: roomData } = await supabase
+              .from('rooms')
+              .select('name')
+              .eq('id', regularRoomId)
+              .maybeSingle();
+              
+            const roomName = roomData?.name || 'regulären Unterrichtsraum';
+            alert(`Der Raum für den Termin wurde wieder auf den ${roomName} zurückgesetzt.`);
+          }
+        } else {
+          // No regular room is assigned to the schedule
+          alert('Für diesen Termin wurde noch kein regulärer Raum zugeordnet.');
+          return;
+        }
+      } else {
+        // Regular manual booking - delete directly from room_bookings
+        const { error: delErr } = await supabase
+          .from('room_bookings')
+          .delete()
+          .eq('id', b.id);
+          
+        if (delErr) throw delErr;
+      }
+      
+      // Dispatch refresh event to update other components/boards
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+      // Trigger a local state refresh
+      setTicker(prev => prev + 1);
+    } catch (err) {
+      console.error('Failed to delete booking:', err);
+      alert('Fehler beim Löschen der Buchung.');
     }
   };
 
@@ -5232,19 +5386,16 @@ export function TeacherDashboard({
                                 fontWeight: 950, 
                                 color: '#0f172a', 
                                 fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '8px',
-                                lineHeight: 1.15
+                                lineHeight: 1.2
                               }}>
-                                {dynamicGreeting.greeting}, <span style={{ 
+                                {dynamicGreeting.greeting},{' '}
+                                <span style={{ 
                                   color: '#007aff', 
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
-                                  display: 'inline-flex',
-                                  alignItems: 'center'
-                                }}>{teacher?.first_name || 'Coach'}</span>! 
-                                <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
+                                  display: 'inline'
+                                }}>{teacher?.first_name || 'Coach'}</span>!{' '}
+                                <span className="inline-block animate-bounce" style={{ marginLeft: '4px', display: 'inline-block' }}>
                                   {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
                                 </span>
                               </h3>
@@ -7581,6 +7732,30 @@ export function TeacherDashboard({
                               </button>
                             )}
                           </div>
+
+                          {/* Deletion button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteMyBooking(b); }}
+                            style={{
+                              background: '#ff453a15',
+                              color: '#ff453a',
+                              border: 'none',
+                              borderRadius: '10px',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              flexShrink: 0
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = '#ff453a25'}
+                            onMouseOut={e => e.currentTarget.style.background = '#ff453a15'}
+                            title="Buchung stornieren"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       );
                     })}

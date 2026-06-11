@@ -96,7 +96,6 @@ export function CampusSetupScreen({
       const { error } = await supabase
         .from('schools')
         .update({
-          name: schoolName,
           opening_hours: updatedOpeningHours,
           calendar_url: icalActive ? (calendarUrl || null) : null
         })
@@ -151,20 +150,9 @@ export function CampusSetupScreen({
         
         {/* Title and General Settings */}
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Settings size={20} color={brandColor} /> Campus-Einstellungen
           </h2>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '450px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schulname</label>
-            <input 
-              type="text" 
-              value={schoolName}
-              onChange={e => setSchoolName(e.target.value)}
-              placeholder="z.B. Musäk Bad Säckingen"
-              style={{ padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontWeight: 650, fontSize: '0.9rem', outline: 'none', background: '#f8fafc' }}
-            />
-          </div>
         </div>
 
         {/* Section 1: Stundenplan & Kalender */}
