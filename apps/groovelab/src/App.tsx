@@ -2933,7 +2933,7 @@ function App() {
               profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
             )
           )
-        `).eq('school_id', schoolId).eq('is_campus_active', false).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
+        `).eq('school_id', schoolId).eq('is_groovelab_active', true).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
         supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
         bandIds.length > 0
           ? supabase.from('bands').select(`
@@ -3027,7 +3027,7 @@ function App() {
       });
       const instrumentalSongs = safeSkills.map((p: any) => {
           const song = Array.isArray(p.songs) ? p.songs[0] : p.songs;
-          if (!song) return null;
+          if (!song || song.is_groovelab_active === false) return null;
           // EXCLUDE VOCALS/GESANG FROM INDIVIDUAL SKILLS: THEY MUST BE IN A FORMATION
           const pi = (p.instrument || '').toLowerCase();
           if (pi.includes('vocal') || pi.includes('gesang')) return null;
@@ -3060,7 +3060,7 @@ function App() {
         // 1. Process from band_songs where user is assigned to Vocals slot
         (band.band_songs || []).forEach((bs: any) => {
           const s = Array.isArray(bs.songs) ? bs.songs[0] : bs.songs;
-          if (!s) return;
+          if (!s || s.is_groovelab_active === false) return;
           
           const isMyVocalSlot = (bs.band_song_slots || []).some((slot: any) => 
             slot.user_id === userId && 
