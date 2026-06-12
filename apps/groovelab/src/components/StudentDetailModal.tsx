@@ -711,7 +711,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
 
 
-  const memberSince = new Date(student.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  const memberSince = (() => {
+    if (!student?.created_at) return 'unbekannt';
+    const d = new Date(student.created_at);
+    return isNaN(d.getTime()) ? 'unbekannt' : d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  })();
 
   const weekSessions = (() => {
     if (loading || !planningList || planningList.length === 0) return [];

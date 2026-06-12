@@ -9139,7 +9139,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   🏢 {studentUser.schools?.name || 'Groovelab Campus'}
                 </span>
                 <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
-                  • Mitglied seit {new Date(studentUser.created_at).toLocaleDateString('de-DE')}
+                  • Mitglied seit {studentUser.created_at && !isNaN(new Date(studentUser.created_at).getTime()) ? new Date(studentUser.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
                 </span>
               </div>
 

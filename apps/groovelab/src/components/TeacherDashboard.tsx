@@ -306,8 +306,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         src.includes('oboe_avatar')
       );
       if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-        // Fall back to student/teacher musician avatar
-        return getDefaultMusicianAvatarUrl(resolvedInstrument, targetUser?.role);
+        return '/avatar_ghost.jpg';
       }
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
@@ -624,9 +623,9 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
-                fontWeight: 600, 
+                fontWeight: isMe ? 800 : 600, 
                 fontSize: '0.85rem', 
-                color: '#1e293b', 
+                color: isMe ? color : '#1e293b', 
                 lineHeight: 1.1, 
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',

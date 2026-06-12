@@ -202,7 +202,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
       src.includes('oboe_avatar')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-      displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument, targetUser?.role);
+      displaySrc = '/avatar_ghost.jpg';
     }
   }
 
@@ -5303,7 +5303,7 @@ function App() {
         // Auto-correct if a student on groovelab has an invalid campus-only tab saved (e.g. 'briefing' from old Safety Hook bug)
         const isStudent = user.role?.toLowerCase() === 'student';
         if (isStudent && activePlatform === 'groovelab') {
-          const validGroovelabStudentTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages'];
+          const validGroovelabStudentTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile', 'settings'];
           if (!validGroovelabStudentTabs.includes(activeStudentTab)) {
             console.log('[Tab Sync] Auto-correcting invalid groovelab student tab to live:', activeStudentTab);
             setActiveStudentTab('live');
@@ -7273,7 +7273,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: (activePlatform === 'campus' && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
+            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>
@@ -7356,7 +7356,7 @@ function App() {
                         🏢 {user.schools?.name || 'Groovelab Campus'}
                       </span>
                       <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
-                        • Mitglied seit {new Date(user.created_at).toLocaleDateString()}
+                        • Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}
                       </span>
                     </div>
 
@@ -7620,12 +7620,7 @@ function App() {
               {/* Top: Massive Hero Card */}
               <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
-                  <StudioAvatar src={user.photo_url} user={user} style={{ display: user.photo_url || !user.first_name ? 'block' : 'none' }} />
-                  {!user.photo_url && user.first_name && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '5rem', color: 'white', background: brandColor, fontWeight: 800 }}>
-                      {user.first_name?.[0]}
-                    </div>
-                  )}
+                  <StudioAvatar src={user.photo_url || '/avatar_ghost.jpg'} user={user} style={{ position: 'absolute', inset: 0 }} />
                   {/* Edit Button Overlay */}
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'all 0.3s' }} className="photo-overlay">
                     <button 
@@ -7656,7 +7651,7 @@ function App() {
                       {(user.role === 'teacher' || user.role === 'admin') ? 'Coach' : 'Pro Artist'}
                     </span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Groovelab Academy'}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {new Date(user.created_at).toLocaleDateString()}</span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}</span>
 
                     {/* XP only for students */}
                     {user.role === 'student' && (
