@@ -18492,18 +18492,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   left: 0 !important;
                   top: 0 !important;
                   width: 100% !important;
-                  height: auto !important;
+                  max-height: 270mm !important;
+                  overflow: hidden !important;
                   margin: 0 !important;
                   padding: 0 !important;
                   box-shadow: none !important;
                   border: none !important;
+                  page-break-after: avoid !important;
+                  page-break-inside: avoid !important;
                 }
                 html, body {
+                  max-height: 270mm !important;
                   height: 100% !important;
                   margin: 0 !important;
                   padding: 0 !important;
                   background: #fff !important;
                   overflow: hidden !important;
+                  page-break-after: avoid !important;
+                  page-break-inside: avoid !important;
                 }
                 @page {
                   size: A4 portrait;
