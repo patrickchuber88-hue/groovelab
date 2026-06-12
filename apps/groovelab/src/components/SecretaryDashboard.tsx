@@ -7776,17 +7776,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
                             const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
                             const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
-                            const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal;
+                            
+                            const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
+                            const extraAnnualPrice = extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0;
+                            const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
+
+                            const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal + extraEinmalzahlungTotal;
                             setSelectedInvoice({
                               id: 'RE-2026-08',
                               year: '2026',
                               date: '25. August 2026',
                               isCurrentMonth: true,
-                              b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
-                              amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
+                              b2b: mixedTotal_global + einmalzahlungTotal + extraEinmalzahlungTotal,
+                              amount: mixedTotal_global + einmalzahlungTotal + extraEinmalzahlungTotal,
                               schoolStudentCost: studentSharePreview_global,
                               schoolStudentLevy: studentLevyMonthly_global,
-                              schoolExtraCost: schoolShareBookedExtra_global + extraLevyMonthly_global,
+                              schoolExtraCost: schoolShareBookedExtra_global,
+                              extraLevyMonthly: extraLevyMonthly_global,
+                              extraEinmalzahlung: extraEinmalzahlungTotal,
                               b2c: 0,
                               einmalzahlung: einmalzahlungTotal,
                               status: 'Entwurf',
@@ -15367,7 +15374,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                   // Calculate B2B and student shares dynamically
                                   const b2bAmount = isCurrent 
-                                    ? (isAnnualBilling || isExtraAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global)
+                                    ? (mixedTotal_global + einmalzahlungTotal + extraEinmalzahlungTotal)
                                     : 39.90;
                                   
                                   const schoolStudentCost = isCurrent ? studentSharePreview_global : 0;
