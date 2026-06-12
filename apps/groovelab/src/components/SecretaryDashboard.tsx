@@ -14004,7 +14004,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       />
                                     </div>
                                     <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '6px', lineHeight: '1.3' }}>
-                                      Komplette Verwaltungsplattform für Schüler, Rechnungen, Räume und Verträge.
+                                      Das All-in-One Operations-Center für Verwaltung, Lehrer &amp; Schüler: Intelligente Stundenpläne, digitales Hausaufgabenheft, automatisierte Raumbelegungspläne, proaktives Krankheits- &amp; Krisen-Cockpit und geführte Übe-Pfade.
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #f1f5f9', fontSize: '0.74rem' }}>
