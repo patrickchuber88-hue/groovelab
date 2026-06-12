@@ -14673,17 +14673,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal;
 
                                 const invoiceList = [
-                                  {
-                                    id: 'RE-2026-06',
-                                    year: '2026',
-                                    date: '12. Juni 2026',
-                                    b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
-                                    b2c: 0,
-                                    einmalzahlung: einmalzahlungTotal,
-                                    status: 'Entwurf',
-                                    paid: false
-                                  }
-                                ];
+                                   {
+                                     id: 'RE-2026-06',
+                                     year: '2026',
+                                     date: '12. Juni 2026',
+                                     isCurrentMonth: true,
+                                     b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
+                                     amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
+                                     schoolStudentCost: studentSharePreview,
+                                     schoolStudentLevy: studentLevyMonthly,
+                                     schoolExtraCost: schoolShareBookedExtra + extraLevyMonthly,
+                                     b2c: 0,
+                                     einmalzahlung: einmalzahlungTotal,
+                                     status: 'Entwurf',
+                                     paid: false
+                                   }
+                                 ];
 
                                 return invoiceList.map((inv) => (
                                   <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
@@ -17847,25 +17852,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </tr>
                     )}
 
-                    {/* Position 4: Schüler-Umlage (Schule-Anteil) */}
+                    {/* Position 4: Schüler-Umlage (Schulanteil / Kofinanzierung) */}
                     {selectedInvoice.schoolStudentCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Umlage (Schule-Anteil)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Umlage (Schulanteil / Kofinanzierung)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            {studentBillingOption === 'option2' 
-                              ? `${students.length} Schüler (Schule zahlt 100% = 0,49 €)`
-                              : `${students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 €)`}
+                            {students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
                           </span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
-                          {(selectedInvoice.schoolStudentCost / (selectedInvoice.isCurrentMonth ? 1 : 12) / students.length).toFixed(2).replace('.', ',')} €
+                          0,25 €
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolStudentCost.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 4b: Schüler-Monatsumlage (durch Schule an Campus-Groovelab bezahlt) */}
+                    {selectedInvoice.schoolStudentLevy > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Monatsumlage (Sammelrechnung)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            {students.length} Schüler (Umlagesatz = {studentBillingOption === 'option2' ? '0,49' : '0,24'} € / Mo.)
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {(studentBillingOption === 'option2' ? 0.49 : 0.24).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.schoolStudentLevy.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
