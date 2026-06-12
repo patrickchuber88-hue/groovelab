@@ -15282,90 +15282,82 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   return `${lastDay}. ${monthName} ${y}`;
                                 };
 
-                                const invoicesData = [
-                                  {
-                                    id: 'RE-2026-06',
-                                    year: '2026',
-                                    monthName: 'Juni',
-                                    date: '25. Juni 2026',
-                                    isCurrentMonth: true,
-                                    b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
-                                    amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
-                                    schoolStudentCost: studentSharePreview_global,
-                                    schoolStudentLevy: studentLevyMonthly_global,
-                                    schoolExtraCost: schoolShareBookedExtra_global + extraLevyMonthly_global,
-                                    b2c: 0,
-                                    einmalzahlung: einmalzahlungTotal,
-                                    status: 'Versendet',
-                                    paid: false
-                                  },
-                                  {
-                                    id: 'RE-2026-05',
-                                    year: '2026',
-                                    monthName: 'Mai',
-                                    date: '25. Mai 2026',
-                                    isCurrentMonth: false,
-                                    b2b: 39.90,
-                                    amount: 39.90,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    b2c: 0,
-                                    einmalzahlung: 0,
-                                    status: 'Bezahlt',
-                                    paid: true
-                                  },
-                                  {
-                                    id: 'RE-2026-04',
-                                    year: '2026',
-                                    monthName: 'April',
-                                    date: '25. April 2026',
-                                    isCurrentMonth: false,
-                                    b2b: 39.90,
-                                    amount: 39.90,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    b2c: 0,
-                                    einmalzahlung: 0,
-                                    status: 'Bezahlt',
-                                    paid: true
-                                  },
-                                  {
-                                    id: 'RE-2025-12',
-                                    year: '2025',
-                                    monthName: 'Dezember',
-                                    date: '25. Dezember 2025',
-                                    isCurrentMonth: false,
-                                    b2b: 29.90,
-                                    amount: 29.90,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    b2c: 0,
-                                    einmalzahlung: 0,
-                                    status: 'Bezahlt',
-                                    paid: true
-                                  }
+                                // Parse contractStartDate or default to June 12, 2026
+                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:30:38+02:00');
+                                const startYear = contractDateObj.getFullYear();
+                                const startMonth = contractDateObj.getMonth() + 1; // 1-indexed
+
+                                const systemDate = new Date('2026-06-12T19:30:38+02:00');
+                                const currentYear = systemDate.getFullYear();
+                                const currentMonth = systemDate.getMonth() + 1;
+
+                                const deMonths = [
+                                  '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+                                  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
                                 ];
 
-                                // Group by calendar year, filtering by contractStartDate
-                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:27:58+02:00');
-                                const contractYear = contractDateObj.getFullYear();
-                                const contractMonth = contractDateObj.getMonth() + 1; // 1-indexed
+                                const invoicesData: any[] = [];
+                                let y = startYear;
+                                let m = startMonth;
 
-                                const filteredInvoices = invoicesData.filter(inv => {
-                                  const match = inv.id.match(/^RE-(\d{4})-(\d{2})$/);
-                                  if (!match) return true;
-                                  const invYear = parseInt(match[1], 10);
-                                  const invMonth = parseInt(match[2], 10);
-                                  if (invYear < contractYear) return false;
-                                  if (invYear === contractYear && invMonth < contractMonth) return false;
-                                  return true;
-                                });
+                                while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+                                  const monthStr = m < 10 ? `0${m}` : `${m}`;
+                                  const invId = `RE-${y}-${monthStr}`;
+                                  
+                                  const lastDay = new Date(y, m, 0).getDate();
+                                  const monthName = deMonths[m];
+                                  const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
+                                  
+                                  const isCurrent = (y === currentYear && m === currentMonth);
+                                  
+                                  // The invoice is created at 23:58 on the last day of the month
+                                  const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
+                                  const isCreated = systemDate.getTime() >= creationTime.getTime();
+                                  
+                                  const status = isCreated ? 'Bezahlt' : 'Entwurf';
+                                  const paid = isCreated;
+
+                                  // Calculate B2B and student shares dynamically
+                                  const b2bAmount = isCurrent 
+                                    ? (isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global)
+                                    : 39.90;
+                                  
+                                  const schoolStudentCost = isCurrent ? studentSharePreview_global : 0;
+                                  const schoolStudentLevy = isCurrent ? studentLevyMonthly_global : 0;
+                                  const schoolExtraCost = isCurrent ? (schoolShareBookedExtra_global + extraLevyMonthly_global) : 0;
+                                  const einmalzahlung = isCurrent ? einmalzahlungTotal : 0;
+
+                                  invoicesData.push({
+                                    id: invId,
+                                    year: String(y),
+                                    monthName: monthName,
+                                    date: invoiceDateStr,
+                                    isCurrentMonth: isCurrent,
+                                    b2b: b2bAmount,
+                                    amount: b2bAmount,
+                                    schoolStudentCost: schoolStudentCost,
+                                    schoolStudentLevy: schoolStudentLevy,
+                                    schoolExtraCost: schoolExtraCost,
+                                    b2c: 0,
+                                    einmalzahlung: einmalzahlung,
+                                    status: status,
+                                    paid: paid,
+                                    creationTime: creationTime
+                                  });
+
+                                  // Increment month
+                                  m++;
+                                  if (m > 12) {
+                                    m = 1;
+                                    y++;
+                                  }
+                                }
+
+                                // Reverse order so the newest is on top
+                                invoicesData.reverse();
 
                                 const grouped: Record<string, typeof invoicesData> = {};
-                                filteredInvoices.forEach(inv => {
+                                invoicesData.forEach(inv => {
                                   if (!grouped[inv.year]) {
                                     grouped[inv.year] = [];
                                   }
@@ -15403,7 +15395,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                                               <div>
                                                 <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
-                                                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                                                <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
+                                                  Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)} um 23:58 Uhr
+                                                </span>
+                                                <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
                                                   Fällig am: {getLastDayOfMonth(inv.monthName, inv.year)}
                                                 </span>
                                               </div>
@@ -18489,10 +18484,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Dates */}
-                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '0.75rem', marginBottom: '30px', border: '1px solid #f1f5f9' }}>
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '10px', fontSize: '0.75rem', marginBottom: '30px', border: '1px solid #f1f5f9' }}>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
-                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date}</strong>
+                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')} um 23:58 Uhr</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Fälligkeit</span>
+                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Leistungszeitraum</span>
@@ -18502,7 +18501,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
-                    <strong style={{ color: '#0f172a' }}>Überweisung (14 Tage Zahlungsziel)</strong>
+                    <strong style={{ color: '#0f172a' }}>B2B-Lastschrift</strong>
                   </div>
                 </div>
 
