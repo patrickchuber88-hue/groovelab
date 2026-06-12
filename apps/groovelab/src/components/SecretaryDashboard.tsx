@@ -5167,18 +5167,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           {(student.is_campus_active || student.is_groovelab_active) ? 'Aktiv' : 'Inaktiv'}
                         </span>
                         <span style={{
-                          fontSize: '0.7rem',
+                          fontSize: '0.74rem',
                           fontWeight: 700,
-                          color: '#1e40af',
-                          background: '#eff6ff',
-                          padding: '4px 8px',
-                          borderRadius: '8px',
-                          border: '1px solid #bfdbfe',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          color: '#475569',
+                          padding: '0 4px'
                         }}>
-                          📅 Abrechnung: {student.day_of_birth || '1'}.
+                          {student.day_of_birth || '1'}
                         </span>
 
                         {/* Delete Button */}
