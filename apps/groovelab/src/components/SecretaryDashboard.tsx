@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  ShieldAlert, CheckCircle, Users, Settings, Bell, 
+  ShieldAlert, CheckCircle, Users, Settings, Bell, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
@@ -998,6 +998,8 @@ const parseRoomName = (name: string) => {
 };
 
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
+  const [showAgb, setShowAgb] = useState<boolean>(false);
+  const [showPrivacy, setShowPrivacy] = useState<boolean>(false);
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
     const saved = localStorage.getItem('groovelab_active_workspace');
@@ -14350,7 +14352,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                    style={{ width: '18px', height: '18px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
                                  />
                                  <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
-                                   <strong>Bestellbedingungen akzeptieren:</strong> Ich bestätige die zahlungspflichtige Buchung der ausgewählten Module und Service-Leistungen für das Schuljahr 2026/2027. Die Abrechnung erfolgt monatlich per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).
+                                   <strong>Bestellbedingungen akzeptieren:</strong> Ich habe die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAgb(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Allgemeinen Geschäftsbedingungen (AGB)</span> sowie die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span> gelesen und akzeptiere diese. Ich bestätige die zahlungspflichtige Buchung der ausgewählten Module und Service-Leistungen für das Schuljahr 2026/2027. Die Abrechnung erfolgt monatlich per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).
                                  </span>
                                </label>
 
@@ -18260,6 +18262,269 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               >
                 Vertrag kündigen
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AGB Modal */}
+      {showAgb && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '680px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowAgb(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                <FileText size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Allgemeine Geschäftsbedingungen</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nutzungsbedingungen SaaS-Plattform „Campus-Groovelab“</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700 }}>Vertragspartner und Anbieter:</p>
+                <p style={{ margin: '4px 0 0 0' }}>Simplified Work GbR, Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                  <strong>Geltungsbereich:</strong> Ausschließlich für den unternehmerischen Geschäftsverkehr (B2B)<br/>
+                  <strong>Stand und Gültigkeit:</strong> August 2026
+                </p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+                <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales, jedoch rein komplementäres Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs, der organisatorischen Infrastruktur sowie zur pädagogischen Lernbegleitung mittels Gamification-Elementen.</p>
+                <p style={{ margin: '8px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, die Service-Bereitstellung, das Hosting, die Härtung der Datenbank-Infrastruktur sowie für die administrativen Service-, Support- und Betriebsleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>Souveränitäts-Versprechen (100 % Made & Hosted in Germany):</strong> Die technische Bereitstellung dieser Infrastruktur erfolgt über gehärtete Systeme auf in Deutschland befindlichen, ISO-27001-zertifizierten Servern. Der Anbieter garantiert, dass zu keinem Zeitpunkt US-amerikanische oder sonstige außereuropäische Cloud-Infrastrukturen (wie z. B. AWS, Microsoft Azure oder Google Cloud) für die Kern-Datenhaltung verwendet werden.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
+                <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand dieses Vertrages ist die dauerhaft kostenlose (lizenzgebührenfreie) Bereitstellung der Software zur Nutzung über das Internet im Wege des Software-as-a-Service (SaaS)-Modells sowie die Einräumung der entsprechenden Nutzungsrechte nach Maßgabe dieses Vertrages. Die vom Kunden zu entrichtende Vergütung versteht sich ausdrücklich und ausschließlich als Entgelt für den Server-Betrieb und die Service-Bereitstellung (Infrastruktur-Leistung) sowie für die vereinbarten laufenden Service-, Betriebs- und Wartungsleistungen des Anbieters. Das Vertragsverhältnis über die Server- und Servicebereitstellung qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag gemäß §§ 535 ff., 611 BGB.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Leistungsumfang:</strong> Der genaue Funktionsumfang der Software sowie die Spezifikationen der Server-Infrastruktur und Serviceleistungen ergeben sich aus der zum Zeitpunkt des Vertragsabschlusses gültigen Produkt- und Leistungsbeschreibung. Schulungen, individueller Support vor Ort, Datenmigrationen oder kundenspezifische Programmierungen sind nicht geschuldet, es sei denn, sie wurden ausdrücklich als kostenpflichtige Zusatzleistung vereinbart.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Anbieter stellt dem Kunden die Software am Ausgang des vom Anbieter genutzten Rechenzentrums (Schnittstelle zum öffentlichen Internet, nachfolgend „Übergabepunkt“) zur Nutzung auf den bereitgestellten Servern bereit. Für die Netzanbindung des Kunden, die Bereitstellung geeigneter Endgeräte sowie die Beschaffung kompatibler Browser-Software ist ausschließlich der Kunde verantwortlich.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>4. Add-On-Status & Führendes System:</strong> Die Software versteht sich ausdrücklich als komplementäres Zusatz- und Kommunikationswerkzeug (Add-On) und ersetzt nicht das primäre Verwaltungs- und ERP-System des Kunden (wie z. B. iMikel, nachfolgend „führendes System“). Der Kunde bleibt uneingeschränkt verpflichtet, alle grundlegenden und rechtsverbindlichen Verwaltungsakte, die vertragliche Abrechnung, die Stammdatenpflege sowie die finale Stundenplan- und Raumbelegung eigenständig in seinem führenden System zu pflegen und zu verwalten. Die Software dient lediglich der operativen Erleichterung und Visualisierung im Alltag von Verwaltung, Lehrkräften und Endnutzern.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 2 SPEZIFISCHE SCHNITTSTELLEN- & LEISTUNGSPATHEN</h4>
+                <p style={{ margin: 0 }}><strong>1. iMikel-CSV-Schnittstelle & Import-Spezifikationen:</strong> Der Anbieter stellt dem Kunden im Rahmen seiner Serviceleistungen ein Import-Modul zur Einlesung von CSV-Stammdaten aus Altsystemen (z. B. iMikel) zur Verfügung. Die Datenerfassung erfolgt über ein dafür vorgesehenes Textfeld innerhalb der Benutzeroberfläche der Software, in welches der Kunde die Rohdaten mittels Kopieren und Einfügen (Copy-and-Paste) überträgt. Der Kunde ist verpflichtet, die Textdaten vorab auf Formatkompatibilität zu prüfen. Der Kunde trägt die alleinige Verantwortung dafür, dass die eingefügten Textdaten dem geforderten CSV-Format entsprechen sowie frei von manipulativen Inhalten oder schädlichen Skripten sind.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>Transaktionales Rollback-Verfahren:</strong> Das System arbeitet mit einer transaktionalen Absicherung. Tritt während der Verarbeitung des eingefügten CSV-Textes ein Daten- oder Formatfehler auf, wird die gesamte Import-Transaktion automatisch abgebrochen und der vorherige, konsistente Datenbankzustand wiederhergestellt (Rollback). Eine Haftung des Anbieters für Mehraufwände durch fehlerhaft formatierte Importdaten ist ausgeschlossen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Kalender-Kopplung & iCal-Schnittstelle:</strong> Die Software ermöglicht es Endnutzern, personalisierte, abonnierbare Kalender-Feeds (.ics) in externen Kalender-Anwendungen (z. B. Apple Calendar, Google Calendar) einzubinden. Um die Privatsphäre minderjähriger Schüler bei der Übertragung von iCal-Links über unverschlüsselte Kalender-Protokolle zu sichern, werden Schülernamen im exportierten Kalendertext automatisch pseudonymisiert (z. B. „J. M. Musikschule“ statt „Jonas Müller“). Der Kunde wird darauf hingewiesen, dass iCal-Feeds auf dem Pull-Prinzip basieren. Die Synchronisations- und Aktualisierungsfrequenz wird ausschließlich durch das Endgerät bzw. den Kalender-Provider des Endnutzers bestimmt. Der Anbieter haftet nicht für verspätete oder fehlerhafte Darstellungen von Terminänderungen im Kalender des Endnutzers.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 3 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & COMPLIANCE</h4>
+                <p style={{ margin: 0 }}><strong>1. Passwortlose QR-Code-Authentifizierung:</strong> Der Zugang für Endnutzer erfolgt passwortlos über eine eindeutige URL, die als scanbarer QR-Code verschlüsselt ist. Der Kunde verpflichtet sich, seine Lehrkräfte und Mitarbeiter im sorgsamen Umgang mit den QR-Codes zu schulen. Die QR-Codes dürfen ausschließlich den jeweils berechtigten Endnutzern persönlich oder durch Aufkleben auf das physische Noten-/Hausaufgabenheft zur Verfügung gestellt werden.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Zweistufige Verifikations-Schranke (Anti-Theft Device-Pairing):</strong> Um unbefugten Zugriff auf personenbezogene Logistik- und Schülerdaten bei physischem Verlust des QR-Codes auszuschließen, erzwingt die Software beim Aufruf auf einem neuen, nicht registrierten Endgerät die Eingabe eines dem Endnutzer bekannten, schülerbezogenen Sicherheitsmerkmals (PIN) als einmaligen Freischalt-Code. Nach erfolgreicher Eingabe wird auf dem Endgerät ein kryptografischer Schlüssel zur permanenten Autorisierung hinterlegt (Device-Pairing), wodurch nachfolgende Scans ohne erneute Code-Eingabe ermöglicht werden. Der Kunde is verpflichtet, seine Endnutzer darüber zu informieren, dass bei Verlust des physischen QR-Codes oder des registrierten Endgeräts unverzüglich eine Sperrung des Tokens über das Lehrer-Cockpit oder die Verwaltung zu veranlassen ist. Der Anbieter sperrt den betroffenen Token in Echtzeit nach Eingang der Sperraufforderung im System.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 4 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
+                <p style={{ margin: 0 }}><strong>1. Rollenverteilung:</strong> Die Parteien stimmen überein, dass der Kunde im Sinne des Art. 4 Nr. 7 DSGVO „Verantwortlicher“ für die Verarbeitung personenbezogener Daten der Endnutzer ist. Der Anbieter verarbeitet diese Daten ausschließlich im Auftrag und auf Weisung des Kunden als „Auftragsverarbeiter“ im Sinne des Art. 4 Nr. 8 DSGVO.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. AV-Vertrag:</strong> Die Einzelheiten der Datenverarbeitung werden in einer gesonderten Vereinbarung über die Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO geregelt, die bei Vertragsabschluss zwingend zu unterzeichnen ist.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Schülerdaten-Fragment-Prinzip (Privacy by Design):</strong> Der Anbieter betreibt die Softwarearchitektur so, dass identifizierende Klarnamen der Schüler physisch isoliert auf dem deutschen Host-System verarbeitet werden. Systembenachrichtigungen (z. B. Push-Mitteilungen) werden verschlüsselt und fragmentiert übertragen, sodass Dritte zu keinem Zeitpunkt Einblick in vollständige Klarnamen oder Unterrichtsinhalte erhalten.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>4. Lokaler Kommunikations-Workflow (Zero-Mail-Infrastruktur):</strong> Da der Anbieter zum Schutz personenbezogener Daten auf die Einbindung externer E-Mail-Versanddienstleister verzichtet, erfolgt der Versand administrativer Korrespondenzen (z. B. Benachrichtigungen an Eltern) lokal über das E-Mail-Programm des Kunden via mailto:-Protokoll, wodurch der Anbieter vollständig von der datenschutzrechtlichen Haftung für den Mail-Transport befreit ist.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>5. Anti-CLOUD-Act-Garantie:</strong> Der Anbieter garantiert dem Kunden vertraglich, dass sämtliche personenbezogenen Daten ausschließlich in zertifizierten Rechenzentren auf dem Staatsgebiet der Bundesrepublik Deutschland gespeichert und verarbeitet werden. Da der Anbieter ein rein deutsches Unternehmen ohne außereuropäische Muttergesellschaften ist, unterliegt die Infrastruktur weder direkt noch indirekt den Zugriffsbefugnissen von Drittstaaten-Behörden (z. B. über den US-amerikanischen CLOUD Act).</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>6. Ausschluss von Drittlandübermittlungen:</strong> Eine Übermittlung personenbezogener Daten in ein Drittland außerhalb der Europäischen Union (EU) bzw. des Europäischen Wirtschaftsraums (EWR) findet nicht statt. Der Einsatz von Subunternehmern mit Kooperationssitz oder Datenverarbeitung in einem Drittland ist für den Bereich der personenbezogenen Datenhaltung ausgeschlossen.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 5 GEWÄHRLEISTUNG (MÄNGELHAFTUNG) & HAFTUNGSBEGRENZUNG</h4>
+                <p style={{ margin: 0 }}><strong>1. Display-Down-Zwangstimer & Gerätesensorik:</strong> Der integrierte Übe-Timer nutzt die Lagesensoren der Endgeräte (DeviceOrientation API). Zur Vermeidung von Frustration und Drucksituationen für Kinder gewährt das System eine 15-sekündige Toleranzzeit (Grace Period) bei Lageveränderungen. Eine Gewährleistung für die korrekte Funktion des Timers auf Endgeräten, deren physikalische Sensoren fehlerhaft kalibriert sind oder deren Betriebssystem die Sensorabfrage blockiert, ist ausgeschlossen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit, die auf einer vorsätzlichen oder fahrlässigen Pflichtverletzung des Anbieters oder seiner Erfüllungsgehilfen beruhen. Für sonstige Schäden haftet der Anbieter nur bei Vorsatz oder grober Fahrlässigkeit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftung bei Verletzung einer Kardinalpflicht ist auf den vertragstypischen, bei Vertragsabschluss vorhersehbaren Schaden begrenzt. Die Haftung für entgangenen Gewinn, Betriebsunterbrechungsschäden oder sonstige mittelbare Schäden des Kunden ist ausgeschlossen.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 6 VERFÜGBARKEIT & AUTOMATISIERTE SICHERHEITSSPERREN</h4>
+                <p style={{ margin: 0 }}><strong>1. Systemverfügbarkeit:</strong> Der Anbieter garantiert eine Verfügbarkeit der Software und Server-Infrastruktur von 99,0 % im Jahresmittel am Übergabepunkt.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Berechnungsgrundlage:</strong> Bei der Berechnung der Verfügbarkeit bleiben Zeiten außer Betracht, in denen die Software aufgrund von (a) angekündigten Wartungsarbeiten, (b) notwendigen unangekündigten Sicherheits-Updates zur Gefahrenabwehr, (c) höherer Gewalt oder (d) Störungen in der Netz-Infrastruktur des Kunden oder dessen Endnutzer nicht erreichbar ist.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Automatisierte IP-Sperren (Rate-Limiting):</strong> Zur Abwehr von Cyber-Angriffen verfügt das System über ein automatisiertes Rate-Limiting. Bei mehr als 5 fehlgeschlagenen Authentifizierungsversuchen innerhalb einer Minute auf der /qr/:token-Route wird die anfragende IP-Adresse vollautomatisch für 1 Stunde gesperrt. Derartige Sperren dienen der Datensicherheit, stellen keinen Mangel dar und begründen keinen Anspruch des Kunden auf Minderung oder Schadensersatz.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>4. Ausfall-Fallback & Aufrechterhaltung des Kernbetriebs:</strong> Da es sich bei der Software um ein rein komplementäres Zusatzsystem (Add-On) handelt, führt ein temporärer Ausfall der Software oder der Server-Infrastruktur zu keinerlei Stilllegung der betrieblichen Kernprozesse des Kunden. Für den Fall einer temporären Nichtverfügbarkeit ist der Kunde verpflichtet, seine bewährten, klassischen Kommunikations- und Organisationskanäle (z. B. telefonische Absprachen, manuelle Stundenplanerstellung, direkter E-Mail-Versand) eigenverantwortlich als Ausweichlösung fortzuführen.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 7 GAMIFICATION-ELEMENTE & PÄDAGOGISCHE RECHTE</h4>
+                <p style={{ margin: 0 }}><strong>1. Pädagogische Motivationselemente:</strong> Die Software enthält spielerische Motivationselemente (XP-Punkte, Aktivitäts-Ringe, Streak-Flammen und Reaktivierungs-Quests).</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Keine Gewährleistung auf Spielstände:</strong> Der Kunde und die Endnutzer haben keinen rechtlichen Anspruch auf die ununterbrochene Speicherung oder fehlerfreie Wiederherstellung von Spielständen, virtuellen Auszeichnungen, historischen Übe-Streaks oder statistischen Scores.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Anpassungsrecht:</strong> Der Anbieter behält sich das Recht vor, die spielerischen Mechanismen, mathematischen Berechnungsformeln und grafischen Darstellungen der Gamification-Infrastruktur jederzeit zwecks pädagogischer Optimierung anzupassen.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 8 NUTZUNGSRECHTE & LIZENZGEBÜHRENFREIHEIT</h4>
+                <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Anbieter räumt dem Kunden für die Laufzeit dieses Vertrages ein einfaches, nicht übertragbares, nicht unterlizensierbares und auf die Anzahl der gebuchten Schüler limitiertes Nutzungsrecht an der Software ein.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Lizenzgebührenfreiheit:</strong> Diese Einräumung des Nutzungsrechts erfolgt dauerhaft zu 100 % kostenlos und lizenzgebührenfrei. Das vom Kunden entrichtete Entgelt stellt zu keinem Zeitpunkt eine Lizenzgebühr für den Programmcode dar.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Modifikationsverbot:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zu dekompilieren, zurückzuentwickeln (Reverse Engineering) oder den Programmcode in irgendeiner Weise zu modifizieren. Sämtliche Urheber- und Leistungsschutzrechte an der Software verbleiben beim Anbieter.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 9 VERTRAGSLAUFZEIT, PREISE, ZAHLUNGSBEDINGUNGEN & KÜNDIGUNG</h4>
+                <p style={{ margin: 0 }}><strong>1. Laufzeit gekoppelt an das Schuljahr:</strong> Das Vertragsverhältnis über die Server- & Servicebereitstellung ist fest an den Zyklus des Schuljahres (September bis August des Folgejahres) gebunden. Die Mindestlaufzeit beträgt ein volles Schuljahr (bzw. bei unterjährigem Einstieg die verbleibende Laufzeit bis zum nächsten 31. August).</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Automatische Verlängerung:</strong> Der Vertrag verlängert sich automatisch um ein weiteres Schuljahr (12 Monate bis zum 31. August des Folgejahres), sofern er nicht mit einer Frist von 1 Monat zum Schuljahresende (d. h. spätestens bis zum 31. Juli) gekündigt wird.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Preise & Kleinunternehmerregelung:</strong> Alle angegebenen Server- & Servicegebühren sind Endpreise. Da der Anbieter als Kleinunternehmer agiert, wird gemäß § 19 UStG keine Umsatzsteuer berechnet oder ausgewiesen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>4. Rechnungsstellung & Zahlungsfrist:</strong> Die Abrechnung der Server- & Servicegebühren erfolgt monatlich zum Monatsende. Rechnungen werden in elektronischer Form per E-Mail an die vom Kunden hinterlegte E-Mail-Adresse zugestellt. Der Rechnungsbetrag ist innerhalb von 14 Tagen nach Rechnungserhalt per manueller Banküberweisung auf das Geschäftskonto des Anbieters zu zahlen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>5. Außerordentliche Kündigung:</strong> Das Recht zur außerordentlichen Kündigung aus wichtigem Grund (§ 543 BGB) bleibt unberührt. Ein wichtiger Grund für den Anbieter liegt insbesondere vor, wenn der Kunde mit der Zahlung der Server- & Servicegebühren für zwei aufeinanderfolgende Monate in Verzug gerät.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 10 GERICHTSSTAND & SCHLUSSBESTIMMUNGEN</h4>
+                <p style={{ margin: 0 }}><strong>1. Rechtswahl:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Gerichtsstand:</strong> Ausschließlicher Gerichtsstand für alle Streitigkeiten aus oder im Zusammenhang mit diesem Vertrag ist der Geschäftssitz des Anbieters (Rheinfelden).</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>3. Salvatorische Klausel:</strong> Sollten einzelne Bestimmungen dieses Vertrages unwirksam oder undurchführbar sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen davon unberührt. Die Parteien verpflichten sich, die unwirksame Bestimmung durch eine wirksame Regelung zu ersetzen, die dem wirtschaftlichen und rechtlichen Zweck der unwirksamen Bestimmung am nächsten kommt.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowPrivacy(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Datenschutzerklärung</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Zur Einhaltung der Datenminimierung werden Nachnamen von Schülern standardmäßig anonymisiert (nur die Initiale wird gespeichert, z.B. Max M.).</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>2. Kamera & QR-Scanner</h4>
+                <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
+                <p style={{ margin: 0 }}>GrooveLab prüft beim Einloggen kurz deinen Gerätestandort (GPS), um sicherzustellen, dass du dich im GrooveLab-Raum der Musikschule befindest. Diese Standortdaten werden rein lokal in deinem Browser berechnet und nicht an Server übertragen. In der Datenbank wird lediglich ein Bestätigungswert (Erfolgreich/Fehlgeschlagen) für deine aktive Session hinterlegt. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>4. Rechte der Betroffenen</h4>
+                <p style={{ margin: 0 }}>Sie haben das Recht auf Auskunft, Berichtigung, Sperrung oder Löschung Ihrer Daten. Wenden Sie sich hierzu bitte an die Schulleitung Ihrer Musikakademie.</p>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
+              </div>
             </div>
           </div>
         </div>
