@@ -14227,50 +14227,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 3 von 3</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestellung abschließen</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Bitte stimme den Lastschrifteinzügen per SEPA-Mandat zu, um das Abrechnungssystem deiner Musikschule für dieses Schuljahr verbindlich einzurichten.
+                                  Bitte bestätige deine zahlungspflichtige Buchung. Du erhältst die Rechnung monatlich zum Monatsende bequem per E-Mail und kannst diese innerhalb von 14 Tagen per Banküberweisung ausgleichen.
                                 </p>
                               </div>
 
-                              {/* Stripe Security Info Box */}
-                              <div style={{ 
-                                background: '#f0fdf4', 
-                                border: '1px solid #bbf7d0', 
-                                borderRadius: '16px', 
-                                padding: '12px 14px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '10px',
-                                fontSize: '0.7rem',
-                                color: '#166534',
-                                lineHeight: '1.4'
-                              }}>
-                                <span style={{ fontSize: '1.25rem' }}>🔒</span>
-                                <span>
-                                  <strong>Sicherheit durch Tokenisierung:</strong> Deine Bankdaten werden verschlüsselt direkt an unseren PCI-DSS-zertifizierten Zahlungsdienstleister <strong>Stripe</strong> übertragen. Campus-Groovelab speichert <strong>zu keinem Zeitpunkt IBAN- oder Bankdaten</strong> auf eigenen Servern.
-                                </span>
-                              </div>
-
                               <label style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: '10px',
-                                padding: '16px',
-                                borderRadius: '16px',
-                                background: agreedToSepa ? '#f0fdf4' : '#f8fafc',
-                                border: agreedToSepa ? '2px solid #10b981' : '1px solid #e2e8f0',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s'
-                              }}>
-                                <input 
-                                  type="checkbox"
-                                  checked={agreedToSepa}
-                                  onChange={(e) => setAgreedToSepa(e.target.checked)}
-                                  style={{ width: '18px', height: '18px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
-                                />
-                                <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
-                                  <strong>SEPA-Lastschriftmandat:</strong> Ich ermächtige die Simplified Work GbR (Gläubiger-ID: DE88ZZZ00002839481) zum Lastschrifteinzug und weise mein Kreditinstitut an, diese einzulösen. Die Buchung ist für das laufende Schuljahr bindend. (Mandatsreferenz: MS-{schoolZipCode || 'REF'}-2026, Fälligkeit: Monatsende).
-                                </span>
-                              </label>
+                                 display: 'flex',
+                                 alignItems: 'flex-start',
+                                 gap: '10px',
+                                 padding: '16px',
+                                 borderRadius: '16px',
+                                 background: agreedToSepa ? '#f0fdf4' : '#f8fafc',
+                                 border: agreedToSepa ? '2px solid #10b981' : '1px solid #e2e8f0',
+                                 cursor: 'pointer',
+                                 transition: 'all 0.15s'
+                               }}>
+                                 <input 
+                                   type="checkbox"
+                                   checked={agreedToSepa}
+                                   onChange={(e) => setAgreedToSepa(e.target.checked)}
+                                   style={{ width: '18px', height: '18px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
+                                 />
+                                 <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
+                                   <strong>Bestellbedingungen akzeptieren:</strong> Ich bestätige die zahlungspflichtige Buchung der ausgewählten Module und Service-Leistungen für das Schuljahr 2026/2027. Die Abrechnung erfolgt monatlich per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).
+                                 </span>
+                               </label>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
@@ -17891,7 +17872,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
-                    <strong style={{ color: '#0f172a' }}>B2B Lastschrift</strong>
+                    <strong style={{ color: '#0f172a' }}>Überweisung (14 Tage Zahlungsziel)</strong>
                   </div>
                 </div>
 
@@ -18056,6 +18037,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                     <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
                       Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                    </div>
+                    
+                    {/* Bank Details Block */}
+                    <div style={{ 
+                      marginTop: '20px', 
+                      padding: '12px 16px', 
+                      background: '#f8fafc', 
+                      borderRadius: '12px', 
+                      border: '1px solid #cbd5e1', 
+                      fontSize: '0.7rem', 
+                      color: '#475569', 
+                      width: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '4px',
+                      textAlign: 'left'
+                    }}>
+                      <strong style={{ color: '#0f172a' }}>Zahlungshinweis:</strong>
+                      <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto:</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', marginTop: '4px', gap: '2px' }}>
+                        <strong>Zahlungsempfänger:</strong> <span>Simplified Work GbR</span>
+                        <strong>IBAN:</strong> <span>DE89 3704 0044 0532 9482 11</span>
+                        <strong>BIC:</strong> <span>WELADED1XYZ</span>
+                        <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{selectedInvoice.id}</strong>
+                      </div>
                     </div>
                   </div>
                 </div>
