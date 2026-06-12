@@ -14746,9 +14746,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                 const invoiceList = [
                                    {
-                                     id: 'RE-2026-06',
+                                     id: 'RE-2026-08',
                                      year: '2026',
-                                     date: '12. Juni 2026',
+                                     date: '25. August 2026',
                                      isCurrentMonth: true,
                                      b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
                                      amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
@@ -17853,7 +17853,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Leistungszeitraum</span>
                     <strong style={{ color: '#0f172a' }}>
-                      {selectedInvoice.isCurrentMonth ? 'Juni 2026' : `Schuljahr ${selectedInvoice.year}`}
+                      {selectedInvoice.isCurrentMonth ? 'August 2026' : `Schuljahr ${selectedInvoice.year}`}
                     </strong>
                   </div>
                   <div>
