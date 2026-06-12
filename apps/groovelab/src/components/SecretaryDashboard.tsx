@@ -14569,22 +14569,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                         {/* Visual Summary Cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '20px' }}>
-                          {/* Card 1: Active Modules */}
-                          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Module</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.65rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
+                          {/* Card 1: Active Modules & License Info */}
+                          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Module &amp; Software-Lizenz</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
                                 Campus
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 700, color: hasGroovelabSub ? '#16a34a' : '#94a3b8' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasGroovelabSub ? '#d1fae5' : '#f1f5f9', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.65rem' }}>{hasGroovelabSub ? '✓' : '✗'}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasGroovelabSub ? '#16a34a' : '#94a3b8' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasGroovelabSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasGroovelabSub ? '✓' : '✗'}</span>
                                 GrooveLab
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                              Software Lizenz: <strong>100% kostenlos</strong>
-                            </span>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Software-Lizenz:</span>
+                                <strong style={{ color: '#16a34a' }}>100% kostenlos</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Server-Betrieb Module:</span>
+                                <strong>{(activeModulesCount * 4.99).toFixed(2)} € / Mo.</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Server-Betrieb Team ({allTeachers.length + employees.length} Profile):</span>
+                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Card 2: Student Billing Option */}
