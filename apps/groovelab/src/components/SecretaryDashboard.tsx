@@ -13971,7 +13971,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 1 von 3</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Welche Module möchtest du nutzen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Campus-Lizenzgebühr selbst ist kostenlos. Infrastrukturkosten fallen nur für aktive Team-Profile und gebuchte Schüler an.
+                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Campus-Lizenzgebühr selbst ist kostenlos. Infrastrukturkosten fallen nur für Team-Profile und gebuchte Schüler an.
                                 </p>
                               </div>
 
