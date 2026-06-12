@@ -18446,6 +18446,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const studentShareTotal = selectedInvoice.isCurrentMonth
           ? (selectedInvoice.schoolStudentLevy + selectedInvoice.einmalzahlung + selectedInvoice.extraLevyMonthly + selectedInvoice.extraEinmalzahlung)
           : 0;
+
+        // Count rendered rows to dynamically compress layout if needed
+        let lineCount = 1;
+        if (selectedInvoice.b2b > 0) lineCount += 2;
+        if (selectedInvoice.schoolStudentCost > 0) lineCount++;
+        if (selectedInvoice.schoolStudentLevy > 0) lineCount++;
+        if (selectedInvoice.schoolExtraCost > 0) lineCount++;
+        if (selectedInvoice.extraLevyMonthly > 0) lineCount++;
+        if (selectedInvoice.einmalzahlung > 0) lineCount++;
+        if (selectedInvoice.extraEinmalzahlung > 0) lineCount++;
+
+        const isLongInvoice = lineCount > 5;
+        const dynamicPadding = isLongInvoice ? '16px 24px' : '24px 30px';
+        const dynamicMargin = isLongInvoice ? '10px' : '16px';
+        const dynamicLineHeight = isLongInvoice ? '1.25' : '1.35';
+        const dynamicTdPadding = isLongInvoice ? '6px 0' : '8px 0';
+        const dynamicTdPaddingRight = isLongInvoice ? '6px' : '8px';
         
         return (
           <div style={{
@@ -18552,9 +18569,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
 
               {/* Print Area */}
-              <div id="printable-invoice" style={{ padding: '24px 30px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.35' }}>
+              <div id="printable-invoice" style={{ padding: dynamicPadding, overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: dynamicLineHeight }}>
                 {/* Invoice Meta */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: dynamicMargin }}>
                   <div>
                     <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
                     <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
@@ -18568,7 +18585,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Addresses */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px', fontSize: '0.72rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: dynamicMargin, fontSize: '0.72rem' }}>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Rechnungsempfänger</span>
                     <strong style={{ color: '#0f172a', display: 'block' }}>{schoolName}</strong>
@@ -18586,7 +18603,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Dates */}
-                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '8px', fontSize: '0.7rem', marginBottom: '16px', border: '1px solid #f1f5f9' }}>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '8px', fontSize: '0.7rem', marginBottom: dynamicMargin, border: '1px solid #f1f5f9' }}>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
                     <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')}</strong>
@@ -18608,43 +18625,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Line Items Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', marginBottom: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', marginBottom: dynamicMargin }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
-                      <th style={{ padding: '8px 0' }}>Position</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Menge</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Einzelpreis</th>
-                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Gesamtpreis</th>
+                      <th style={{ padding: dynamicTdPadding }}>Position</th>
+                      <th style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>Menge</th>
+                      <th style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>Einzelpreis</th>
+                      <th style={{ padding: dynamicTdPadding, textAlign: 'right' }}>Gesamtpreis</th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* Position 1: 100% Kostenlose Software Lizenz */}
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
+                      <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
                         <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
                       </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                         {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
                       </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>0,00 €</td>
+                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
                     </tr>
 
                     {/* Position 2: Active Modules */}
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Module)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus / GrooveLab)</span>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {mCost.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18653,17 +18670,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 3: Team-Members (excl. students) */}
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {(((allTeachers.length + employees.length) * 0.49) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18672,7 +18689,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 4: Schüler-Umlage (Schulanteil / Kofinanzierung) */}
                     {selectedInvoice.schoolStudentCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Kofinanzierung)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18681,13 +18698,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           0,25 €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolStudentCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18696,7 +18713,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 4b: Schüler-Monatsumlage (durch Schule an Campus-Groovelab bezahlt) */}
                     {selectedInvoice.schoolStudentLevy > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schülerumlage)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18705,13 +18722,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {(studentBillingOption === 'option2' ? 0.49 : 0.24).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolStudentLevy.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18720,7 +18737,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 5: Zusätzliche Schüler-Zugänge (Schule-Anteil) */}
                     {selectedInvoice.schoolExtraCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18729,13 +18746,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           0,25 €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18744,7 +18761,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 5b: Zusätzliche Schüler-Umlage (transit) */}
                     {selectedInvoice.extraLevyMonthly > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Umlage)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18753,13 +18770,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {(extraBillingOption === 'option3_1' ? 0.24 : 0.49).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.extraLevyMonthly.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18768,7 +18785,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 6: Einmalzahlung Schüler */}
                     {selectedInvoice.einmalzahlung > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18777,13 +18794,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1x
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18792,7 +18809,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 6b: Einmalzahlung Zusätzliche Schüler */}
                     {selectedInvoice.extraEinmalzahlung > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Jahrespauschale)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18801,13 +18818,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1x
                         </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
