@@ -15467,7 +15467,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               <div>
                                                 <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
-                                                  Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)} um 23:58 Uhr
+                                                  Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)}
                                                 </span>
                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
                                                   Fällig am: {inv.dueDateStr}
@@ -15475,16 +15475,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               </div>
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
                                                 <div style={{ color: '#0369a1', fontWeight: 800 }}>
-                                                  Musikschule B2B: {inv.b2b.toFixed(2)} €
+                                                  Rechnungsbetrag (Netto): {inv.b2b.toFixed(2).replace('.', ',')} €
                                                 </div>
                                                 {inv.einmalzahlung > 0 && (
                                                   <div style={{ fontSize: '0.62rem', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 700, marginTop: '2px' }}>
-                                                    Enthält {inv.einmalzahlung.toFixed(2)} € Einmalzahlung Schüler
+                                                    Enthält {inv.einmalzahlung.toFixed(2).replace('.', ',')} € Einmalzahlung Schüler
                                                   </div>
                                                 )}
                                                 {inv.b2c > 0 && (
                                                   <div style={{ color: '#6b21a8', fontSize: '0.68rem', fontWeight: 700 }}>
-                                                    Schüler B2C Einzug: {inv.b2c.toFixed(2)} €
+                                                    Schüler B2C Einzug: {inv.b2c.toFixed(2).replace('.', ',')} €
                                                   </div>
                                                 )}
                                               </div>
