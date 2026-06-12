@@ -14406,19 +14406,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </div>
                               )}
 
-                              {checkoutStep >= 2 && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
-                                  <span>Umlage Schüler einmalig (B2C):</span>
-                                  <strong style={{ fontWeight: 800 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} €</strong>
-                                </div>
-                              )}
-
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                 <span style={{ fontWeight: 900 }}>Gesamter Bankeinzug:</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
                                   {checkoutStep >= 2 ? mixedTotal.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
                                 </strong>
                               </div>
+
+                              {checkoutStep >= 2 && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
+                                <div style={{ 
+                                  background: '#f0f9ff', 
+                                  border: '1.5px solid #bae6fd', 
+                                  borderRadius: '12px', 
+                                  padding: '10px 14px', 
+                                  marginTop: '6px',
+                                  fontSize: '0.8rem', 
+                                  color: '#0369a1',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px'
+                                }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Zuzüglich Einmalzahlung Schüler:</span>
+                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} €</strong>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
+                                    <strong>Einzug im 1. Monat:</strong>
+                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59))).toFixed(2)} €</strong>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
