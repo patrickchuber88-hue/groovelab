@@ -18460,7 +18460,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
-                    <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>RECHNUNG</strong>
+                    <strong style={{ display: 'block', fontSize: '0.92rem', color: selectedInvoice.status === 'Entwurf' ? '#d97706' : '#0f172a' }}>
+                      {selectedInvoice.status === 'Entwurf' ? 'RECHNUNG (ENTWURF)' : 'RECHNUNG'}
+                    </strong>
                     <span style={{ color: '#64748b' }}>Nr. {selectedInvoice.id}</span>
                   </div>
                 </div>
