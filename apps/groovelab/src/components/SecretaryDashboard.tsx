@@ -1328,6 +1328,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [checkoutStep, setCheckoutStep] = useState<number>(1);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('isCancelled') === 'true';
@@ -14847,13 +14848,47 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       )}
                                     </div>
                                   )}
+
+                                  {extraUsersSliderVal > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderTop: '1.5px dashed #f59e0b', paddingTop: '6px', marginTop: '6px' }}>
+                                      <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 800 }}>Geplante Erweiterung (+{extraUsersSliderVal} Schüler):</span>
+                                      {schoolShareAdditional > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (B2B):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>+{schoolShareAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                        </div>
+                                      )}
+                                      {extraLevyMonthlyAdditional > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyMonthlyAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                        </div>
+                                      )}
+                                      {extraLevyYearlyAdditional > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C Umlage):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyYearlyAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}
 
                             <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 'auto' }}>
                               <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Einzug vom Musikschulkonto (Gesamt):</span>
-                              <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                              {extraUsersSliderVal > 0 ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.88rem', color: '#64748b', textDecoration: 'line-through' }}>{mixedTotal.toFixed(2)} €</span>
+                                  <span style={{ fontSize: '0.88rem', color: '#64748b' }}>➔</span>
+                                  <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>
+                                    {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
+                                  </strong>
+                                </div>
+                              ) : (
+                                <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -14871,225 +14906,349 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             gap: '14px',
                             boxShadow: '0 4px 12px rgba(107, 33, 168, 0.02)'
                           }}>
-                            <div>
-                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge erweitern</span>
-                              <strong style={{ display: 'block', fontSize: '1.1rem', color: '#1e293b', marginTop: '2px', fontFamily: 'Urbanist' }}>
-                                Gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
-                              </strong>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <span style={{ fontSize: '0.68rem', color: '#6b21a8', fontWeight: 700 }}>Zusätzliche Schüler hinzufügen (max. 500):</span>
-                              
-                              <style>{`
-                                .custom-range-slider {
-                                  -webkit-appearance: none;
-                                  appearance: none;
-                                  width: 100%;
-                                  height: 32px;
-                                  background: transparent;
-                                  margin: 0;
-                                  padding: 0;
-                                  outline: none;
-                                }
-                                .custom-range-slider::-webkit-slider-runnable-track {
-                                  width: 100%;
-                                  height: 6px;
-                                  cursor: pointer;
-                                  background: var(--track-background);
-                                  border-radius: 100px;
-                                }
-                                .custom-range-slider::-moz-range-track {
-                                  width: 100%;
-                                  height: 6px;
-                                  cursor: pointer;
-                                  background: var(--track-background);
-                                  border-radius: 100px;
-                                }
-                                .custom-range-slider::-webkit-slider-thumb {
-                                  -webkit-appearance: none;
-                                  appearance: none;
-                                  width: 28px;
-                                  height: 28px;
-                                  border-radius: 50%;
-                                  background: #7c3aed;
-                                  cursor: pointer;
-                                  border: 3px solid #ffffff;
-                                  box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
-                                  transition: transform 0.15s;
-                                  margin-top: -11px; /* Centering mathematically: (6px track / 2) - (28px thumb / 2) */
-                                }
-                                .custom-range-slider::-webkit-slider-thumb:hover {
-                                  transform: scale(1.15);
-                                }
-                                .custom-range-slider::-moz-range-thumb {
-                                  width: 28px;
-                                  height: 28px;
-                                  border-radius: 50%;
-                                  background: #7c3aed;
-                                  cursor: pointer;
-                                  border: 3px solid #ffffff;
-                                  box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
-                                  transition: transform 0.15s;
-                                }
-                                .custom-range-slider::-moz-range-thumb:hover {
-                                  transform: scale(1.15);
-                                }
-                              `}</style>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
-                                {/* Minus Button */}
-                                <button 
-                                  onClick={() => setExtraUsersSliderVal(Math.max(0, extraUsersSliderVal - 5))}
-                                  className="hover-scale"
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '50%',
-                                    border: '1.5px solid #ddd6fe',
-                                    background: '#ffffff',
-                                    color: '#6b21a8',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                </button>
-                                
-                                {/* Slider track wrapper */}
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                                  {(() => {
-                                    const fillPercent = (extraUsersSliderVal / 500) * 100;
-                                    return (
-                                      <input 
-                                        type="range" 
-                                        min="0" 
-                                        max="500" 
-                                        value={extraUsersSliderVal} 
-                                        onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
-                                        className="custom-range-slider"
-                                        style={{
-                                          '--track-background': `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`
-                                        } as React.CSSProperties}
-                                      />
-                                    );
-                                  })()}
+                            {showConfirmExtra ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Buchung bestätigen</span>
+                                  <strong style={{ display: 'block', fontSize: '1.1rem', color: '#1e293b', marginTop: '2px', fontFamily: 'Urbanist' }}>
+                                    Zusammenfassung
+                                  </strong>
                                 </div>
 
-                                {/* Plus Button */}
-                                <button 
-                                  onClick={() => setExtraUsersSliderVal(Math.min(500, extraUsersSliderVal + 5))}
-                                  className="hover-scale"
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '50%',
-                                    border: '1.5px solid #ddd6fe',
-                                    background: '#ffffff',
-                                    color: '#6b21a8',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                </button>
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', padding: '0 4px', alignItems: 'center' }}>
-                                <span>0</span>
-                                <span style={{ 
-                                  background: '#7c3aed', 
-                                  color: '#ffffff', 
-                                  padding: '3px 12px', 
-                                  borderRadius: '100px', 
-                                  fontSize: '0.74rem',
-                                  fontWeight: 800,
-                                  boxShadow: '0 2px 5px rgba(124, 58, 237, 0.2)'
+                                <div style={{ 
+                                  background: '#ffffff', 
+                                  border: '1.5px solid #e9d5ff', 
+                                  borderRadius: '16px', 
+                                  padding: '14px', 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  gap: '10px',
+                                  position: 'relative'
                                 }}>
-                                  +{extraUsersSliderVal} Schüler
-                                </span>
-                                <span>500</span>
-                              </div>
+                                  {/* Delete / Trash Button */}
+                                  <button
+                                    onClick={() => {
+                                      setExtraUsersSliderVal(0);
+                                      setShowConfirmExtra(false);
+                                    }}
+                                    title="Position löschen"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '12px',
+                                      right: '12px',
+                                      background: '#fef2f2',
+                                      border: '1px solid #fee2e2',
+                                      borderRadius: '8px',
+                                      width: '28px',
+                                      height: '28px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#ef4444',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                                      <polyline points="3 6 5 6 21 6"/>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                      <line x1="10" y1="11" x2="10" y2="17"/>
+                                      <line x1="14" y1="11" x2="14" y2="17"/>
+                                    </svg>
+                                  </button>
 
-                              {/* Billing Option Dropdown for Additional Students */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                                <span style={{ fontSize: '0.65rem', color: '#6b21a8', fontWeight: 700 }}>Abrechnungsmethode für zusätzliche Schüler:</span>
-                                <select
-                                  value={extraBillingOption}
-                                  onChange={(e) => setExtraBillingOption(e.target.value)}
-                                  style={{
-                                    padding: '8px 12px',
-                                    borderRadius: '10px',
-                                    border: '1.5px solid #ddd6fe',
-                                    background: '#ffffff',
-                                    fontSize: '0.74rem',
-                                    color: '#1e293b',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    outline: 'none',
-                                    width: '100%'
-                                  }}
-                                >
-                                  <option value="option1">Option 1: Jahrespauschale (Schüler zahlt 5,29 € / Jahr)</option>
-                                  <option value="option2">Option 2: Monatsumlage (Schüler zahlt 0,49 € / Mo.)</option>
-                                  <option value="option3_1">Option 3.1: Kofinanzierung (Schüler 0,24 € / Schule 0,25 € / Mo.)</option>
-                                  <option value="option3_2">Option 3.2: Kofinanzierung (Schüler 2,59 € / Jahr, Schule 0,25 € / Mo.)</option>
-                                </select>
-                              </div>
-                            </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '32px' }}>
+                                    <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase' }}>Position</span>
+                                    <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>+{extraUsersSliderVal} zusätzliche Schüler</strong>
+                                  </div>
 
-                            {extraUsersSliderVal > 0 && (
-                              <div style={{ background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
-                                <span style={{ fontWeight: 800, color: '#6b21a8' }}>Kosten für {extraUsersSliderVal} zusätzliche Schüler:</span>
-                                {(() => {
-                                  const addB2B = schoolShareAdditional;
-                                  const addB2C = isAnnualAdditional ? extraLevyYearlyAdditional : extraLevyMonthlyAdditional;
-                                  return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>• Anteil Schule (B2B):</span>
-                                        <strong>{addB2B.toFixed(2)} € / Mo.</strong>
-                                      </div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>• Anteil Schüler (B2C):</span>
-                                        <strong>{addB2C.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
-                                      </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase' }}>Abrechnungsmethode</span>
+                                    <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>
+                                      {extraBillingOption === 'option1' && 'Option 1: Jahrespauschale (Schüler zahlt vollständig)'}
+                                      {extraBillingOption === 'option2' && 'Option 2: Monatsumlage (Schüler zahlt vollständig)'}
+                                      {extraBillingOption === 'option3_1' && 'Option 3.1: Kofinanzierung (Monatlich)'}
+                                      {extraBillingOption === 'option3_2' && 'Option 3.2: Kofinanzierung (Jährlich)'}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '8px', fontSize: '0.74rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Anteil Schule (B2B):</span>
+                                      <strong>{schoolShareAdditional.toFixed(2)} € / Mo.</strong>
                                     </div>
-                                  );
-                                })()}
-                                
-                                <button
-                                  onClick={() => {
-                                    const newVal = bookedExtraUsers + extraUsersSliderVal;
-                                    setBookedExtraUsers(newVal);
-                                    localStorage.setItem('bookedExtraUsers', newVal.toString());
-                                    alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich gebucht!`);
-                                    setExtraUsersSliderVal(0);
-                                  }}
-                                  style={{
-                                    background: '#7c3aed',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    padding: '8px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    marginTop: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.15)'
-                                  }}
-                                >
-                                  Zusätzliche Schüler buchen
-                                </button>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Anteil Schüler (B2C):</span>
+                                      <strong>
+                                        {extraLevyYearlyAdditional > 0 ? extraLevyYearlyAdditional.toFixed(2) : extraLevyMonthlyAdditional.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                                  <button
+                                    onClick={() => {
+                                      const newVal = bookedExtraUsers + extraUsersSliderVal;
+                                      setBookedExtraUsers(newVal);
+                                      localStorage.setItem('bookedExtraUsers', newVal.toString());
+                                      alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich gebucht!`);
+                                      setExtraUsersSliderVal(0);
+                                      setShowConfirmExtra(false);
+                                    }}
+                                    style={{
+                                      background: '#7c3aed',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    Jetzt zahlungspflichtig bestellen
+                                  </button>
+                                  <button
+                                    onClick={() => setShowConfirmExtra(false)}
+                                    style={{
+                                      background: '#ffffff',
+                                      color: '#64748b',
+                                      border: '1.5px solid #cbd5e1',
+                                      borderRadius: '12px',
+                                      padding: '10px',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    Abbrechen &amp; Bearbeiten
+                                  </button>
+                                </div>
                               </div>
+                            ) : (
+                              <>
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge erweitern</span>
+                                  <strong style={{ display: 'block', fontSize: '1.1rem', color: '#1e293b', marginTop: '2px', fontFamily: 'Urbanist' }}>
+                                    Gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
+                                  </strong>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <span style={{ fontSize: '0.68rem', color: '#6b21a8', fontWeight: 700 }}>Zusätzliche Schüler hinzufügen (max. 500):</span>
+                                  
+                                  <style>{`
+                                    .custom-range-slider {
+                                      -webkit-appearance: none;
+                                      appearance: none;
+                                      width: 100%;
+                                      height: 32px;
+                                      background: transparent;
+                                      margin: 0;
+                                      padding: 0;
+                                      outline: none;
+                                    }
+                                    .custom-range-slider::-webkit-slider-runnable-track {
+                                      width: 100%;
+                                      height: 6px;
+                                      cursor: pointer;
+                                      background: var(--track-background);
+                                      border-radius: 100px;
+                                    }
+                                    .custom-range-slider::-moz-range-track {
+                                      width: 100%;
+                                      height: 6px;
+                                      cursor: pointer;
+                                      background: var(--track-background);
+                                      border-radius: 100px;
+                                    }
+                                    .custom-range-slider::-webkit-slider-thumb {
+                                      -webkit-appearance: none;
+                                      appearance: none;
+                                      width: 28px;
+                                      height: 28px;
+                                      border-radius: 50%;
+                                      background: #7c3aed;
+                                      cursor: pointer;
+                                      border: 3px solid #ffffff;
+                                      box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
+                                      transition: transform 0.15s;
+                                      margin-top: -11px; /* Centering mathematically: (6px track / 2) - (28px thumb / 2) */
+                                    }
+                                    .custom-range-slider::-webkit-slider-thumb:hover {
+                                      transform: scale(1.15);
+                                    }
+                                    .custom-range-slider::-moz-range-thumb {
+                                      width: 28px;
+                                      height: 28px;
+                                      border-radius: 50%;
+                                      background: #7c3aed;
+                                      cursor: pointer;
+                                      border: 3px solid #ffffff;
+                                      box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
+                                      transition: transform 0.15s;
+                                    }
+                                    .custom-range-slider::-moz-range-thumb:hover {
+                                      transform: scale(1.15);
+                                    }
+                                  `}</style>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
+                                    {/* Minus Button */}
+                                    <button 
+                                      onClick={() => setExtraUsersSliderVal(Math.max(0, extraUsersSliderVal - 5))}
+                                      className="hover-scale"
+                                      style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '50%',
+                                        border: '1.5px solid #ddd6fe',
+                                        background: '#ffffff',
+                                        color: '#6b21a8',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
+                                    
+                                    {/* Slider track wrapper */}
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                                      {(() => {
+                                        const fillPercent = (extraUsersSliderVal / 500) * 100;
+                                        return (
+                                          <input 
+                                            type="range" 
+                                            min="0" 
+                                            max="500" 
+                                            value={extraUsersSliderVal} 
+                                            onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
+                                            className="custom-range-slider"
+                                            style={{
+                                              '--track-background': `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`
+                                            } as React.CSSProperties}
+                                          />
+                                        );
+                                      })()}
+                                    </div>
+
+                                    {/* Plus Button */}
+                                    <button 
+                                      onClick={() => setExtraUsersSliderVal(Math.min(500, extraUsersSliderVal + 5))}
+                                      className="hover-scale"
+                                      style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '50%',
+                                        border: '1.5px solid #ddd6fe',
+                                        background: '#ffffff',
+                                        color: '#6b21a8',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
+                                  </div>
+
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', padding: '0 4px', alignItems: 'center' }}>
+                                    <span>0</span>
+                                    <span style={{ 
+                                      background: '#7c3aed', 
+                                      color: '#ffffff', 
+                                      padding: '3px 12px', 
+                                      borderRadius: '100px', 
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      boxShadow: '0 2px 5px rgba(124, 58, 237, 0.2)'
+                                    }}>
+                                      +{extraUsersSliderVal} Schüler
+                                    </span>
+                                    <span>500</span>
+                                  </div>
+
+                                  {/* Billing Option Dropdown for Additional Students */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                    <span style={{ fontSize: '0.65rem', color: '#6b21a8', fontWeight: 700 }}>Abrechnungsmethode für zusätzliche Schüler:</span>
+                                    <select
+                                      value={extraBillingOption}
+                                      onChange={(e) => setExtraBillingOption(e.target.value)}
+                                      style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid #ddd6fe',
+                                        background: '#ffffff',
+                                        fontSize: '0.74rem',
+                                        color: '#1e293b',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        width: '100%'
+                                      }}
+                                    >
+                                      <option value="option1">Option 1: Jahrespauschale (Schüler zahlt 5,29 € / Jahr)</option>
+                                      <option value="option2">Option 2: Monatsumlage (Schüler zahlt 0,49 € / Mo.)</option>
+                                      <option value="option3_1">Option 3.1: Kofinanzierung (Schüler 0,24 € / Schule 0,25 € / Mo.)</option>
+                                      <option value="option3_2">Option 3.2: Kofinanzierung (Schüler 2,59 € / Jahr, Schule 0,25 € / Mo.)</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {extraUsersSliderVal > 0 && (
+                                  <div style={{ background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
+                                    <span style={{ fontWeight: 800, color: '#6b21a8' }}>Kosten für {extraUsersSliderVal} zusätzliche Schüler:</span>
+                                    {(() => {
+                                      const addB2B = schoolShareAdditional;
+                                      const addB2C = isAnnualAdditional ? extraLevyYearlyAdditional : extraLevyMonthlyAdditional;
+                                      return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>• Anteil Schule (B2B):</span>
+                                            <strong>{addB2B.toFixed(2)} € / Mo.</strong>
+                                          </div>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>• Anteil Schüler (B2C):</span>
+                                            <strong>{addB2C.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                    
+                                    <button
+                                      onClick={() => {
+                                        setShowConfirmExtra(true);
+                                      }}
+                                      style={{
+                                        background: '#7c3aed',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        padding: '8px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        marginTop: '6px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.15)'
+                                      }}
+                                    >
+                                      Zusätzliche Schüler buchen
+                                    </button>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
 
