@@ -1329,6 +1329,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
+  const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('contractStartDate') : null;
+  });
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('isCancelled') === 'true';
@@ -14402,6 +14405,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 
                                 <button 
                                   onClick={() => {
+                                    const nowStr = new Date().toISOString();
+                                    setContractStartDate(nowStr);
+                                    localStorage.setItem('contractStartDate', nowStr);
                                     setIsBillingBooked(true);
                                     localStorage.setItem('isBillingBooked', 'true');
                                     setIsCancelled(false);
@@ -14665,6 +14671,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 setExtraUsersSliderVal(0);
                                 setIsCancelled(false);
                                 localStorage.removeItem('isCancelled');
+                                setContractStartDate(null);
+                                localStorage.removeItem('contractStartDate');
                                 alert('Vertrag erfolgreich aufgelöst (Entwickler-Reset durchgeführt)!');
                               }}
                               className="hover-scale"
@@ -15341,9 +15349,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   }
                                 ];
 
-                                // Group by calendar year
+                                // Group by calendar year, filtering by contractStartDate
+                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:27:58+02:00');
+                                const contractYear = contractDateObj.getFullYear();
+                                const contractMonth = contractDateObj.getMonth() + 1; // 1-indexed
+
+                                const filteredInvoices = invoicesData.filter(inv => {
+                                  const match = inv.id.match(/^RE-(\d{4})-(\d{2})$/);
+                                  if (!match) return true;
+                                  const invYear = parseInt(match[1], 10);
+                                  const invMonth = parseInt(match[2], 10);
+                                  if (invYear < contractYear) return false;
+                                  if (invYear === contractYear && invMonth < contractMonth) return false;
+                                  return true;
+                                });
+
                                 const grouped: Record<string, typeof invoicesData> = {};
-                                invoicesData.forEach(inv => {
+                                filteredInvoices.forEach(inv => {
                                   if (!grouped[inv.year]) {
                                     grouped[inv.year] = [];
                                   }
