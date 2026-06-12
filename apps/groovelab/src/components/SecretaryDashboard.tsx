@@ -14458,16 +14458,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '1rem' }}>💡</span>
                               <span>
                                 {studentBillingOption === 'option1' && (
-                                  <><strong>Preisvergleich:</strong> Die Jahrespauschale ist <strong>günstiger als ein Gitarren-Plektrum Set</strong>.</>
+                                  <>Die Jahrespauschale ist <strong>günstiger als ein Gitarren-Plektrum Set</strong>.</>
                                 )}
                                 {studentBillingOption === 'option2' && (
-                                  <><strong>Preisvergleich:</strong> Die Monatsumlage ist <strong>günstiger als das Porto für eine Briefmarke</strong>.</>
+                                  <>Die Monatsumlage ist <strong>günstiger als das Porto für eine Briefmarke</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_1' && (
-                                  <><strong>Preisvergleich:</strong> Die monatliche Kofinanzierung ist <strong>günstiger als eine Kugel Kaugummi aus dem Automaten</strong>.</>
+                                  <>Die monatliche Kofinanzierung ist <strong>günstiger als eine Kugel Kaugummi aus dem Automaten</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_2' && (
-                                  <><strong>Preisvergleich:</strong> Die jährliche Kofinanzierung entspricht etwa dem Preis für <strong>einen Kaffee/Tee am Bahnhofs-Automaten</strong>.</>
+                                  <>Der jährliche Betrag entspricht dem Preis für <strong>eine Tasse Kaffee</strong>.</>
                                 )}
                               </span>
                             </div>
