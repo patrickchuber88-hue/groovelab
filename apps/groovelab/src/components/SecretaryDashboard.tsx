@@ -14219,7 +14219,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Team-Bereitstellung (Server & Service):</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2)} € (B2B).
+                                  <strong>Team-Bereitstellung (Server & Service):</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
                                 </span>
                               </div>
 
@@ -14521,18 +14521,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               {(hasCampusSub || hasGroovelabSub) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                   <span>Module ({activeModulesCount} aktiv):</span>
-                                  <strong>{moduleCost.toFixed(2)} € / Mo.</strong>
+                                  <strong>{moduleCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Team-Profile ({allTeachers.length + employees.length}):</span>
-                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
+                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                               </div>
 
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
                                 <span>Server- & Service-Gebühr (Zwischensumme):</span>
-                                <strong>{baseB2B.toFixed(2)} € / Mo.</strong>
+                                <strong>{baseB2B.toFixed(2).replace('.', ',')} € / Mo.</strong>
                               </div>
 
                               {checkoutStep >= 2 && (
@@ -14542,14 +14542,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {studentBillingOption === 'option1' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                       <span>Einmalzahlung Schüler:</span>
-                                      <strong>{(students.length * 5.29).toFixed(2)} € / Jahr</strong>
+                                      <strong>{(students.length * 5.29).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                     </div>
                                   )}
 
                                   {studentBillingOption === 'option2' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                       <span>Schüler-Monatsumlage:</span>
-                                      <strong>{(students.length * 0.49).toFixed(2)} € / Mo.</strong>
+                                      <strong>{(students.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
                                   )}
 
@@ -14557,11 +14557,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     <>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                         <span>Schüler-Umlage (durch Schule erstattet):</span>
-                                        <strong>{(students.length * 0.24).toFixed(2)} € / Mo.</strong>
+                                        <strong>{(students.length * 0.24).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
                                         <span>Kofinanzierung Schule:</span>
-                                        <strong>{(students.length * 0.25).toFixed(2)} € / Mo.</strong>
+                                        <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </>
                                   )}
@@ -14570,11 +14570,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     <>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                         <span>Schüler-Umlage (durch Schule erstattet):</span>
-                                        <strong>{(students.length * 2.59).toFixed(2)} € / Jahr</strong>
+                                        <strong>{(students.length * 2.59).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
                                         <span>Kofinanzierung Schule:</span>
-                                        <strong>{(students.length * 0.25).toFixed(2)} € / Mo.</strong>
+                                        <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </>
                                   )}
@@ -14586,21 +14586,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
                                 <span>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
                                 <strong style={{ fontWeight: 800 }}>
-                                  {checkoutStep >= 2 ? currentTotalB2B.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
+                                  {checkoutStep >= 2 ? currentTotalB2B.toFixed(2).replace('.', ',') : baseB2B.toFixed(2).replace('.', ',')} € / Mo.
                                 </strong>
                               </div>
 
                               {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
                                   <span>Schülerumlage ({students.length} × {studentBillingOption === 'option2' ? '0,49' : '0,24'} €):</span>
-                                  <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2)} € / Mo.</strong>
+                                  <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                 <span style={{ fontWeight: 900 }}>Gesamteinzug von Musikschulkonto:</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
-                                  {checkoutStep >= 2 ? mixedTotal.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
+                                  {checkoutStep >= 2 ? mixedTotal.toFixed(2).replace('.', ',') : baseB2B.toFixed(2).replace('.', ',')} € / Mo.
                                 </strong>
                               </div>
                               <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
@@ -14622,11 +14622,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span>Zuzüglich Anteil Schüler ({students.length} × {studentBillingOption === 'option1' ? '5,29' : '2,59'} €):</span>
-                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} €</strong>
+                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
                                     <strong>Einzug im 1. Monat:</strong>
-                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59))).toFixed(2)} €</strong>
+                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59))).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                 </div>
                               )}
@@ -14805,11 +14805,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>Server-Betrieb Module:</span>
-                                <strong>{(activeModulesCount * 4.99).toFixed(2)} € / Mo.</strong>
+                                <strong>{(activeModulesCount * 4.99).toFixed(2).replace('.', ',')} € / Mo.</strong>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>Server-Betrieb Team ({allTeachers.length + employees.length} Profile):</span>
-                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
+                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                               </div>
                               <div style={{ 
                                 marginTop: '8px',
@@ -14874,7 +14874,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                                     <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
-                                    <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{standardB2B.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                    <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{standardB2B.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                   </div>
 
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -14882,7 +14882,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       {isAnnual ? 'Schülerumlage (1. Monatsrechnung):' : 'Schülerumlage (monatlich):'}
                                     </span>
                                     <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>
-                                      {standardB2C.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>{isAnnual ? '/ Jahr' : '/ Mo.'}</span>
+                                      {standardB2C.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>{isAnnual ? '/ Jahr' : '/ Mo.'}</span>
                                     </strong>
                                   </div>
 
@@ -14891,20 +14891,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 800 }}>Zusätzliche Schüler ({bookedExtraUsers} gebucht):</span>
                                       {schoolShareBookedExtra > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (B2B):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>{schoolShareBookedExtra.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (Netto):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>{schoolShareBookedExtra.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                         </div>
                                       )}
                                       {extraLevyMonthly > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{extraLevyMonthly.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler:</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{extraLevyMonthly.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                         </div>
                                       )}
                                       {(extraBillingOption === 'option1' || extraBillingOption === 'option3_2') && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C Umlage):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? 5.29 : 2.59) * bookedExtraUsers).toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler (Jährlich):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? 5.29 : 2.59) * bookedExtraUsers).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
                                         </div>
                                       )}
                                     </div>
@@ -14915,20 +14915,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 800 }}>Geplante Erweiterung (+{extraUsersSliderVal} Schüler):</span>
                                       {schoolShareAdditional > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (B2B):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>+{schoolShareAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (Netto):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>+{schoolShareAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                         </div>
                                       )}
                                       {extraLevyMonthlyAdditional > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyMonthlyAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler:</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyMonthlyAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                         </div>
                                       )}
                                       {extraLevyYearlyAdditional > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C Umlage):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyYearlyAdditional.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler (Jährlich):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyYearlyAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
                                         </div>
                                       )}
                                     </div>
@@ -14941,14 +14941,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Monatsrate (Gesamt):</span>
                               {extraUsersSliderVal > 0 ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.88rem', color: '#64748b', textDecoration: 'line-through' }}>{mixedTotal.toFixed(2)} €</span>
+                                  <span style={{ fontSize: '0.88rem', color: '#64748b', textDecoration: 'line-through' }}>{mixedTotal.toFixed(2).replace('.', ',')} €</span>
                                   <span style={{ fontSize: '0.88rem', color: '#64748b' }}>➔</span>
                                   <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>
-                                    {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
+                                    {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
                                   </strong>
                                 </div>
                               ) : (
-                                <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
                               )}
                             </div>
                           </div>
@@ -15036,13 +15036,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '8px', fontSize: '0.74rem' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>Anteil Schule (B2B):</span>
-                                      <strong>{schoolShareAdditional.toFixed(2)} € / Mo.</strong>
+                                      <span>Anteil Schule (Netto):</span>
+                                      <strong>{schoolShareAdditional.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>Anteil Schüler (B2C):</span>
+                                      <span>Umlage Schüler:</span>
                                       <strong>
-                                        {extraLevyYearlyAdditional > 0 ? extraLevyYearlyAdditional.toFixed(2) : extraLevyMonthlyAdditional.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}
+                                        {extraLevyYearlyAdditional > 0 ? extraLevyYearlyAdditional.toFixed(2).replace('.', ',') : extraLevyMonthlyAdditional.toFixed(2).replace('.', ',')} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}
                                       </strong>
                                     </div>
                                   </div>
@@ -15277,12 +15277,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       return (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>• Anteil Schule (B2B):</span>
-                                            <strong>{addB2B.toFixed(2)} € / Mo.</strong>
+                                            <span>• Anteil Schule (Netto):</span>
+                                            <strong>{addB2B.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                           </div>
                                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>• Anteil Schüler (B2C):</span>
-                                            <strong>{addB2C.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
+                                            <span>• Umlage Schüler:</span>
+                                            <strong>{addB2C.toFixed(2).replace('.', ',')} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
                                           </div>
                                         </div>
                                       );
