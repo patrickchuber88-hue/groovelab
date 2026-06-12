@@ -14575,11 +14575,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.65rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
-                                Campus (Verwaltung)
+                                Campus
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 700, color: hasGroovelabSub ? '#16a34a' : '#94a3b8' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasGroovelabSub ? '#d1fae5' : '#f1f5f9', width: '20px', height: '20px', borderRadius: '50%', fontSize: '0.65rem' }}>{hasGroovelabSub ? '✓' : '✗'}</span>
-                                GrooveLab (Übe-App)
+                                GrooveLab
                               </div>
                             </div>
                             <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
