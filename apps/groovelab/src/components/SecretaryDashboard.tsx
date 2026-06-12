@@ -1347,6 +1347,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [coaches, setCoaches] = useState<GrooveLabCoach[]>([]);
   const [campusTeachers, setCampusTeachers] = useState<any[]>([]);
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
+  const [dismissedInvoiceAlert, setDismissedInvoiceAlert] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('dismissedInvoiceAlert') === 'true';
+  });
+
+  // Global pricing calculations for use in briefing & invoice lists
+  const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
+  const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
+  const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
+  const moduleCost_global = activeModulesCount_global * 4.99;
+  const studentLevyMonthly_global = studentBillingOption === 'option2' ? students.length * 0.49 : studentBillingOption === 'option3_1' ? students.length * 0.24 : 0;
+  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : extraBillingOption === 'option3_1' ? bookedExtraUsers * 0.24 : 0;
+  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49;
+  const studentSharePreview_global = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
+  const schoolShareBookedExtra_global = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
+  const currentTotalB2B_global = baseB2B_global + schoolShareBookedExtra_global + studentSharePreview_global;
+  const mixedTotal_global = currentTotalB2B_global + studentLevyMonthly_global + extraLevyMonthly_global;
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
   
   // Room Planner Matrix states
@@ -7689,6 +7705,91 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {isBillingBooked && !dismissedInvoiceAlert && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '24px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                        <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>📧</div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>
+                            Monatsrechnung RE-2026-08 versendet
+                          </h4>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#1e40af', lineHeight: '1.4', fontWeight: 500 }}>
+                            Die Rechnung für den Leistungszeitraum August 2026 über <strong>{mixedTotal_global.toFixed(2)} €</strong> wurde am 25.08.2026 per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          onClick={() => {
+                            setSecretarySubTab('licenses');
+                            const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                            const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
+                            const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
+                            const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal;
+                            setSelectedInvoice({
+                              id: 'RE-2026-08',
+                              year: '2026',
+                              date: '25. August 2026',
+                              isCurrentMonth: true,
+                              b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
+                              amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
+                              schoolStudentCost: studentSharePreview_global,
+                              schoolStudentLevy: studentLevyMonthly_global,
+                              schoolExtraCost: schoolShareBookedExtra_global + extraLevyMonthly_global,
+                              b2c: 0,
+                              einmalzahlung: einmalzahlungTotal,
+                              status: 'Entwurf',
+                              paid: false
+                            });
+                          }}
+                          style={{
+                            background: '#ffffff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '10px',
+                            padding: '8px 16px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Rechnung einsehen
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDismissedInvoiceAlert(true);
+                            localStorage.setItem('dismissedInvoiceAlert', 'true');
+                          }}
+                          title="Als gelesen markieren"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#1e40af',
+                            fontSize: '1.2rem',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* 4 GAMIFIED CARD METRICS ROW (KPIs) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -14279,6 +14380,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     localStorage.setItem('isBillingBooked', 'true');
                                     setIsCancelled(false);
                                     localStorage.removeItem('isCancelled');
+                                    setDismissedInvoiceAlert(false);
+                                    localStorage.removeItem('dismissedInvoiceAlert');
                                     setCheckoutStep(1);
                                   }}
                                   disabled={!agreedToSepa}
@@ -14764,11 +14867,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                      year: '2026',
                                      date: '25. August 2026',
                                      isCurrentMonth: true,
-                                     b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
-                                     amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal,
-                                     schoolStudentCost: studentSharePreview,
-                                     schoolStudentLevy: studentLevyMonthly,
-                                     schoolExtraCost: schoolShareBookedExtra + extraLevyMonthly,
+                                     b2b: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
+                                     amount: isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global,
+                                     schoolStudentCost: studentSharePreview_global,
+                                     schoolStudentLevy: studentLevyMonthly_global,
+                                     schoolExtraCost: schoolShareBookedExtra_global + extraLevyMonthly_global,
                                      b2c: 0,
                                      einmalzahlung: einmalzahlungTotal,
                                      status: 'Entwurf',
