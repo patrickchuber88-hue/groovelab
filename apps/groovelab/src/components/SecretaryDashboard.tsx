@@ -14041,7 +14041,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       />
                                     </div>
                                     <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '6px', lineHeight: '1.3' }}>
-                                      Interaktive Schüler-Übe-App mit Lektionen, Playalongs und Gamification.
+                                      Das interaktive Modul zur Ergänzung des GrooveLab-Unterrichts: Mit Live-Lab-Board für eine klare Übersicht im Raum, Songs zum Meistern, automatisiertem Band-Matching-System, Bandprofilen und tollen Avataren. Gamifizierte Begleitung für das aktive, gemeinsame Musizieren.
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #f1f5f9', fontSize: '0.74rem' }}>
