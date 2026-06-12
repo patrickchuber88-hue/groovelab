@@ -8918,7 +8918,7 @@ export function AdminDashboard({
                 <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                   <Library size={20} />
                 </div>
-                <span>Mediathek</span>
+                <span>{activePlatform === 'campus' ? 'Mediathek' : 'Songs'}</span>
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
                 {activePlatform === 'campus' 
@@ -9042,7 +9042,7 @@ export function AdminDashboard({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
-                          {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', 'Vocals'].map(inst => {
+                          {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', ...(activePlatform === 'campus' ? ['Vocals'] : [])].map(inst => {
                             const count = newSong.instrumentation?.[inst] || 0;
                             const isSelected = count > 0;
                             return (
@@ -9264,7 +9264,7 @@ export function AdminDashboard({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
-                      {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', 'Vocals'].map(inst => {
+                      {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', ...(activePlatform === 'campus' ? ['Vocals'] : [])].map(inst => {
                         const count = editingSong.instrumentation?.[inst] || 0;
                         const isSelected = count > 0;
                         return (
@@ -9738,8 +9738,9 @@ export function AdminDashboard({
         </div>
 
         {/* Right Side: Textbausteine Sidebar */}
-        <div 
-          className="glass-panel" 
+        {activePlatform === 'campus' && (
+          <div 
+            className="glass-panel" 
           style={{ 
             flex: '0 0 260px',
             width: '260px',
@@ -9900,6 +9901,7 @@ export function AdminDashboard({
             </div>
           </div>
         </div>
+      )}
       </div>
     );
   };
