@@ -18006,7 +18006,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <td style={{ padding: '12px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern erstattet)
+                            Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern bezahlt)
                           </span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
