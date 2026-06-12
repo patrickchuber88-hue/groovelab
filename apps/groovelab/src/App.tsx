@@ -1803,12 +1803,10 @@ function App() {
     if (user.role === 'student') {
       updateData.age = editingProfile.age;
     } else {
-      updateData.instrument = editingProfile.instrument;
+      updateData.groovelab_instrument = editingProfile.groovelab_instrument;
       updateData.bio = editingProfile.bio;
       updateData.expertise = editingProfile.expertise;
       updateData.bands = editingProfile.bands;
-      updateData.gear = editingProfile.gear;
-      updateData.listening = editingProfile.listening;
     }
 
     const { error } = await supabase.from('users').update(updateData).eq('id', user.id);
@@ -7669,7 +7667,7 @@ function App() {
                   {(user.role === 'teacher' || user.role === 'admin') ? (
                     // COACH: show only selected instruments, no count
                     (() => {
-                      const teacherInstruments = (user.instrument || '')
+                      const teacherInstruments = (user.groovelab_instrument || '')
                         .split(',')
                         .map((s: string) => s.trim())
                         .filter(Boolean);
@@ -7742,18 +7740,6 @@ function App() {
                           <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
                             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Bands & Projekte</div>
                             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.bands}</div>
-                          </div>
-                        )}
-                        {user.gear && (
-                          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
-                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Equipment</div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.gear}</div>
-                          </div>
-                        )}
-                        {user.listening && (
-                          <div style={{ background: '#fffbeb', borderRadius: '14px', padding: '10px 14px', border: '1px solid #fef3c7', flex: 1, minWidth: '140px' }}>
-                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>🎧 Aktuell im Ohr</div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>{user.listening}</div>
                           </div>
                         )}
                       </div>
@@ -12237,34 +12223,34 @@ function App() {
 
       {/* Edit Profile Modal */}
       {showEditProfile && editingProfile && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
-          <form onSubmit={handleUpdateProfile} className="glass-panel animation-slide-up" style={{ background: 'white', padding: '40px', borderRadius: '32px', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Profil bearbeiten</h2>
-              <button type="button" onClick={() => setShowEditProfile(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(20px)' }}>
+          <form onSubmit={handleUpdateProfile} className="glass-panel animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(40px) saturate(200%)', border: '1px solid rgba(255, 255, 255, 0.5)', padding: '36px', borderRadius: '28px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1c1c1e', margin: 0, letterSpacing: '-0.02em' }}>Profil bearbeiten</h2>
+              <button type="button" onClick={() => setShowEditProfile(false)} style={{ background: 'rgba(0, 0, 0, 0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#48484a', cursor: 'pointer', transition: 'background 0.2s' }}><X size={16} /></button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {user.role === 'student' ? (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vorname</label>
+                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Anfangsbuchstabe Nachname</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Anfangsbuchstabe Nachname</label>
                       <input required maxLength={1} value={editingProfile.last_name || ''} onChange={e => {
                         const val = e.target.value.trim().substring(0, 1).toUpperCase();
                         setEditingProfile({...editingProfile, last_name: val});
-                      }} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                      }} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
                   </div>
 
                   {user.instrument && (user.instrument.toLowerCase().includes('guitar') || user.instrument.toLowerCase().includes('gitarre')) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Profilbild (Avatar)</label>
-                      <div style={{ display: 'flex', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Profilbild (Avatar)</label>
+                      <div style={{ display: 'flex', gap: '16px' }}>
                         {[
                           { id: 'gitarre', label: 'Akustische Gitarre (Standard)', url: '/avatars/gitarre_avatar_new.png' },
                           { id: 'egitarre', label: 'E-Gitarre', url: '/avatars/egitarre_avatar.png' }
@@ -12282,18 +12268,19 @@ function App() {
                                 alignItems: 'center',
                                 gap: '10px',
                                 padding: '16px',
-                                borderRadius: '20px',
-                                border: `3px solid ${isSelected ? brandColor : '#f1f5f9'}`,
-                                background: isSelected ? `${brandColor}08` : 'white',
+                                borderRadius: '16px',
+                                border: `2px solid ${isSelected ? brandColor : 'rgba(0, 0, 0, 0.08)'}`,
+                                background: isSelected ? `${brandColor}08` : 'rgba(255, 255, 255, 0.65)',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
-                                outline: 'none'
+                                outline: 'none',
+                                boxShadow: isSelected ? `0 8px 20px ${brandColor}15` : 'none'
                               }}
                             >
-                              <div style={{ width: '80px', height: '80px', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                              <div style={{ width: '80px', height: '80px', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                                 <img src={avatar.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={avatar.label} />
                               </div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isSelected ? '#1e293b' : '#64748b' }}>{avatar.label}</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? '#1c1c1e' : '#48484a' }}>{avatar.label}</span>
                             </button>
                           );
                         })}
@@ -12303,78 +12290,71 @@ function App() {
                 </>
               ) : (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vorname</label>
+                      <input required value={editingProfile.first_name || ''} onChange={e => setEditingProfile({...editingProfile, first_name: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                      <input required value={editingProfile.last_name || ''} onChange={e => setEditingProfile({...editingProfile, last_name: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Nachname</label>
+                      <input required value={editingProfile.last_name || ''} onChange={e => setEditingProfile({...editingProfile, last_name: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Instrumente (Icons anklicken):</label>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
                       {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
-                        const isSelected = (editingProfile.instrument || '').includes(inst);
+                        const isSelected = (editingProfile.groovelab_instrument || '').includes(inst);
                         return (
                           <button
                             key={inst}
                             type="button"
                             onClick={() => {
-                              const current = (editingProfile.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                              const current = (editingProfile.groovelab_instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
                               const next = current.includes(inst) ? current.filter((s: string) => s !== inst) : [...current, inst];
-                              setEditingProfile({...editingProfile, instrument: next.join(', ')});
+                              setEditingProfile({...editingProfile, groovelab_instrument: next.join(', ')});
                             }}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '14px', 
-                              border: `2px solid ${isSelected ? brandColor : '#e2e8f0'}`,
-                              background: isSelected ? `${brandColor}10` : 'white',
-                              color: isSelected ? '#1e293b' : '#64748b',
-                              fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s'
+                              flex: 1,
+                              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 8px', borderRadius: '12px', 
+                              border: `1px solid ${isSelected ? brandColor : 'rgba(0, 0, 0, 0.08)'}`,
+                              background: isSelected ? `${brandColor}10` : 'rgba(255, 255, 255, 0.65)',
+                              color: isSelected ? '#1c1c1e' : '#48484a',
+                              fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
+                              boxShadow: isSelected ? `0 4px 12px ${brandColor}15` : 'none',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
                             }}
                           >
-                            <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[inst]}</span> {inst}
+                            <span style={{ fontSize: '1.1rem' }}>{APP_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikalischer Werdegang (Bio)</label>
-                    <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingProfile.bio || ''} onChange={e => setEditingProfile({...editingProfile, bio: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 500, minHeight: '100px', fontSize: '0.95rem', lineHeight: 1.5 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Musikalischer Werdegang (Bio)</label>
+                    <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingProfile.bio || ''} onChange={e => setEditingProfile({...editingProfile, bio: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, minHeight: '100px', fontSize: '0.95rem', lineHeight: 1.5, transition: 'all 0.2s', outline: 'none', resize: 'vertical' }} />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
-                      <input placeholder="z.B. Jazz, Rock, Metal..." value={editingProfile.expertise || ''} onChange={e => setEditingProfile({...editingProfile, expertise: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Expertise & Stile</label>
+                      <input placeholder="z.B. Jazz, Rock, Metal..." value={editingProfile.expertise || ''} onChange={e => setEditingProfile({...editingProfile, expertise: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bands & Projekte</label>
-                      <input placeholder="Aktuelle Bands..." value={editingProfile.bands || ''} onChange={e => setEditingProfile({...editingProfile, bands: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Equipment / Gear</label>
-                      <input placeholder="Dein Setup..." value={editingProfile.gear || ''} onChange={e => setEditingProfile({...editingProfile, gear: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Aktuell im Ohr</label>
-                      <input placeholder="Was hörst du gerade?" value={editingProfile.listening || ''} onChange={e => setEditingProfile({...editingProfile, listening: e.target.value})} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bands & Projekte</label>
+                      <input placeholder="Aktuelle Bands..." value={editingProfile.bands || ''} onChange={e => setEditingProfile({...editingProfile, bands: e.target.value})} onFocus={e => { e.target.style.borderColor = brandColor; e.target.style.boxShadow = `0 0 0 3px ${brandColor}25`; e.target.style.background = '#ffffff'; }} onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none'; e.target.style.background = 'rgba(255, 255, 255, 0.65)'; }} style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(255, 255, 255, 0.65)', color: '#1c1c1e', fontWeight: 500, fontSize: '0.95rem', transition: 'all 0.2s', outline: 'none' }} />
                     </div>
                   </div>
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '18px', borderRadius: '20px', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer', boxShadow: `0 10px 30px ${brandColor}30` }}>Speichern</button>
-                <button type="button" onClick={() => setShowEditProfile(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '18px', borderRadius: '20px', fontWeight: 800, cursor: 'pointer' }}>Abbrechen</button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: `0 8px 24px ${brandColor}25`, transition: 'all 0.2s' }}>Speichern</button>
+                <button type="button" onClick={() => setShowEditProfile(false)} style={{ flex: 1, background: 'rgba(0, 0, 0, 0.05)', color: '#48484a', border: 'none', padding: '14px 28px', borderRadius: '14px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', transition: 'all 0.2s' }}>Abbrechen</button>
               </div>
             </div>
           </form>

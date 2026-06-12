@@ -3212,13 +3212,11 @@ export function AdminDashboard({
       first_name: editingTeacher.first_name,
       last_name: editingTeacher.last_name,
       role: editingTeacher.role,
-      instrument: editingTeacher.instrument,
+      groovelab_instrument: editingTeacher.groovelab_instrument,
       photo_url: editingTeacher.photo_url,
       bio: editingTeacher.bio,
       expertise: editingTeacher.expertise,
-      bands: editingTeacher.bands,
-      gear: editingTeacher.gear,
-      listening: editingTeacher.listening
+      bands: editingTeacher.bands
     }).eq('id', editingTeacher.id);
     
     if (error) alert('Fehler: ' + error.message);
@@ -5229,9 +5227,9 @@ export function AdminDashboard({
 
             <div>
               <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
                 {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
-                  const currentInstruments = (editingTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                  const currentInstruments = (editingTeacher.groovelab_instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
                   const isSelected = currentInstruments.includes(inst);
                   return (
                     <button
@@ -5239,18 +5237,21 @@ export function AdminDashboard({
                       type="button"
                       onClick={() => {
                         const next = isSelected ? currentInstruments.filter((s: string) => s !== inst) : [...currentInstruments, inst];
-                        setEditingTeacher({...editingTeacher, instrument: next.join(', ')});
+                        setEditingTeacher({...editingTeacher, groovelab_instrument: next.join(', ')});
                       }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', 
+                        flex: 1,
+                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 8px', borderRadius: '12px', 
                         border: `1.5px solid ${isSelected ? brandColor : '#e2e8f0'}`,
                         background: isSelected ? `${brandColor}10` : 'white',
                         color: isSelected ? '#1e293b' : '#64748b',
                         fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: isSelected ? `0 2px 8px ${brandColor}15` : 'none'
+                        boxShadow: isSelected ? `0 2px 8px ${brandColor}15` : 'none',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
                       }}
                     >
-                      <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst}
+                      <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
                     </button>
                   );
                 })}
@@ -5273,10 +5274,6 @@ export function AdminDashboard({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Lieblingsbands</label>
-              <input placeholder="z.B. Metallica..." value={editingTeacher.listening || ''} onChange={e => setEditingTeacher({...editingTeacher, listening: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
-            </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
               <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Änderungen speichern</button>
@@ -5373,7 +5370,7 @@ export function AdminDashboard({
                   </div>
 
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                    {t.instrument?.split(',')
+                    {t.groovelab_instrument?.split(',')
                       .map((inst: string) => inst.trim())
                       .filter(Boolean)
                       .map((inst: string) => (
