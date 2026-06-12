@@ -14173,24 +14173,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 })}
                               </div>
 
-                              {/* Price comparison anchor note */}
-                              <div style={{ 
-                                background: '#f8fafc', 
-                                border: '1px solid #e2e8f0', 
-                                borderRadius: '12px', 
-                                padding: '10px 14px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '8px',
-                                fontSize: '0.72rem', 
-                                color: '#475569' 
-                              }}>
-                                <span>💡</span>
-                                <span>
-                                  Zur Relation: Die monatliche Umlage (0,49 €) ist günstiger als das Porto für eine einzige Briefmarke.
-                                </span>
-                              </div>
-
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
                                   onClick={() => setCheckoutStep(1)}
@@ -14419,7 +14401,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                               {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
-                                  <span>Anteil Schüler (B2C):</span>
+                                  <span>Anteil Schüler (B2C) ({students.length} × {studentBillingOption === 'option2' ? '0,49' : '0,24'} €):</span>
                                   <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2)} € / Mo.</strong>
                                 </div>
                               )}
@@ -14445,7 +14427,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   gap: '2px'
                                 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Zuzüglich Anteil Schüler:</span>
+                                    <span>Zuzüglich Anteil Schüler ({students.length} × {studentBillingOption === 'option1' ? '5,29' : '2,59'} €):</span>
                                     <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} €</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
@@ -14456,6 +14438,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               )}
                             </div>
                           </div>
+
+                          {/* Price comparison anchor box below order summary widget */}
+                          {checkoutStep >= 2 && (
+                            <div style={{ 
+                              marginTop: '12px',
+                              background: '#ffffff', 
+                              border: '1.5px dashed #cbd5e1', 
+                              borderRadius: '16px', 
+                              padding: '12px 14px', 
+                              display: 'flex', 
+                              alignItems: 'flex-start', 
+                              gap: '8px',
+                              fontSize: '0.74rem', 
+                              color: '#475569',
+                              lineHeight: '1.35',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                            }}>
+                              <span style={{ fontSize: '1rem' }}>💡</span>
+                              <span>
+                                {studentBillingOption === 'option1' && (
+                                  <><strong>Preisvergleich:</strong> Die jährliche Umlage (5,29 € / Jahr) entspricht etwa dem Preis für <strong>eine einzelne Gitarrensaite</strong>.</>
+                                )}
+                                {studentBillingOption === 'option2' && (
+                                  <><strong>Preisvergleich:</strong> Die monatliche Umlage (0,49 €) ist <strong>günstiger als das Porto für eine einzige Briefmarke (0,85 €)</strong>.</>
+                                )}
+                                {studentBillingOption === 'option3_1' && (
+                                  <><strong>Preisvergleich:</strong> Die monatliche Umlage (0,24 €) ist <strong>günstiger als ein einfaches Brötchen beim Bäcker</strong>.</>
+                                )}
+                                {studentBillingOption === 'option3_2' && (
+                                  <><strong>Preisvergleich:</strong> Die jährliche Umlage (2,59 € / Jahr) entspricht etwa dem Preis für <strong>einen Kaffee/Tee am Bahnhofs-Automaten</strong>.</>
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (
