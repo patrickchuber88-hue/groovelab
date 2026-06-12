@@ -14513,12 +14513,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div>
                               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: isCancelled ? '#78350f' : '#14532d', fontFamily: 'Urbanist' }}>
                                 {isCancelled 
-                                  ? 'Abonnement gekündigt zum 31.08.2027' 
+                                  ? 'Abonnement gekündigt zum 31.08.2026' 
                                   : 'Abrechnungssystem für das Schuljahr 2026/2027 aktiv'}
                               </h4>
                               <span style={{ fontSize: '0.74rem', color: isCancelled ? '#b45309' : '#15803d', fontWeight: 600 }}>
                                 {isCancelled 
-                                  ? 'Dein Zugang bleibt bis zum Ende des Schuljahres am 31. August 2027 aktiv. Es erfolgen danach keine weiteren Abbuchungen.'
+                                  ? 'Dein Zugang bleibt bis zum Ende des Schuljahres am 31. August 2026 aktiv. Es erfolgen danach keine weiteren Abbuchungen.'
                                   : 'Alle Module und Schüler-Umlagen sind verbindlich eingerichtet und aktiv gebucht.'}
                               </span>
                             </div>
@@ -14583,7 +14583,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
                             </div>
                             <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                              Nutzungslizenz: <strong>Kostenlos</strong>
+                              Software Lizenz: <strong>100% kostenlos</strong>
                             </span>
                           </div>
 
@@ -14766,7 +14766,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                                     <div>
                                       <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
-                                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Fällig am: {inv.date}</span>
+                                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Fällig am: 31. August 2026</span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
                                       <div style={{ color: '#0369a1', fontWeight: 800 }}>
@@ -14774,7 +14774,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       </div>
                                       {inv.einmalzahlung > 0 && (
                                         <div style={{ fontSize: '0.62rem', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 700, marginTop: '2px' }}>
-                                          Enthält {inv.einmalzahlung.toFixed(2)} € Einmalzahlung Schüler (B2C)
+                                          Enthält {inv.einmalzahlung.toFixed(2)} € Einmalzahlung Schüler
                                         </div>
                                       )}
                                       {inv.b2c > 0 && (
@@ -18082,7 +18082,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               color: '#b45309',
               lineHeight: '1.4'
             }}>
-              <strong>Info zum Schuljahresende:</strong> Da Buchungen für das laufende Schuljahr bindend sind, wird deine Kündigung zum nächstmöglichen Termin am <strong>31. August 2027</strong> wirksam. Bis dahin steht dir die Plattform wie gewohnt in vollem Umfang zur Verfügung.
+              <strong>Info zum Schuljahresende:</strong> Da Buchungen für das laufende Schuljahr bindend sind, wird deine Kündigung zum nächstmöglichen Termin am <strong>31. August 2026</strong> wirksam. Bis dahin steht dir die Plattform wie gewohnt in vollem Umfang zur Verfügung.
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
