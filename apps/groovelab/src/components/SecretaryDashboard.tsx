@@ -14458,16 +14458,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '1rem' }}>💡</span>
                               <span>
                                 {studentBillingOption === 'option1' && (
-                                  <><strong>Preisvergleich:</strong> Die jährliche Umlage (5,29 € / Jahr) entspricht etwa dem Preis für <strong>eine einzelne Gitarrensaite</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die Jahrespauschale ist <strong>günstiger als ein Gitarren-Plektrum Set</strong>.</>
                                 )}
                                 {studentBillingOption === 'option2' && (
-                                  <><strong>Preisvergleich:</strong> Die monatliche Umlage (0,49 €) ist <strong>günstiger als das Porto für eine einzige Briefmarke (0,85 €)</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die Monatsumlage ist <strong>günstiger als das Porto für eine einzige Briefmarke (0,85 €)</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_1' && (
-                                  <><strong>Preisvergleich:</strong> Die monatliche Umlage (0,24 €) ist <strong>günstiger als ein einfaches Brötchen beim Bäcker</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die monatliche Kofinanzierung ist <strong>günstiger als ein einfaches Brötchen beim Bäcker</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_2' && (
-                                  <><strong>Preisvergleich:</strong> Die jährliche Umlage (2,59 € / Jahr) entspricht etwa dem Preis für <strong>einen Kaffee/Tee am Bahnhofs-Automaten</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die jährliche Kofinanzierung entspricht etwa dem Preis für <strong>einen Kaffee/Tee am Bahnhofs-Automaten</strong>.</>
                                 )}
                               </span>
                             </div>
