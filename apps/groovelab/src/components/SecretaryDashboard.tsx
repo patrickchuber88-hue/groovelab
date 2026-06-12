@@ -4730,19 +4730,75 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             )}
 
             {/* KPI ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.62rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Schüler Gesamt</span>
-                <strong style={{ fontSize: '1.4rem', color: '#1e3a8a', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalStudents}</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '8px' }}>
+              
+              {/* Card 1: Schüler Gesamt */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.25)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
+                padding: '16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }} className="hover-scale">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Schüler Gesamt</span>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                    <Users size={12} color="white" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{totalStudents}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>registriert</span>
+                </div>
               </div>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
-                <strong style={{ fontSize: '1.4rem', color: '#14532d', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeCampusCount}</strong>
+
+              {/* Card 2: Campus Aktiv */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.25)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
+                padding: '16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }} className="hover-scale">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                    <UserCheck size={12} color="white" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeCampusCount}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Lizenzen</span>
+                </div>
               </div>
-              <div style={{ background: '#feefe3', border: '1px solid #fed7aa', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
-                <strong style={{ fontSize: '1.4rem', color: '#713f12', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeGroovelabCount}</strong>
+
+              {/* Card 3: Campus-Groovelab Aktiv */}
+              <div style={{
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.3)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
+                padding: '16px', boxSizing: 'border-box',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }} className="hover-scale">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Campus-Groovelab Aktiv</span>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                    <Music size={12} color="white" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Lizenzen</span>
+                </div>
               </div>
+
+              {/* Card 4: Actionable Onboarding Link */}
               <div 
                 onClick={() => {
                   const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
@@ -4750,29 +4806,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   setCopiedStudentId('general-onboarding');
                   setTimeout(() => setCopiedStudentId(null), 2000);
                 }}
-                style={{ 
-                  background: copiedStudentId === 'general-onboarding' ? '#e2f6ea' : '#f8fafc', 
-                  border: copiedStudentId === 'general-onboarding' ? '1px solid #a7f3d0' : '1px solid #cbd5e1', 
-                  padding: '10px 14px', 
-                  borderRadius: '14px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '2px',
+                style={{
+                  position: 'relative', overflow: 'hidden',
+                  background: copiedStudentId === 'general-onboarding' 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                    : 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', 
+                  color: 'white',
+                  borderRadius: '20px', 
+                  boxShadow: copiedStudentId === 'general-onboarding'
+                    ? '0 10px 25px -5px rgba(16, 185, 129, 0.3)'
+                    : '0 10px 25px -5px rgba(124, 58, 237, 0.35)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
+                  padding: '16px', boxSizing: 'border-box',
                   cursor: 'pointer',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s ease'
-                }}
-                className="hover-scale-mini"
-                title="Klicke, um den allgemeinen Eltern-Onboarding Link zu kopieren"
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }} 
+                className="hover-scale"
+                title="Klicke hier, um den Onboarding-Link für Eltern zu kopieren"
               >
-                <span style={{ fontSize: '0.62rem', color: copiedStudentId === 'general-onboarding' ? '#137333' : '#475569', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {copiedStudentId === 'general-onboarding' ? <Check size={10} /> : <LinkIcon size={10} />}
-                  Onboarding Link
-                </span>
-                <span style={{ fontSize: '0.8rem', color: copiedStudentId === 'general-onboarding' ? '#137333' : '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>
-                  {copiedStudentId === 'general-onboarding' ? '✓ Kopiert' : 'Link kopieren'}
-                </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Eltern-Registrierung</span>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                    {copiedStudentId === 'general-onboarding' ? <Check size={12} color="white" /> : <LinkIcon size={12} color="white" />}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: 'Urbanist', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {copiedStudentId === 'general-onboarding' ? '✓ Kopiert!' : 'Onboarding-Link'}
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.85 }}>
+                    {copiedStudentId === 'general-onboarding' ? 'In Zwischenablage gesichert' : 'Hier klicken zum Kopieren'}
+                  </span>
+                </div>
               </div>
+
             </div>
 
             {/* FILTER & SEARCH */}
@@ -5115,13 +5183,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <span style={{
                           fontSize: '0.7rem',
                           fontWeight: 700,
-                          color: '#0f172a',
-                          background: '#e2e8f0',
+                          color: '#1e40af',
+                          background: '#eff6ff',
                           padding: '4px 8px',
                           borderRadius: '8px',
-                          border: '1px solid #cbd5e1'
+                          border: '1px solid #bfdbfe',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}>
-                          Tag: {student.day_of_birth || '1'}
+                          📅 Abrechnung: {student.day_of_birth || '1'}.
                         </span>
 
                         {/* Delete Button */}
