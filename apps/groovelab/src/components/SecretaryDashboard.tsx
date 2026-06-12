@@ -14393,7 +14393,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                             <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
-                                <span>Lastschrift Schule (B2B):</span>
+                                <span>Anteil Schule (B2B):</span>
                                 <strong style={{ fontWeight: 800 }}>
                                   {checkoutStep >= 2 ? currentTotalB2B.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
                                 </strong>
@@ -14401,13 +14401,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                               {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
-                                  <span>Lastschrift Schüler (B2C):</span>
+                                  <span>Anteil Schüler (B2C):</span>
                                   <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2)} € / Mo.</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
-                                <span style={{ fontWeight: 900 }}>Gesamter Bankeinzug:</span>
+                                <span style={{ fontWeight: 900 }}>Einzug von deinem Konto (Gesamt):</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
                                   {checkoutStep >= 2 ? mixedTotal.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
                                 </strong>
@@ -14427,7 +14427,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   gap: '2px'
                                 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Zuzüglich Einmalzahlung Schüler:</span>
+                                    <span>Zuzüglich Anteil Schüler:</span>
                                     <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} €</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
@@ -14520,25 +14520,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Musikschule (B2B):</span>
+                                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Anteil Schule (B2B):</span>
                                 <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{currentTotalB2B.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
                               </div>
 
                               {isAnnual ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Umlage Schüler (B2C):</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Anteil Schüler (B2C):</span>
                                   <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Jahr</span></strong>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Umlage Schüler (B2C):</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Anteil Schüler (B2C):</span>
                                   <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>{studentLevyMonthly.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
                                 </div>
                               )}
                             </div>
 
                             <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 'auto' }}>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Gesamteinzug (Mischpreis):</span>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Einzug von deinem Konto (Gesamt):</span>
                               <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
                             </div>
                           </div>
@@ -14590,11 +14590,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>• Musikschule (B2B):</span>
+                                        <span>• Anteil Schule (B2B):</span>
                                         <strong>{addB2B.toFixed(2)} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>• Schüler-Umlage (B2C):</span>
+                                        <span>• Anteil Schüler (B2C):</span>
                                         <strong>{addB2C.toFixed(2)} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
                                       </div>
                                     </div>
