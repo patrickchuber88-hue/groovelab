@@ -102,6 +102,16 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
+  // Master Billing Settings State
+  const [billingCompany, setBillingCompany] = useState('Simplified Work GbR');
+  const [billingContact, setBillingContact] = useState('Patrick Huber');
+  const [billingStreet, setBillingStreet] = useState('Karl-Fürstenberg-Str. 59');
+  const [billingZip, setBillingZip] = useState('79618');
+  const [billingCity, setBillingCity] = useState('Rheinfelden');
+  const [billingIban, setBillingIban] = useState('');
+  const [billingBic, setBillingBic] = useState('');
+  const [updatingBilling, setUpdatingBilling] = useState(false);
+
   // Stats State
   const [stats, setStats] = useState({
     totalSchools: 0,
@@ -134,7 +144,55 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   useEffect(() => {
     fetchSchoolsAndStats();
     fetchAdminUser();
+    fetchBillingSettings();
   }, []);
+
+  const fetchBillingSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('master_billing_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+      if (data) {
+        setBillingCompany(data.company_name || '');
+        setBillingContact(data.contact_person || '');
+        setBillingStreet(data.street || '');
+        setBillingZip(data.zip_code || '');
+        setBillingCity(data.city || '');
+        setBillingIban(data.iban || '');
+        setBillingBic(data.bic || '');
+      }
+    } catch (err) {
+      console.error('Error fetching billing settings:', err);
+    }
+  };
+
+  const handleUpdateBillingSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setUpdatingBilling(true);
+      const { error } = await supabase
+        .from('master_billing_settings')
+        .update({
+          company_name: billingCompany.trim(),
+          contact_person: billingContact.trim(),
+          street: billingStreet.trim(),
+          zip_code: billingZip.trim(),
+          city: billingCity.trim(),
+          iban: billingIban.trim(),
+          bic: billingBic.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 1);
+      if (error) throw error;
+      alert('Rechnungsadresse & Bankverbindung erfolgreich aktualisiert!');
+    } catch (err: any) {
+      alert('Fehler beim Speichern der Rechnungsadresse: ' + err.message);
+    } finally {
+      setUpdatingBilling(false);
+    }
+  };
 
   const fetchAdminUser = async () => {
     try {
@@ -1325,6 +1383,223 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Master Billing Settings Card */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '28px',
+            padding: '32px',
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
+          }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
+              <Settings size={22} color="#eab308" /> Rechnungsadresse &amp; Bankverbindung
+            </h2>
+
+            <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Firma / Name
+                </label>
+                <input
+                  type="text"
+                  value={billingCompany}
+                  onChange={(e) => setBillingCompany(e.target.value)}
+                  placeholder="Simplified Work GbR"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Ansprechpartner
+                </label>
+                <input
+                  type="text"
+                  value={billingContact}
+                  onChange={(e) => setBillingContact(e.target.value)}
+                  placeholder="Patrick Huber"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Straße &amp; Hausnummer
+                </label>
+                <input
+                  type="text"
+                  value={billingStreet}
+                  onChange={(e) => setBillingStreet(e.target.value)}
+                  placeholder="Karl-Fürstenberg-Str. 59"
+                  required
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    PLZ
+                  </label>
+                  <input
+                    type="text"
+                    value={billingZip}
+                    onChange={(e) => setBillingZip(e.target.value)}
+                    placeholder="79618"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#f5f5f7',
+                      border: '1px solid transparent',
+                      color: '#1d1d1f',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Ort
+                  </label>
+                  <input
+                    type="text"
+                    value={billingCity}
+                    onChange={(e) => setBillingCity(e.target.value)}
+                    placeholder="Rheinfelden"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#f5f5f7',
+                      border: '1px solid transparent',
+                      color: '#1d1d1f',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  IBAN (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={billingIban}
+                  onChange={(e) => setBillingIban(e.target.value)}
+                  placeholder="z.B. DE89 3704 0044 ..."
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  BIC (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={billingBic}
+                  onChange={(e) => setBillingBic(e.target.value)}
+                  placeholder="z.B. WELADED1XYZ"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: '#f5f5f7',
+                    border: '1px solid transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={updatingBilling}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '14px',
+                  background: '#1d1d1f', // iOS Solid Dark
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+                  transition: 'all 0.2s'
+                }}
+                className="hover-scale-mini"
+              >
+                {updatingBilling ? 'Wird gespeichert...' : 'Rechnungsadresse speichern'}
+              </button>
+            </form>
           </div>
         </div>
       </div>
