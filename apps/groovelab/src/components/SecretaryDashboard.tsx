@@ -14464,7 +14464,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <><strong>Preisvergleich:</strong> Die Monatsumlage ist <strong>günstiger als das Porto für eine Briefmarke</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_1' && (
-                                  <><strong>Preisvergleich:</strong> Die monatliche Kofinanzierung ist <strong>günstiger als ein einfaches Brötchen beim Bäcker</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die monatliche Kofinanzierung ist <strong>günstiger als eine Kugel Kaugummi aus dem Automaten</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_2' && (
                                   <><strong>Preisvergleich:</strong> Die jährliche Kofinanzierung entspricht etwa dem Preis für <strong>einen Kaffee/Tee am Bahnhofs-Automaten</strong>.</>
