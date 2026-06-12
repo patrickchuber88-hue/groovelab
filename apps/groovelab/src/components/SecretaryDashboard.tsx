@@ -14173,6 +14173,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 })}
                               </div>
 
+                              {/* Price comparison anchor note */}
+                              <div style={{ 
+                                background: '#f8fafc', 
+                                border: '1px solid #e2e8f0', 
+                                borderRadius: '12px', 
+                                padding: '10px 14px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                fontSize: '0.72rem', 
+                                color: '#475569' 
+                              }}>
+                                <span>💡</span>
+                                <span>
+                                  Zur Relation: Die monatliche Umlage (0,49 €) ist günstiger als das Porto für eine einzige Briefmarke.
+                                </span>
+                              </div>
+
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
                                   onClick={() => setCheckoutStep(1)}
