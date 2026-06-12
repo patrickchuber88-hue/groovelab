@@ -14231,6 +14231,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </p>
                               </div>
 
+                              {/* Stripe Security Info Box */}
+                              <div style={{ 
+                                background: '#f0fdf4', 
+                                border: '1px solid #bbf7d0', 
+                                borderRadius: '16px', 
+                                padding: '12px 14px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '10px',
+                                fontSize: '0.7rem',
+                                color: '#166534',
+                                lineHeight: '1.4'
+                              }}>
+                                <span style={{ fontSize: '1.25rem' }}>🔒</span>
+                                <span>
+                                  <strong>Sicherheit durch Tokenisierung:</strong> Deine Bankdaten werden verschlüsselt direkt an unseren PCI-DSS-zertifizierten Zahlungsdienstleister <strong>Stripe</strong> übertragen. Campus-Groovelab speichert <strong>zu keinem Zeitpunkt IBAN- oder Bankdaten</strong> auf eigenen Servern.
+                                </span>
+                              </div>
+
                               <label style={{
                                 display: 'flex',
                                 alignItems: 'flex-start',
