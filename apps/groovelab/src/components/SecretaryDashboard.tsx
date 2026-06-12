@@ -13975,7 +13975,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 1 von 3</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Welche Module möchtest du nutzen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Campus-Lizenzgebühr selbst ist kostenlos. Infrastrukturkosten fallen nur für Team-Profile und gebuchte Schüler an.
+                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Campus-Lizenzgebühr selbst ist kostenlos. Server- & Service-Bereitstellungskosten fallen nur für Team-Profile und gebuchte Schüler an.
                                 </p>
                               </div>
 
@@ -14058,7 +14058,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Team-Infrastruktur:</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2)} € (B2B).
+                                  <strong>Team-Bereitstellung (Server & Service):</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2)} € (B2B).
                                 </span>
                               </div>
 
@@ -14095,7 +14095,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 2 von 3</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Abrechnungsmethode für Schüler festlegen</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Bestimme, wie die monatlichen Infrastrukturgebühren für Schüler (<strong>{students.length} Schüler registriert</strong>) getragen und eingezogen werden.
+                                  Bestimme, wie die monatlichen Server- & Service-Bereitstellungsgebühren für Schüler (<strong>{students.length} Schüler registriert</strong>) getragen und eingezogen werden.
                                 </p>
                               </div>
 
@@ -14346,7 +14346,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </div>
 
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                <span>Infrastruktur (Zwischensumme):</span>
+                                <span>Server- & Service-Gebühr (Zwischensumme):</span>
                                 <strong>{baseB2B.toFixed(2)} € / Mo.</strong>
                               </div>
 
@@ -17890,8 +17890,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Module: Campus / Groovelab</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastruktur &amp; Plattform-Zugang</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Module)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus / GrooveLab)</span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
