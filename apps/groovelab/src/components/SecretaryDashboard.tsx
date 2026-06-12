@@ -4536,6 +4536,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
+                  onClick={() => {
+                    const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
+                    navigator.clipboard.writeText(onboardingUrl);
+                    setCopiedStudentId('general-onboarding');
+                    setTimeout(() => setCopiedStudentId(null), 2000);
+                  }}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    borderRadius: '12px', 
+                    padding: '8px 16px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: 800,
+                    background: copiedStudentId === 'general-onboarding' ? '#ecfdf5' : '#ffffff',
+                    border: copiedStudentId === 'general-onboarding' ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+                    color: copiedStudentId === 'general-onboarding' ? '#059669' : '#0f172a',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                  }}
+                  title="Eltern-Onboarding Link kopieren"
+                >
+                  {copiedStudentId === 'general-onboarding' ? <Check size={14} /> : <LinkIcon size={14} />}
+                  {copiedStudentId === 'general-onboarding' ? 'Onboarding-Link kopiert!' : 'Onboarding-Link kopieren'}
+                </button>
+
+                <button
                   onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
                   style={{ 
                     display: 'flex', 
@@ -4730,7 +4759,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             )}
 
             {/* KPI ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '8px' }}>
               
               {/* Card 1: Schüler Gesamt */}
               <div style={{
@@ -4795,49 +4824,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                   <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Lizenzen</span>
-                </div>
-              </div>
-
-              {/* Card 4: Actionable Onboarding Link */}
-              <div 
-                onClick={() => {
-                  const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
-                  navigator.clipboard.writeText(onboardingUrl);
-                  setCopiedStudentId('general-onboarding');
-                  setTimeout(() => setCopiedStudentId(null), 2000);
-                }}
-                style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: copiedStudentId === 'general-onboarding' 
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                    : 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', 
-                  color: 'white',
-                  borderRadius: '20px', 
-                  boxShadow: copiedStudentId === 'general-onboarding'
-                    ? '0 10px 25px -5px rgba(16, 185, 129, 0.3)'
-                    : '0 10px 25px -5px rgba(124, 58, 237, 0.35)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
-                  padding: '16px', boxSizing: 'border-box',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }} 
-                className="hover-scale"
-                title="Klicke hier, um den Onboarding-Link für Eltern zu kopieren"
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Eltern-Registrierung</span>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
-                    {copiedStudentId === 'general-onboarding' ? <Check size={12} color="white" /> : <LinkIcon size={12} color="white" />}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: 'Urbanist', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {copiedStudentId === 'general-onboarding' ? '✓ Kopiert!' : 'Onboarding-Link'}
-                  </span>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.85 }}>
-                    {copiedStudentId === 'general-onboarding' ? 'In Zwischenablage gesichert' : 'Hier klicken zum Kopieren'}
-                  </span>
                 </div>
               </div>
 
