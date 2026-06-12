@@ -18438,6 +18438,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
         const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
         const mCost = activeModulesCount * 4.99;
+
+        const schoolShareTotal = selectedInvoice.isCurrentMonth
+          ? (mCost + ((allTeachers.length + employees.length) * 0.49) + selectedInvoice.schoolStudentCost + selectedInvoice.schoolExtraCost)
+          : selectedInvoice.amount;
+
+        const studentShareTotal = selectedInvoice.isCurrentMonth
+          ? (selectedInvoice.schoolStudentLevy + selectedInvoice.einmalzahlung + selectedInvoice.extraLevyMonthly + selectedInvoice.extraEinmalzahlung)
+          : 0;
         
         return (
           <div style={{
@@ -18811,6 +18819,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     <div style={{ width: '240px' }}>
+                      {schoolShareTotal > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
+                          <span>• Träger Musikschule:</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{schoolShareTotal.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                      )}
+                      {studentShareTotal > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
+                          <span>• Träger Schüler (Umlage):</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                      )}
+                      <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
                         <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
                         <strong style={{ fontWeight: 900, color: '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
