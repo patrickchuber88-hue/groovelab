@@ -17934,25 +17934,56 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Datenbereinigungen, Auftragsverarbeitungsverträge und JSON Backups.</p>
                   </div>
 
-                  {/* Hetzner AV Vertrag info box */}
-                  <div style={{ 
-                    background: '#f0fdf4', 
-                    border: '1px solid #bbf7d0', 
-                    borderRadius: '16px', 
-                    padding: '16px', 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
-                    gap: '12px',
-                    fontSize: '0.76rem',
-                    color: '#166534',
-                    lineHeight: '1.45'
-                  }}>
-                    <span style={{ fontSize: '1.4rem' }}>🛡️</span>
-                    <div>
-                      <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px' }}>AV-Vertrag abgeschlossen (DSGVO)</strong>
-                      <span>
-                        Der Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO für das Hosten personenbezogener Daten in deutschen Rechenzentren der <strong>Hetzner Online GmbH</strong> ist rechtsgültig gezeichnet und aktiv hinterlegt.
-                      </span>
+                  {/* AV-Vertrag Statusbereich */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Schule AVV */}
+                    <div style={{ 
+                      background: '#fffbeb', 
+                      border: '1px solid #fde68a', 
+                      borderRadius: '16px', 
+                      padding: '16px', 
+                      display: 'flex', 
+                      alignItems: 'flex-start', 
+                      gap: '12px',
+                      fontSize: '0.76rem',
+                      color: '#92400e',
+                      lineHeight: '1.45'
+                    }}>
+                      <span style={{ fontSize: '1.4rem' }}>📄</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit GrooveLab (Schul-Vereinbarung)</strong>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Vorbereitung</span>
+                        </div>
+                        <span style={{ display: 'block', marginTop: '4px' }}>
+                          Für den datenschutzkonformen Betrieb von GrooveLab ist der Abschluss eines Auftragsverarbeitungsvertrags (AVV) nach Art. 28 DSGVO zwischen deiner Musikschule und GrooveLab erforderlich. Die Vorlage wird freigeschaltet, sobald die Hoster-Vereinbarungen finalisiert sind.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Hoster AVV */}
+                    <div style={{ 
+                      background: '#fffbeb', 
+                      border: '1px solid #fde68a', 
+                      borderRadius: '16px', 
+                      padding: '16px', 
+                      display: 'flex', 
+                      alignItems: 'flex-start', 
+                      gap: '12px',
+                      fontSize: '0.76rem',
+                      color: '#92400e',
+                      lineHeight: '1.45'
+                    }}>
+                      <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Hoster (Hetzner Online GmbH)</strong>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Zeichnung</span>
+                        </div>
+                        <span style={{ display: 'block', marginTop: '4px' }}>
+                          Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wird derzeit durch GrooveLab abgeschlossen.
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -19594,7 +19625,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
-                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
+                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wird ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) abgeschlossen (derzeit in Zeichnung), um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
           </div>
