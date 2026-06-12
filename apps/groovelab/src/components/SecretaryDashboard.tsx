@@ -13872,8 +13872,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </p>
 
               {(() => {
-                const billedCampus = hasCampusSub || campusActivatedThisMonth;
-                const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
+                const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
+                const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
                 const moduleCost = activeModulesCount * 4.99;
                 const studentLevyMonthly = (() => {
