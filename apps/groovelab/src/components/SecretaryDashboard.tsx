@@ -3469,7 +3469,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 onChange={(e) => setSubjectCsvText(e.target.value)}
                 placeholder="z.B.&#10;Gitarre&#10;Klavier&#10;Gesang&#10;Querflöte"
                 rows={5}
-                style={{ padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace', outline: 'none' }}
+                style={{ padding: '8px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace', outline: 'none' }}
               />
               <button
                 onClick={handleImportSubjects}
@@ -3665,7 +3665,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
                 >
                   Fach anlegen
                 </button>
@@ -3920,7 +3920,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             display: 'flex', 
             gap: '12px', 
             background: '#f8fafc', 
-            padding: '12px', 
+            padding: '8px', 
             borderRadius: '16px',
             border: '1px solid #cbd5e1',
             flexWrap: 'wrap',
@@ -4225,7 +4225,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
 
           {/* PAGINATION FOOTER */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '12px', flexWrap: 'wrap', gap: '12px' }}>
             <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
               Zeige {startIndex + 1} bis {Math.min(startIndex + cooperationPageSize, totalCount)} von {totalCount} Partnern
             </span>
@@ -4406,7 +4406,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
                 >
                   Kooperation anlegen
                 </button>
@@ -4744,7 +4744,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               display: 'flex', 
               gap: '12px', 
               background: '#f8fafc', 
-              padding: '12px', 
+              padding: '8px', 
               borderRadius: '16px',
               border: '1px solid #cbd5e1',
               flexWrap: 'wrap',
@@ -5118,7 +5118,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
             {/* PAGINATION CONTROLS */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
                   Zeige {startIndex + 1} bis {Math.min(startIndex + studentPageSize, totalCount)} von {totalCount} gefilterten Schülern (Seite {safeCurrentPage} von {totalPages})
                 </span>
@@ -5374,7 +5374,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <button
                   type="submit"
                   className="google-btn-primary"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px' }}
                 >
                   Schüler anlegen
                 </button>
@@ -8268,7 +8268,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
                           return (
                             <div key={teacher.id} style={{
-                              padding: '12px',
+                              padding: '8px',
                               borderRadius: '16px',
                               border: '1px solid rgba(239, 68, 68, 0.1)',
                               background: 'rgba(239, 68, 68, 0.04)',
@@ -8358,7 +8358,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       }} style={{
                         background: 'rgba(245, 158, 11, 0.02)',
                         border: '1px dashed rgba(245, 158, 11, 0.2)',
-                        padding: '12px',
+                        padding: '8px',
                         borderRadius: '16px',
                         marginBottom: '12px',
                         display: 'flex',
@@ -10301,7 +10301,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div className="google-card" style={{ padding: '24px' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937' }}>📌 Wichtige Hinweise &amp; tägliche Aufgaben</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '12px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc' }}>
                         <span style={{ fontSize: '1.25rem' }}>📢</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1f2937' }}>Stundenplan-Reviews:</strong>
@@ -10309,7 +10309,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '12px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc' }}>
                         <span style={{ fontSize: '1.25rem' }}>🔑</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1f2937' }}>Lehrer-Bypass:</strong>
@@ -11374,7 +11374,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                               return (
                                 <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                                  <td style={{ padding: '12px', verticalAlign: 'top', background: draggedPlanId && !isCompatible ? '#fef2f2' : 'transparent', transition: 'background 0.25s' }}>
+                                  <td style={{ padding: '8px', verticalAlign: 'top', background: draggedPlanId && !isCompatible ? '#fef2f2' : 'transparent', transition: 'background 0.25s' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                       <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
                                         {room.name}
@@ -11512,7 +11512,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             required
                             value={adHocTeacherId}
                             onChange={(e) => setAdHocTeacherId(e.target.value)}
-                            style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
+                            style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
                           >
                             <option value="">— Bitte Lehrkraft wählen —</option>
                             {campusTeachers.map(t => (
@@ -11529,7 +11529,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             placeholder="z.B. Nachholstunde Max Muster, oder Freies Üben"
                             value={adHocStudentName}
                             onChange={(e) => setAdHocStudentName(e.target.value)}
-                            style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
+                            style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
                           />
                         </div>
 
@@ -11542,7 +11542,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               required
                               value={adHocStartTime}
                               onChange={(e) => setAdHocStartTime(e.target.value)}
-                              style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
+                              style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
                             />
                           </div>
 
@@ -11552,7 +11552,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <select
                               value={adHocDuration}
                               onChange={(e) => setAdHocDuration(Number(e.target.value))}
-                              style={{ padding: '12px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
+                              style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
                             >
                               <option value={30}>30 Minuten</option>
                               <option value={45}>45 Minuten</option>
@@ -11730,7 +11730,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     📅 Campus Kalender
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem', color: '#5f6368' }}>
-                    <div style={{ background: '#f6fbf7', border: '1px solid #e6f4ea', padding: '12px', borderRadius: '12px' }}>
+                    <div style={{ background: '#f6fbf7', border: '1px solid #e6f4ea', padding: '8px', borderRadius: '12px' }}>
                       <strong style={{ display: 'block', marginBottom: '4px', color: '#137333' }}>Heutiger Betrieb:</strong>
                       <span>Normaler Stundenplanbetrieb. Keine Störungen gemeldet. Sync-Frequenz auf "Täglich" eingestellt.</span>
                     </div>
@@ -12878,7 +12878,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           background: '#ffffff',
                           border: '1px solid rgba(0, 0, 0, 0.06)',
                           borderRadius: '14px',
-                          padding: '12px',
+                          padding: '8px',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'flex-start',
@@ -12915,7 +12915,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               background: '#ffffff',
                               border: '1px solid rgba(0, 0, 0, 0.06)',
                               borderRadius: '14px',
-                              padding: '12px',
+                              padding: '8px',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'flex-start',
@@ -12950,7 +12950,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           background: '#ffffff',
                           border: '1px solid rgba(0, 0, 0, 0.06)',
                           borderRadius: '14px',
-                          padding: '12px',
+                          padding: '8px',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'flex-start',
@@ -13002,7 +13002,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               background: '#ffffff',
                               border: '1px solid rgba(0, 0, 0, 0.06)',
                               borderRadius: '14px',
-                              padding: '12px',
+                              padding: '8px',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'flex-start',
@@ -13061,7 +13061,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{
                               background: 'rgba(255, 59, 48, 0.05)',
                               border: '1px solid rgba(255, 59, 48, 0.15)',
-                              padding: '12px',
+                              padding: '8px',
                               borderRadius: '12px',
                               display: 'flex',
                               flexDirection: 'column',
@@ -13170,7 +13170,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <span style={{ color: '#137333', fontWeight: 900 }}>OK ✓</span>
                     </div>
 
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', marginTop: '4px' }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: '12px', marginTop: '4px' }}>
                       <strong style={{ display: 'block', marginBottom: '4px', color: '#475569' }}>Sicherheits-Tipp:</strong>
                       <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.78rem' }}>
                         Regeneriere den Campus-Token bei personellen Änderungen im Kollegium, um unbefugten Zugriff auf Stundenpläne zu verhindern.
@@ -13229,7 +13229,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
                     <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#b45309' }}>📌 Daily Briefing &amp; Live-Status</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '1.25rem' }}>🟢</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Eingecheckte Schüler:</strong>
@@ -13241,7 +13241,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '1.25rem' }}>🔌</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Kiosk-Modus:</strong>
@@ -13251,7 +13251,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '1.25rem' }}>🔥 Holiday-Boost:</span>
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Ferien-XP:</strong>
@@ -13271,7 +13271,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       ⚡ GrooveLab-Betrieb
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem', color: '#64748b' }}>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px' }}>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: '12px' }}>
                         <strong style={{ display: 'block', marginBottom: '4px', color: '#b45309' }}>Betriebszustand:</strong>
                         <span>{isPaused ? '⏸️ Der Schulbetrieb ist aktuell pausiert.' : '✅ Normaler GrooveLab Live-Betrieb.'}</span>
                       </div>
@@ -13819,7 +13819,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       rows={5}
                       value={bulkTxtInput}
                       onChange={(e) => setBulkTxtInput(e.target.value)}
-                      style={{ padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontFamily: 'monospace', fontSize: '0.8rem' }}
+                      style={{ padding: '8px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontFamily: 'monospace', fontSize: '0.8rem' }}
                     />
                     <button type="submit" className="google-btn-primary" style={{ background: '#fbbc05', color: '#09090b', fontWeight: 900, alignSelf: 'flex-start' }}>Lehrer importieren</button>
                   </form>
@@ -13975,7 +13975,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       Kiosk Token regenerieren
                     </button>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '10px' }}>
                       <div>
                         <strong style={{ fontSize: '0.88rem', display: 'block', color: '#1e293b' }}>Chaträume freischalten</strong>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Ermöglicht Coaches den direkten Austausch mit Schülern.</span>
@@ -14206,7 +14206,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </label>
                               </div>
 
-                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: '#475569' }}>
+                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
                                   <strong>Team-Bereitstellung (Server & Service):</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2)} € (B2B).
@@ -15053,7 +15053,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       color: '#ffffff',
                                       border: 'none',
                                       borderRadius: '12px',
-                                      padding: '12px',
+                                      padding: '8px',
                                       fontSize: '0.8rem',
                                       fontWeight: 800,
                                       cursor: 'pointer',
@@ -15259,7 +15259,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </div>
 
                                 {extraUsersSliderVal > 0 && (
-                                  <div style={{ background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
+                                  <div style={{ background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
                                     <span style={{ fontWeight: 800, color: '#6b21a8' }}>Kosten für {extraUsersSliderVal} zusätzliche Schüler:</span>
                                     {(() => {
                                       const addB2B = schoolShareAdditional;
@@ -15754,7 +15754,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           onChange={e => setRoomCsvText(e.target.value)}
                           placeholder="z.B.&#10;Klavierzimmer;2;12&#10;Schlagzeugstudio;1;18&#10;Theorieraum;15;30"
                           rows={5}
-                          style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none', background: '#ffffff', resize: 'vertical' }}
+                          style={{ width: '100%', padding: '8px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none', background: '#ffffff', resize: 'vertical' }}
                         />
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button
@@ -15797,7 +15797,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     display: 'flex', 
                     gap: '12px', 
                     background: '#f8fafc', 
-                    padding: '12px', 
+                    padding: '8px', 
                     borderRadius: '16px',
                     border: '1px solid #cbd5e1',
                     flexWrap: 'wrap',
@@ -16647,7 +16647,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
                           color: 'white',
                           border: 'none',
-                          padding: '12px',
+                          padding: '8px',
                           borderRadius: '12px',
                           fontWeight: 800,
                           fontSize: '0.82rem',
@@ -17165,7 +17165,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <button
                           onClick={() => handleSaveRoomInstrumentEdit(editRoomInstFormName, editRoomInstFormModel)}
                           disabled={!editRoomInstFormName.trim()}
-                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Speichern
                         </button>
@@ -17342,7 +17342,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             paddingRight: '4px' 
                           }}>
                             {editGroupInstancesData.map((inst, idx) => (
-                              <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <div key={inst.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0b57d0' }}>{inst.fullName || `Exemplar #${idx + 1}`}</span>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b' }}>Name</span>
@@ -17388,7 +17388,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <button
                           onClick={handleSaveEquipmentGroup}
                           disabled={editGroupCoupled ? !editGroupName.trim() : editGroupInstancesData.some(inst => !inst.fullName.trim())}
-                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Speichern
                         </button>
@@ -17598,7 +17598,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
                 <button 
                   onClick={handleSaveBrandingAndCalendar}
                   className="google-btn-primary" 
@@ -18172,7 +18172,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               })()}
 
               {/* Permissions Switches */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Modulberechtigungen &amp; Status</label>
                 
                 {/* Campus Toggle */}
@@ -18552,11 +18552,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
 
               {/* Print Area */}
-              <div id="printable-invoice" style={{ padding: '40px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.5' }}>
+              <div id="printable-invoice" style={{ padding: '24px 30px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.35' }}>
                 {/* Invoice Meta */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div>
-                    <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.6rem', fontWeight: 900 }}>Campus-Groovelab</h2>
+                    <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
                     <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
@@ -18568,7 +18568,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Addresses */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', fontSize: '0.78rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px', fontSize: '0.72rem' }}>
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Rechnungsempfänger</span>
                     <strong style={{ color: '#0f172a', display: 'block' }}>{schoolName}</strong>
@@ -18586,7 +18586,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Dates */}
-                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '10px', fontSize: '0.75rem', marginBottom: '30px', border: '1px solid #f1f5f9' }}>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '8px', fontSize: '0.7rem', marginBottom: '16px', border: '1px solid #f1f5f9' }}>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
                     <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')}</strong>
@@ -18608,7 +18608,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
 
                 {/* Line Items Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '30px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', marginBottom: '16px' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
                       <th style={{ padding: '8px 0' }}>Position</th>
@@ -18620,31 +18620,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <tbody>
                     {/* Position 1: 100% Kostenlose Software Lizenz */}
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 0' }}>
+                      <td style={{ padding: '8px 0' }}>
                         <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
                         <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                         {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                      <td style={{ padding: '12px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
                     </tr>
 
                     {/* Position 2: Active Modules */}
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Module)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus / GrooveLab)</span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {mCost.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18653,17 +18653,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 3: Team-Members (excl. students) */}
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {(((allTeachers.length + employees.length) * 0.49) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18672,7 +18672,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 4: Schüler-Umlage (Schulanteil / Kofinanzierung) */}
                     {selectedInvoice.schoolStudentCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Kofinanzierung)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18681,13 +18681,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           0,25 €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolStudentCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18696,7 +18696,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 4b: Schüler-Monatsumlage (durch Schule an Campus-Groovelab bezahlt) */}
                     {selectedInvoice.schoolStudentLevy > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schülerumlage)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18705,13 +18705,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {(studentBillingOption === 'option2' ? 0.49 : 0.24).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolStudentLevy.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18720,7 +18720,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 5: Zusätzliche Schüler-Zugänge (Schule-Anteil) */}
                     {selectedInvoice.schoolExtraCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18729,13 +18729,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           0,25 €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18744,7 +18744,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 5b: Zusätzliche Schüler-Umlage (transit) */}
                     {selectedInvoice.extraLevyMonthly > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Umlage)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18753,13 +18753,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {(extraBillingOption === 'option3_1' ? 0.24 : 0.49).toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.extraLevyMonthly.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18768,7 +18768,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 6: Einmalzahlung Schüler */}
                     {selectedInvoice.einmalzahlung > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18777,13 +18777,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           1x
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18792,7 +18792,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {/* Position 6b: Einmalzahlung Zusätzliche Schüler */}
                     {selectedInvoice.extraEinmalzahlung > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px 0' }}>
+                        <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Jahrespauschale)</strong>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
@@ -18801,13 +18801,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           1x
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
-                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
@@ -18816,7 +18816,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </table>
 
                 {/* Total Calculation */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '12px' }}>
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     <div style={{ width: '240px' }}>
                       {schoolShareTotal > 0 && (
@@ -18843,7 +18843,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     
                     {/* Bank Details Block */}
                     <div style={{ 
-                      marginTop: '20px', 
+                      marginTop: '12px', 
                       padding: '12px 16px', 
                       background: '#f8fafc', 
                       borderRadius: '12px', 
