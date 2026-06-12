@@ -17952,11 +17952,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <span style={{ fontSize: '1.4rem' }}>📄</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit GrooveLab (Schul-Vereinbarung)</strong>
+                          <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
                           <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Vorbereitung</span>
                         </div>
                         <span style={{ display: 'block', marginTop: '4px' }}>
-                          Für den datenschutzkonformen Betrieb von GrooveLab ist der Abschluss eines Auftragsverarbeitungsvertrags (AVV) nach Art. 28 DSGVO zwischen deiner Musikschule und GrooveLab erforderlich. Die Vorlage wird freigeschaltet, sobald die Hoster-Vereinbarungen finalisiert sind.
+                          Für den datenschutzkonformen Betrieb von Campus-Groovelab ist der Abschluss eines Auftragsverarbeitungsvertrags (AVV) nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab erforderlich. Die Vorlage wird freigeschaltet, sobald die Hoster-Vereinbarungen finalisiert sind.
                         </span>
                       </div>
                     </div>
@@ -17981,7 +17981,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Zeichnung</span>
                         </div>
                         <span style={{ display: 'block', marginTop: '4px' }}>
-                          Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wird derzeit durch GrooveLab abgeschlossen.
+                          Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wird derzeit durch Campus-Groovelab abgeschlossen.
                         </span>
                       </div>
                     </div>
@@ -19625,7 +19625,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
-                <p style={{ margin: 0 }}>Unsere Anwendung wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wird ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) abgeschlossen (derzeit in Zeichnung), um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
+                <p style={{ margin: 0 }}>Campus-Groovelab wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wird ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) abgeschlossen (derzeit in Zeichnung), um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
           </div>
