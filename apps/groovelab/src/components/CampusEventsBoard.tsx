@@ -1841,25 +1841,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     borderRadius: '18px',
                     cursor: 'pointer',
                     background: isHolidayEvent 
-                      ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' 
+                      ? 'linear-gradient(135deg, #f0fdf41a 0%, #ffffff 100%)' 
                       : '#ffffff',
-                    border: hasFestInTitle
-                      ? '1.5px solid #f97316'
-                      : isKlassenvorspiel
-                        ? '1.5px solid #3b82f6'
-                        : isHolidayEvent 
-                          ? '1px solid #a7f3d0' 
-                          : '1px solid #e2e8f0',
+                    border: '1px solid rgba(0, 0, 0, 0.06)',
                     borderLeft: hasFestInTitle
-                      ? '6px solid #f97316'
+                      ? '5px solid #ff5e3a'
                       : isKlassenvorspiel
-                        ? '6px solid #3b82f6'
+                        ? '5px solid #3b82f6'
                         : `4px solid ${catColor}`,
-                    boxShadow: hasFestInTitle
-                      ? '0 6px 18px rgba(249, 115, 22, 0.08)'
-                      : isKlassenvorspiel
-                        ? '0 6px 18px rgba(59, 130, 246, 0.08)'
-                        : '0 4px 12px rgba(0,0,0,0.015)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.01)',
                     transition: 'all 0.2s ease',
                     position: 'relative'
                   }}
@@ -1869,10 +1859,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <span style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                        color: hasFestInTitle ? '#ea580c' : catColor,
-                        background: hasFestInTitle ? '#ffedd5' : catBg,
+                        fontSize: '0.68rem',
+                        fontWeight: 650,
+                        color: hasFestInTitle ? '#ff5e3a' : catColor,
+                        background: hasFestInTitle ? '#ff5e3a14' : `${catColor}14`,
                         padding: '3px 8px',
                         borderRadius: '6px',
                         textTransform: 'uppercase',
@@ -1883,10 +1873,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                       {hasFestInTitle && (
                         <span style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          color: '#ffffff',
-                          background: '#f97316',
+                          fontSize: '0.68rem',
+                          fontWeight: 650,
+                          color: '#ff5e3a',
+                          background: '#ff5e3a14',
                           padding: '3px 8px',
                           borderRadius: '6px',
                           textTransform: 'uppercase',
@@ -1900,10 +1890,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       )}
 
                       <span style={{
-                        fontSize: '0.6rem',
-                        fontWeight: 800,
-                        color: isSubscribed ? '#475569' : '#0369a1',
-                        background: isSubscribed ? '#f1f5f9' : '#e0f2fe',
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        color: '#6e6e73',
+                        background: '#f5f5f7',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         display: 'flex',
@@ -1946,15 +1936,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     <h4 style={{ 
                       margin: 0, 
                       fontSize: '0.98rem', 
-                      fontWeight: 800, 
-                      color: hasFestInTitle
-                        ? '#c2410c'
-                        : isHolidayEvent 
-                          ? '#065f46' 
-                          : isKlassenvorspiel
-                            ? '#1e40af'
-                            : '#0f172a', 
-                      fontFamily: 'Urbanist', 
+                      fontWeight: 700, 
+                      color: '#1d1d1f', 
+                      fontFamily: 'Urbanist, sans-serif', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'flex-start', 
@@ -1975,21 +1959,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     </h4>
                     <span style={{
                       fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: hasFestInTitle
-                        ? '#ea580c'
-                        : isHolidayEvent 
-                          ? '#047857' 
-                          : isKlassenvorspiel
-                            ? '#2563eb'
-                            : '#475569',
-                      background: hasFestInTitle
-                        ? '#ffedd5'
-                        : isHolidayEvent 
-                          ? '#d1fae5' 
-                          : isKlassenvorspiel
-                            ? '#dbeafe'
-                            : '#f1f5f9',
+                      fontWeight: 600,
+                      color: '#515154',
+                      background: '#f5f5f7',
                       padding: '4px 8px',
                       borderRadius: '8px',
                       whiteSpace: 'nowrap',
@@ -1999,7 +1971,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       marginTop: '2px',
                       flexShrink: 0
                     }}>
-                      <Calendar size={12} /> {ev.event_end_date && ev.event_end_date !== ev.event_date 
+                      <Calendar size={12} color="#86868b" /> {ev.event_end_date && ev.event_end_date !== ev.event_date 
                         ? `von ${formatDateGerman(ev.event_date)} - bis ${formatDateGerman(ev.event_end_date)}` 
                         : formatDateGerman(ev.event_date)}
                     </span>
@@ -2111,24 +2083,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     style={{
                       padding: '14px',
                       borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
                       borderLeft: `4px solid ${catColor}`,
                       background: '#ffffff',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.01)',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.01)',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-subtle"
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.58rem', fontWeight: 900, color: catColor, background: catBg, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 650, color: catColor, background: `${catColor}14`, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         {ev.category}
                       </span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6e6e73' }}>
                         {dateStr}
                       </span>
                     </div>
-                    <h4 style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', margin: '0 0 6px 0', lineHeight: 1.3 }}>
+                    <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1d1d1f', margin: '0 0 6px 0', lineHeight: 1.3 }}>
                       {ev.title}
                     </h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
@@ -2805,8 +2777,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         const ev = selectedEvent;
         const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
         const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
-        const catColor = hasFestInTitle ? '#f97316' : (ev.catColor || '#64748b');
-        const catBg = hasFestInTitle ? '#ffedd5' : (ev.catBg || '#f1f5f9');
+        const catColor = hasFestInTitle ? '#ff5e3a' : (ev.catColor || '#64748b');
+        const catBg = hasFestInTitle ? '#ff5e3a14' : (ev.catBg || '#f1f5f9');
         const isSubscribed = ev.is_subscribed;
         const canEditVisibility = (role === 'admin' || role === 'secretary') && !isSubscribed;
         const currentVisibility = ev.visibility || 'all';
@@ -2839,11 +2811,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
                 overflow: 'hidden',
                 fontFamily: 'Urbanist, sans-serif',
-                border: hasFestInTitle
-                  ? '2px solid #f97316'
-                  : isKlassenvorspiel
-                    ? '2px solid #3b82f6'
-                    : 'none'
+                border: '1px solid rgba(0, 0, 0, 0.08)'
               }}
             >
               {/* Color bar */}
@@ -2862,8 +2830,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   
                   {hasFestInTitle && (
                     <span style={{
-                      fontSize: '0.62rem', fontWeight: 900,
-                      color: '#ffffff', background: '#f97316',
+                      fontSize: '0.68rem', fontWeight: 650,
+                      color: '#ff5e3a', background: '#ff5e3a14',
                       padding: '4px 10px', borderRadius: '8px',
                       textTransform: 'uppercase', letterSpacing: '0.04em',
                       display: 'inline-flex', alignItems: 'center', gap: '2px'

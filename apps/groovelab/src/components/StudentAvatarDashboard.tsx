@@ -2790,7 +2790,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       
       // Fallback Mock Upgrade
-      alert("Stripe Checkout wird geladen... (Simulation: Upgrade auf Premium erfolgt jetzt)");
+      alert("Premium Upgrade wird geladen... (Simulation: Upgrade auf Premium erfolgt jetzt)");
       const { error } = await supabase
         .from('premium_status')
         .upsert({ student_id: studentId, is_premium_active: true });

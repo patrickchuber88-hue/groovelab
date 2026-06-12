@@ -298,6 +298,7 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
 
 
 const showMissionsFeature = false;
+const showEnsemblesFeature = false;
 
 // --- Band Name Generator Words ---
 const BAND_ADJECTIVES = [
@@ -1833,7 +1834,11 @@ function App() {
   const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab' | 'ensembles'>(() => {
     const isCampusDomain = typeof window !== 'undefined' && window.location.hostname.includes('campus');
     const defaultPlat = isCampusDomain ? 'campus' : 'groovelab';
-    return (localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
+    const saved = localStorage.getItem('groovelab_active_platform');
+    if (!showEnsemblesFeature && saved === 'ensembles') {
+      return defaultPlat;
+    }
+    return (saved as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
   });
   const setActivePlatform = React.useCallback((val: any) => {
     React.startTransition(() => {
@@ -6877,9 +6882,9 @@ function App() {
                   gap: '8px',
                   padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
-                  background: activePlatform === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.05)',
-                  color: activePlatform === 'groovelab' ? '#09090b' : '#b45309',
-                  border: activePlatform === 'groovelab' ? '1px solid #fbbc05' : '1px solid rgba(251, 188, 5, 0.18)',
+                  background: activePlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.05)',
+                  color: activePlatform === 'groovelab' ? '#09090b' : '#eab308',
+                  border: activePlatform === 'groovelab' ? '1px solid #facc15' : '1px solid rgba(250, 204, 21, 0.18)',
                   borderBottom: 'none',
                   fontWeight: 750,
                   fontSize: '0.82rem',
@@ -6888,52 +6893,54 @@ function App() {
                   cursor: 'pointer',
                   zIndex: activePlatform === 'groovelab' ? 2 : 1,
                   transform: activePlatform === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
-                  boxShadow: activePlatform === 'groovelab' ? '0 -4px 16px rgba(251, 188, 5, 0.18)' : 'none',
+                  boxShadow: activePlatform === 'groovelab' ? '0 -4px 16px rgba(250, 204, 21, 0.18)' : 'none',
                   transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                   height: '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
-                <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#b45309'} />
+                <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
                 <span>GrooveLab</span>
               </div>
             )}
 
             {/* Ensemble & Bands Tab */}
-            <div 
-              onClick={() => {
-                setActivePlatform('ensembles');
-                setActiveStudentTab('overview');
-                localStorage.setItem('ensembles_active_tab', 'overview');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
-                borderRadius: '12px 12px 0 0',
-                background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
-                color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
-                border: activePlatform === 'ensembles' ? '1px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.18)',
-                borderBottom: 'none',
-                fontWeight: 750,
-                fontSize: '0.82rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                cursor: 'pointer',
-                zIndex: activePlatform === 'ensembles' ? 2 : 1,
-                transform: activePlatform === 'ensembles' ? 'translateY(1px)' : 'translateY(0)',
-                boxShadow: activePlatform === 'ensembles' ? '0 -4px 16px rgba(59, 130, 246, 0.18)' : 'none',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                height: '44px',
-                boxSizing: 'border-box',
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}
-            >
-              <Users size={15} color={activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6'} />
-              <span>Ensembles & Bands</span>
-            </div>
+            {showEnsemblesFeature && (
+              <div 
+                onClick={() => {
+                  setActivePlatform('ensembles');
+                  setActiveStudentTab('overview');
+                  localStorage.setItem('ensembles_active_tab', 'overview');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
+                  borderRadius: '12px 12px 0 0',
+                  background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
+                  color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
+                  border: activePlatform === 'ensembles' ? '1px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.18)',
+                  borderBottom: 'none',
+                  fontWeight: 750,
+                  fontSize: '0.82rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                  zIndex: activePlatform === 'ensembles' ? 2 : 1,
+                  transform: activePlatform === 'ensembles' ? 'translateY(1px)' : 'translateY(0)',
+                  boxShadow: activePlatform === 'ensembles' ? '0 -4px 16px rgba(59, 130, 246, 0.18)' : 'none',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  height: '44px',
+                  boxSizing: 'border-box',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                }}
+              >
+                <Users size={15} color={activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6'} />
+                <span>Ensembles & Bands</span>
+              </div>
+            )}
           </div>
 
           <div style={{ 

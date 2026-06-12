@@ -106,7 +106,7 @@ export function BillingDashboard() {
       const paidInvoicesList = getPaidInvoices(schoolId);
       const isMarkedPaid = paidInvoicesList.includes(invId);
 
-      const status = isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Entwurf');
+      const status = isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
 
       list.push({
         id: invId,
@@ -536,9 +536,9 @@ export function BillingDashboard() {
                                       <span className="font-mono font-bold text-slate-700">{invoice.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      {invoice.status === 'Entwurf' && (
+                                      {invoice.status === 'Vorschau' && (
                                         <span className="text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
-                                          Entwurf (fällig am Monatsende)
+                                          Vorschau (fällig am Monatsende)
                                         </span>
                                       )}
                                       {invoice.status === 'Versendet' && (
