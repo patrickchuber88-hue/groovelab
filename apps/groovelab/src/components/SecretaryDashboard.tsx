@@ -1322,6 +1322,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return typeof window !== 'undefined' ? (localStorage.getItem('nextBillingOptionEffectiveAt') || '') : '';
   });
   const [showChangeTariffModal, setShowChangeTariffModal] = useState<boolean>(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+  const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -14180,8 +14182,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           {!isBillingBooked ? (
                             <button
                               onClick={() => {
-                                setIsBillingBooked(true);
-                                localStorage.setItem('isBillingBooked', 'true');
+                                setAgreedToSepa(false);
+                                setShowCheckoutModal(true);
                               }}
                               className="hover-scale font-bold"
                               style={{
@@ -15033,6 +15035,219 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         })()}
                       </div>
                     </div>
+
+                    {/* Modal for Checkout / Shopping Cart Review */}
+                    {showCheckoutModal && (
+                      <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                        padding: '20px'
+                      }}>
+                        <div style={{
+                          background: '#ffffff',
+                          borderRadius: '24px',
+                          width: '100%',
+                          maxWidth: '560px',
+                          padding: '28px',
+                          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                          border: '1px solid #f1f5f9',
+                          fontFamily: 'Inter',
+                          animation: 'scaleUp 0.2s ease-out',
+                          textAlign: 'left'
+                        }}>
+                          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 900, fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b21a8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                            Bestellvorgang &amp; Buchung abschließen
+                          </h3>
+                          <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 20px 0', lineHeight: '1.4' }}>
+                            Überprüfe deine Buchung und aktiviere das Abrechnungssystem für deine Musikschule.
+                          </p>
+
+                          {/* Warenkorb Liste */}
+                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warenkorb</span>
+                            
+                            {/* Position 1 */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.74rem' }}>
+                              <div>
+                                <strong style={{ color: '#0f172a', display: 'block' }}>Campus-Groovelab Musikschul-Software</strong>
+                                <span style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700 }}>Software-Nutzungslizenz</span>
+                              </div>
+                              <strong style={{ color: '#16a34a' }}>Kostenlos</strong>
+                            </div>
+
+                            <div style={{ height: '1px', background: '#e2e8f0' }} />
+
+                            {/* Position 2 */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.74rem' }}>
+                              <div>
+                                <strong style={{ color: '#0f172a', display: 'block' }}>Module &amp; Cloud-Infrastruktur</strong>
+                                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Campus &amp; GrooveLab</span>
+                              </div>
+                              <strong>{moduleCost.toFixed(2)} € / Mo.</strong>
+                            </div>
+
+                            <div style={{ height: '1px', background: '#e2e8f0' }} />
+
+                            {/* Position 3 */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.74rem' }}>
+                              <div>
+                                <strong style={{ color: '#0f172a', display: 'block' }}>Mitarbeiter &amp; Lehrer Team-Profile</strong>
+                                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
+                              </div>
+                              <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2)} € / Mo.</strong>
+                            </div>
+
+                            <div style={{ height: '1px', background: '#e2e8f0' }} />
+
+                            {/* Position 4: Schüler Modell */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.74rem' }}>
+                              <div>
+                                <strong style={{ color: '#0f172a', display: 'block' }}>
+                                  {studentBillingOption === 'option1' && 'Option 1: Jahrespauschale Schüler'}
+                                  {studentBillingOption === 'option2' && 'Option 2: Monatsumlage Schüler'}
+                                  {studentBillingOption === 'option3_1' && 'Option 3.1: Kofinanzierung (Monatlich)'}
+                                  {studentBillingOption === 'option3_2' && 'Option 3.2: Kofinanzierung (Jährlich)'}
+                                </strong>
+                                <span style={{ fontSize: '0.65rem', color: '#6b21a8', fontWeight: 600 }}>
+                                  {studentBillingOption === 'option1' && `${students.length} Schüler × 5,29 € / Jahr`}
+                                  {studentBillingOption === 'option2' && `${students.length} Schüler × 0,49 € / Mo.`}
+                                  {studentBillingOption === 'option3_1' && `Schüler zahlt 0,24 € / Mo. & Schule kofinanziert 0,25 € / Mo.`}
+                                  {studentBillingOption === 'option3_2' && `Schüler zahlt einmalig 2,59 € / Jahr & Schule kofinanziert 0,25 € / Mo.`}
+                                </span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                {studentBillingOption === 'option1' && (
+                                  <strong style={{ color: '#6b21a8' }}>{(students.length * 5.29).toFixed(2)} € / Jahr</strong>
+                                )}
+                                {studentBillingOption === 'option2' && (
+                                  <strong style={{ color: '#6b21a8' }}>{(students.length * 0.49).toFixed(2)} € / Mo.</strong>
+                                )}
+                                {studentBillingOption === 'option3_1' && (
+                                  <>
+                                    <strong style={{ display: 'block', color: '#6b21a8' }}>{(students.length * 0.24).toFixed(2)} € / Mo. (B2C)</strong>
+                                    <span style={{ fontSize: '0.65rem', color: '#0369a1' }}>Schule: {(students.length * 0.25).toFixed(2)} € / Mo.</span>
+                                  </>
+                                )}
+                                {studentBillingOption === 'option3_2' && (
+                                  <>
+                                    <strong style={{ display: 'block', color: '#6b21a8' }}>{(students.length * 2.59).toFixed(2)} € / Jahr (B2C)</strong>
+                                    <span style={{ fontSize: '0.65rem', color: '#0369a1' }}>Schule: {(students.length * 0.25).toFixed(2)} € / Mo.</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Rechnungsaufstellung / Lastschrift-Zusammenfassung */}
+                          <div style={{ padding: '0 8px 20px 8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#475569' }}>
+                              <span>Monatliche Lastschrift Schule (B2B):</span>
+                              <strong>{currentTotalB2B.toFixed(2)} € / Mo.</strong>
+                            </div>
+                            
+                            {(studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
+                                <span>Monatlicher Lastschrifteinzug Schüler (B2C):</span>
+                                <strong>{studentLevyMonthly.toFixed(2)} € / Mo.</strong>
+                              </div>
+                            )}
+
+                            {(studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
+                                <span>Einmalige Umlage Schüler (B2C):</span>
+                                <strong>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} € einmalig</strong>
+                              </div>
+                            )}
+
+                            <div style={{ height: '1px', background: '#cbd5e1', margin: '8px 0' }} />
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
+                              <span style={{ fontWeight: 800 }}>Gesamter Bankeinzug (Mischpreis):</span>
+                              <strong style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: 900 }}>{mixedTotal.toFixed(2)} € / Mo.</strong>
+                            </div>
+                          </div>
+
+                          {/* SEPA & Terms Checkbox */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: agreedToSepa ? '#f0fdf4' : '#f8fafc',
+                            border: agreedToSepa ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                            cursor: 'pointer',
+                            marginBottom: '24px',
+                            transition: 'all 0.15s'
+                          }}>
+                            <input 
+                              type="checkbox"
+                              checked={agreedToSepa}
+                              onChange={(e) => setAgreedToSepa(e.target.checked)}
+                              style={{ width: '16px', height: '16px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.72rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
+                              Ich stimme der monatlichen Abrechnung per SEPA-Lastschrift für die Schule (B2B) und dem Einzug der Schülerumlage (B2C) zu. Die Buchung ist für das laufende Schuljahr bindend.
+                            </span>
+                          </label>
+
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button 
+                              onClick={() => setShowCheckoutModal(false)}
+                              style={{
+                                padding: '10px 18px',
+                                borderRadius: '12px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                fontSize: '0.78rem',
+                                fontWeight: 750,
+                                cursor: 'pointer',
+                                color: '#475569'
+                              }}
+                            >
+                              Abbrechen
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setIsBillingBooked(true);
+                                localStorage.setItem('isBillingBooked', 'true');
+                                setShowCheckoutModal(false);
+                              }}
+                              disabled={!agreedToSepa}
+                              style={{
+                                padding: '10px 18px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                background: agreedToSepa ? '#6b21a8' : '#cbd5e1',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: agreedToSepa ? 'pointer' : 'not-allowed',
+                                color: agreedToSepa ? '#ffffff' : '#94a3b8',
+                                boxShadow: agreedToSepa ? '0 4px 12px rgba(107, 33, 168, 0.2)' : 'none',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              Zahlungspflichtig einbuchen
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                   </>
                 );
