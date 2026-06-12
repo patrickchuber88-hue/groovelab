@@ -14461,7 +14461,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   <><strong>Preisvergleich:</strong> Die Jahrespauschale ist <strong>günstiger als ein Gitarren-Plektrum Set</strong>.</>
                                 )}
                                 {studentBillingOption === 'option2' && (
-                                  <><strong>Preisvergleich:</strong> Die Monatsumlage ist <strong>günstiger als das Porto für eine einzige Briefmarke (0,85 €)</strong>.</>
+                                  <><strong>Preisvergleich:</strong> Die Monatsumlage ist <strong>günstiger als das Porto für eine Briefmarke</strong>.</>
                                 )}
                                 {studentBillingOption === 'option3_1' && (
                                   <><strong>Preisvergleich:</strong> Die monatliche Kofinanzierung ist <strong>günstiger als ein einfaches Brötchen beim Bäcker</strong>.</>
