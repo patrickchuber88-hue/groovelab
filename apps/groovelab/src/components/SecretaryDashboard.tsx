@@ -17818,7 +17818,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Sicherheit &amp; Kiosk-Einstellungen</h3>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Kiosk-Optionen, PIN-Sicherheit und Systemhärtebremsen.</p>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Kiosk-Optionen und PIN-Sicherheit.</p>
                   </div>
 
                   {/* Kiosk-PIN settings */}
@@ -17867,55 +17867,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   </div>
 
-                  {/* Auto Logout & Limits */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Auto Logout */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Kiosk Auto-Abmeldung</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Automatischer Logout des Lehrers bei Inaktivität.</span>
-                      </div>
-                      <select 
-                        value={kioskAutoLogout} 
-                        onChange={(e) => setKioskAutoLogout(parseInt(e.target.value))} 
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700 }}
-                      >
-                        <option value={1}>Nach 1 Minute</option>
-                        <option value={5}>Nach 5 Minuten</option>
-                        <option value={10}>Nach 10 Minuten</option>
-                        <option value={30}>Nach 30 Minuten</option>
-                      </select>
-                    </div>
 
-                    {/* Hard Limit / Härtebremse */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Limits Härtebremse aktivieren</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Prüft Stundenpläne automatisch gegen die Raum- &amp; Auslastungslimits.</span>
-                      </div>
-                      {/* iOS-Style Switch */}
-                      <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={limitsEnabled}
-                          onChange={(e) => handleToggleLimitsEnabled(e.target.checked)}
-                          style={{ opacity: 0, width: 0, height: 0 }}
-                        />
-                        <span style={{
-                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-                          backgroundColor: limitsEnabled ? '#34c759' : '#e5e5ea',
-                          transition: '.2s', borderRadius: '24px'
-                        }}>
-                          <span style={{
-                            position: 'absolute', content: '""', height: '20px', width: '20px', left: '2px', bottom: '2px',
-                            backgroundColor: 'white', transition: '.2s', borderRadius: '50%',
-                            transform: limitsEnabled ? 'translateX(20px)' : 'none',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
-                          }} />
-                        </span>
-                      </label>
-                    </div>
-                  </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                     <button 
