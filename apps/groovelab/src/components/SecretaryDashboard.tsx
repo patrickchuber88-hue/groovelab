@@ -14805,24 +14805,51 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <div style={{ background: '#f8fafc', border: '2px solid #6b21a8', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gesamt-Abrechnung (B2B-Lastschrift)</span>
                             
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
-                                <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{currentTotalB2B.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                              </div>
+                            {(() => {
+                              const standardB2B = baseB2B + studentSharePreview;
+                              const standardB2C = isAnnual ? (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)) : studentLevyMonthly;
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
+                                    <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{standardB2B.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                  </div>
 
-                              {isAnnual ? (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schülerumlage (1. Monatsrechnung):</span>
-                                  <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
+                                      {isAnnual ? 'Schülerumlage (1. Monatsrechnung):' : 'Schülerumlage (monatlich):'}
+                                    </span>
+                                    <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>
+                                      {standardB2C.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>{isAnnual ? '/ Jahr' : '/ Mo.'}</span>
+                                    </strong>
+                                  </div>
+
+                                  {bookedExtraUsers > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 800 }}>Zusätzliche Schüler ({bookedExtraUsers} gebucht):</span>
+                                      {schoolShareBookedExtra > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (B2B):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>{schoolShareBookedExtra.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                        </div>
+                                      )}
+                                      {extraLevyMonthly > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{extraLevyMonthly.toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                        </div>
+                                      )}
+                                      {(extraBillingOption === 'option1' || extraBillingOption === 'option3_2') && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schüler (B2C Umlage):</span>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? 5.29 : 2.59) * bookedExtraUsers).toFixed(2)} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              ) : (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schülerumlage (monatlich berechnet):</span>
-                                  <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>{studentLevyMonthly.toFixed(2)} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                                </div>
-                              )}
-                            </div>
+                              );
+                            })()}
 
                             <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 'auto' }}>
                               <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Einzug vom Musikschulkonto (Gesamt):</span>
@@ -14855,33 +14882,58 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '0.68rem', color: '#6b21a8', fontWeight: 700 }}>Zusätzliche Schüler hinzufügen (max. 500):</span>
                               
                               <style>{`
+                                .custom-range-slider {
+                                  -webkit-appearance: none;
+                                  appearance: none;
+                                  width: 100%;
+                                  height: 32px;
+                                  background: transparent;
+                                  margin: 0;
+                                  padding: 0;
+                                  outline: none;
+                                }
+                                .custom-range-slider::-webkit-slider-runnable-track {
+                                  width: 100%;
+                                  height: 6px;
+                                  cursor: pointer;
+                                  background: var(--track-background);
+                                  border-radius: 100px;
+                                }
+                                .custom-range-slider::-moz-range-track {
+                                  width: 100%;
+                                  height: 6px;
+                                  cursor: pointer;
+                                  background: var(--track-background);
+                                  border-radius: 100px;
+                                }
                                 .custom-range-slider::-webkit-slider-thumb {
                                   -webkit-appearance: none;
                                   appearance: none;
-                                  width: 16px;
-                                  height: 16px;
+                                  width: 28px;
+                                  height: 28px;
                                   border-radius: 50%;
                                   background: #7c3aed;
                                   cursor: pointer;
-                                  border: 2px solid #ffffff;
-                                  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+                                  border: 3px solid #ffffff;
+                                  box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
                                   transition: transform 0.15s;
+                                  margin-top: -11px; /* Centering mathematically: (6px track / 2) - (28px thumb / 2) */
                                 }
                                 .custom-range-slider::-webkit-slider-thumb:hover {
-                                  transform: scale(1.25);
+                                  transform: scale(1.15);
                                 }
                                 .custom-range-slider::-moz-range-thumb {
-                                  width: 16px;
-                                  height: 16px;
+                                  width: 28px;
+                                  height: 28px;
                                   border-radius: 50%;
                                   background: #7c3aed;
                                   cursor: pointer;
-                                  border: 2px solid #ffffff;
-                                  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+                                  border: 3px solid #ffffff;
+                                  box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
                                   transition: transform 0.15s;
                                 }
                                 .custom-range-slider::-moz-range-thumb:hover {
-                                  transform: scale(1.25);
+                                  transform: scale(1.15);
                                 }
                               `}</style>
 
@@ -14921,21 +14973,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
                                         className="custom-range-slider"
                                         style={{
-                                          width: '100%',
-                                          WebkitAppearance: 'none',
-                                          appearance: 'none',
-                                          height: '20px',
-                                          borderRadius: '100px',
-                                          outline: 'none',
-                                          background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`,
-                                          backgroundSize: '100% 6px',
-                                          backgroundRepeat: 'no-repeat',
-                                          backgroundPosition: 'center',
-                                          cursor: 'pointer',
-                                          transition: 'background 0.1s',
-                                          margin: '0',
-                                          padding: '0'
-                                        }} 
+                                          '--track-background': `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`
+                                        } as React.CSSProperties}
                                       />
                                     );
                                   })()}
