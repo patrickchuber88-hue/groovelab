@@ -14929,6 +14929,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
                                     )}
                                   </span>
+                                  {(isAnnual || isAnnualAdditional) && (
+                                    <span style={{ display: 'inline-block', marginTop: '10px', fontSize: '0.65rem', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '5px 10px', lineHeight: '1.5', fontWeight: 600 }}>
+                                      📋 Wird mit der <strong>1. Monatsrechnung</strong> der Schule fällig
+                                    </span>
+                                  )}
                                 </>
                               );
                             })()}
@@ -14958,7 +14963,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             return 0; // option1: 0 € for school
                           })();
 
+                          // Annual one-time student fee (Einmalzahlung) – billed to school with first invoice
+                          const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                          const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
+                          const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
+
                           const currentMonthSchoolTotal = baseB2B + schoolStudentCost + schoolExtraCost;
+                          const firstMonthTotal = currentMonthSchoolTotal + einmalzahlungTotal;
                           const annualSchoolTotal = currentMonthSchoolTotal * 12;
 
                           const recipientDetails = {
@@ -14976,71 +14987,46 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               b2b: baseB2B, 
                               schoolStudentCost: schoolStudentCost, 
                               schoolExtraCost: schoolExtraCost,
-                              amount: currentMonthSchoolTotal, 
+                              einmalzahlung: einmalzahlungTotal,
+                              amount: firstMonthTotal, 
                               status: 'Entwurf',
                               recipient: recipientDetails,
                               isCurrentMonth: true
                             },
-                            { 
-                              id: 'RE-2026-0001', 
-                              year: '2026',
-                              date: '01. Jan. 2026', 
-                              b2b: baseB2B * 12, 
-                              schoolStudentCost: schoolStudentCost * 12, 
-                              schoolExtraCost: schoolExtraCost * 12,
-                              amount: annualSchoolTotal, 
-                              status: isBillingBooked ? 'Bezahlt' : 'Entwurf',
-                              recipient: recipientDetails
-                            },
-                            { 
-                              id: 'RE-2025-0001', 
-                              year: '2025',
-                              date: '01. Jan. 2025', 
-                              b2b: 920.50, 
-                              schoolStudentCost: 0, 
-                              schoolExtraCost: 0,
-                              amount: 920.50, 
-                              status: 'Bezahlt',
-                              recipient: recipientDetails
-                            },
-                            { 
-                              id: 'RE-2024-0001', 
-                              year: '2024',
-                              date: '01. Jan. 2024', 
-                              b2b: 830.00, 
-                              schoolStudentCost: 0, 
-                              schoolExtraCost: 0,
-                              amount: 830.00, 
-                              status: 'Bezahlt',
-                              recipient: recipientDetails
-                            }
                           ];
 
                           return invoiceList.map((inv) => (
-                            <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid #f1f5f9', background: '#ffffff', fontSize: '0.82rem', fontFamily: 'Inter' }}>
-                              <div>
-                                <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                                  Abrechnungszeitraum: {inv.year} | Netto: {(inv.amount / 1.19).toFixed(2).replace('.', ',')} € | Zzgl. 19% MwSt.: {(inv.amount - (inv.amount / 1.19)).toFixed(2).replace('.', ',')} €
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-                                <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{inv.amount.toFixed(2).replace('.', ',')} €</strong>
-                                <span style={{ 
-                                  fontSize: '0.7rem', 
-                                  background: inv.status === 'Bezahlt' ? '#d1fae5' : '#fef3c7', 
-                                  color: inv.status === 'Bezahlt' ? '#065f46' : '#b45309', 
-                                  padding: '6px 14px', 
-                                  borderRadius: '100px', 
-                                  fontWeight: 800 
-                                }}>{inv.status}</span>
-                                <button 
-                                  onClick={() => setSelectedInvoice(inv)} 
-                                  className="hover-scale font-bold"
-                                  style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                                >
-                                  PDF
-                                </button>
+                            <div key={inv.id} style={{ borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', fontSize: '0.82rem', fontFamily: 'Inter' }}>
+                                <div>
+                                  <strong style={{ display: 'block', color: '#0f172a', fontWeight: 650, fontSize: '0.88rem' }}>Rechnung {inv.id} ({inv.year})</strong>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                                    Abrechnungszeitraum: {inv.year} | Netto: {(inv.amount / 1.19).toFixed(2).replace('.', ',')} € | Zzgl. 19% MwSt.: {(inv.amount - (inv.amount / 1.19)).toFixed(2).replace('.', ',')} €
+                                  </span>
+                                  {inv.einmalzahlung > 0 && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '5px', fontSize: '0.68rem', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', padding: '3px 8px', fontWeight: 700 }}>
+                                      📋 inkl. Einmalzahlung Schüler: {inv.einmalzahlung.toFixed(2).replace('.', ',')} €
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                                  <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{inv.amount.toFixed(2).replace('.', ',')} €</strong>
+                                  <span style={{ 
+                                    fontSize: '0.7rem', 
+                                    background: inv.status === 'Bezahlt' ? '#d1fae5' : '#fef3c7', 
+                                    color: inv.status === 'Bezahlt' ? '#065f46' : '#b45309', 
+                                    padding: '6px 14px', 
+                                    borderRadius: '100px', 
+                                    fontWeight: 800 
+                                  }}>{inv.status}</span>
+                                  <button 
+                                    onClick={() => setSelectedInvoice(inv)} 
+                                    className="hover-scale font-bold"
+                                    style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                                  >
+                                    PDF
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ));
@@ -18206,6 +18192,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 6: Einmalzahlung Schüler */}
+                    {selectedInvoice.einmalzahlung > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Einmalzahlung Schüler</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern erstattet)
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          1x
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
