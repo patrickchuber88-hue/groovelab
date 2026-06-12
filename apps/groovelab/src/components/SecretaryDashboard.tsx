@@ -18447,6 +18447,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             zIndex: 99999,
             padding: '20px'
           }}>
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden !important;
+                }
+                #printable-invoice, #printable-invoice * {
+                  visibility: visible !important;
+                }
+                #printable-invoice {
+                  position: absolute !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                }
+                html, body {
+                  height: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: #fff !important;
+                  overflow: hidden !important;
+                }
+                @page {
+                  size: A4 portrait;
+                  margin: 10mm;
+                }
+              }
+            `}</style>
             <div style={{
               background: '#ffffff',
               borderRadius: '24px',
