@@ -1326,6 +1326,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [checkoutStep, setCheckoutStep] = useState<number>(1);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isCancelled, setIsCancelled] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('isCancelled') === 'true';
+  });
+  const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
@@ -14273,6 +14277,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   onClick={() => {
                                     setIsBillingBooked(true);
                                     localStorage.setItem('isBillingBooked', 'true');
+                                    setIsCancelled(false);
+                                    localStorage.removeItem('isCancelled');
                                     setCheckoutStep(1);
                                   }}
                                   disabled={!agreedToSepa}
@@ -14479,19 +14485,85 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         
                         {/* Active Booking Banner */}
                         <div style={{
-                          background: 'linear-gradient(90deg, #f0fdf4 0%, #dcfce7 100%)',
-                          border: '1px solid #bbf7d0',
+                          background: isCancelled 
+                            ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' 
+                            : 'linear-gradient(90deg, #f0fdf4 0%, #dcfce7 100%)',
+                          border: isCancelled ? '1px solid #fde68a' : '1px solid #bbf7d0',
                           borderRadius: '20px',
                           padding: '20px 24px',
                           display: 'flex',
                           alignItems: 'center',
+                          justifyContent: 'space-between',
                           gap: '16px',
                           boxShadow: '0 4px 16px rgba(22, 163, 74, 0.04)'
                         }}>
-                          <div style={{ background: '#16a34a', color: '#ffffff', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 900 }}>✓</div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#14532d', fontFamily: 'Urbanist' }}>Abrechnungssystem für das Schuljahr 2026/2027 active</h4>
-                            <span style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600 }}>Alle Module und Schüler-Umlagen sind verbindlich eingerichtet und aktiv gebucht.</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                            <div style={{ 
+                              background: isCancelled ? '#d97706' : '#16a34a', 
+                              color: '#ffffff', 
+                              width: '38px', 
+                              height: '38px', 
+                              borderRadius: '50%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '1.25rem', 
+                              fontWeight: 900 
+                            }}>{isCancelled ? '!' : '✓'}</div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: isCancelled ? '#78350f' : '#14532d', fontFamily: 'Urbanist' }}>
+                                {isCancelled 
+                                  ? 'Abonnement gekündigt zum 31.08.2027' 
+                                  : 'Abrechnungssystem für das Schuljahr 2026/2027 aktiv'}
+                              </h4>
+                              <span style={{ fontSize: '0.74rem', color: isCancelled ? '#b45309' : '#15803d', fontWeight: 600 }}>
+                                {isCancelled 
+                                  ? 'Dein Zugang bleibt bis zum Ende des Schuljahres am 31. August 2027 aktiv. Es erfolgen danach keine weiteren Abbuchungen.'
+                                  : 'Alle Module und Schüler-Umlagen sind verbindlich eingerichtet und aktiv gebucht.'}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {!isCancelled ? (
+                              <button
+                                onClick={() => setShowCancelModal(true)}
+                                className="hover-scale"
+                                style={{
+                                  background: '#ffffff',
+                                  color: '#ef4444',
+                                  border: '1px solid #fca5a5',
+                                  borderRadius: '10px',
+                                  padding: '8px 16px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Abo kündigen
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setIsCancelled(false);
+                                  localStorage.removeItem('isCancelled');
+                                }}
+                                className="hover-scale"
+                                style={{
+                                  background: '#16a34a',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '10px',
+                                  padding: '8px 16px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Reaktivieren
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -17962,6 +18034,97 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
         );
       })()}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.5)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            border: '1px solid #e2e8f0',
+            fontFamily: 'Inter',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            animation: 'scaleUp 0.15s ease-out'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+              Abonnement kündigen?
+            </h3>
+            
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: '1.5' }}>
+              Möchtest du das Abrechnungssystem für **Campus-Groovelab** wirklich kündigen?
+            </p>
+            
+            <div style={{ 
+              background: '#fffbeb', 
+              border: '1px solid #fde68a', 
+              borderRadius: '12px', 
+              padding: '12px 14px', 
+              fontSize: '0.74rem', 
+              color: '#b45309',
+              lineHeight: '1.4'
+            }}>
+              <strong>Info zum Schuljahresende:</strong> Da Buchungen für das laufende Schuljahr bindend sind, wird deine Kündigung zum nächstmöglichen Termin am <strong>31. August 2027</strong> wirksam. Bis dahin steht dir die Plattform wie gewohnt in vollem Umfang zur Verfügung.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  background: '#ffffff',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '10px 18px',
+                  fontSize: '0.78rem',
+                  fontWeight: 750,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => {
+                  setIsCancelled(true);
+                  localStorage.setItem('isCancelled', 'true');
+                  setShowCancelModal(false);
+                }}
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 18px',
+                  fontSize: '0.78rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                }}
+              >
+                Vertrag kündigen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
   );
