@@ -14866,7 +14866,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   border: 2px solid #ffffff;
                                   box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
                                   transition: transform 0.15s;
-                                  margin-top: -5px;
                                 }
                                 .custom-range-slider::-webkit-slider-thumb:hover {
                                   transform: scale(1.25);
@@ -14925,10 +14924,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                           width: '100%',
                                           WebkitAppearance: 'none',
                                           appearance: 'none',
-                                          height: '6px',
+                                          height: '20px',
                                           borderRadius: '100px',
                                           outline: 'none',
                                           background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`,
+                                          backgroundSize: '100% 6px',
+                                          backgroundRepeat: 'no-repeat',
+                                          backgroundPosition: 'center',
                                           cursor: 'pointer',
                                           transition: 'background 0.1s',
                                           margin: '0',
