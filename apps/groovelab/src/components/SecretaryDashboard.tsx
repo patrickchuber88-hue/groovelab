@@ -14249,7 +14249,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   style={{ width: '18px', height: '18px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
                                 />
                                 <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
-                                  <strong>SEPA-Lastschriftmandat:</strong> Ich stimme der monatlichen Abrechnung der fälligen Beträge (Schulanteil sowie ggf. Schülerumlagen) per SEPA-Lastschrift für die Musikschule zu. Die Buchung ist für das laufende Schuljahr bindend.
+                                  <strong>SEPA-Lastschriftmandat:</strong> Ich ermächtige die Simplified Work GbR (Gläubiger-ID: DE88ZZZ00002839481) zum Lastschrifteinzug und weise mein Kreditinstitut an, diese einzulösen. Die Buchung ist für das laufende Schuljahr bindend. (Mandatsreferenz: MS-{schoolZipCode || 'REF'}-2026, Fälligkeit: Monatsende).
                                 </span>
                               </label>
 
@@ -14418,6 +14418,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {checkoutStep >= 2 ? mixedTotal.toFixed(2) : baseB2B.toFixed(2)} € / Mo.
                                 </strong>
                               </div>
+                              <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
+                                Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
+                              </span>
 
                               {checkoutStep >= 2 && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
                                 <div style={{ 
@@ -18025,18 +18028,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                 {/* Total Calculation */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
-                  <div style={{ width: '240px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span>Netto-Summe:</span>
-                      <strong>{(selectedInvoice.amount / 1.19).toFixed(2).replace('.', ',')} €</strong>
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <div style={{ width: '240px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
+                        <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
+                        <strong style={{ fontWeight: 900, color: '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#64748b' }}>
-                      <span>Zzgl. 19% MwSt.:</span>
-                      <span>{(selectedInvoice.amount - (selectedInvoice.amount / 1.19)).toFixed(2).replace('.', ',')} €</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '0.92rem', color: '#0f172a' }}>
-                      <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
-                      <strong style={{ fontWeight: 900, color: '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
+                      Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
                     </div>
                   </div>
                 </div>
@@ -18093,7 +18093,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               color: '#b45309',
               lineHeight: '1.4'
             }}>
-              <strong>Info zum Schuljahresende:</strong> Da Buchungen für das laufende Schuljahr bindend sind, wird deine Kündigung zum nächstmöglichen Termin am <strong>31. August 2026</strong> wirksam. Bis dahin steht dir die Plattform wie gewohnt in vollem Umfang zur Verfügung.
+              <strong>Info zur Kündigungsfrist:</strong> Die Kündigung muss mit einer Frist von 1 Monat zum Schuljahresende (31.08.) eingereicht werden. Da das aktuelle Schuljahr am 31. August 2026 endet, wird diese Kündigung wirksam zum <strong>31. August 2026</strong>. Bis dahin bleibt dein Zugang voll aktiv.
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
