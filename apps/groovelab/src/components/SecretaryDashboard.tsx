@@ -17920,7 +17920,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.b2b > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Mitarbeiter &amp; Lehrer Team-Profile</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
@@ -17939,7 +17939,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.schoolStudentCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Umlage (Schulanteil / Kofinanzierung)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Kofinanzierung)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             {students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
                           </span>
@@ -17960,7 +17960,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.schoolStudentLevy > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Monatsumlage (Sammelrechnung)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schülerumlage)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             {students.length} Schüler (Umlagesatz = {studentBillingOption === 'option2' ? '0,49' : '0,24'} € / Mo.)
                           </span>
@@ -17981,7 +17981,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.schoolExtraCost > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Zusätzliche Schüler-Zugänge (Schule-Anteil)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             {extraBillingOption === 'option2'
                               ? `${bookedExtraUsers} Extra-Schüler (Schule zahlt 100% = 0,49 €)`
@@ -18004,7 +18004,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {selectedInvoice.einmalzahlung > 0 && (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Einmalzahlung Schüler</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern erstattet)
                           </span>
