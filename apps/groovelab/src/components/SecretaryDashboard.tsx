@@ -1000,6 +1000,39 @@ const parseRoomName = (name: string) => {
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
   const [showAgb, setShowAgb] = useState<boolean>(false);
   const [showPrivacy, setShowPrivacy] = useState<boolean>(false);
+
+  // Operator Billing Info States (Loaded from MasterAdmin Settings)
+  const [operatorCompany, setOperatorCompany] = useState('Simplified Work GbR');
+  const [operatorContact, setOperatorContact] = useState('Patrick Huber');
+  const [operatorStreet, setOperatorStreet] = useState('Karl-Fürstenberg-Str. 59');
+  const [operatorZip, setOperatorZip] = useState('79618');
+  const [operatorCity, setOperatorCity] = useState('Rheinfelden');
+  const [operatorIban, setOperatorIban] = useState('DE89 3704 0044 0532 9482 11');
+  const [operatorBic, setOperatorBic] = useState('WELADED1XYZ');
+
+  useEffect(() => {
+    const fetchOperatorBillingSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('master_billing_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+        if (data) {
+          if (data.company_name) setOperatorCompany(data.company_name);
+          if (data.contact_person) setOperatorContact(data.contact_person);
+          if (data.street) setOperatorStreet(data.street);
+          if (data.zip_code) setOperatorZip(data.zip_code);
+          if (data.city) setOperatorCity(data.city);
+          if (data.iban) setOperatorIban(data.iban);
+          if (data.bic) setOperatorBic(data.bic);
+        }
+      } catch (err) {
+        console.error("Error fetching operator billing settings:", err);
+      }
+    };
+    fetchOperatorBillingSettings();
+  }, []);
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
     const saved = localStorage.getItem('groovelab_active_workspace');
@@ -14772,7 +14805,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 fontWeight: 700,
                                 fontSize: '0.62rem'
                               }}>
-                                <span>🛡️ 100% DSGVO-konform auf deutschen Servern</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <ShieldCheck size={12} style={{ color: '#15803d' }} />
+                                  100% DSGVO-konform auf deutschen Servern
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -14812,7 +14848,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                           {/* Card 3: Polished Cost Overview */}
                           <div style={{ background: '#f8fafc', border: '2px solid #6b21a8', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gesamt-Abrechnung (B2B-Lastschrift)</span>
+                            <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gesamt-Abrechnung (Rechnung)</span>
                             
                             {(() => {
                               const standardB2B = baseB2B + studentSharePreview;
@@ -14885,7 +14921,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             })()}
 
                             <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 'auto' }}>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Einzug vom Musikschulkonto (Gesamt):</span>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Monatsrate (Gesamt):</span>
                               {extraUsersSliderVal > 0 ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ fontSize: '0.88rem', color: '#64748b', textDecoration: 'line-through' }}>{mixedTotal.toFixed(2)} €</span>
@@ -15268,7 +15304,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
                                 const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
                                 const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
-                                const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal;
+                                
+                                const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
+                                const extraAnnualPrice = extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0;
+                                const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
+
+                                const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal + extraEinmalzahlungTotal;
 
                                 // Helper function to get last day of month as string
                                 const getLastDayOfMonth = (monthName: string, yearVal: string) => {
@@ -15314,30 +15355,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
                                   const isCreated = systemDate.getTime() >= creationTime.getTime();
                                   
+                                  const dueDateObj = new Date(y, m - 1, lastDay);
+                                  dueDateObj.setDate(dueDateObj.getDate() + 14);
+                                  const dueDay = dueDateObj.getDate();
+                                  const dueMonthName = deMonths[dueDateObj.getMonth() + 1];
+                                  const dueYear = dueDateObj.getFullYear();
+                                  const dueDateStr = `${dueDay}. ${dueMonthName} ${dueYear}`;
+
                                   const status = isCreated ? 'Bezahlt' : 'Entwurf';
                                   const paid = isCreated;
 
                                   // Calculate B2B and student shares dynamically
                                   const b2bAmount = isCurrent 
-                                    ? (isAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global)
+                                    ? (isAnnualBilling || isExtraAnnualBilling ? totalB2BWithEinmalzahlung : mixedTotal_global)
                                     : 39.90;
                                   
                                   const schoolStudentCost = isCurrent ? studentSharePreview_global : 0;
                                   const schoolStudentLevy = isCurrent ? studentLevyMonthly_global : 0;
-                                  const schoolExtraCost = isCurrent ? (schoolShareBookedExtra_global + extraLevyMonthly_global) : 0;
-                                  const einmalzahlung = isCurrent ? einmalzahlungTotal : 0;
+                                  const schoolExtraCost = isCurrent ? schoolShareBookedExtra_global : 0;
+                                  const extraLevyMonthly = isCurrent ? extraLevyMonthly_global : 0;
+                                  const einmalzahlung = isCurrent ? (isAnnualBilling ? students.length * annualPricePerStudent : 0) : 0;
+                                  const extraEinmalzahlung = isCurrent ? extraEinmalzahlungTotal : 0;
 
                                   invoicesData.push({
                                     id: invId,
                                     year: String(y),
                                     monthName: monthName,
                                     date: invoiceDateStr,
+                                    dueDateStr: dueDateStr,
                                     isCurrentMonth: isCurrent,
                                     b2b: b2bAmount,
                                     amount: b2bAmount,
                                     schoolStudentCost: schoolStudentCost,
                                     schoolStudentLevy: schoolStudentLevy,
                                     schoolExtraCost: schoolExtraCost,
+                                    extraLevyMonthly: extraLevyMonthly,
+                                    extraEinmalzahlung: extraEinmalzahlung,
                                     b2c: 0,
                                     einmalzahlung: einmalzahlung,
                                     status: status,
@@ -15387,7 +15440,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                               userSelect: 'none'
                                             }}
                                           >
-                                            <span>📅 Kalenderjahr {year}</span>
+                                            <span><Calendar size={13} style={{ marginRight: '6px', color: '#64748b', verticalAlign: 'middle' }} />Kalenderjahr {year}</span>
                                             <span>{isExpanded ? '▼' : '▶'}</span>
                                           </div>
                                           
@@ -15399,7 +15452,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                   Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)} um 23:58 Uhr
                                                 </span>
                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
-                                                  Fällig am: {getLastDayOfMonth(inv.monthName, inv.year)}
+                                                  Fällig am: {inv.dueDateStr}
                                                 </span>
                                               </div>
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
@@ -18461,7 +18514,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
                     <strong style={{ display: 'block', fontSize: '0.92rem', color: selectedInvoice.status === 'Entwurf' ? '#d97706' : '#0f172a' }}>
-                      {selectedInvoice.status === 'Entwurf' ? 'RECHNUNG (ENTWURF)' : 'RECHNUNG'}
+                      {selectedInvoice.status === 'Entwurf' ? 'RECHNUNGSVORSCHAU' : 'RECHNUNG'}
                     </strong>
                     <span style={{ color: '#64748b' }}>Nr. {selectedInvoice.id}</span>
                   </div>
@@ -18478,10 +18531,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   <div>
                     <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
                     <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
-                    <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>Simplified Work GbR</strong>
-                    <span>Patrick Huber</span><br />
-                    <span>Karl-Fürstenberg-Str. 59</span><br />
-                    <span>79618 Rheinfelden</span>
+                    <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>{operatorCompany}</strong>
+                    <span>{operatorContact}</span><br />
+                    <span>{operatorStreet}</span><br />
+                    <span>{operatorZip} {operatorCity}</span>
                   </div>
                 </div>
 
@@ -18489,11 +18542,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '10px', fontSize: '0.75rem', marginBottom: '30px', border: '1px solid #f1f5f9' }}>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
-                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')} um 23:58 Uhr</strong>
+                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Fälligkeit</span>
-                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.date.split(' ').slice(0, 3).join(' ')}</strong>
+                    <strong style={{ color: '#0f172a' }}>{selectedInvoice.dueDateStr}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Leistungszeitraum</span>
@@ -18503,7 +18556,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div>
                     <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
-                    <strong style={{ color: '#0f172a' }}>B2B-Lastschrift</strong>
+                    <strong style={{ color: '#0f172a' }}>Rechnung (14 Tage Zahlungsziel)</strong>
                   </div>
                 </div>
 
@@ -18574,9 +18627,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Kofinanzierung)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            {students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
+                          </div>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -18595,9 +18651,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schülerumlage)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            {students.length} Schüler (Umlagesatz = {studentBillingOption === 'option2' ? '0,49' : '0,24'} € / Mo.)
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {students.length} Schüler (Umlagesatz = {studentBillingOption === 'option2' ? '0,49' : '0,24'} € / Mo.)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
+                          </div>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -18616,20 +18675,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            {extraBillingOption === 'option2'
-                              ? `${bookedExtraUsers} Extra-Schüler (Schule zahlt 100% = 0,49 €)`
-                              : `${bookedExtraUsers} Extra-Schüler (Kofinanzierung = Schule zahlt 0,25 €)`}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {bookedExtraUsers} Extra-Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
+                          </div>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
-                          {(selectedInvoice.schoolExtraCost / (selectedInvoice.isCurrentMonth ? 1 : 12) / bookedExtraUsers).toFixed(2).replace('.', ',')} €
+                          0,25 €
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 5b: Zusätzliche Schüler-Umlage (transit) */}
+                    {selectedInvoice.extraLevyMonthly > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Umlage)</strong>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {bookedExtraUsers} Extra-Schüler (Umlagesatz = {extraBillingOption === 'option3_1' ? '0,24' : '0,49'} € / Mo.)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {(extraBillingOption === 'option3_1' ? 0.24 : 0.49).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.extraLevyMonthly.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
@@ -18639,9 +18723,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern bezahlt)
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern bezahlt)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
+                          </div>
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
                           1x
@@ -18651,6 +18738,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </td>
                         <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
                           {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Position 6b: Einmalzahlung Zusätzliche Schüler */}
+                    {selectedInvoice.extraEinmalzahlung > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Jahrespauschale)</strong>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              Jahrespauschale für {bookedExtraUsers} zusätzliche Schüler (wird von Schule ausgelegt &amp; von Schülern bezahlt)
+                            </span>
+                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          1x
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', color: '#64748b' }}>
+                          {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
                         </td>
                       </tr>
                     )}
@@ -18687,10 +18798,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     }}>
                       <strong style={{ color: '#0f172a' }}>Zahlungshinweis:</strong>
                       <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto:</span>
-                      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', marginTop: '4px', gap: '2px' }}>
-                        <strong>Zahlungsempfänger:</strong> <span>Simplified Work GbR</span>
-                        <strong>IBAN:</strong> <span>DE89 3704 0044 0532 9482 11</span>
-                        <strong>BIC:</strong> <span>WELADED1XYZ</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', marginTop: '4px', gap: '6px' }}>
+                        <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
+                        <strong>IBAN:</strong> <span>{operatorIban}</span>
+                        <strong>BIC:</strong> <span>{operatorBic}</span>
                         <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{selectedInvoice.id}</strong>
                       </div>
                     </div>

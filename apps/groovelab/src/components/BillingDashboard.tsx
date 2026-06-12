@@ -51,6 +51,83 @@ export function BillingDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const getPaidInvoices = (schoolId: string): string[] => {
+    if (typeof window === 'undefined') return [];
+    return JSON.parse(localStorage.getItem(`paid_invoices_${schoolId}`) || '[]');
+  };
+
+  const toggleInvoicePaid = (schoolId: string, invoiceId: string) => {
+    const current = getPaidInvoices(schoolId);
+    let updated: string[];
+    if (current.includes(invoiceId)) {
+      updated = current.filter(id => id !== invoiceId);
+    } else {
+      updated = [...current, invoiceId];
+    }
+    localStorage.setItem(`paid_invoices_${schoolId}`, JSON.stringify(updated));
+    setTick(t => t + 1);
+  };
+
+  const getSchoolInvoices = (schoolId: string, baseInvoiceAmount: number) => {
+    const storedDate = localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem('contractStartDate');
+    const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-04-01T12:00:00Z');
+    
+    const startYear = contractDateObj.getFullYear();
+    const startMonth = contractDateObj.getMonth() + 1;
+
+    const systemDate = new Date('2026-06-12T19:30:38+02:00');
+    const currentYear = systemDate.getFullYear();
+    const currentMonth = systemDate.getMonth() + 1;
+
+    const deMonths = [
+      '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+    ];
+
+    const list: any[] = [];
+    let y = startYear;
+    let m = startMonth;
+
+    while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+      const monthStr = m < 10 ? `0${m}` : `${m}`;
+      const invId = `RE-${y}-${monthStr}`;
+      
+      const lastDay = new Date(y, m, 0).getDate();
+      const monthName = deMonths[m];
+      const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
+      
+      const isCurrent = (y === currentYear && m === currentMonth);
+      const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
+      const isCreated = systemDate.getTime() >= creationTime.getTime();
+      
+      const paidInvoicesList = getPaidInvoices(schoolId);
+      const isMarkedPaid = paidInvoicesList.includes(invId);
+
+      const status = isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Entwurf');
+
+      list.push({
+        id: invId,
+        date: invoiceDateStr,
+        monthName,
+        year: String(y),
+        amount: isCurrent ? baseInvoiceAmount : 39.90,
+        status,
+        isCreated,
+        isCurrentMonth: isCurrent
+      });
+
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    
+    return list.reverse();
+  };
 
   useEffect(() => {
     fetchBillingData();
@@ -359,80 +436,154 @@ export function BillingDashboard() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => (
-                  <tr key={inv.schoolId} className="hover:bg-slate-50/50 transition-all text-sm font-semibold text-slate-650">
-                    <td className="py-4.5 px-6 font-extrabold text-slate-800">{inv.schoolName}</td>
-                    
-                    {/* Status Badge */}
-                    <td className="py-4.5 px-6">
-                      {inv.status === 'bypass' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                          Bypass
-                        </span>
-                      ) : inv.status === 'trial' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full">
-                          Probezeit
-                        </span>
-                      ) : inv.status === 'suspended' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                          Ausgesetzt
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                          Aktiv
-                        </span>
+                filteredInvoices.map((inv) => {
+                  const isExpanded = expandedSchoolId === inv.schoolId;
+                  const schoolInvoices = getSchoolInvoices(inv.schoolId, inv.total);
+                  
+                  return (
+                    <React.Fragment key={inv.schoolId}>
+                      <tr 
+                        className={`hover:bg-slate-50/50 transition-all text-sm font-semibold text-slate-650 cursor-pointer ${isExpanded ? 'bg-indigo-50/20' : ''}`}
+                        onClick={() => setExpandedSchoolId(isExpanded ? null : inv.schoolId)}
+                      >
+                        <td className="py-4.5 px-6 font-extrabold text-slate-800">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                            {inv.schoolName}
+                          </div>
+                        </td>
+                        
+                        {/* Status Badge */}
+                        <td className="py-4.5 px-6">
+                          {inv.status === 'bypass' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                              Bypass
+                            </span>
+                          ) : inv.status === 'trial' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full">
+                              Probezeit
+                            </span>
+                          ) : inv.status === 'suspended' ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                              Ausgesetzt
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                              Aktiv
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Total Pupils */}
+                        <td className="py-4.5 px-6 text-center font-bold text-slate-800">
+                          {inv.totalStudents} Schüler
+                        </td>
+
+                        {/* Premium Users */}
+                        <td className="py-4.5 px-6 text-center">
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-650 bg-indigo-50/80 px-2 py-1 rounded-xl">
+                            🎓 {inv.premiumStudents} Campus aktiv
+                          </span>
+                        </td>
+
+                        {/* Resulting B2B Umsatz (Schüler * 0.49 €) */}
+                        <td className="py-4.5 px-6 text-right font-mono text-xs font-bold text-slate-700">
+                          {inv.b2bRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                          <span className="block text-[9px] text-slate-400 font-bold mt-0.5">
+                            {inv.activeStudents} active x 0,49 €
+                          </span>
+                        </td>
+
+                        {/* B2C Revenue share */}
+                        <td className="py-4.5 px-6 text-right font-mono text-xs text-emerald-600 font-bold">
+                          {inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                          <span className="block text-[9px] text-emerald-400 font-bold mt-0.5">
+                            {inv.premiumStudents} active x 9,99 €
+                          </span>
+                        </td>
+
+                        {/* Active/Pending Quota */}
+                        <td className="py-4.5 px-6 text-center text-xs">
+                          <span className="font-bold text-slate-800">{inv.userQuota}</span>
+                          {inv.pendingUserQuota && (
+                            <span className="block text-[10px] text-purple-600 font-bold mt-0.5">
+                              ⏳ Next: {inv.pendingUserQuota}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Final Amount (B2B invoice total) */}
+                        <td className="py-4.5 px-6 text-right font-mono font-black text-sm text-slate-900 bg-slate-50/20">
+                          {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                          {inv.subscriptionBypass && (
+                            <span className="block text-[9px] text-rose-500 font-black uppercase mt-0.5">
+                              Bypass Aktiv
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={8} className="bg-slate-50/50 p-6 border-b border-slate-100">
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-inner p-5 space-y-4">
+                              <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Rechnungshistorie ({inv.schoolName})</h4>
+                              <div className="divide-y divide-slate-100">
+                                {schoolInvoices.map(invoice => (
+                                  <div key={invoice.id} className="py-3 flex items-center justify-between text-sm">
+                                    <div className="flex items-center gap-4">
+                                      <span className="font-mono font-black text-slate-800">{invoice.id}</span>
+                                      <span className="text-slate-500 font-semibold">{invoice.date}</span>
+                                      <span className="font-mono font-bold text-slate-700">{invoice.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      {invoice.status === 'Entwurf' && (
+                                        <span className="text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
+                                          Entwurf (fällig am Monatsende)
+                                        </span>
+                                      )}
+                                      {invoice.status === 'Versendet' && (
+                                        <>
+                                          <span className="text-[11px] font-extrabold text-orange-650 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full">
+                                            Versendet (Offen)
+                                          </span>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleInvoicePaid(inv.schoolId, invoice.id);
+                                            }}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1"
+                                          >
+                                            ✓ Als bezahlt markieren
+                                          </button>
+                                        </>
+                                      )}
+                                      {invoice.status === 'Bezahlt' && (
+                                        <>
+                                          <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
+                                            Bezahlt
+                                          </span>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleInvoicePaid(inv.schoolId, invoice.id);
+                                            }}
+                                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
+                                          >
+                                            Auf unbezahlt setzen
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-
-                    {/* Total Pupils */}
-                    <td className="py-4.5 px-6 text-center font-bold text-slate-800">
-                      {inv.totalStudents} Schüler
-                    </td>
-
-                    {/* Premium Users */}
-                    <td className="py-4.5 px-6 text-center">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-650 bg-indigo-50/80 px-2 py-1 rounded-xl">
-                        🎓 {inv.premiumStudents} Campus aktiv
-                      </span>
-                    </td>
-
-                    {/* Resulting B2B Umsatz (Schüler * 0.49 €) */}
-                    <td className="py-4.5 px-6 text-right font-mono text-xs font-bold text-slate-700">
-                      {inv.b2bRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                      <span className="block text-[9px] text-slate-400 font-bold mt-0.5">
-                        {inv.activeStudents} active x 0,49 €
-                      </span>
-                    </td>
-
-                    {/* B2C Revenue share */}
-                    <td className="py-4.5 px-6 text-right font-mono text-xs text-emerald-600 font-bold">
-                      {inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                      <span className="block text-[9px] text-emerald-400 font-bold mt-0.5">
-                        {inv.premiumStudents} active x 9,99 €
-                      </span>
-                    </td>
-
-                    {/* Active/Pending Quota */}
-                    <td className="py-4.5 px-6 text-center text-xs">
-                      <span className="font-bold text-slate-800">{inv.userQuota}</span>
-                      {inv.pendingUserQuota && (
-                        <span className="block text-[10px] text-purple-600 font-bold mt-0.5">
-                          ⏳ Next: {inv.pendingUserQuota}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Final Amount (B2B invoice total) */}
-                    <td className="py-4.5 px-6 text-right font-mono font-black text-sm text-slate-900 bg-slate-50/20">
-                      {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                      {inv.subscriptionBypass && (
-                        <span className="block text-[9px] text-rose-500 font-black uppercase mt-0.5">
-                          Bypass Aktiv
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
