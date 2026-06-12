@@ -14880,17 +14880,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Divider 2 */}
                         <div style={{ width: '1px', background: '#bae6fd', alignSelf: 'stretch' }} />
 
-                        {/* Right Side: Einmalige Umlage (Schüler-Pauschale / Einmalzahlungen) */}
+                        {/* Right Side: Einmalige Umlage / Monatsumlage Schüler */}
                         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
                           <div>
-                            <span style={{ fontSize: '0.95rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800 }}>Einmalzahlung Schüler</span>
                             {(() => {
+                              const isMonthly = studentBillingOption === 'option2' || studentBillingOption === 'option3_1';
                               const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                              const pricePerStudent = studentBillingOption === 'option1' ? 5.29 : (studentBillingOption === 'option3_2' ? 2.59 : 0);
-                              const totalYearly = students.length * pricePerStudent;
+                              const monthlyPricePerStudent = studentBillingOption === 'option2' ? 0.49 : studentBillingOption === 'option3_1' ? 0.24 : 0;
+                              const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
+                              const totalMonthly = students.length * monthlyPricePerStudent;
+                              const totalYearly = students.length * annualPricePerStudent;
+                              const color = '#6b21a8';
+                              const dimColor = '#94a3b8';
+                              if (isMonthly) {
+                                return (
+                                  <>
+                                    <span style={{ fontSize: '0.95rem', color, textTransform: 'uppercase', fontWeight: 800 }}>Anteil Schüler (B2C)</span>
+                                    <strong style={{ display: 'block', fontSize: '2.4rem', color, margin: '12px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                      {totalMonthly.toFixed(2)} €
+                                      {extraUsersSliderVal > 0 && (
+                                        <span style={{ color: '#2563eb', fontSize: '1.2rem', marginLeft: '4px', fontWeight: 800 }}>
+                                          + {(extraUsersSliderVal * (studentBillingOption === 'option2' ? 0.49 : 0.24)).toFixed(2)} €
+                                        </span>
+                                      )}
+                                      <span style={{ fontSize: '1.2rem', fontWeight: 500 }}> / Mo.</span>
+                                    </strong>
+                                    <span style={{ fontSize: '0.72rem', color, display: 'block', fontWeight: 900, lineHeight: '1.3' }}>
+                                      {students.length} Schüler × {monthlyPricePerStudent.toFixed(2).replace('.', ',')} €
+                                    </span>
+                                  </>
+                                );
+                              }
                               return (
                                 <>
-                                  <strong style={{ display: 'block', fontSize: '2.4rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', margin: '12px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                  <span style={{ fontSize: '0.95rem', color: isAnnual ? color : dimColor, textTransform: 'uppercase', fontWeight: 800 }}>Einmalzahlung Schüler</span>
+                                  <strong style={{ display: 'block', fontSize: '2.4rem', color: isAnnual || isAnnualAdditional ? color : dimColor, margin: '12px 0', fontWeight: 900, fontFamily: 'Urbanist' }}>
                                     {totalYearly.toFixed(2)} €
                                     {extraUsersSliderVal > 0 && isAnnualAdditional && (
                                       <span style={{ color: '#2563eb', fontSize: '1.2rem', marginLeft: '4px', fontWeight: 800 }}>
@@ -14899,8 +14923,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     )}
                                     <span style={{ fontSize: '1.2rem', fontWeight: 500 }}> / Jahr</span>
                                   </strong>
-                                  <span style={{ fontSize: '0.72rem', color: isAnnual || isAnnualAdditional ? '#6b21a8' : '#94a3b8', display: 'block', fontWeight: 900, lineHeight: '1.3' }}>
-                                    {isAnnual ? `${students.length} Schüler × ${pricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
+                                  <span style={{ fontSize: '0.72rem', color: isAnnual || isAnnualAdditional ? color : dimColor, display: 'block', fontWeight: 900, lineHeight: '1.3' }}>
+                                    {isAnnual ? `${students.length} Schüler × ${annualPricePerStudent.toFixed(2).replace('.', ',')} €` : ''}
                                     {extraUsersSliderVal > 0 && isAnnualAdditional && (
                                       <span>{isAnnual ? ' und ' : ''}+{extraUsersSliderVal} Schüler × {(extraBillingOption === 'option1' ? 5.29 : 2.59).toFixed(2).replace('.', ',')} €</span>
                                     )}
