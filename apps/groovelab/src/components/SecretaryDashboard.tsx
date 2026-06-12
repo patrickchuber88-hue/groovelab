@@ -998,6 +998,16 @@ const parseRoomName = (name: string) => {
 };
 
 export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
+  const getSchoolNumericId = (id: string): number => {
+    if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash % 98) + 2;
+  };
+  const schoolNumericId = getSchoolNumericId(schoolId);
+
   const [showAgb, setShowAgb] = useState<boolean>(false);
   const [showPrivacy, setShowPrivacy] = useState<boolean>(false);
 
@@ -7762,7 +7772,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>📧</div>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>
-                            Monatsrechnung RE-2026-08 versendet
+                            Monatsrechnung RE-{schoolNumericId}-2608-01 versendet
                           </h4>
                           <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#1e40af', lineHeight: '1.4', fontWeight: 500 }}>
                             Die Rechnung für den Leistungszeitraum August 2026 über <strong>{mixedTotal_global.toFixed(2)} €</strong> wurde am 25.08.2026 per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
@@ -7783,7 +7793,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                             const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal + extraEinmalzahlungTotal;
                             setSelectedInvoice({
-                              id: 'RE-2026-08',
+                              id: `RE-${schoolNumericId}-2608-01`,
                               year: '2026',
                               date: '25. August 2026',
                               isCurrentMonth: true,
@@ -15350,7 +15360,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                 while (y < currentYear || (y === currentYear && m <= currentMonth)) {
                                   const monthStr = m < 10 ? `0${m}` : `${m}`;
-                                  const invId = `RE-${y}-${monthStr}`;
+                                  const yearShort = String(y).slice(-2);
+                                  const invId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
                                   
                                   const lastDay = new Date(y, m, 0).getDate();
                                   const monthName = deMonths[m];
