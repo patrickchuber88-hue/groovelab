@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -5106,6 +5106,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         e.dataTransfer.setData("studentId", student.id);
                         e.dataTransfer.setData("text/plain", student.id);
                         e.dataTransfer.effectAllowed = "move";
+                        
+                        // Set drag image to the name & avatar container (small) to fix Safari drag failure on wide items
+                        const nameEl = e.currentTarget.querySelector('.student-drag-target');
+                        if (nameEl) {
+                          e.dataTransfer.setDragImage(nameEl, 20, 20);
+                        }
                       }}
                       style={{ 
                         display: 'flex',
@@ -5117,11 +5123,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         border: '1px solid #f1f5f9',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
                         minWidth: '850px',
-                        transition: 'all 0.25s ease',
-                        cursor: 'grab'
+                        transition: 'all 0.25s ease'
                       }}
                       className="hover-scale"
                     >
+                      {/* Drag Handle */}
+                      <div 
+                        style={{ 
+                          color: '#cbd5e1', 
+                          cursor: 'grab', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          paddingRight: '4px',
+                          alignSelf: 'stretch'
+                        }}
+                      >
+                        <GripVertical size={16} />
+                      </div>
+
                       {/* Avatar & Name */}
                       <div 
                         onClick={() => setSelectedStudentForDetail(student)}
@@ -5133,7 +5153,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           minWidth: '180px',
                           cursor: 'pointer'
                         }}
-                        className="student-name-hover"
+                        className="student-name-hover student-drag-target"
                       >
                         <div style={{
                           width: '42px',
