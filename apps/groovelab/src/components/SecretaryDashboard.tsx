@@ -1414,8 +1414,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const targetFlatTotal = isCoFinancing ? 35.00 : 69.00;
       return parseFloat((targetFlatTotal / schoolSize).toFixed(2));
     }
-    // Proportional calculation based on standard full-year prices (5.29 standard, 2.59 co-financed)
-    const basePrice = isCoFinancing ? 2.59 : 5.29;
+    // Proportional calculation based on standard full-year prices (4.80 standard)
+    const basePrice = 4.80;
     return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
   };
 
@@ -1505,14 +1505,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   // Global pricing calculations for use in briefing & invoice lists
   const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
   const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
-  const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
+  const activeModulesCount_global = billedCampus_global ? 1 : 0;
   const moduleCost_global = activeModulesCount_global * 4.99;
-  const studentLevyMonthly_global = studentBillingOption === 'option2' ? students.length * 0.49 : studentBillingOption === 'option3_1' ? students.length * 0.24 : 0;
-  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : extraBillingOption === 'option3_1' ? bookedExtraUsers * 0.24 : 0;
-  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49;
-  const studentSharePreview_global = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
-  const schoolShareBookedExtra_global = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
-  const currentTotalB2B_global = baseB2B_global + schoolShareBookedExtra_global + studentSharePreview_global;
+  const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
+  const studentLevyMonthly_global = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
+  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
+  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49 + students.length * 0.09;
+  const studentSharePreview_global = 0;
+  const schoolShareBookedExtra_global = 0;
+  const currentTotalB2B_global = baseB2B_global;
   const mixedTotal_global = currentTotalB2B_global + studentLevyMonthly_global + extraLevyMonthly_global;
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
   
@@ -2013,10 +2014,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         setPendingUserQuota(schoolData.pending_user_quota);
       }
 
-      // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -14493,36 +14493,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 const isStarterFlat = cMonth === 6 || cMonth === 7 || cMonth === 8;
                 const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
-                const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
+                const activeModulesCount = billedCampus ? 1 : 0;
                 const moduleCost = activeModulesCount * 4.99;
-                const studentLevyMonthly = (() => {
-                  if (studentBillingOption === 'option1') return 0;
-                  if (studentBillingOption === 'option2') return students.length * 0.49;
-                  if (studentBillingOption === 'option3_1') return students.length * 0.24;
-                  if (studentBillingOption === 'option3_2') return 0;
-                  return 0;
-                })();
-                const extraLevyMonthly = (() => {
-                  if (extraBillingOption === 'option1') return 0;
-                  if (extraBillingOption === 'option2') return bookedExtraUsers * 0.49;
-                  if (extraBillingOption === 'option3_1') return bookedExtraUsers * 0.24;
-                  if (extraBillingOption === 'option3_2') return 0;
-                  return 0;
-                })();
+                const studentLevyMonthly = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
+                const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
 
-                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49;
-                const studentSharePreview = (studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') ? students.length * 0.25 : 0;
-                const schoolShareBookedExtra = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? bookedExtraUsers * 0.25 : 0;
-                const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
+                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + students.length * 0.09;
+                const studentSharePreview = 0;
+                const isAnnual = studentBillingOption === 'option1';
                 
                 // Slider prospective change variables (Real-time preview)
-                const schoolShareAdditional = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? extraUsersSliderVal * 0.25 : 0;
-                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : extraBillingOption === 'option3_1' ? extraUsersSliderVal * 0.24 : 0);
-                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, true) : 0);
-                const isAnnualAdditional = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
+                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.40 : 0);
+                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, false) : 0);
+                const isAnnualAdditional = extraBillingOption === 'option1';
+                const schoolShareAdditional = 0;
 
-                // B2B total including kofinanzierung preview
-                const currentTotalB2B = baseB2B + schoolShareBookedExtra + studentSharePreview;
+                // B2B total
+                const currentTotalB2B = baseB2B;
                 
                 // Mixed Total B2B + B2C
                 const mixedTotal = currentTotalB2B + studentLevyMonthly + extraLevyMonthly;
@@ -14729,7 +14716,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     ),
                                     title: 'Option 2: Monatsumlage (Schüler zahlt vollständig)',
                                     badge: 'Monatlich',
-                                    desc: 'Der Schüler zahlt monatlich 0,49 € / Mo. Die Musikschule zahlt für Schüler 0,00 €.'
+                                    desc: 'Der Schüler zahlt monatlich 0,40 € / Mo. Die Musikschule zahlt für Schüler 0,00 €.'
                                   },
                                   {
                                     id: 'option1',
@@ -14743,28 +14730,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       ? 'Einsteiger-Flat (bis Aug.)'
                                       : '10% Rabatt',
                                     desc: `Der Schüler zahlt einmalig ${getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € (Flatrate bis Aug.). Die Musikschule zahlt für Schüler 0,00 €.`
-                                  },
-                                  {
-                                    id: 'option3_1',
-                                    icon: (
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><line x1="12" x2="12" y1="3" y2="21"/><line x1="2" x2="22" y1="7" y2="7"/><path d="M5 7 3 21h4Z"/><path d="M19 7l-2 14h4Z"/></svg>
-                                    ),
-                                    title: 'Option 3.1: Kofinanzierung (Monatlicher Split)',
-                                    badge: 'Split Mo.',
-                                    desc: 'Kostenaufteilung: Schüler zahlt 0,24 € / Mo., die Musikschule übernimmt 0,25 € / Mo.'
-                                  },
-                                  {
-                                    id: 'option3_2',
-                                    icon: (
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
-                                    ),
-                                    title: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
-                                      ? 'Option 3.2: Kofinanzierung (Einsteiger-Flat Schüler-Split)'
-                                      : 'Option 3.2: Kofinanzierung (Jährlicher Schüler-Split)',
-                                    badge: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
-                                      ? 'Split Flat (bis Aug.)'
-                                      : 'Split + 10% Rabatt',
-                                    desc: `Kostenaufteilung: Schüler zahlt einmalig ${getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € (Flatrate bis Aug.). Die Musikschule zahlt 0,25 € / Mo.`
                                   }
                                 ].map((opt) => {
                                   const isSelected = studentBillingOption === opt.id;
@@ -15003,10 +14968,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <strong style={{ color: '#16a34a' }}>0,00 €</strong>
                               </div>
 
-                              {(hasCampusSub || hasGroovelabSub) && (
+                              {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Module ({activeModulesCount} aktiv):</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : `${moduleCost.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                  <span>Campus-Plattformzugriff:</span>
+                                  <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
+                                </div>
+                              )}
+                              {hasGroovelabSub && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                  <span>GrooveLab-Plattformzugriff:</span>
+                                  <strong style={{ color: '#16a34a' }}>Inklusive (in Grundgebühr abgedeckt)</strong>
                                 </div>
                               )}
 
@@ -15033,35 +15004,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                   {studentBillingOption === 'option2' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                      <span>Schüler-Monatsumlage (0,49 € pro Schüler):</span>
-                                      <strong>{(students.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                      <span>Schüler-Monatsumlage (0,40 € pro Schüler):</span>
+                                      <strong>{(students.length * 0.40).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
-                                  )}
-
-                                  {studentBillingOption === 'option3_1' && (
-                                    <>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                        <span>Schüler-Umlage (durch Schule erstattet, 0,24 € pro Schüler):</span>
-                                        <strong>{(students.length * 0.24).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                      </div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
-                                        <span>Kofinanzierung Schule (0,25 € pro Schüler):</span>
-                                        <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {studentBillingOption === 'option3_2' && (
-                                    <>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                        <span>Schüler-Umlage (durch Schule erstattet, {getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € pro Schüler):</span>
-                                        <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, true)).toFixed(2).replace('.', ',')} € / Jahr</strong>
-                                      </div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
-                                        <span>Kofinanzierung Schule (0,25 € pro Schüler):</span>
-                                        <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                      </div>
-                                    </>
                                   )}
                                 </div>
                               )}
@@ -15069,15 +15014,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                              <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
-                                <span>{isStarterFlat ? 'Schulanteil (Einsteiger-Flatrate bis 31. Aug.):' : 'Schulanteil (Lizenz & Kofinanzierung):'}</span>
+                                <span>{isStarterFlat ? 'Schulanteil (Einsteiger-Flatrate bis 31. Aug.):' : 'Schulanteil:'}</span>
                                 <strong style={{ fontWeight: 800 }}>
                                   {isStarterFlat ? '69,00 €' : (checkoutStep >= 2 ? `${currentTotalB2B.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
 
-                              {checkoutStep >= 2 && !isStarterFlat && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
+                              {checkoutStep >= 2 && !isStarterFlat && studentBillingOption === 'option2' && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
-                                  <span>Schülerumlage ({students.length} × {studentBillingOption === 'option2' ? '0,49' : '0,24'} €):</span>
+                                  <span>Schülerumlage ({students.length} × 0,40 €):</span>
                                   <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
@@ -15092,7 +15037,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
                               </span>
 
-                              {checkoutStep >= 2 && !isStarterFlat && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
+                              {checkoutStep >= 2 && !isStarterFlat && studentBillingOption === 'option1' && (
                                 <div style={{ 
                                   background: '#f0f9ff', 
                                   border: '1.5px solid #bae6fd', 
@@ -15106,12 +15051,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   gap: '2px'
                                 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Zuzüglich Anteil Schüler ({students.length} × {studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',') : getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} €):</span>
-                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true))).toFixed(2).replace('.', ',')} €</strong>
+                                    <span>Zuzüglich Anteil Schüler ({students.length} × {getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} €):</span>
+                                    <strong style={{ fontWeight: 850 }}>{(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
                                     <strong>Einzug im 1. Monat:</strong>
-                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true)))).toFixed(2).replace('.', ',')} €</strong>
+                                    <strong>{(currentTotalB2B + (students.length * getDynamicAnnualPrice(contractStartDate, false))).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                 </div>
                               )}
@@ -15137,16 +15082,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <span style={{ fontSize: '1rem' }}>💡</span>
                               <span>
                                 {studentBillingOption === 'option1' && (
-                                  <>Die Jahrespauschale (5,29 €) entspricht etwa dem Preis für <strong>ein Gitarren-Plektrum Set</strong>.</>
+                                  <>Die Jahrespauschale (4,80 €) entspricht etwa dem Preis für <strong>ein Gitarren-Plektrum Set</strong>.</>
                                 )}
                                 {studentBillingOption === 'option2' && (
-                                  <>Die Monatsumlage (0,49 €) entspricht etwa dem Porto für <strong>eine Briefmarke</strong>.</>
-                                )}
-                                {studentBillingOption === 'option3_1' && (
-                                  <>Die monatliche Kofinanzierung (0,24 €) entspricht etwa dem Preis für <strong>eine Kugel Kaugummi aus dem Automaten</strong>.</>
-                                )}
-                                {studentBillingOption === 'option3_2' && (
-                                  <>Der jährliche Betrag (2,59 €) entspricht dem Preis für <strong>eine Tasse Kaffee</strong>.</>
+                                  <>Die Monatsumlage (0,40 €) entspricht etwa dem Porto für <strong>eine Briefmarke</strong>.</>
                                 )}
                               </span>
                             </div>
@@ -15251,193 +15190,167 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </div>
                         </div>
 
-                        {/* Visual Summary Cards */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '20px' }}>
-                          {/* Card 1: Active Modules & License Info */}
-                          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Module &amp; Software-Lizenz</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
-                                Campus
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasGroovelabSub ? '#16a34a' : '#94a3b8' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasGroovelabSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasGroovelabSub ? '✓' : '✗'}</span>
-                                GrooveLab
-                              </div>
-                            </div>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Software-Lizenz:</span>
-                                <strong style={{ color: '#16a34a' }}>100% kostenlos</strong>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Server-Betrieb Module:</span>
-                                <strong>{(activeModulesCount * 4.99).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Server-Betrieb Team ({allTeachers.length + employees.length} Profile):</span>
-                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                              </div>
-                              <div style={{ 
-                                marginTop: '8px',
-                                paddingTop: '8px',
-                                borderTop: '1px solid #f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                color: '#15803d',
-                                fontWeight: 700,
-                                fontSize: '0.62rem'
-                              }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  <ShieldCheck size={12} style={{ color: '#15803d' }} />
-                                  100% DSGVO-konform auf deutschen Servern
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                        {(() => {
+                          const activatedStudents = students.filter((s: any) => s.isCampusActive || s.isGroovelabActive || s.is_campus_active || s.is_groovelab_active);
+                          const activeStudentsCount = activatedStudents.length;
+                          const totalStudentsCount = students.length;
+                          const activationPercentage = totalStudentsCount > 0 ? Math.round((activeStudentsCount / totalStudentsCount) * 100) : 0;
+                          const debitCount = activatedStudents.filter((s: any) => s.student_billing_payment_method === 'debit').length;
+                          const cashCount = activatedStudents.filter((s: any) => s.student_billing_payment_method === 'cash').length;
 
-                          {/* Card 2: Student Billing Option */}
-                          <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schülerumlagen (Eingezogen durch Schule)</span>
-                            <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontFamily: 'Urbanist' }}>
-                              {studentBillingOption === 'option1' && 'Option 1: Jahrespauschale'}
-                              {studentBillingOption === 'option2' && 'Option 2: Monatsumlage'}
-                              {studentBillingOption === 'option3_1' && 'Option 3.1: Kofinanzierung (Monatlich)'}
-                              {studentBillingOption === 'option3_2' && 'Option 3.2: Kofinanzierung (Jährlich)'}
-                            </strong>
-                            
-                            <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: '1.5', display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'auto' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>• Umlagesatz (pro Schüler):</span>
-                                <strong style={{ color: '#0f172a' }}>
-                                  {studentBillingOption === 'option1' && `${getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € / Jahr`}
-                                  {studentBillingOption === 'option2' && '0,49 € / Mo.'}
-                                  {studentBillingOption === 'option3_1' && '0,24 € / Mo.'}
-                                  {studentBillingOption === 'option3_2' && `${getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € / Jahr`}
-                                </strong>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>• Schüleranzahl:</span>
-                                <strong style={{ color: '#0f172a' }}>{students.length} Schüler</strong>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px', marginBottom: '2px' }}>
-                                <span>• Gesamtpreis Umlage:</span>
-                                <strong style={{ color: '#6b21a8', fontWeight: 800 }}>
-                                  {studentBillingOption === 'option1' && `${(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} € / Jahr`}
-                                  {studentBillingOption === 'option2' && `${(students.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}
-                                  {studentBillingOption === 'option3_1' && `${(students.length * 0.24).toFixed(2).replace('.', ',')} € / Mo.`}
-                                  {studentBillingOption === 'option3_2' && `${(students.length * getDynamicAnnualPrice(contractStartDate, true)).toFixed(2).replace('.', ',')} € / Jahr`}
-                                </strong>
-                              </div>
-                              {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
-                                <>
+                          const now = new Date();
+                          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                          const studentsAddedThisMonth = students.filter((s: any) => {
+                            if (!s.created_at) return false;
+                            const isCreatedThisMonth = new Date(s.created_at) >= currentMonthStart;
+                            const isCurrentlyActive = s.isCampusActive || s.isGroovelabActive || s.is_campus_active || s.is_groovelab_active;
+                            return isCreatedThisMonth && isCurrentlyActive;
+                          }).length;
+
+                          const activationFeePerStudent = studentBillingOption === 'option1' ? 4.80 : 0.40;
+                          const currentMonthActivationsAmount = studentsAddedThisMonth * activationFeePerStudent;
+
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '20px' }}>
+                              {/* Card 1: Active Modules & License Info */}
+                              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Module &amp; Software-Lizenz</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
+                                    Campus
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasGroovelabSub ? '#16a34a' : '#94a3b8' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasGroovelabSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasGroovelabSub ? '✓' : '✗'}</span>
+                                    GrooveLab
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>• Kofinanzierung Schule (pro Schüler):</span>
-                                    <strong style={{ color: '#0369a1' }}>0,25 € / Mo.</strong>
+                                    <span>Software-Lizenz:</span>
+                                    <strong style={{ color: '#16a34a' }}>100% kostenlos</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>• Gesamt Kofinanzierung Schule:</span>
-                                    <strong style={{ color: '#0369a1', fontWeight: 800 }}>
-                                      {((students.length * 0.25).toFixed(2).replace('.', ','))} € / Mo.
-                                    </strong>
+                                    <span>Campus-Plattformzugriff:</span>
+                                    <strong>{(activeModulesCount * 4.99).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Card 3: Polished Cost Overview */}
-                          <div style={{ background: '#f8fafc', border: '2px solid #6b21a8', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gesamt-Abrechnung (Rechnung)</span>
-                            
-                            {(() => {
-                              const standardB2B = baseB2B + studentSharePreview;
-                              const standardB2C = isAnnual ? (students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true))) : studentLevyMonthly;
-                              return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
-                                    <strong style={{ fontSize: '1.2rem', color: '#0369a1', fontWeight: 900 }}>{standardB2B.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Server-Betrieb Team ({allTeachers.length + employees.length} Profile):</span>
+                                    <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
-
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                                      {isAnnual ? 'Schülerumlage (1. Monatsrechnung):' : 'Schülerumlage (monatlich):'}
+                                  <div style={{ 
+                                    marginTop: '8px',
+                                    paddingTop: '8px',
+                                    borderTop: '1px solid #f1f5f9',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    color: '#15803d',
+                                    fontWeight: 700,
+                                    fontSize: '0.62rem'
+                                  }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <ShieldCheck size={12} style={{ color: '#15803d' }} />
+                                      100% DSGVO-konform auf deutschen Servern
                                     </span>
-                                    <strong style={{ fontSize: '1.2rem', color: '#6b21a8', fontWeight: 900 }}>
-                                      {standardB2C.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>{isAnnual ? '/ Jahr' : '/ Mo.'}</span>
-                                    </strong>
                                   </div>
-
-                                  {bookedExtraUsers > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '4px' }}>
-                                      <span style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 800 }}>Zusätzliche Schüler ({bookedExtraUsers} gebucht):</span>
-                                      {schoolShareBookedExtra > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (Netto):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>{schoolShareBookedExtra.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                                        </div>
-                                      )}
-                                      {extraLevyMonthly > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler:</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{extraLevyMonthly.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                                        </div>
-                                      )}
-                                      {(extraBillingOption === 'option1' || extraBillingOption === 'option3_2') && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler (Jährlich):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true)) * bookedExtraUsers).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {extraUsersSliderVal > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderTop: '1.5px dashed #f59e0b', paddingTop: '6px', marginTop: '6px' }}>
-                                      <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 800 }}>Geplante Erweiterung (+{extraUsersSliderVal} Schüler):</span>
-                                      {schoolShareAdditional > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Anteil Schule (Netto):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#0369a1', fontWeight: 700 }}>+{schoolShareAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                                        </div>
-                                      )}
-                                      {extraLevyMonthlyAdditional > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler:</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyMonthlyAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                                        </div>
-                                      )}
-                                      {extraLevyYearlyAdditional > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
-                                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler (Jährlich):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>+{extraLevyYearlyAdditional.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
-                              );
-                            })()}
+                              </div>
 
-                            <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 'auto' }}>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f2937' }}>Monatsrate (Gesamt):</span>
-                              {extraUsersSliderVal > 0 ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.88rem', color: '#64748b', textDecoration: 'line-through' }}>{mixedTotal.toFixed(2).replace('.', ',')} €</span>
-                                  <span style={{ fontSize: '0.88rem', color: '#64748b' }}>➔</span>
-                                  <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>
-                                    {(mixedTotal + schoolShareAdditional + extraLevyMonthlyAdditional).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span>
+                              {/* Card 2: Schüler-Statistiken */}
+                              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 8px 30px rgba(0,0,0,0.02)' }}>
+                                <div>
+                                  <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '14px' }}>
+                                    Schüler-Statistiken
+                                  </span>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div>
+                                      <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, display: 'block' }}>Aktiv</span>
+                                      <strong style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34c759' }}>{activeStudentsCount}</strong>
+                                    </div>
+                                    <div>
+                                      <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 600, display: 'block' }}>Inaktiv</span>
+                                      <strong style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ff9500' }}>{totalStudentsCount - activeStudentsCount}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ borderTop: '1px solid #f2f2f7', paddingTop: '12px', marginTop: '12px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.72rem', color: '#8e8e93' }}>Diesen Monat neu:</span>
+                                    <span style={{ 
+                                      background: '#e8f5e9', 
+                                      color: '#2e7d32', 
+                                      padding: '2px 8px', 
+                                      borderRadius: '100px', 
+                                      fontSize: '0.74rem', 
+                                      fontWeight: 700 
+                                    }}>
+                                      +{studentsAddedThisMonth}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Card 3: Schüler-Aktivierungen & Sammelrechnung */}
+                              <div style={{ 
+                                background: 'linear-gradient(145deg, #fbfbfd 0%, #f5f5f7 100%)', 
+                                border: '1px solid rgba(0, 0, 0, 0.08)', 
+                                borderRadius: '24px', 
+                                padding: '24px', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                boxShadow: '0 8px 30px rgba(0,0,0,0.02)'
+                              }}>
+                                <span style={{ fontSize: '0.66rem', color: '#8e8e93', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                                  Schüler-Aktivierungen &amp; Sammelrechnung
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '8px 0 10px 0' }}>
+                                  <strong style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10b981', letterSpacing: '-0.02em' }}>
+                                    {currentMonthActivationsAmount.toFixed(2).replace('.', ',')} €
                                   </strong>
+                                  <span style={{ fontSize: '0.82rem', color: '#8e8e93', fontWeight: 550 }}>für neue Aktivierungen diesen Monat fällig</span>
                                 </div>
-                              ) : (
-                                <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 950 }}>{mixedTotal.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>/ Mo.</span></strong>
-                              )}
+
+                                {/* Progress bar */}
+                                <div style={{ marginBottom: '14px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 600, color: '#1d1d1f', marginBottom: '4px' }}>
+                                    <span>Aktivierte Schülerprofile gesamt:</span>
+                                    <span>{activeStudentsCount} von {totalStudentsCount} ({activationPercentage}%)</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '6px', background: 'rgba(0, 0, 0, 0.05)', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${activationPercentage}%`, height: '100%', background: '#34c759', borderRadius: '100px', transition: 'width 0.4s' }} />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '10px', marginTop: 'auto' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
+                                    <span style={{ color: '#8e8e93' }}>💳 Erlaubte Zahlungsarten:</span>
+                                    <strong style={{ fontWeight: 600 }}>Abbuchung &amp; Barzahlung</strong>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
+                                    <span style={{ color: '#8e8e93' }}>🚀 Neue Aktivierungen diesen Monat:</span>
+                                    <strong style={{ fontWeight: 700, color: '#16a34a' }}>+{studentsAddedThisMonth}</strong>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
+                                    <span style={{ color: '#8e8e93' }}>📊 Umlagesatz (Sammelrechnung):</span>
+                                    <strong style={{ fontWeight: 600 }}>{activationFeePerStudent.toFixed(2).replace('.', ',')} € {studentBillingOption === 'option1' ? 'einmalig' : '/ Mo.'}</strong>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f', borderTop: '1px dashed rgba(0, 0, 0, 0.05)', paddingTop: '4px', marginTop: '2px' }}>
+                                    <span style={{ color: '#8e8e93' }}>💳 Per Abbuchung:</span>
+                                    <strong style={{ fontWeight: 600 }}>{debitCount} ({ (debitCount * activationFeePerStudent).toFixed(2).replace('.', ',') } €)</strong>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
+                                    <span style={{ color: '#8e8e93' }}>💵 Per Barzahlung:</span>
+                                    <strong style={{ fontWeight: 600 }}>{cashCount} ({ (cashCount * activationFeePerStudent).toFixed(2).replace('.', ',') } €)</strong>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          );
+                        })()}
+
+
 
                         {/* Slider & Invoices in dashboard */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '28px', alignItems: 'start', marginTop: '12px' }}>
@@ -15756,10 +15669,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         width: '100%'
                                       }}
                                     >
-                                      <option value="option1">Option 1: Jahrespauschale (Schüler zahlt 5,29 € / Jahr)</option>
-                                      <option value="option2">Option 2: Monatsumlage (Schüler zahlt 0,49 € / Mo.)</option>
-                                      <option value="option3_1">Option 3.1: Kofinanzierung (Schüler 0,24 € / Schule 0,25 € / Mo.)</option>
-                                      <option value="option3_2">Option 3.2: Kofinanzierung (Schüler 2,59 € / Jahr, Schule 0,25 € / Mo.)</option>
+                                      <option value="option1">Option 1: Jahrespauschale (Schüler zahlt 4,80 € / Jahr)</option>
+                                      <option value="option2">Option 2: Monatsumlage (Schüler zahlt 0,40 € / Mo.)</option>
                                     </select>
                                   </div>
                                 </div>
@@ -15857,7 +15768,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 while (y < currentYear || (y === currentYear && m <= currentMonth)) {
                                   const monthStr = m < 10 ? `0${m}` : `${m}`;
                                   const yearShort = String(y).slice(-2);
-                                  const invId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
                                   
                                   const lastDay = new Date(y, m, 0).getDate();
                                   const monthName = deMonths[m];
@@ -15879,38 +15789,60 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   const status = isCreated ? 'Bezahlt' : 'Vorschau';
                                   const paid = isCreated;
 
-                                  // Calculate B2B and student shares dynamically
-                                  const b2bAmount = isCurrent 
-                                    ? (mixedTotal_global + einmalzahlungTotal + extraEinmalzahlungTotal)
-                                    : 39.90;
+                                  // Calculate B2B and AKT amounts
+                                  const infAmount = baseB2B_global;
                                   
-                                  const schoolStudentCost = isCurrent ? studentSharePreview_global : 0;
-                                  const schoolStudentLevy = isCurrent ? studentLevyMonthly_global : 0;
-                                  const schoolExtraCost = isCurrent ? schoolShareBookedExtra_global : 0;
-                                  const extraLevyMonthly = isCurrent ? extraLevyMonthly_global : 0;
-                                  const einmalzahlung = isCurrent ? (isAnnualBilling ? students.length * annualPricePerStudent : 0) : 0;
-                                  const extraEinmalzahlung = isCurrent ? extraEinmalzahlungTotal : 0;
+                                  const aktAmount = isCurrent 
+                                    ? (studentBillingOption === 'option1' ? activeStudentsCount_global * 4.80 : activeStudentsCount_global * 0.40)
+                                    : (students.length * (studentBillingOption === 'option1' ? 4.80 : 0.40));
 
+                                  // 1. Infrastruktur-Rechnung (INF)
                                   invoicesData.push({
-                                    id: invId,
+                                    id: `INF-${schoolNumericId}-${yearShort}${monthStr}-01`,
+                                    type: 'INF',
                                     year: String(y),
                                     monthName: monthName,
                                     date: invoiceDateStr,
                                     dueDateStr: dueDateStr,
                                     isCurrentMonth: isCurrent,
-                                    b2b: b2bAmount,
-                                    amount: b2bAmount,
-                                    schoolStudentCost: schoolStudentCost,
-                                    schoolStudentLevy: schoolStudentLevy,
-                                    schoolExtraCost: schoolExtraCost,
-                                    extraLevyMonthly: extraLevyMonthly,
-                                    extraEinmalzahlung: extraEinmalzahlung,
+                                    b2b: infAmount,
+                                    amount: infAmount,
+                                    schoolStudentCost: 0,
+                                    schoolStudentLevy: 0,
+                                    schoolExtraCost: 0,
+                                    extraLevyMonthly: 0,
+                                    extraEinmalzahlung: 0,
                                     b2c: 0,
-                                    einmalzahlung: einmalzahlung,
+                                    einmalzahlung: 0,
                                     status: status,
                                     paid: paid,
                                     creationTime: creationTime
                                   });
+
+                                  // 2. Sammelrechnung Schüleraktivierungen (AKT)
+                                  if (aktAmount > 0) {
+                                    invoicesData.push({
+                                      id: `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`,
+                                      type: 'AKT',
+                                      year: String(y),
+                                      monthName: monthName,
+                                      date: invoiceDateStr,
+                                      dueDateStr: dueDateStr,
+                                      isCurrentMonth: isCurrent,
+                                      b2b: 0,
+                                      amount: aktAmount,
+                                      schoolStudentCost: 0,
+                                      schoolStudentLevy: studentBillingOption === 'option2' ? aktAmount : 0,
+                                      schoolExtraCost: 0,
+                                      extraLevyMonthly: 0,
+                                      extraEinmalzahlung: 0,
+                                      b2c: aktAmount,
+                                      einmalzahlung: studentBillingOption === 'option1' ? aktAmount : 0,
+                                      status: status,
+                                      paid: paid,
+                                      creationTime: creationTime
+                                    });
+                                  }
 
                                   // Increment month
                                   m++;
@@ -15962,6 +15894,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                             <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                                               <div>
                                                 <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
+                                                <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'block', fontWeight: 700 }}>
+                                                  {inv.type === 'INF' ? '💳 Infrastruktur-Rechnung' : '👥 Sammelrechnung Schüleraktivierungen'}
+                                                </span>
                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
                                                   Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)}
                                                 </span>
@@ -15970,17 +15905,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                                 </span>
                                               </div>
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
-                                                <div style={{ color: '#0369a1', fontWeight: 800 }}>
-                                                  Rechnungsbetrag (Netto): {inv.b2b.toFixed(2).replace('.', ',')} €
+                                                <div style={{ color: inv.type === 'INF' ? '#0369a1' : '#16a34a', fontWeight: 800 }}>
+                                                  Betrag: {inv.amount.toFixed(2).replace('.', ',')} €
                                                 </div>
-                                                {inv.einmalzahlung > 0 && (
-                                                  <div style={{ fontSize: '0.62rem', color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 700, marginTop: '2px' }}>
-                                                    Enthält {inv.einmalzahlung.toFixed(2).replace('.', ',')} € Einmalzahlung Schüler
-                                                  </div>
-                                                )}
-                                                {inv.b2c > 0 && (
-                                                  <div style={{ color: '#6b21a8', fontSize: '0.68rem', fontWeight: 700 }}>
-                                                    Schüler B2C Einzug: {inv.b2c.toFixed(2).replace('.', ',')} €
+                                                {inv.type === 'AKT' && (
+                                                  <div style={{ fontSize: '0.58rem', color: '#16a34a', background: '#d1fae5', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                                                    Durchlaufender Posten
                                                   </div>
                                                 )}
                                               </div>
@@ -19162,10 +19092,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             {/* Selection options inside the modal */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
               {[
-                { id: 'option1', title: 'Option 1: Jahrespauschale', desc: '5,29 € / Jahr pro Schüler (Einmalzahlung)' },
-                { id: 'option2', title: 'Option 2: Monatsumlage', desc: '0,49 € / Mo. pro Schüler (Monatlich)' },
-                { id: 'option3_1', title: 'Option 3.1: Kofinanzierung Mo.', desc: 'Schüler 0,24 € / Mo. & Schule 0,25 € / Mo.' },
-                { id: 'option3_2', title: 'Option 3.2: Kofinanzierung Jahr', desc: 'Schüler 2,59 € / Jahr & Schule 0,25 € / Mo.' }
+                { id: 'option1', title: 'Option 1: Jahrespauschale', desc: '4,80 € / Jahr pro Schüler (Einmalzahlung)' },
+                { id: 'option2', title: 'Option 2: Monatsumlage', desc: '0,40 € / Mo. pro Schüler (Monatlich)' }
               ].map((opt) => {
                 const isSelected = selectedModalOption === opt.id;
                 const isCurrentActive = studentBillingOption === opt.id;
@@ -19259,28 +19187,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       {/* Modal for Invoice Preview / Print */}
       {selectedInvoice && (() => {
+        const isInf = selectedInvoice.type === 'INF' || !selectedInvoice.type; // Fallback to INF
+        const isAkt = selectedInvoice.type === 'AKT';
         const billedCampus = hasCampusSub || campusActivatedThisMonth;
-        const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
-        const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
-        const mCost = activeModulesCount * 4.99;
+        const mCost = billedCampus ? 4.99 : 0;
 
-        const schoolShareTotal = selectedInvoice.isCurrentMonth
-          ? (mCost + ((allTeachers.length + employees.length) * 0.49) + selectedInvoice.schoolStudentCost + selectedInvoice.schoolExtraCost)
-          : selectedInvoice.amount;
-
-        const studentShareTotal = selectedInvoice.isCurrentMonth
-          ? (selectedInvoice.schoolStudentLevy + selectedInvoice.einmalzahlung + selectedInvoice.extraLevyMonthly + selectedInvoice.extraEinmalzahlung)
-          : 0;
+        const schoolShareTotal = isInf ? selectedInvoice.amount : 0;
+        const studentShareTotal = isAkt ? selectedInvoice.amount : 0;
 
         // Count rendered rows to dynamically compress layout if needed
-        let lineCount = 1;
-        if (selectedInvoice.b2b > 0) lineCount += 2;
-        if (selectedInvoice.schoolStudentCost > 0) lineCount++;
-        if (selectedInvoice.schoolStudentLevy > 0) lineCount++;
-        if (selectedInvoice.schoolExtraCost > 0) lineCount++;
-        if (selectedInvoice.extraLevyMonthly > 0) lineCount++;
-        if (selectedInvoice.einmalzahlung > 0) lineCount++;
-        if (selectedInvoice.extraEinmalzahlung > 0) lineCount++;
+        let lineCount = isInf ? 4 : 2;
 
         const isLongInvoice = lineCount > 5;
         const dynamicPadding = isLongInvoice ? '16px 24px' : '24px 30px';
@@ -19409,9 +19325,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
                     <strong style={{ display: 'block', fontSize: '0.92rem', color: selectedInvoice.status === 'Vorschau' ? '#d97706' : '#0f172a' }}>
-                      {selectedInvoice.status === 'Vorschau' ? 'RECHNUNGSVORSCHAU' : 'RECHNUNG'}
+                      {selectedInvoice.status === 'Vorschau' 
+                        ? (isInf ? 'VORSCHAU: INFRASTRUKTUR-RECHNUNG' : 'VORSCHAU: SAMMELRECHNUNG') 
+                        : (isInf ? 'INFRASTRUKTUR-RECHNUNG' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')}
                     </strong>
-                    <span style={{ color: '#64748b' }}>Nr. {selectedInvoice.id}</span>
+                    <span style={{ color: '#64748b', fontWeight: 700 }}>Nr. {selectedInvoice.id}</span>
                   </div>
                 </div>
 
@@ -19466,199 +19384,97 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Position 1: 100% Kostenlose Software Lizenz */}
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software 100% kostenlos</span>
-                      </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
-                      </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
-                    </tr>
+                    {isInf && (
+                      <>
+                        {/* Position 1: 100% Kostenlose Software Lizenz */}
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: dynamicTdPadding }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Plattform-Lizenz 100% kostenlos</span>
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>0,00 €</td>
+                          <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                        </tr>
 
-                    {/* Position 2: Active Modules */}
-                    {selectedInvoice.b2b > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Module)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus / GrooveLab)</span>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {mCost.toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
+                        {/* Position 2: Campus platform access */}
+                        {mCost > 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: dynamicTdPadding }}>
+                              <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Plattformzugriff (Server-Modul)</strong>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {mCost.toFixed(2).replace('.', ',')} €
+                            </td>
+                            <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                              {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Position 3: Team-Members */}
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: dynamicTdPadding }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder (Lehrkräfte/Verwaltung)</span>
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                            {(((allTeachers.length + employees.length) * 0.49) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+
+                        {/* Position 4: School Base Fee for DB creation */}
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: dynamicTdPadding }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank-Erstellung &amp; Speicherplatz (Schulanteil)</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {students.length} Schüler (0,09 € / Mo.)</span>
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {(students.length * 0.09).toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                            {((students.length * 0.09) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      </>
                     )}
 
-                    {/* Position 3: Team-Members (excl. students) */}
-                    {selectedInvoice.b2b > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder</span>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {(((allTeachers.length + employees.length) * 0.49) * (selectedInvoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 4: Schüler-Umlage (Schulanteil / Kofinanzierung) */}
-                    {selectedInvoice.schoolStudentCost > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Kofinanzierung)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                    {isAkt && (
+                      <>
+                        {/* Position 1: Student Activations */}
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: dynamicTdPadding }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              {students.length} Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
+                              Nutzungsgebühr für {activeStudentsCount_global} aktivierte Schüler-Accounts (Umlagesatz = {studentBillingOption === 'option1' ? '4,80 € / Jahr' : '0,40 € / Mo.'})
                             </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          0,25 €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.schoolStudentCost.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 4b: Schüler-Monatsumlage (durch Schule an Campus-Groovelab bezahlt) */}
-                    {selectedInvoice.schoolStudentLevy > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schülerumlage)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              {students.length} Schüler (Umlagesatz = {studentBillingOption === 'option2' ? '0,49' : '0,24'} € / Mo.)
-                            </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {(studentBillingOption === 'option2' ? 0.49 : 0.24).toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.schoolStudentLevy.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 5: Zusätzliche Schüler-Zugänge (Schule-Anteil) */}
-                    {selectedInvoice.schoolExtraCost > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              {bookedExtraUsers} Extra-Schüler (Kofinanzierung = Schule zahlt 0,25 € / Mo.)
-                            </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>Träger: Musikschule</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          0,25 €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.schoolExtraCost.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 5b: Zusätzliche Schüler-Umlage (transit) */}
-                    {selectedInvoice.extraLevyMonthly > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Umlage)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              {bookedExtraUsers} Extra-Schüler (Umlagesatz = {extraBillingOption === 'option3_1' ? '0,24' : '0,49'} € / Mo.)
-                            </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (Umlage)</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {(extraBillingOption === 'option3_1' ? 0.24 : 0.49).toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.extraLevyMonthly.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 6: Einmalzahlung Schüler */}
-                    {selectedInvoice.einmalzahlung > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Schüler-Jahrespauschale)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              Jahrespauschale (wird von Schule ausgelegt &amp; von Schülern bezahlt)
-                            </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          1x
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.einmalzahlung.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 6b: Einmalzahlung Zusätzliche Schüler */}
-                    {selectedInvoice.extraEinmalzahlung > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Zusätzliche Schüler-Jahrespauschale)</strong>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                              Jahrespauschale für {bookedExtraUsers} zusätzliche Schüler (wird von Schule ausgelegt &amp; von Schülern bezahlt)
-                            </span>
-                            <span style={{ display: 'inline-block', fontSize: '0.58rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#f5e6ff', color: '#6b21a8' }}>Träger: Schüler (ausgelegt durch Schule)</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          1x
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {selectedInvoice.extraEinmalzahlung.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {activeStudentsCount_global} {activeStudentsCount_global === 1 ? 'Schüler' : 'Schüler'}
+                          </td>
+                          <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                            {(studentBillingOption === 'option1' ? 4.80 : 0.40).toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                            {selectedInvoice.amount.toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      </>
                     )}
                   </tbody>
                 </table>
@@ -19666,25 +19482,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 {/* Total Calculation */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '12px' }}>
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <div style={{ width: '240px' }}>
-                      {schoolShareTotal > 0 && (
+                    <div style={{ width: '320px' }}>
+                      {isInf && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                          <span>• Träger Musikschule:</span>
+                          <span>• Träger Musikschule (Betrieb &amp; Infrastruktur):</span>
                           <span style={{ fontWeight: 650, color: '#0f172a' }}>{schoolShareTotal.toFixed(2).replace('.', ',')} €</span>
                         </div>
                       )}
-                      {studentShareTotal > 0 && (
+                      {isAkt && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                          <span>• Träger Schüler (Umlage):</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                          <span>• Durchlaufender Posten (Umlage an Schüler):</span>
+                          <span style={{ fontWeight: 650, color: '#16a34a' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
                         </div>
                       )}
                       <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
-                        <span style={{ fontWeight: 800 }}>Rechnungsbetrag:</span>
-                        <strong style={{ fontWeight: 900, color: '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                        <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
+                        <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
                       </div>
                     </div>
+                    {isAkt && (
+                      <div style={{ fontSize: '0.64rem', color: '#16a34a', background: '#d1fae5', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                        💡 <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Aktivierungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
+                      </div>
+                    )}
                     <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
                       Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
                     </div>

@@ -380,7 +380,36 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('email') || '';
   });
-  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'preferences' | 'success'>('verify');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'payment_selection' | 'preferences' | 'success'>('verify');
+  const [studentPaymentMethod, setStudentPaymentMethod] = useState<'debit' | 'cash'>('debit');
+
+  const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
+    const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
+    const month = contractDateObj.getMonth() + 1; // 1-indexed
+
+    const monthsMap: Record<number, number> = {
+      9: 12,  // September
+      10: 11, // October
+      11: 10, // November
+      12: 8,  // December
+      1: 7,   // January
+      2: 6,   // February
+      3: 5,   // March
+      4: 4,   // April
+      5: 3,   // May
+      6: 0,   // June
+      7: 0,   // July
+      8: 0    // August
+    };
+
+    const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
+    if (monthsRemaining === 0) {
+      return 4.80;
+    }
+    const basePrice = 4.80;
+    return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
+  };
+
   const [selectedSlots, setSelectedSlots] = useState<{[key: string]: 'wunsch' | 'gesperrt'}>({});
   const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt'>('wunsch');
   const [showSaturday, setShowSaturday] = useState(false);
@@ -884,6 +913,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    if (parentOnboardingStep === 'payment_selection') {
+      const allowed = schoolData?.student_billing_option;
+      if (allowed === 'debit') {
+        setStudentPaymentMethod('debit');
+      } else if (allowed === 'cash') {
+        setStudentPaymentMethod('cash');
+      }
+    }
+  }, [parentOnboardingStep, schoolData?.student_billing_option]);
 
   useEffect(() => {
     if (!schoolData?.logo_url) return;
@@ -1601,10 +1641,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       setVerifiedStudentDetails(studentUser);
-      setParentOnboardingStep('preferences');
+      setParentOnboardingStep('payment_selection');
     } catch (err: any) {
       console.error('Email submission error:', err);
       setParentOnboardingError(err.message || 'Aktivierung konnte nicht abgeschlossen werden.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleSavePaymentSelection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifiedStudentId) {
+      setParentOnboardingError('Schüler-ID fehlt.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ student_billing_payment_method: studentPaymentMethod })
+        .eq('id', verifiedStudentId);
+
+      if (error) throw error;
+
+      setParentOnboardingStep('preferences');
+    } catch (err: any) {
+      console.error('Save payment selection error:', err);
+      setParentOnboardingError(err.message || 'Die Zahlungsmethode konnte nicht gespeichert werden.');
     } finally {
       setParentOnboardingLoading(false);
     }
@@ -3466,6 +3533,139 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="button"
               onClick={() => setParentOnboardingStep('verify')}
               style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '8px' }}
+            >
+              Zurück
+            </button>
+          </form>
+        )}
+
+        {parentOnboardingStep === 'payment_selection' && (
+          <form onSubmit={handleSavePaymentSelection} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
+              <strong>Abrechnung der Schüler-Gebühr</strong>
+            </p>
+
+            <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', lineHeight: '1.5', background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
+              <div style={{ marginTop: '10px', fontWeight: 800, color: '#4ade80', fontSize: '14px' }}>
+                Betrag: {(() => {
+                  const price = getDynamicAnnualPriceLocal(schoolData?.contract_start_date, false);
+                  return `${price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)`;
+                })()}
+              </div>
+              <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', display: 'block', marginTop: '6px' }}>
+                * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
+              </span>
+            </div>
+
+            {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase' }}>Zahlungsmethode wählen *</label>
+                
+                {/* Option 1: Abbuchung */}
+                <div 
+                  onClick={() => setStudentPaymentMethod('debit')}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '14px',
+                    border: studentPaymentMethod === 'debit' ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.15)',
+                    background: studentPaymentMethod === 'debit' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: '2px solid #ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {studentPaymentMethod === 'debit' && (
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                    <strong style={{ color: '#ffffff', fontSize: '13px' }}>Mit der nächsten Unterrichtsgebühr abbuchen</strong>
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '2px', lineHeight: '1.3' }}>
+                      Die Gebühr wird bequem über deine bestehende Bankverbindung der Musikschule eingezogen.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Option 2: Barzahlung */}
+                <div 
+                  onClick={() => setStudentPaymentMethod('cash')}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '14px',
+                    border: studentPaymentMethod === 'cash' ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.15)',
+                    background: studentPaymentMethod === 'cash' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: '2px solid #ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {studentPaymentMethod === 'cash' && (
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                    <strong style={{ color: '#ffffff', fontSize: '13px' }}>Geld in bar mitbringen</strong>
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '2px', lineHeight: '1.3' }}>
+                      Bitte bringe den Betrag passend mit in den nächsten Unterricht und gib ihn der Lehrkraft oder Verwaltung.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                <strong style={{ display: 'block', fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
+                  {schoolData.student_billing_option === 'debit' ? '💳 Abbuchung vereinbart' : '💵 Barzahlung vereinbart'}
+                </strong>
+                <span style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.4' }}>
+                  {schoolData.student_billing_option === 'debit' 
+                    ? 'Diese Gebühr wird automatisch mit deiner nächsten monatlichen Unterrichtsgebühr über die Musikschule abgebucht.'
+                    : 'Bitte bringe den Betrag passend bar zum nächsten Unterricht mit und gib ihn der Lehrkraft oder im Sekretariat ab.'}
+                </span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={parentOnboardingLoading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                background: '#34a853',
+                color: '#ffffff',
+                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
+              }}
+            >
+              {parentOnboardingLoading ? 'Speichere...' : 'Weiter zu den Terminen'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setParentOnboardingStep('email')}
+              style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '4px' }}
             >
               Zurück
             </button>
