@@ -15451,9 +15451,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
 
                         {/* Slider & Invoices in dashboard */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '28px', alignItems: 'start', marginTop: '12px' }}>
+                        <div style={{ display: 'block', marginTop: '12px' }}>
                           {/* Slider Section */}
-                          <div style={{
+                          {false && <div style={{
                             padding: '20px',
                             borderRadius: '24px',
                             border: '1.5px solid #ddd6fe',
@@ -15816,7 +15816,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 )}
                               </>
                             )}
-                          </div>
+                          </div>}
 
                           {/* Rechnungen list */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
