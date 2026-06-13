@@ -3544,7 +3544,7 @@ export function TeacherDashboard({
 
         // Auto-checkout stale session for current student if they are in view-only / not checked in locally
         if (viewMode === 'student' && !isUserCheckedIn && userId) {
-          const staleSession = trulyActive.find(s => s && s.user_id === userId);
+          const staleSession = (sessData || []).find(s => s && s.user_id === userId);
           if (staleSession) {
             console.log('[Groovelab] Stale session detected for current student on board, logging out from database...');
             supabase.from('sessions')

@@ -2955,7 +2955,7 @@ function App() {
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
         supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
-        supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
+        supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -2985,7 +2985,7 @@ function App() {
         const count = activeSessionsRes.data.filter((s: any) => {
           const u: any = Array.isArray(s.users) ? s.users[0] : s.users;
           if (!u) return false;
-          return u.role?.toLowerCase() === 'student' && s.station_id;
+          return u.role?.toLowerCase() === 'student' && s.station_id && s.gps_verified;
         }).length;
         setActiveStudentsCount(count);
       }
@@ -5410,16 +5410,16 @@ function App() {
     // Fetch sessions and join users to filter by school and heartbeat
     const { data: activeSessions } = await supabase
       .from('sessions')
-      .select('user_id, station_id, users!inner(role, school_id, last_seen)')
+      .select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen)')
       .is('check_out_time', null)
       .eq('users.school_id', schoolId)
       .eq('users.role', 'student');
     
-    // Only count students who have an active session at a station
+    // Only count students who have an active session at a station and are gps_verified
     const count = (activeSessions || []).filter(s => {
       const u: any = Array.isArray(s.users) ? s.users[0] : s.users;
       if (!u) return false;
-      return u.role?.toLowerCase() === 'student' && s.station_id;
+      return u.role?.toLowerCase() === 'student' && s.station_id && s.gps_verified;
     }).length;
     
     setActiveStudentsCount(count);
@@ -7249,7 +7249,7 @@ function App() {
                   isSidebarCollapsed={isSidebarCollapsed}
                   setIsSidebarCollapsed={setIsSidebarCollapsed}
                   onSidebarNotificationsChange={setSidebarNotificationsCount}
-                  activePlatform={activePlatform as any}
+                  activePlatform="groovelab"
                   session={session}
                   onSessionChange={setSession}
                   locationMode={locationMode}
