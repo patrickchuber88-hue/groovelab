@@ -2179,7 +2179,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             first_name: fName,
             last_name: lName,
             email: '',
-            instrument: ps.instrument || 'Allgemein',
+            instrument: ps.instrument || 'Offen',
             is_active: false,
             is_campus_active: false,
             is_groovelab_active: false,
@@ -4641,7 +4641,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     // Show all students belonging to the school
     const campusStudentsOnly = students;
 
-    const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Allgemein')));
+    const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Offen')));
     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
@@ -4656,7 +4656,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const query = studentSearchQuery.toLowerCase().trim();
       
       const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
-      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Allgemein') === studentFilterInstrument;
+      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Offen') === studentFilterInstrument;
       const matchesTeacher = studentFilterTeacher === 'All' || 
         (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
       
@@ -5185,7 +5185,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           width: '100%',
                           boxSizing: 'border-box'
                         }}>
-                          {student.instrument || 'Allgemein'}
+                          {student.instrument || 'Offen'}
                         </span>
                       </div>
 

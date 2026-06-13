@@ -43,7 +43,7 @@ const resolveCampusAvatar = (u: any): string => {
   const role = (u.role || '').toLowerCase();
   
   if (role === 'student') {
-    const studentInstrument = u.instrument || 'Allgemein';
+    const studentInstrument = u.instrument || 'Offen';
     const inst = studentInstrument.toLowerCase().trim();
     if (inst.includes('guitar') || inst.includes('gitarre')) {
       if (u.photo_url && (u.photo_url.includes('egitarre_avatar') || u.photo_url.includes('gitarre_avatar_new'))) {
