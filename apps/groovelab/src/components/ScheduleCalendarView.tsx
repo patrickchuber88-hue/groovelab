@@ -962,7 +962,7 @@ export function ScheduleCalendarView({
                     student: { 
                       first_name: student.first_name || 'Pause', 
                       last_name: student.last_name || '', 
-                      instrument: student.instrument || 'Offen' 
+                      instrument: student.instrument || 'Nicht festgelegt' 
                     },
                     schedules: {
                       room_id: board.roomId || null,

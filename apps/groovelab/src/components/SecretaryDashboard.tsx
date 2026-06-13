@@ -507,7 +507,7 @@ function TeacherCard({
 
   const name = `${teacher.firstName || teacher.first_name || ''} ${teacher.lastName || teacher.last_name || ''}`.trim();
   const email = teacher.email || '';
-  const instrument = teacher.instrument || 'Allgemein';
+  const instrument = teacher.instrument || 'Nicht festgelegt';
   const pin = teacher.ausweisNummer || teacher.ausweis_nummer || '';
   const isCampus = teacher.isCampusActive || teacher.is_campus_active;
   const isGroovelab = teacher.isGroovelabActive || teacher.is_groovelab_active;
@@ -2179,7 +2179,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             first_name: fName,
             last_name: lName,
             email: '',
-            instrument: ps.instrument || 'Offen',
+            instrument: ps.instrument || 'Nicht festgelegt',
             is_active: false,
             is_campus_active: false,
             is_groovelab_active: false,
@@ -2728,7 +2728,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       
       const namePart = parts[0].trim();
       const email = parts[1].trim();
-      const instrument = parts[2]?.trim() || 'Allgemein';
+      const instrument = parts[2]?.trim() || 'Nicht festgelegt';
       const roleText = parts[3]?.trim()?.toLowerCase() || 'teacher';
       
       const nameParts = namePart.split(/\s+/);
@@ -3115,7 +3115,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           first_name: newTeacherFirstName.trim(),
           last_name: newTeacherLastName.trim(),
           email: newTeacherEmail.trim(),
-          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Allgemein',
+          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
           max_students: newTeacherLimit,
           ausweis_nummer: pin,
           teacher_qr_token: qrToken,
@@ -3157,7 +3157,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           first_name: coachFirstName,
           last_name: coachLastName,
           email: coachEmail,
-          instrument: coachInstrument || 'Allgemein',
+          instrument: coachInstrument || 'Nicht festgelegt',
           is_active: true,
           is_app_user: true,
           ausweis_nummer: pin,
@@ -3310,7 +3310,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         first_name: newStudentFirstName,
         last_name: newStudentLastName,
         birth_date: newStudentBirthDate.trim(),
-        instrument: newStudentInstrument || 'Allgemein',
+        instrument: newStudentInstrument || 'Nicht festgelegt',
         school_id: schoolId,
         teacher_id: teacherId
       });
@@ -3398,7 +3398,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const firstName = parts[0]?.trim();
         const lastName = parts[1]?.trim();
         const birthDate = parts[2]?.trim(); // DD.MM.YYYY
-        let instrument = parts[3]?.trim() || 'Allgemein';
+        let instrument = parts[3]?.trim() || 'Nicht festgelegt';
         const teacherNamePart = parts[4]?.trim()?.toLowerCase() || '';
 
         if (!firstName || !lastName || !birthDate) {
@@ -3414,7 +3414,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           if (foundSelected) {
             teacherId = foundSelected.id;
             if (!parts[3]?.trim()) {
-              instrument = foundSelected.instrument || 'Allgemein';
+              instrument = foundSelected.instrument || 'Nicht festgelegt';
             }
           }
         }
@@ -3481,7 +3481,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       if (parts.length >= 2) {
         namePart = parts[0].trim();
-        instrument = parts[1].trim() || 'Allgemein';
+        instrument = parts[1].trim() || 'Nicht festgelegt';
         email = parts[2]?.trim() || '';
         teacherNamePart = parts[3]?.trim()?.toLowerCase() || '';
       } else {
@@ -3509,7 +3509,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           teacherId = foundSelected.id;
           // Auto-inject instrument if not explicitly typed or is default/placeholder
           if (!parts[1]?.trim()) {
-            finalInstrument = foundSelected.instrument || 'Allgemein';
+            finalInstrument = foundSelected.instrument || 'Nicht festgelegt';
           }
         }
       }
@@ -3542,7 +3542,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             first_name: firstName,
             last_name: lastName,
             email: finalEmail,
-            instrument: finalInstrument || 'Allgemein',
+            instrument: finalInstrument || 'Nicht festgelegt',
             avatar_url: defaultAvatarUrl,
             is_active: true,
             is_campus_active: true,
@@ -3561,7 +3561,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         await supabase.from('avatars').insert({
           user_id: insertedStudent.id,
           avatar_style: 'Standard_Silhouette',
-          instrument_type: instrument || 'Allgemein',
+          instrument_type: instrument || 'Nicht festgelegt',
           evolution_level: 1
         });
 
@@ -4641,7 +4641,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     // Show all students belonging to the school
     const campusStudentsOnly = students;
 
-    const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Offen')));
+    const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Nicht festgelegt')));
     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
@@ -4656,7 +4656,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const query = studentSearchQuery.toLowerCase().trim();
       
       const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
-      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Offen') === studentFilterInstrument;
+      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
       const matchesTeacher = studentFilterTeacher === 'All' || 
         (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
       
@@ -5185,7 +5185,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           width: '100%',
                           boxSizing: 'border-box'
                         }}>
-                          {student.instrument || 'Offen'}
+                          {student.instrument || 'Nicht festgelegt'}
                         </span>
                       </div>
 
@@ -10773,7 +10773,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   return acc;
                 }, []);
 
-                const uniqueInstruments = Array.from(new Set(allUniqueTeachers.map(t => t.instrument || 'Allgemein')));
+                const uniqueInstruments = Array.from(new Set(allUniqueTeachers.map(t => t.instrument || 'Nicht festgelegt')));
 
                 const filteredTeachers = allUniqueTeachers.filter((t: any) => {
                   const firstName = (t.firstName || t.first_name || '').toLowerCase();
@@ -10789,7 +10789,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     (teacherStatusTab === 'active' && isCampus && isActive) ||
                     (teacherStatusTab === 'inactive' && !isActive);
 
-                  const instrument = (t.instrument || 'Allgemein').toLowerCase();
+                  const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
                   const filterInst = teacherFilterInstrument.toLowerCase();
                   const matchesInstrument = teacherFilterInstrument === 'All' || instrument === filterInst;
                     
@@ -11113,7 +11113,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   width: '100%',
                                   boxSizing: 'border-box'
                                 }}>
-                                  {t.instrument || 'Allgemein'}
+                                  {t.instrument || 'Nicht festgelegt'}
                                 </span>
                               </div>
 
@@ -12237,7 +12237,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 }, []);
 
                 const instrumentCounts = allUniqueTeachers.reduce((acc: Record<string, number>, t: any) => {
-                  const inst = t.instrument || 'Allgemein';
+                  const inst = t.instrument || 'Nicht festgelegt';
                   acc[inst] = (acc[inst] || 0) + 1;
                   return acc;
                 }, {});
@@ -14389,7 +14389,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div key={c.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <strong style={{ fontSize: '0.88rem', color: '#1e293b', display: 'block' }}>{c.firstName} {c.lastName}</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>🎸 {c.instrument || 'Allgemein'} &bull; {c.role}</span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>🎸 {c.instrument || 'Nicht festgelegt'} &bull; {c.role}</span>
                         </div>
                         <button onClick={() => handleDeleteUser(c.id)} style={{ border: 'none', background: 'transparent', color: '#ea4335', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </div>
