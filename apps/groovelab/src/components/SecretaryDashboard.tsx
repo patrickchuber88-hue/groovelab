@@ -1375,6 +1375,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? localStorage.getItem('contractStartDate') : null;
   });
+  const [tempSimulatedDate, setTempSimulatedDate] = useState<string>(() => {
+    const val = typeof window !== 'undefined' ? localStorage.getItem('contractStartDate') : null;
+    return val ? val.split('T')[0] : '2026-06-13';
+  });
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('isCancelled') === 'true';
@@ -1953,9 +1957,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         // Restore contractStartDate from DB contract_start_date or created_at
         if (schoolData.contract_start_date) {
           setContractStartDate(schoolData.contract_start_date);
+          setTempSimulatedDate(schoolData.contract_start_date.split('T')[0]);
           localStorage.setItem('contractStartDate', schoolData.contract_start_date);
         } else if (schoolData.created_at) {
           setContractStartDate(schoolData.created_at);
+          setTempSimulatedDate(schoolData.created_at.split('T')[0]);
           localStorage.setItem('contractStartDate', schoolData.created_at);
         }
 
@@ -7782,7 +7788,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               background: '#f0fdf4',
               padding: '6px 12px',
               borderRadius: '12px',
@@ -7794,12 +7800,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </span>
               <input
                 type="date"
-                value={contractStartDate || '2026-06-13'}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setContractStartDate(val);
-                  localStorage.setItem('contractStartDate', val);
-                }}
+                value={tempSimulatedDate}
+                onChange={(e) => setTempSimulatedDate(e.target.value)}
                 style={{
                   border: 'none',
                   background: 'transparent',
@@ -7811,6 +7813,37 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               />
+              <button
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('schools')
+                      .update({ contract_start_date: tempSimulatedDate })
+                      .eq('id', schoolId);
+                    if (error) throw error;
+                    
+                    setContractStartDate(tempSimulatedDate);
+                    localStorage.setItem('contractStartDate', tempSimulatedDate);
+                    alert("Startdatum erfolgreich simuliert und gespeichert!");
+                  } catch (err: any) {
+                    console.error("Error setting simulated date:", err);
+                    alert("Fehler beim Speichern des Startdatums.");
+                  }
+                }}
+                style={{
+                  padding: '4px 10px',
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(22,163,74,0.2)'
+                }}
+              >
+                Bestätigen
+              </button>
             </div>
 
             {/* Integrated School & User Pill */}
