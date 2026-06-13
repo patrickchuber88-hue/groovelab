@@ -481,7 +481,7 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                    <QRCode value={teacherQrToken} size={130} />
+                    <QRCode value={`https://campus-groovelab.de/qr/${teacherQrToken}`} size={130} />
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>QR Code wird generiert...</div>

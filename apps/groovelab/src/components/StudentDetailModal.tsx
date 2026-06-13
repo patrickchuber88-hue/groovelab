@@ -1950,7 +1950,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     justifyContent: 'center',
                     border: '1.5px solid rgba(251, 191, 36, 0.3)'
                   }}>
-                    <QRCode value={student.qr_token || student.id || ''} size={135} />
+                    <QRCode value={`https://campus-groovelab.de/qr/${student.qr_token || student.id || ''}`} size={135} />
                   </div>
                 </div>
               </div>
@@ -2030,7 +2030,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <QRCode value={student.qr_token || student.id || ''} size={135} />
+                    <QRCode value={`https://campus-groovelab.de/qr/${student.qr_token || student.id || ''}`} size={135} />
                   </div>
 
                   <p style={{ 
