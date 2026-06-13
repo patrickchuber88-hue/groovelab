@@ -1404,6 +1404,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     };
 
     const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
+    if (monthsRemaining === 0) {
+      // June, July, August: Flat starter rate between 49 and 99 EUR for the school (69 EUR standard, 35 EUR co-financed)
+      const schoolSize = students.length || 7;
+      const targetFlatTotal = isCoFinancing ? 35.00 : 69.00;
+      return parseFloat((targetFlatTotal / schoolSize).toFixed(2));
+    }
     const ratePerMonth = isCoFinancing ? 0.24 : 0.49;
     return parseFloat((monthsRemaining * ratePerMonth).toFixed(2));
   };
@@ -14675,9 +14681,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     icon: (
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
                                     ),
-                                    title: 'Option 1: Jahrespauschale (Schüler zahlt vollständig)',
-                                    badge: '10% Rabatt',
-                                    desc: 'Der Schüler zahlt einmalig 5,29 € / Jahr. Die Musikschule zahlt für Schüler 0,00 €.'
+                                    title: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
+                                      ? 'Option 1: Einsteiger-Flatrate (Schüler zahlt vollständig)'
+                                      : 'Option 1: Jahrespauschale (Schüler zahlt vollständig)',
+                                    badge: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
+                                      ? 'Einsteiger-Flat (bis Aug.)'
+                                      : '10% Rabatt',
+                                    desc: `Der Schüler zahlt einmalig ${getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € (Flatrate bis Aug.). Die Musikschule zahlt für Schüler 0,00 €.`
                                   },
                                   {
                                     id: 'option3_1',
@@ -14693,9 +14703,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     icon: (
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
                                     ),
-                                    title: 'Option 3.2: Kofinanzierung (Jährlicher Schüler-Split)',
-                                    badge: 'Split + 10% Rabatt',
-                                    desc: 'Kostenaufteilung: Schüler zahlt einmalig 2,59 € / Jahr. Die Musikschule zahlt 0,25 € / Mo.'
+                                    title: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
+                                      ? 'Option 3.2: Kofinanzierung (Einsteiger-Flat Schüler-Split)'
+                                      : 'Option 3.2: Kofinanzierung (Jährlicher Schüler-Split)',
+                                    badge: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
+                                      ? 'Split Flat (bis Aug.)'
+                                      : 'Split + 10% Rabatt',
+                                    desc: `Kostenaufteilung: Schüler zahlt einmalig ${getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € (Flatrate bis Aug.). Die Musikschule zahlt 0,25 € / Mo.`
                                   }
                                 ].map((opt) => {
                                   const isSelected = studentBillingOption === opt.id;
