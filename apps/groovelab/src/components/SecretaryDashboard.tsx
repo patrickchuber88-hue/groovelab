@@ -1373,10 +1373,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
   const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('contractStartDate') : null;
+    return typeof window !== 'undefined' ? (localStorage.getItem('contractStartDate') || localStorage.getItem('simulatedContractStartDate')) : null;
   });
   const [tempSimulatedDate, setTempSimulatedDate] = useState<string>(() => {
-    const val = typeof window !== 'undefined' ? localStorage.getItem('contractStartDate') : null;
+    const val = typeof window !== 'undefined' ? (localStorage.getItem('contractStartDate') || localStorage.getItem('simulatedContractStartDate')) : null;
     return val ? val.split('T')[0] : '2026-06-13';
   });
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
@@ -1420,6 +1420,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   };
 
   const handleDeveloperReset = async () => {
+    const simulated = typeof window !== 'undefined' ? localStorage.getItem('simulatedContractStartDate') : null;
     try {
       const { error } = await supabase
         .from('schools')
@@ -1429,7 +1430,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           has_groovelab_subscription: false,
           campus_activated_this_month: false,
           groovelab_activated_this_month: false,
-          contract_start_date: null,
+          contract_start_date: simulated || null,
           contract_ends_at: null,
           student_billing_option: 'option1',
           extra_billing_option: 'option1',
@@ -1449,7 +1450,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     setExtraBillingOption('option1');
     setNextBillingOption('');
     setNextBillingOptionEffectiveAt('');
-    setContractStartDate(null);
+    setContractStartDate(simulated || null);
     setIsCancelled(false);
     setHasCampusSub(false);
     setHasGroovelabSub(false);
@@ -1459,12 +1460,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     setAgreedToSepa(false);
 
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('isBillingBooked');
-      localStorage.removeItem('bookedExtraUsers');
+      localStorage.setItem('isBillingBooked', 'false');
+      localStorage.setItem('bookedExtraUsers', '0');
       localStorage.removeItem('nextBillingOption');
       localStorage.removeItem('nextBillingOptionEffectiveAt');
-      localStorage.removeItem('contractStartDate');
-      localStorage.removeItem('isCancelled');
+      if (simulated) {
+        localStorage.setItem('contractStartDate', simulated);
+      } else {
+        localStorage.removeItem('contractStartDate');
+      }
+      localStorage.setItem('isCancelled', 'false');
       localStorage.removeItem('unbooked_52_temp');
     }
   };
@@ -1959,10 +1964,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           setContractStartDate(schoolData.contract_start_date);
           setTempSimulatedDate(schoolData.contract_start_date.split('T')[0]);
           localStorage.setItem('contractStartDate', schoolData.contract_start_date);
-        } else if (schoolData.created_at) {
-          setContractStartDate(schoolData.created_at);
-          setTempSimulatedDate(schoolData.created_at.split('T')[0]);
-          localStorage.setItem('contractStartDate', schoolData.created_at);
+        } else {
+          const simulated = localStorage.getItem('simulatedContractStartDate');
+          if (simulated) {
+            setContractStartDate(simulated);
+            setTempSimulatedDate(simulated.split('T')[0]);
+            localStorage.setItem('contractStartDate', simulated);
+          } else if (schoolData.created_at) {
+            setContractStartDate(schoolData.created_at);
+            setTempSimulatedDate(schoolData.created_at.split('T')[0]);
+            localStorage.setItem('contractStartDate', schoolData.created_at);
+          }
         }
 
         // Restore extraBillingOption
@@ -15014,14 +15026,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   
                                   {studentBillingOption === 'option1' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                      <span>Einmalzahlung Schüler:</span>
+                                      <span>Einmalzahlung Schüler ({getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € pro Schüler):</span>
                                       <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                     </div>
                                   )}
 
                                   {studentBillingOption === 'option2' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                      <span>Schüler-Monatsumlage:</span>
+                                      <span>Schüler-Monatsumlage (0,49 € pro Schüler):</span>
                                       <strong>{(students.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
                                   )}
@@ -15029,11 +15041,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {studentBillingOption === 'option3_1' && (
                                     <>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                        <span>Schüler-Umlage (durch Schule erstattet):</span>
+                                        <span>Schüler-Umlage (durch Schule erstattet, 0,24 € pro Schüler):</span>
                                         <strong>{(students.length * 0.24).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
-                                        <span>Kofinanzierung Schule:</span>
+                                        <span>Kofinanzierung Schule (0,25 € pro Schüler):</span>
                                         <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </>
@@ -15042,11 +15054,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {studentBillingOption === 'option3_2' && (
                                     <>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                        <span>Schüler-Umlage (durch Schule erstattet):</span>
+                                        <span>Schüler-Umlage (durch Schule erstattet, {getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € pro Schüler):</span>
                                         <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, true)).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
-                                        <span>Kofinanzierung Schule:</span>
+                                        <span>Kofinanzierung Schule (0,25 € pro Schüler):</span>
                                         <strong>{(students.length * 0.25).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </>
@@ -15071,9 +15083,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
-                                <span style={{ fontWeight: 900 }}>Gesamteinzug von Musikschulkonto:</span>
+                                <span style={{ fontWeight: 900 }}>Monatliche Rate:</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
-                                  {isStarterFlat ? '69,00 € (einmalig)' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
+                                  {isStarterFlat ? '69,00 € / Mo.' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
                               <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
@@ -20076,40 +20088,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       )}
 
       {/* Floating Developer Reset Button */}
-      <button
-        onClick={handleDeveloperReset}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 99999,
-          background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-          color: '#ffffff',
-          border: 'none',
-          borderRadius: '30px',
-          padding: '12px 20px',
-          fontSize: '0.8rem',
-          fontWeight: 800,
-          cursor: 'pointer',
-          boxShadow: '0 10px 25px rgba(124, 58, 237, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          transition: 'all 0.2s ease-in-out',
-          fontFamily: 'Urbanist, sans-serif'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.boxShadow = '0 12px 30px rgba(124, 58, 237, 0.45)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)';
-        }}
-      >
-        <RefreshCw size={14} style={{ animation: 'spin 4s linear infinite' }} />
-        Entwickler-Reset (Bestellvorgang zurücksetzen)
-      </button>
+      {activeTab === 'secretary' && secretarySubTab === 'licenses' && (
+        <button
+          onClick={handleDeveloperReset}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 99999,
+            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '30px',
+            padding: '12px 20px',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(124, 58, 237, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease-in-out',
+            fontFamily: 'Urbanist, sans-serif'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 12px 30px rgba(124, 58, 237, 0.45)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)';
+          }}
+        >
+          <RefreshCw size={14} style={{ animation: 'spin 4s linear infinite' }} />
+          Entwickler-Reset (Bestellvorgang zurücksetzen)
+        </button>
+      )}
     </div>
   </div>
   );
