@@ -1410,8 +1410,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       const targetFlatTotal = isCoFinancing ? 35.00 : 69.00;
       return parseFloat((targetFlatTotal / schoolSize).toFixed(2));
     }
-    const ratePerMonth = isCoFinancing ? 0.24 : 0.49;
-    return parseFloat((monthsRemaining * ratePerMonth).toFixed(2));
+    // Proportional calculation based on standard full-year prices (5.29 standard, 2.59 co-financed)
+    const basePrice = isCoFinancing ? 2.59 : 5.29;
+    return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
   };
 
   const handleDeveloperReset = async () => {
@@ -14442,6 +14443,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </p>
 
               {(() => {
+                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:30:38+02:00');
+                const cMonth = contractDateObj.getMonth() + 1;
+                const isStarterFlat = cMonth === 6 || cMonth === 7 || cMonth === 8;
                 const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
@@ -14497,11 +14501,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             fontFamily: 'Inter',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
                           }}>
-                            {[
-                              { step: 1, label: 'Module wählen' },
-                              { step: 2, label: 'Abrechnungsmethode' },
-                              { step: 3, label: 'Bestätigen & Buchen' }
-                            ].map((s, index, arr) => {
+                            {(isStarterFlat 
+                              ? [
+                                  { step: 1, label: 'Module wählen' },
+                                  { step: 3, label: 'Bestätigen & Buchen' }
+                                ]
+                              : [
+                                  { step: 1, label: 'Module wählen' },
+                                  { step: 2, label: 'Abrechnungsmethode' },
+                                  { step: 3, label: 'Bestätigen & Buchen' }
+                                ]
+                            ).map((s, index, arr) => {
                               const isCurrent = checkoutStep === s.step;
                               const isPassed = checkoutStep > s.step;
                               return (
@@ -14520,7 +14530,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       color: '#ffffff',
                                       transition: 'all 0.2s'
                                     }}>
-                                      {isPassed ? '✓' : s.step}
+                                      {isPassed ? '✓' : (isStarterFlat && s.step === 3 ? 2 : s.step)}
                                     </span>
                                     <span style={{ fontSize: '0.74rem', fontWeight: isCurrent ? 800 : 600, color: isCurrent ? '#6b21a8' : isPassed ? '#16a34a' : '#64748b' }}>
                                       {s.label}
@@ -14630,7 +14640,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                                 <button 
-                                  onClick={() => setCheckoutStep(2)}
+                                  onClick={() => setCheckoutStep(isStarterFlat ? 3 : 2)}
                                   disabled={!hasCampusSub && !hasGroovelabSub}
                                   style={{
                                     padding: '12px 24px',
@@ -14798,10 +14808,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           {checkoutStep === 3 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                               <div>
-                                <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 3 von 3</span>
+                                <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{isStarterFlat ? 'Schritt 2 von 2' : 'Schritt 3 von 3'}</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestellung abschließen</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Bitte bestätige deine zahlungspflichtige Buchung. Du erhältst die Rechnung monatlich zum Monatsende bequem per E-Mail und kannst diese innerhalb von 14 Tagen per Banküberweisung ausgleichen.
+                                  {isStarterFlat 
+                                    ? 'Bitte bestätige deine zahlungspflichtige Buchung. Die Abrechnung der Einsteiger-Flatrate erfolgt einmalig per Rechnung und deckt die uneingeschränkte Nutzung der Plattform bis zum 31. August ab.'
+                                    : 'Bitte bestätige deine zahlungspflichtige Buchung. Du erhältst die Rechnung monatlich zum Monatsende bequem per E-Mail und kannst diese innerhalb von 14 Tagen per Banküberweisung ausgleichen.'}
                                 </p>
                               </div>
 
@@ -14842,13 +14854,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                    style={{ width: '18px', height: '18px', accentColor: '#16a34a', marginTop: '2px', cursor: 'pointer' }}
                                  />
                                  <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.4', fontWeight: 500 }}>
-                                   <strong>Bestellbedingungen akzeptieren:</strong> Ich habe die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAgb(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Allgemeinen Geschäftsbedingungen (AGB)</span> sowie die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span> gelesen und akzeptiere diese. Ich bestätige die zahlungspflichtige Buchung der ausgewählten Module und Service-Leistungen für das Schuljahr 2026/2027. Die Abrechnung erfolgt monatlich per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).
+                                   <strong>Bestellbedingungen akzeptieren:</strong> Ich habe die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAgb(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Allgemeinen Geschäftsbedingungen (AGB)</span> sowie die <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ color: '#6d28d9', textDecoration: 'underline', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span> gelesen und akzeptiere diese. Ich bestätige die zahlungspflichtige Buchung der ausgewählten Module und Service-Leistungen für das Schuljahr 2026/2027. Die Abrechnung erfolgt {isStarterFlat ? 'einmalig per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).' : 'monatlich per Rechnung (Zahlungsfrist: 14 Tage nach Rechnungserhalt per Überweisung).'}
                                  </span>
                                </label>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
-                                  onClick={() => setCheckoutStep(2)}
+                                  onClick={() => setCheckoutStep(isStarterFlat ? 1 : 2)}
                                   style={{
                                     padding: '12px 20px',
                                     borderRadius: '12px',
@@ -14949,18 +14961,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               {(hasCampusSub || hasGroovelabSub) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                   <span>Module ({activeModulesCount} aktiv):</span>
-                                  <strong>{moduleCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  <strong>{isStarterFlat ? 'Inklusive' : `${moduleCost.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Team-Profile ({allTeachers.length + employees.length}):</span>
-                                <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
                                 <span>Server- & Service-Gebühr (Zwischensumme):</span>
-                                <strong>{baseB2B.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                <strong>{isStarterFlat ? '0,00 €' : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               {checkoutStep >= 2 && (
@@ -15010,15 +15022,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               )}
                             </div>
 
-                            <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                             <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
-                                <span>Schulanteil (Lizenz &amp; Kofinanzierung):</span>
+                                <span>{isStarterFlat ? 'Schulanteil (Einsteiger-Flatrate bis 31. Aug.):' : 'Schulanteil (Lizenz & Kofinanzierung):'}</span>
                                 <strong style={{ fontWeight: 800 }}>
-                                  {checkoutStep >= 2 ? currentTotalB2B.toFixed(2).replace('.', ',') : baseB2B.toFixed(2).replace('.', ',')} € / Mo.
+                                  {isStarterFlat ? '69,00 €' : (checkoutStep >= 2 ? `${currentTotalB2B.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
 
-                              {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
+                              {checkoutStep >= 2 && !isStarterFlat && (studentBillingOption === 'option2' || studentBillingOption === 'option3_1') && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
                                   <span>Schülerumlage ({students.length} × {studentBillingOption === 'option2' ? '0,49' : '0,24'} €):</span>
                                   <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
@@ -15028,14 +15040,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                 <span style={{ fontWeight: 900 }}>Gesamteinzug von Musikschulkonto:</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
-                                  {checkoutStep >= 2 ? mixedTotal.toFixed(2).replace('.', ',') : baseB2B.toFixed(2).replace('.', ',')} € / Mo.
+                                  {isStarterFlat ? '69,00 € (einmalig)' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
                               <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
                                 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
                               </span>
 
-                              {checkoutStep >= 2 && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
+                              {checkoutStep >= 2 && !isStarterFlat && (studentBillingOption === 'option1' || studentBillingOption === 'option3_2') && (
                                 <div style={{ 
                                   background: '#f0f9ff', 
                                   border: '1.5px solid #bae6fd', 
