@@ -8,19 +8,23 @@ const supabase = createClient(
 );
 
 async function check() {
-  console.log("Searching for user 1e19196b-430c-4fa6-8488-ea9e71f92e31 on sslip.io...");
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, first_name, last_name, role, email')
-    .eq('id', '1e19196b-430c-4fa6-8488-ea9e71f92e31')
-    .single();
+  console.log("Querying active student sessions on sslip.io...");
+  const { data: activeSessions, error } = await supabase
+    .from('sessions')
+    .select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen)')
+    .is('check_out_time', null)
+    .eq('users.school_id', '0e3957eb-3a5f-4a0b-9dfd-b4f0ed863a32')
+    .eq('users.role', 'student');
 
   if (error) {
     console.error("Query failed:", error);
     return;
   }
 
-  console.log("User found on sslip.io:", user);
+  console.log("Active student sessions found:", activeSessions?.length);
+  for (const s of (activeSessions || [])) {
+    console.log("Session row:", s);
+  }
 }
 
 check();

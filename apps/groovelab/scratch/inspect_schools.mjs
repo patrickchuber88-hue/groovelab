@@ -7,8 +7,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function run() {
   const { data, error } = await supabase
     .from('schools')
-    .select('*');
+    .select('opening_hours');
   console.log("Error:", error);
-  console.log("Schools data:", data);
+  console.log("Opening Hours detail:", JSON.stringify(data?.[0]?.opening_hours, null, 2));
 }
 run();

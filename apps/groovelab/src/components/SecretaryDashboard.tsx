@@ -5104,6 +5104,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       draggable={true}
                       onDragStart={(e) => {
                         e.dataTransfer.setData("studentId", student.id);
+                        e.dataTransfer.setData("text/plain", student.id);
+                        e.dataTransfer.effectAllowed = "move";
                       }}
                       style={{ 
                         display: 'flex',
@@ -5215,7 +5217,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             WebkitAppearance: 'none'
                           }}
                         >
-                          <option value="">Allgemein</option>
+                          <option value="">Ohne Zuweisung</option>
                           {allUniqueTeachers.map((t: any) => (
                             <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                           ))}
@@ -12557,11 +12559,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             key="allgemein"
                             onDragOver={(e) => {
                               e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
                               setDragHoveredTeacher('none');
                             }}
                             onDragLeave={() => setDragHoveredTeacher(null)}
                             onDrop={(e) => {
-                              const studentId = e.dataTransfer.getData("studentId");
+                              const studentId = e.dataTransfer.getData("studentId") || e.dataTransfer.getData("text/plain");
                               if (studentId) {
                                 handleUpdateStudentTeacher(studentId, null);
                               }
@@ -12649,11 +12652,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             key={t.id}
                             onDragOver={(e) => {
                               e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
                               setDragHoveredTeacher(t.id);
                             }}
                             onDragLeave={() => setDragHoveredTeacher(null)}
                             onDrop={(e) => {
-                              const studentId = e.dataTransfer.getData("studentId");
+                              const studentId = e.dataTransfer.getData("studentId") || e.dataTransfer.getData("text/plain");
                               if (studentId) {
                                 handleUpdateStudentTeacher(studentId, t.id);
                               }
