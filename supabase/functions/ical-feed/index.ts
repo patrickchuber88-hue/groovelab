@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     })
 
     // 5. Generate RFC 5545 iCalendar data stream
-    const calendarName = `Groovelab Unterricht (${first_name} ${last_name})`
+    const calendarName = `Unterricht (${first_name} ${last_name})`
     let icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
