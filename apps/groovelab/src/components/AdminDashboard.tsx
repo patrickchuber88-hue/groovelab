@@ -4036,7 +4036,7 @@ export function AdminDashboard({
     { id: 'songs', label: activePlatform === 'campus' ? 'Mediathek' : 'Songs', icon: activePlatform === 'campus' ? Library : Music },
     { id: 'stats', label: 'Statistik', icon: LucideBarChart },
     { id: 'gallery', label: 'ID Galerie', icon: QrCode },
-    { id: 'setup', label: activePlatform === 'campus' ? 'Einstellungen' : 'Setup', icon: activePlatform === 'campus' ? Settings : Shield },
+    { id: 'setup', label: 'Einstellungen', icon: Settings },
   ];
 
   const renderLiveTab = () => (

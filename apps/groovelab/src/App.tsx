@@ -6736,7 +6736,7 @@ function App() {
                   <QrCode size={20} /> ID Galerie
                 </button>
                 <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
-                  <Shield size={20} /> Setup
+                  <Settings size={20} /> Einstellungen
                 </button>
               </>
             )
@@ -12067,8 +12067,8 @@ function App() {
                   <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Highlights">
                     <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
                   </button>
-                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Setup">
-                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Setup</span>}
+                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Einstellungen">
+                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
                   </button>
                   <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
                     <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
@@ -12104,8 +12104,8 @@ function App() {
                   <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery', 'groovelab')} className="hover-scale" title="ID Galerie">
                     <QrCode size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>ID Galerie</span>}
                   </button>
-                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Setup">
-                    <Shield size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Setup</span>}
+                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Einstellungen">
+                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
                   </button>
                   <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
                     <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
