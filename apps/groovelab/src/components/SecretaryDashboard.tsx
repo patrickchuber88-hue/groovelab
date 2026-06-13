@@ -7674,7 +7674,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               <span>Verwaltung</span>
             </div>
 
-            {hasCampusSub && (
+            {(!isBillingBooked || hasCampusSub) && (
               /* Campus Tab Button */
               <div 
                 onClick={() => {
@@ -7710,7 +7710,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </div>
             )}
 
-            {hasGroovelabSub && (
+            {(!isBillingBooked || hasGroovelabSub) && (
               /* GrooveLab Tab Button */
               <div 
                 onClick={() => {
