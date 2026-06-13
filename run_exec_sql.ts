@@ -10,7 +10,7 @@ const supabase = createClient(
 import fs from 'fs';
 
 async function run() {
-  const sql = fs.readFileSync('supabase/migrations/151_streak_reset_cron.sql', 'utf-8');
+  const sql = fs.readFileSync('supabase/migrations/164_add_student_billing_payment_method.sql', 'utf-8');
   console.log("Trying exec_sql...");
   const { data, error } = await supabase.rpc('exec_sql', { query: sql });
   if (error) {
