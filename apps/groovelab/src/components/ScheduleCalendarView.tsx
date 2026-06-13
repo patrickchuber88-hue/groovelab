@@ -53,6 +53,7 @@ interface ScheduleCalendarViewProps {
   selectedTeacherId?: string;
   setSelectedTeacherId?: (id: string) => void;
   currentUserRole?: string;
+  hasSubmittedSchedule?: boolean;
 }
 
 export function ScheduleCalendarView({ 
@@ -64,7 +65,8 @@ export function ScheduleCalendarView({
   teachers,
   selectedTeacherId,
   setSelectedTeacherId,
-  currentUserRole
+  currentUserRole,
+  hasSubmittedSchedule = true
 }: ScheduleCalendarViewProps) {
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
@@ -1115,6 +1117,10 @@ export function ScheduleCalendarView({
 
   const handleDropOnDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
+    if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
+      alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
+      return;
+    }
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
 
@@ -1152,6 +1158,10 @@ export function ScheduleCalendarView({
   const handleDropOnOccurrence = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     e.stopPropagation();
+    if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
+      alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
+      return;
+    }
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId || sourceId === targetId) return;
 
@@ -1771,6 +1781,25 @@ export function ScheduleCalendarView({
         </div>
       </div>
 
+      {!hasSubmittedSchedule && (currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.15)',
+          color: '#b45309',
+          borderRadius: '16px',
+          padding: '12px 20px',
+          fontSize: '0.82rem',
+          fontWeight: 650,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 2px 8px rgba(245, 158, 11, 0.03)'
+        }}>
+          <AlertCircle size={16} />
+          <span>Diese Lehrkraft hat ihren Stundenplan noch nicht eingereicht (nur Entwurf). Die Raumzuteilung ist gesperrt.</span>
+        </div>
+      )}
+
       <div style={{ position: 'relative' }}>
         
         <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10, overflow: 'visible' }}>
@@ -2042,12 +2071,16 @@ export function ScheduleCalendarView({
                       )}
                       <div 
                         id={`occ-${occ.id}`}
-                      draggable={!isBreak && !isVacant}
+                       draggable={!( (currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule ) && !isBreak && !isVacant}
                       onDragStart={(e) => handleDragStart(e, occ.id)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
                       title={isVacant ? `${occ.student?.first_name} ${occ.student?.last_name}` : undefined}
                        onClick={() => {
+                        if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
+                          alert('Dieser Stundenplan ist noch ein Entwurf und wurde noch nicht eingereicht. Zuteilung oder Änderungen sind gesperrt.');
+                          return;
+                        }
                         if (!isBreak) {
                           setEditOccState({ 
                             id: occ.id, 

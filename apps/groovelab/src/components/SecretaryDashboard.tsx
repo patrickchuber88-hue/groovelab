@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -1383,6 +1383,58 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
+
+  const getDynamicAnnualPrice = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
+    const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
+    const month = contractDateObj.getMonth() + 1; // 1-indexed
+
+    const monthsMap: Record<number, number> = {
+      9: 12,  // September
+      10: 11, // October
+      11: 10, // November
+      12: 8,  // December
+      1: 7,   // January
+      2: 6,   // February
+      3: 5,   // March
+      4: 4,   // April
+      5: 3,   // May
+      6: 0,   // June
+      7: 0,   // July
+      8: 0    // August
+    };
+
+    const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
+    const ratePerMonth = isCoFinancing ? 0.24 : 0.49;
+    return parseFloat((monthsRemaining * ratePerMonth).toFixed(2));
+  };
+
+  const handleDeveloperReset = () => {
+    setIsBillingBooked(false);
+    setBookedExtraUsers(0);
+    setExtraUsersSliderVal(0);
+    setStudentBillingOption('option1');
+    setExtraBillingOption('option1');
+    setNextBillingOption('');
+    setNextBillingOptionEffectiveAt('');
+    setContractStartDate(null);
+    setIsCancelled(false);
+    setHasCampusSub(false);
+    setHasGroovelabSub(false);
+    setCampusActivatedThisMonth(false);
+    setGroovelabActivatedThisMonth(false);
+    setCheckoutStep(1);
+    setAgreedToSepa(false);
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('isBillingBooked');
+      localStorage.removeItem('bookedExtraUsers');
+      localStorage.removeItem('nextBillingOption');
+      localStorage.removeItem('nextBillingOptionEffectiveAt');
+      localStorage.removeItem('contractStartDate');
+      localStorage.removeItem('isCancelled');
+      localStorage.removeItem('unbooked_52_temp');
+    }
+  };
   
   // Apple-style settings panel states
   const [settingsTab, setSettingsTab] = useState<'general' | 'branding' | 'security' | 'notifications' | 'gdpr'>('general');
@@ -1428,6 +1480,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   
   // Room Planner Matrix states
   const [matrixAllocations, setMatrixAllocations] = useState<any[]>([]);
+  const [unsubmittedTeachers, setUnsubmittedTeachers] = useState<Record<string, boolean>>({});
   const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
@@ -1836,7 +1889,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option')
         .eq('id', schoolId)
         .single();
 
@@ -1852,15 +1905,50 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
-          const hasCampus = schoolData.has_campus_subscription ?? false;
+        const hasCampus = schoolData.has_campus_subscription ?? false;
         const hasGroove = schoolData.has_groovelab_subscription ?? false;
         setHasCampusSub(hasCampus);
         setHasGroovelabSub(hasGroove);
         setCampusActivatedThisMonth(schoolData.campus_activated_this_month ?? false);
         setGroovelabActivatedThisMonth(schoolData.groovelab_activated_this_month ?? false);
         
+        const uq = schoolData.user_quota || 150;
+        setUserQuota(uq);
+        setActiveUserQuota(uq);
+        
+        // Calculate bookedExtraUsers from user_quota (anything above 150 is extra)
+        const extraFromDb = Math.max(0, uq - 150);
+        setBookedExtraUsers(extraFromDb);
+        localStorage.setItem('bookedExtraUsers', extraFromDb.toString());
+
+        // Restore contractStartDate from DB contract_start_date or created_at
+        if (schoolData.contract_start_date) {
+          setContractStartDate(schoolData.contract_start_date);
+          localStorage.setItem('contractStartDate', schoolData.contract_start_date);
+        } else if (schoolData.created_at) {
+          setContractStartDate(schoolData.created_at);
+          localStorage.setItem('contractStartDate', schoolData.created_at);
+        }
+
+        // Restore extraBillingOption
+        if (schoolData.extra_billing_option) {
+          setExtraBillingOption(schoolData.extra_billing_option);
+        }
+
+        // Restore isCancelled from DB contract_ends_at
+        const dbIsCancelled = schoolData.contract_ends_at !== null;
+        const storedIsCancelled = localStorage.getItem('isCancelled') === 'true';
+        if (dbIsCancelled || storedIsCancelled) {
+          setIsCancelled(true);
+          localStorage.setItem('isCancelled', 'true');
+        } else {
+          setIsCancelled(false);
+          localStorage.removeItem('isCancelled');
+        }
+        
+        const dbIsBooked = schoolData.is_billing_booked ?? false;
         const storedIsBooked = localStorage.getItem('isBillingBooked') === 'true';
-        if (!hasCampus && !hasGroove && !storedIsBooked) {
+        if (!hasCampus && !hasGroove && !storedIsBooked && !dbIsBooked) {
           setIsBillingBooked(false);
           localStorage.removeItem('isBillingBooked');
           setBookedExtraUsers(0);
@@ -1868,31 +1956,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           setExtraUsersSliderVal(0);
           setStudentBillingOption('option1');
         } else {
-          if (storedIsBooked) {
-            setIsBillingBooked(true);
-            setHasCampusSub(true);
-            setHasGroovelabSub(true);
-          }
+          setIsBillingBooked(true);
+          localStorage.setItem('isBillingBooked', 'true');
+          if (hasCampus) setHasCampusSub(true);
+          if (hasGroove) setHasGroovelabSub(true);
           setStudentBillingOption(schoolData.student_billing_option || 'option1');
         }
         
-        if (!hasCampus && hasGroove) {
-          setActiveTab('groovelab');
-        } else if (hasCampus && !hasGroove) {
-          setActiveTab('campus');
-        }
-        setIsPaused(schoolData.is_paused ?? false);
-        setLimitsEnabled(schoolData.limits_enabled ?? false);
-        const uq = schoolData.user_quota || 150;
-        setUserQuota(uq);
-        setActiveUserQuota(uq);
         setPendingUserQuota(schoolData.pending_user_quota);
       }
 
       // Fetch all users
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids')
+        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -2197,6 +2274,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       // Group schedules by teacher_id and day_of_week to build matrixAllocations
       const teacherDays: Record<string, any[]> = {};
+      const unsubmittedTeachersMap: Record<string, boolean> = {};
+      (allUsers || []).forEach(u => {
+        if (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary') {
+          const rawPlanned = u.planned_boards;
+          let loadedDrafts: any[] = [];
+          let loadedSubmittedDraftId = '';
+          if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
+            loadedDrafts = (rawPlanned as any).drafts;
+            loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
+          } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
+            loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned }];
+          }
+          
+          const hasSchedulesInDb = (allSchedulesData || []).some(s => s.teacher_id === u.id && (s.status === 'approved' || s.status === 'ready_for_admin_review'));
+          const isSubmitted = loadedSubmittedDraftId !== '' || hasSchedulesInDb;
+          
+          if (!isSubmitted) {
+            unsubmittedTeachersMap[u.id] = true;
+          }
+        }
+      });
+      setUnsubmittedTeachers(unsubmittedTeachersMap);
+
       (allSchedulesData || []).forEach(s => {
         if (s.status !== 'approved' && s.status !== 'ready_for_admin_review') return;
         const key = `${s.teacher_id}_${s.day_of_week}`;
@@ -2210,8 +2310,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         } catch { return {}; }
       })();
 
-      const initialAllocations = Object.entries(teacherDays).map(([key, slots]) => {
-        const [teacherId, dayOfWeekStr] = key.split('_');
+      const initialAllocations = Object.entries(teacherDays)
+        .filter(([key]) => {
+          const [teacherId] = key.split('_');
+          return !unsubmittedTeachersMap[teacherId];
+        })
+        .map(([key, slots]) => {
+          const [teacherId, dayOfWeekStr] = key.split('_');
         const dayOfWeek = parseInt(dayOfWeekStr);
 
         const sortedSlots = [...slots]
@@ -2790,6 +2895,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       if (error) throw error;
     } catch (err: any) {
       console.error('Error updating student billing option:', err);
+    }
+  };
+
+  const handleUpdateExtraBillingOption = async (option: string) => {
+    try {
+      setExtraBillingOption(option);
+      const { error } = await supabase
+        .from('schools')
+        .update({ extra_billing_option: option })
+        .eq('id', schoolId);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Error updating extra billing option:', err);
     }
   };
 
@@ -7631,6 +7749,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
           {/* Action & Profile */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Dynamic Date Simulator Selector */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f0fdf4',
+              padding: '6px 12px',
+              borderRadius: '12px',
+              border: '1px solid #bbf7d0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+            }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                Simuliertes Startdatum:
+              </span>
+              <input
+                type="date"
+                value={contractStartDate || '2026-06-13'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setContractStartDate(val);
+                  localStorage.setItem('contractStartDate', val);
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#166534',
+                  fontWeight: 900,
+                  fontSize: '0.74rem',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                }}
+              />
+            </div>
+
             {/* Integrated School & User Pill */}
             <div style={{ 
               display: 'flex', 
@@ -7892,11 +8045,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             onClick={() => {
                               setSecretarySubTab('licenses');
                               const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                              const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
+                              const annualPricePerStudent = studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                               const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
                               
                               const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
-                              const extraAnnualPrice = extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0;
+                              const extraAnnualPrice = extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                               const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
 
                               const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal + extraEinmalzahlungTotal;
@@ -11531,16 +11684,48 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: borderStyle, background: cellBg, opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanId && draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
                                           {cellPlans.map(plan => {
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
+                                            
+                                            // Dynamic instrument-based pastel coloring for consistency with Raumplan (Live)
+                                            let themeBg = 'rgba(220, 252, 231, 0.45)'; // default green
+                                            let themeBorder = '1px solid #e2e8f0';
+                                            let themeBorderLeft = '4px solid #10b981';
+                                            let themeText = '#0f172a';
+                                            let timeText = '#059669';
+
+                                            if (hasOverlap) {
+                                              themeBg = 'rgba(254, 226, 226, 0.45)';
+                                              themeBorder = '2px dashed #ef4444';
+                                              themeBorderLeft = '4px solid #ef4444';
+                                              themeText = '#991b1b';
+                                              timeText = '#ef4444';
+                                            } else if (plan.instrument?.toLowerCase().includes('schlagzeug') || plan.instrument?.toLowerCase().includes('drums')) {
+                                              themeBg = 'rgba(219, 234, 254, 0.45)'; // light blue
+                                              themeBorderLeft = '4px solid #3b82f6';
+                                              themeText = '#1e3a8a';
+                                              timeText = '#3b82f6';
+                                            } else if (plan.instrument?.toLowerCase().includes('piano') || plan.instrument?.toLowerCase().includes('klavier') || plan.instrument?.toLowerCase().includes('keys')) {
+                                              themeBg = 'rgba(243, 232, 255, 0.45)'; // light purple
+                                              themeBorderLeft = '4px solid #a855f7';
+                                              themeText = '#581c87';
+                                              timeText = '#a855f7';
+                                            } else if (plan.id.startsWith('adhoc_')) {
+                                              themeBg = 'rgba(254, 243, 199, 0.45)'; // light yellow
+                                              themeBorder = '1px solid #fde68a';
+                                              themeBorderLeft = '4px solid #f59e0b';
+                                              themeText = '#78350f';
+                                              timeText = '#d97706';
+                                            }
+
                                             return (
                                               <div
                                                 key={plan.id}
                                                 draggable
                                                 onDragStart={() => handleDragStartMatrix(plan.id)}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: hasOverlap ? 'rgba(254, 226, 226, 0.45)' : 'rgba(220, 252, 231, 0.45)', border: hasOverlap ? '2px dashed #ef4444' : '1px solid #e2e8f0', borderLeft: hasOverlap ? '4px solid #ef4444' : '4px solid #10b981', borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                                style={{ background: themeBg, border: themeBorder, borderLeft: themeBorderLeft, borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                                                  <span style={{ fontSize: '0.73rem', fontWeight: 800, color: hasOverlap ? '#991b1b' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                  <span style={{ fontSize: '0.73rem', fontWeight: 800, color: themeText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {getPlanDisplayName(plan)}
                                                   </span>
                                                   {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
@@ -12753,13 +12938,35 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         const unassigned = matrixAllocations.filter(p => !p.roomId);
                         
                         // Group by teacher
-                        const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[] }> = {};
+                        const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[], isUnsubmitted: boolean }> = {};
+                        
+                        // 1. Initialize with all active teachers (Campus, Bypass, and Coaches)
+                        const allTeachersList: any[] = [];
+                        const seenIds = new Set<string>();
+                        [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].forEach(t => {
+                          if (t && t.id && !seenIds.has(t.id)) {
+                            seenIds.add(t.id);
+                            allTeachersList.push(t);
+                          }
+                        });
+
+                        allTeachersList.forEach(t => {
+                          grouped[t.id] = {
+                            teacherName: `${t.firstName} ${t.lastName}`,
+                            instrument: t.instrument || 'Lehrkraft',
+                            blocks: [],
+                            isUnsubmitted: !!unsubmittedTeachers[t.id]
+                          };
+                        });
+
+                        // 2. Put unassigned day blocks under each teacher
                         unassigned.forEach(p => {
                           if (!grouped[p.teacherId]) {
                             grouped[p.teacherId] = {
                               teacherName: p.teacherName,
                               instrument: p.instrument,
-                              blocks: []
+                              blocks: [],
+                              isUnsubmitted: !!unsubmittedTeachers[p.teacherId]
                             };
                           }
                           grouped[p.teacherId].blocks.push(p);
@@ -12775,29 +12982,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{
                               padding: '24px 16px',
                               textAlign: 'center',
-                              background: 'rgba(52, 199, 89, 0.05)',
                               borderRadius: '12px',
-                              border: '1px dashed rgba(52, 199, 89, 0.3)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '8px'
+                              border: '1px dashed rgba(0, 0, 0, 0.08)',
+                              background: 'rgba(0, 0, 0, 0.01)',
+                              color: '#8e8e93',
+                              fontSize: '0.74rem',
+                              fontWeight: 650
                             }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                background: 'rgba(52, 199, 89, 0.1)',
-                                color: '#34c759'
-                              }}>
-                                <CheckCircle size={16} />
-                              </div>
-                              <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
-                                Alle Stundenpläne erfolgreich zugeteilt!
-                              </span>
+                              Keine passenden Lehrkräfte gefunden.
                             </div>
                           );
                         }
@@ -12851,12 +13043,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   key={tId} 
                                   style={{ 
                                     background: '#ffffff', 
-                                    border: isSelected ? '1px solid rgba(0, 122, 255, 0.3)' : '1px solid rgba(0, 0, 0, 0.06)', 
+                                    border: isSelected 
+                                      ? '1px solid rgba(0, 122, 255, 0.3)' 
+                                      : data.isUnsubmitted 
+                                        ? '1px solid rgba(245, 158, 11, 0.3)' 
+                                        : '1px solid rgba(0, 0, 0, 0.06)', 
                                     borderRadius: '10px', 
                                     overflow: 'hidden',
                                     transition: 'all 0.15s ease',
                                     boxShadow: isSelected ? '0 2px 8px rgba(0, 122, 255, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)',
-                                    borderLeft: isSelected ? '3px solid #007aff' : '1px solid rgba(0, 0, 0, 0.06)'
+                                    borderLeft: isSelected 
+                                      ? '3px solid #007aff' 
+                                      : data.isUnsubmitted 
+                                        ? '3px solid #f59e0b' 
+                                        : '1px solid rgba(0, 0, 0, 0.06)'
                                   }}
                                 >
                                   {/* Accordion Header */}
@@ -12871,7 +13071,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
-                                      background: isSelected ? 'rgba(0, 122, 255, 0.03)' : '#ffffff',
+                                      background: isSelected 
+                                        ? 'rgba(0, 122, 255, 0.03)' 
+                                        : data.isUnsubmitted 
+                                          ? 'rgba(245, 158, 11, 0.02)' 
+                                          : '#ffffff',
                                       borderBottom: isExpanded ? '1px solid rgba(0, 0, 0, 0.04)' : 'none'
                                     }}
                                   >
@@ -12880,111 +13084,169 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                         transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
                                         transition: 'transform 0.15s ease-out', 
                                         marginRight: '6px', 
-                                        color: isSelected ? '#007aff' : '#8e8e93' 
+                                        color: isSelected 
+                                          ? '#007aff' 
+                                          : data.isUnsubmitted 
+                                            ? '#d97706' 
+                                            : '#8e8e93' 
                                       }} />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: isSelected ? '#007aff' : '#1c1c1e' }}>{data.teacherName}</span>
+                                        <span style={{ 
+                                          fontSize: '0.74rem', 
+                                          fontWeight: 600, 
+                                          color: isSelected 
+                                            ? '#007aff' 
+                                            : data.isUnsubmitted 
+                                              ? '#d97706' 
+                                              : '#1c1c1e' 
+                                        }}>{data.teacherName}</span>
                                         <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 500 }}>{data.instrument}</span>
                                       </div>
                                     </div>
-                                    <span style={{ 
-                                      fontSize: '0.66rem', 
-                                      background: isSelected ? 'rgba(0,122,255,0.1)' : 'rgba(120, 120, 128, 0.08)', 
-                                      color: isSelected ? '#007aff' : '#8e8e93', 
-                                      fontWeight: 700, 
-                                      padding: '1px 5px', 
-                                      borderRadius: '6px' 
-                                    }}>
-                                      {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
-                                    </span>
+                                    {data.isUnsubmitted ? (
+                                      <span style={{ 
+                                        fontSize: '0.66rem', 
+                                        background: 'rgba(245, 158, 11, 0.12)', 
+                                        color: '#d97706', 
+                                        fontWeight: 700, 
+                                        padding: '2px 6px', 
+                                        borderRadius: '6px' 
+                                      }}>
+                                        Entwurf
+                                      </span>
+                                    ) : (
+                                      <span style={{ 
+                                        fontSize: '0.66rem', 
+                                        background: isSelected ? 'rgba(0,122,255,0.1)' : 'rgba(120, 120, 128, 0.08)', 
+                                        color: isSelected ? '#007aff' : '#8e8e93', 
+                                        fontWeight: 700, 
+                                        padding: '1px 5px', 
+                                        borderRadius: '6px' 
+                                      }}>
+                                        {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Collapsible content (Accordion Details) */}
                                   {isExpanded && (
                                     <div style={{ padding: '6px 8px 8px 8px', background: 'rgba(120, 120, 128, 0.04)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      <div style={{ border: '1px solid rgba(0, 0, 0, 0.06)', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
-                                        {[...data.blocks]
-                                          .sort((a, b) => {
-                                            if (a.dayOfWeek !== b.dayOfWeek) {
-                                              return a.dayOfWeek - b.dayOfWeek;
-                                            }
-                                            return (a.startTime || '').localeCompare(b.startTime || '');
-                                          })
-                                          .map((block, idx, sortedArr) => (
-                                          <div 
-                                            key={block.id}
-                                            draggable
-                                            onDragStart={() => handleDragStartMatrix(block.id)}
-                                            style={{
-                                              background: '#ffffff',
-                                              borderBottom: idx < sortedArr.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
-                                              padding: '8px 10px',
-                                              cursor: 'grab',
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              gap: '6px'
-                                            }}
-                                          >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Calendar size={11} style={{ color: '#007aff' }} />
-                                                {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
-                                              </span>
-                                              <span style={{ fontSize: '0.66rem', fontWeight: 500, color: '#8e8e93' }}>
-                                                {block.startTime}–{block.endTime}
-                                              </span>
-                                            </div>
-                                            
-                                            {/* Room quick selection dropdown (Apple Select style) */}
-                                            <select
-                                              defaultValue=""
-                                              onChange={(e) => {
-                                                const rId = e.target.value;
-                                                if (rId) {
-                                                  const room = rooms.find(r => r.id === rId);
-                                                  if (room) {
-                                                    const unsuitable = room.unsuitable_instruments || (() => {
-                                                      try {
-                                                        const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-                                                        return map[room.id] || [];
-                                                      } catch { return []; }
-                                                    })();
-                                                    if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
-                                                      alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
-                                                      e.target.value = "";
-                                                      return;
+                                      {data.isUnsubmitted ? (
+                                        <div style={{
+                                          padding: '12px 10px',
+                                          borderRadius: '8px',
+                                          border: '1px dashed rgba(245, 158, 11, 0.3)',
+                                          background: 'rgba(245, 158, 11, 0.05)',
+                                          color: '#d97706',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 600,
+                                          textAlign: 'center',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          gap: '6px'
+                                        }}>
+                                          <Lock size={14} style={{ color: '#d97706' }} />
+                                          <span>Stundenplan noch nicht eingereicht</span>
+                                        </div>
+                                      ) : data.blocks.length === 0 ? (
+                                        <div style={{
+                                          padding: '12px 10px',
+                                          borderRadius: '8px',
+                                          border: '1px dashed rgba(16, 185, 129, 0.3)',
+                                          background: 'rgba(16, 185, 129, 0.05)',
+                                          color: '#059669',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 600,
+                                          textAlign: 'center'
+                                        }}>
+                                          Alle Tage erfolgreich zugeteilt! ✅
+                                        </div>
+                                      ) : (
+                                        <div style={{ border: '1px solid rgba(0, 0, 0, 0.06)', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
+                                          {[...data.blocks]
+                                            .sort((a, b) => {
+                                              if (a.dayOfWeek !== b.dayOfWeek) {
+                                                return a.dayOfWeek - b.dayOfWeek;
+                                              }
+                                              return (a.startTime || '').localeCompare(b.startTime || '');
+                                            })
+                                            .map((block, idx, sortedArr) => (
+                                              <div 
+                                                key={block.id}
+                                                draggable
+                                                onDragStart={() => handleDragStartMatrix(block.id)}
+                                                style={{
+                                                  background: '#ffffff',
+                                                  borderBottom: idx < sortedArr.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                                                  padding: '8px 10px',
+                                                  cursor: 'grab',
+                                                  display: 'flex',
+                                                  flexDirection: 'column',
+                                                  gap: '6px'
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Calendar size={11} style={{ color: '#007aff' }} />
+                                                    {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
+                                                  </span>
+                                                  <span style={{ fontSize: '0.66rem', fontWeight: 500, color: '#8e8e93' }}>
+                                                    {block.startTime}–{block.endTime}
+                                                  </span>
+                                                </div>
+                                                
+                                                {/* Room quick selection dropdown (Apple Select style) */}
+                                                <select
+                                                  defaultValue=""
+                                                  onChange={(e) => {
+                                                    const rId = e.target.value;
+                                                    if (rId) {
+                                                      const room = rooms.find(r => r.id === rId);
+                                                      if (room) {
+                                                        const unsuitable = room.unsuitable_instruments || (() => {
+                                                          try {
+                                                            const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                                            return map[room.id] || [];
+                                                          } catch { return []; }
+                                                        })();
+                                                        if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
+                                                          alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
+                                                          e.target.value = "";
+                                                          return;
+                                                        }
+                                                      }
+                                                      setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
                                                     }
-                                                  }
-                                                  setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
-                                                }
-                                              }}
-                                              style={{
-                                                width: '100%',
-                                                fontSize: '0.68rem',
-                                                padding: '5px 24px 5px 8px',
-                                                borderRadius: '6px',
-                                                border: 'none',
-                                                outline: 'none',
-                                                background: 'rgba(120, 120, 128, 0.08)',
-                                                color: '#1c1c1e',
-                                                fontWeight: 500,
-                                                appearance: 'none',
-                                                WebkitAppearance: 'none',
-                                                backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'%238e8e93\' height=\'14\' viewBox=\'0 0 24 24\' width=\'14\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>")',
-                                                backgroundRepeat: 'no-repeat',
-                                                backgroundPositionX: '97%',
-                                                backgroundPositionY: '50%',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              <option value="" disabled>Raum zuweisen...</option>
-                                              {rooms.filter(rm => rm.is_campus_active !== false).map(rm => (
-                                                <option key={rm.id} value={rm.id}>{rm.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                        ))}
-                                      </div>
+                                                  }}
+                                                  style={{
+                                                    width: '100%',
+                                                    fontSize: '0.68rem',
+                                                    padding: '5px 24px 5px 8px',
+                                                    borderRadius: '6px',
+                                                    border: 'none',
+                                                    outline: 'none',
+                                                    background: 'rgba(120, 120, 128, 0.08)',
+                                                    color: '#1c1c1e',
+                                                    fontWeight: 500,
+                                                    appearance: 'none',
+                                                    WebkitAppearance: 'none',
+                                                    backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'%238e8e93\' height=\'14\' viewBox=\'0 0 24 24\' width=\'14\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>")',
+                                                    backgroundRepeat: 'no-repeat',
+                                                    backgroundPositionX: '97%',
+                                                    backgroundPositionY: '50%',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  <option value="" disabled>Raum zuweisen...</option>
+                                                  {rooms.filter(rm => rm.is_campus_active !== false).map(rm => (
+                                                    <option key={rm.id} value={rm.id}>{rm.name}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -14179,7 +14441,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 // Slider prospective change variables (Real-time preview)
                 const schoolShareAdditional = (extraBillingOption === 'option3_1' || extraBillingOption === 'option3_2') ? extraUsersSliderVal * 0.25 : 0;
                 const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : extraBillingOption === 'option3_1' ? extraUsersSliderVal * 0.24 : 0);
-                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * 5.29 : extraBillingOption === 'option3_2' ? extraUsersSliderVal * 2.59 : 0);
+                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, true) : 0);
                 const isAnnualAdditional = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
 
                 // B2B total including kofinanzierung preview
@@ -14569,17 +14831,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </button>
                                 
                                 <button 
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const nowStr = new Date().toISOString();
-                                    setContractStartDate(nowStr);
-                                    localStorage.setItem('contractStartDate', nowStr);
-                                    setIsBillingBooked(true);
-                                    localStorage.setItem('isBillingBooked', 'true');
-                                    setIsCancelled(false);
-                                    localStorage.removeItem('isCancelled');
-                                    setDismissedInvoiceAlert(false);
-                                    localStorage.removeItem('dismissedInvoiceAlert');
-                                    setCheckoutStep(1);
+                                    try {
+                                      const { error } = await supabase
+                                        .from('schools')
+                                        .update({
+                                          is_billing_booked: true,
+                                          contract_start_date: nowStr,
+                                          contract_ends_at: null
+                                        })
+                                        .eq('id', schoolId);
+                                      if (error) throw error;
+
+                                      setContractStartDate(nowStr);
+                                      localStorage.setItem('contractStartDate', nowStr);
+                                      setIsBillingBooked(true);
+                                      localStorage.setItem('isBillingBooked', 'true');
+                                      setIsCancelled(false);
+                                      localStorage.removeItem('isCancelled');
+                                      setDismissedInvoiceAlert(false);
+                                      localStorage.removeItem('dismissedInvoiceAlert');
+                                      setCheckoutStep(1);
+                                    } catch (err: any) {
+                                      console.error("Booking confirmation error:", err);
+                                      alert("Fehler beim Bestätigen der Buchung. Bitte versuche es erneut.");
+                                    }
                                   }}
                                   disabled={!agreedToSepa}
                                   style={{
@@ -14657,7 +14934,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   {studentBillingOption === 'option1' && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                       <span>Einmalzahlung Schüler:</span>
-                                      <strong>{(students.length * 5.29).toFixed(2).replace('.', ',')} € / Jahr</strong>
+                                      <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                     </div>
                                   )}
 
@@ -14685,7 +14962,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     <>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
                                         <span>Schüler-Umlage (durch Schule erstattet):</span>
-                                        <strong>{(students.length * 2.59).toFixed(2).replace('.', ',')} € / Jahr</strong>
+                                        <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, true)).toFixed(2).replace('.', ',')} € / Jahr</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
                                         <span>Kofinanzierung Schule:</span>
@@ -14736,12 +15013,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   gap: '2px'
                                 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Zuzüglich Anteil Schüler ({students.length} × {studentBillingOption === 'option1' ? '5,29' : '2,59'} €):</span>
-                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)).toFixed(2).replace('.', ',')} €</strong>
+                                    <span>Zuzüglich Anteil Schüler ({students.length} × {studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',') : getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} €):</span>
+                                    <strong style={{ fontWeight: 850 }}>{(students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true))).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
                                     <strong>Einzug im 1. Monat:</strong>
-                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59))).toFixed(2).replace('.', ',')} €</strong>
+                                    <strong>{(currentTotalB2B + (students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true)))).toFixed(2).replace('.', ',')} €</strong>
                                   </div>
                                 </div>
                               )}
@@ -14847,9 +15124,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               </button>
                             ) : (
                               <button
-                                onClick={() => {
-                                  setIsCancelled(false);
-                                  localStorage.removeItem('isCancelled');
+                                onClick={async () => {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('schools')
+                                      .update({ contract_ends_at: null })
+                                      .eq('id', schoolId);
+                                    if (error) throw error;
+
+                                    setIsCancelled(false);
+                                    localStorage.removeItem('isCancelled');
+                                  } catch (err: any) {
+                                    console.error("Reactivation error:", err);
+                                    alert("Fehler beim Reaktivieren des Vertrags. Bitte versuche es erneut.");
+                                  }
                                 }}
                                 className="hover-scale"
                                 style={{
@@ -14931,10 +15219,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>• Umlagesatz (pro Schüler):</span>
                                 <strong style={{ color: '#0f172a' }}>
-                                  {studentBillingOption === 'option1' && '5,29 € / Jahr'}
+                                  {studentBillingOption === 'option1' && `${getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € / Jahr`}
                                   {studentBillingOption === 'option2' && '0,49 € / Mo.'}
                                   {studentBillingOption === 'option3_1' && '0,24 € / Mo.'}
-                                  {studentBillingOption === 'option3_2' && '2,59 € / Jahr'}
+                                  {studentBillingOption === 'option3_2' && `${getDynamicAnnualPrice(contractStartDate, true).toFixed(2).replace('.', ',')} € / Jahr`}
                                 </strong>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -14944,10 +15232,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px', marginBottom: '2px' }}>
                                 <span>• Gesamtpreis Umlage:</span>
                                 <strong style={{ color: '#6b21a8', fontWeight: 800 }}>
-                                  {studentBillingOption === 'option1' && `${(students.length * 5.29).toFixed(2).replace('.', ',')} € / Jahr`}
+                                  {studentBillingOption === 'option1' && `${(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} € / Jahr`}
                                   {studentBillingOption === 'option2' && `${(students.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}
                                   {studentBillingOption === 'option3_1' && `${(students.length * 0.24).toFixed(2).replace('.', ',')} € / Mo.`}
-                                  {studentBillingOption === 'option3_2' && `${(students.length * 2.59).toFixed(2).replace('.', ',')} € / Jahr`}
+                                  {studentBillingOption === 'option3_2' && `${(students.length * getDynamicAnnualPrice(contractStartDate, true)).toFixed(2).replace('.', ',')} € / Jahr`}
                                 </strong>
                               </div>
                               {(studentBillingOption === 'option3_1' || studentBillingOption === 'option3_2') && (
@@ -14973,7 +15261,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             
                             {(() => {
                               const standardB2B = baseB2B + studentSharePreview;
-                              const standardB2C = isAnnual ? (students.length * (studentBillingOption === 'option1' ? 5.29 : 2.59)) : studentLevyMonthly;
+                              const standardB2C = isAnnual ? (students.length * (studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true))) : studentLevyMonthly;
                               return (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -15008,7 +15296,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                       {(extraBillingOption === 'option1' || extraBillingOption === 'option3_2') && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: '8px' }}>
                                           <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>• Umlage Schüler (Jährlich):</span>
-                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? 5.29 : 2.59) * bookedExtraUsers).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
+                                          <strong style={{ fontSize: '0.82rem', color: '#6b21a8', fontWeight: 700 }}>{((extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : getDynamicAnnualPrice(contractStartDate, true)) * bookedExtraUsers).toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.62rem', fontWeight: 500 }}>/ Jahr</span></strong>
                                         </div>
                                       )}
                                     </div>
@@ -15154,13 +15442,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
                                   <button
-                                    onClick={() => {
-                                      const newVal = bookedExtraUsers + extraUsersSliderVal;
-                                      setBookedExtraUsers(newVal);
-                                      localStorage.setItem('bookedExtraUsers', newVal.toString());
-                                      alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich gebucht!`);
-                                      setExtraUsersSliderVal(0);
-                                      setShowConfirmExtra(false);
+                                    onClick={async () => {
+                                      try {
+                                        const newVal = bookedExtraUsers + extraUsersSliderVal;
+                                        const { error } = await supabase
+                                          .from('schools')
+                                          .update({ user_quota: 150 + newVal })
+                                          .eq('id', schoolId);
+                                        if (error) throw error;
+
+                                        setBookedExtraUsers(newVal);
+                                        localStorage.setItem('bookedExtraUsers', newVal.toString());
+                                        alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich gebucht!`);
+                                        setExtraUsersSliderVal(0);
+                                        setShowConfirmExtra(false);
+                                      } catch (err: any) {
+                                        console.error("Error booking extra users:", err);
+                                        alert("Fehler beim Buchen der zusätzlichen User. Bitte versuche es erneut.");
+                                      }
                                     }}
                                     style={{
                                       background: '#7c3aed',
@@ -15350,7 +15649,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                     <span style={{ fontSize: '0.65rem', color: '#6b21a8', fontWeight: 700 }}>Abrechnungsmethode für zusätzliche Schüler:</span>
                                     <select
                                       value={extraBillingOption}
-                                      onChange={(e) => setExtraBillingOption(e.target.value)}
+                                      onChange={(e) => handleUpdateExtraBillingOption(e.target.value)}
                                       style={{
                                         padding: '8px 12px',
                                         borderRadius: '10px',
@@ -15423,11 +15722,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{ border: '1px solid #e2e8f0', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
                               {(() => {
                                 const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                                const annualPricePerStudent = studentBillingOption === 'option1' ? 5.29 : studentBillingOption === 'option3_2' ? 2.59 : 0;
+                                const annualPricePerStudent = studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                                 const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
                                 
                                 const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
-                                const extraAnnualPrice = extraBillingOption === 'option1' ? 5.29 : extraBillingOption === 'option3_2' ? 2.59 : 0;
+                                const extraAnnualPrice = extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                                 const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
 
                                 const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal + extraEinmalzahlungTotal;
@@ -19396,10 +19695,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 Abbrechen
               </button>
               <button
-                onClick={() => {
-                  setIsCancelled(true);
-                  localStorage.setItem('isCancelled', 'true');
-                  setShowCancelModal(false);
+                onClick={async () => {
+                  try {
+                    const endStr = new Date('2026-08-31T22:00:00.000Z').toISOString();
+                    const { error } = await supabase
+                      .from('schools')
+                      .update({ contract_ends_at: endStr })
+                      .eq('id', schoolId);
+                    if (error) throw error;
+
+                    setIsCancelled(true);
+                    localStorage.setItem('isCancelled', 'true');
+                    setShowCancelModal(false);
+                  } catch (err: any) {
+                    console.error("Cancellation error:", err);
+                    alert("Fehler beim Kündigen des Vertrags. Bitte versuche es erneut.");
+                  }
                 }}
                 style={{
                   background: '#ef4444',
@@ -19682,6 +19993,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           </div>
         </div>
       )}
+
+      {/* Floating Developer Reset Button */}
+      <button
+        onClick={handleDeveloperReset}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 99999,
+          background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '30px',
+          padding: '12px 20px',
+          fontSize: '0.8rem',
+          fontWeight: 800,
+          cursor: 'pointer',
+          boxShadow: '0 10px 25px rgba(124, 58, 237, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          transition: 'all 0.2s ease-in-out',
+          fontFamily: 'Urbanist, sans-serif'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+          e.currentTarget.style.boxShadow = '0 12px 30px rgba(124, 58, 237, 0.45)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)';
+        }}
+      >
+        <RefreshCw size={14} style={{ animation: 'spin 4s linear infinite' }} />
+        Entwickler-Reset (Bestellvorgang zurücksetzen)
+      </button>
     </div>
   </div>
   );

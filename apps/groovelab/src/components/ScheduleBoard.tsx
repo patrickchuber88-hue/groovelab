@@ -208,11 +208,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (role === 'admin' || role === 'secretary') {
           const { data: tData } = await supabase
             .from('users')
-            .select('id, first_name, last_name')
+            .select('id, first_name, last_name, planned_boards')
             .eq('school_id', schoolId)
             .in('role', ['teacher', 'admin', 'secretary'])
             .order('first_name');
-          teachersList = tData || [];
+          
+          const filteredTeachers = (tData || []).filter(u => {
+            const rawPlanned = u.planned_boards;
+            let loadedDrafts: any[] = [];
+            let loadedSubmittedDraftId = '';
+            if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
+              loadedDrafts = (rawPlanned as any).drafts;
+              loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
+            } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
+              loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned }];
+            }
+            
+            const hasDrafts = loadedDrafts && loadedDrafts.length > 0 && loadedDrafts.some(d => d.boards && d.boards.length > 0);
+            const isSubmitted = loadedSubmittedDraftId !== '';
+            
+            if (hasDrafts && !isSubmitted) {
+              return false; // exclude unsubmitted
+            }
+            return true;
+          });
+
+          teachersList = filteredTeachers;
           setTeachers(teachersList);
           
           // Default to the first teacher if selectedTeacherId is still the admin's ID
@@ -275,11 +296,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let loadedDrafts: { id: string; name: string; boards: DayBoard[] }[] = [];
       let loadedActiveDraftId = 'default';
       let loadedSubmittedDraftId = '';
+      let loadedSubmittedAt = '';
 
       if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
         loadedDrafts = (rawPlanned as any).drafts;
         loadedActiveDraftId = (rawPlanned as any).activeDraftId || 'default';
         loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
+        loadedSubmittedAt = (rawPlanned as any).submittedAt || '';
       } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
         // Legacy single draft format
         loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned as any }];
@@ -294,6 +317,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               loadedDrafts = parsed.drafts;
               loadedActiveDraftId = parsed.activeDraftId || 'default';
               loadedSubmittedDraftId = parsed.submittedDraftId || '';
+              loadedSubmittedAt = parsed.submittedAt || '';
             }
           } catch (e) {}
         }
@@ -345,10 +369,31 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         } else {
           setScheduleStatus('approved');
         }
+
+        // Parse and set the submission timestamp with date and time
+        let submissionDate: Date | null = null;
+        if (loadedSubmittedAt) {
+          submissionDate = new Date(loadedSubmittedAt);
+        } else {
+          // Find the latest created_at in schedData
+          const dates = schedData.map(s => s.created_at ? new Date(s.created_at).getTime() : 0).filter(t => t > 0);
+          if (dates.length > 0) {
+            submissionDate = new Date(Math.max(...dates));
+          }
+        }
+
+        if (submissionDate && !isNaN(submissionDate.getTime())) {
+          const formattedDate = submissionDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const formattedTime = submissionDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          setLastSubmittedTime(`am ${formattedDate}. um ${formattedTime}`);
+        } else {
+          setLastSubmittedTime(null);
+        }
       } else {
         setHasSubmittedSchedule(false);
         setSubmittedDraftId('');
         setScheduleStatus('none');
+        setLastSubmittedTime(null);
       }
 
       // Reconstruct boards based on database planned_boards OR localStorage OR existing schedules
@@ -1169,6 +1214,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const draftStateToSave = {
         activeDraftId,
         submittedDraftId: activeDraftId,
+        submittedAt: new Date().toISOString(),
         drafts: updatedDrafts
       };
 
@@ -1281,7 +1327,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setShowCelebration(true);
       setHasSubmittedSchedule(true);
       setScheduleStatus('pending');
-      setLastSubmittedTime(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      setLastSubmittedTime(`am ${formattedDate}. um ${formattedTime}`);
     } catch (err: any) {
       console.error('Error saving schedule:', err);
       alert('Fehler beim Speichern: ' + err.message);
@@ -1332,6 +1381,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           selectedTeacherId={selectedTeacherId}
           setSelectedTeacherId={setSelectedTeacherId}
           currentUserRole={currentUserRole}
+          hasSubmittedSchedule={hasSubmittedSchedule}
         />
       ) : (
         <>
