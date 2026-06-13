@@ -1408,7 +1408,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     return parseFloat((monthsRemaining * ratePerMonth).toFixed(2));
   };
 
-  const handleDeveloperReset = () => {
+  const handleDeveloperReset = async () => {
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          is_billing_booked: false,
+          has_campus_subscription: false,
+          has_groovelab_subscription: false,
+          campus_activated_this_month: false,
+          groovelab_activated_this_month: false,
+          contract_start_date: null,
+          contract_ends_at: null,
+          student_billing_option: 'option1',
+          extra_billing_option: 'option1',
+          user_quota: 150,
+          pending_user_quota: null
+        })
+        .eq('id', schoolId);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Developer reset database error:", err);
+    }
+
     setIsBillingBooked(false);
     setBookedExtraUsers(0);
     setExtraUsersSliderVal(0);
