@@ -169,8 +169,10 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
     // GrooveLab platform: strictly block instrument avatars and fall back to musician avatars
     const isInstrumentAvatar = src && (
       src.includes('avatar.png') || 
+      src.includes('avatar_new') ||
+      src.includes('_avatar') ||
       src.includes('guitar_avatar') || 
-      src.includes('gitarre_avatar_new') || 
+      src.includes('gitarre_avatar') || 
       src.includes('ebass_avatar') || 
       src.includes('egitarre_avatar') || 
       src.includes('kontrabass_avatar') || 
@@ -178,31 +180,33 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
       src.includes('drums_avatar') || 
       src.includes('schlagzeug_avatar') || 
       src.includes('piano_avatar') || 
-      src.includes('klavier_avatar_new') || 
+      src.includes('klavier_avatar') || 
       src.includes('vocals_avatar') || 
       src.includes('gesang_avatar') || 
       src.includes('trumpet_avatar') || 
-      src.includes('trompete_avatar_new') || 
+      src.includes('trompete_avatar') || 
       src.includes('trombone_avatar') || 
       src.includes('posaune_avatar') || 
       src.includes('horn_avatar') || 
-      src.includes('horn_avatar_new') || 
       src.includes('cello_avatar') || 
-      src.includes('cello_avatar_new') || 
       src.includes('violin_avatar') || 
-      src.includes('violine_avatar_new') || 
+      src.includes('violine_avatar') || 
       src.includes('clarinet_avatar') || 
-      src.includes('klarinette_avatar_new') || 
+      src.includes('klarinette_avatar') || 
       src.includes('flute_avatar') || 
       src.includes('querfloete_avatar') || 
       src.includes('saxophone_avatar') || 
-      src.includes('saxophon_avatar_new') || 
+      src.includes('saxophon_avatar') || 
       src.includes('blockfloete_avatar') || 
       src.includes('bariton_avatar') || 
-      src.includes('oboe_avatar')
+      src.includes('oboe_avatar') ||
+      src.includes('realistic') ||
+      src.includes('acoustic') ||
+      src.includes('focused') ||
+      src.includes('eguitar_17')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-      displaySrc = '/avatar_ghost.jpg';
+      displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, targetUser?.role);
     }
   }
 
