@@ -162,6 +162,19 @@ body {
   transform: translateY(-1px);
 }
 
+/* Student Drag Card (No layout transforms to ensure reliable drag start in Safari/Chrome) */
+.student-drag-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+}
+.student-drag-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+  background-color: #f8fafc !important;
+}
+.student-drag-card:active {
+  cursor: grabbing !important;
+}
+
 /* Sidebar */
 .glass-sidebar {
   background: var(--glass-bg-strong) !important;
