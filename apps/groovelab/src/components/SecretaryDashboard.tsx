@@ -5249,6 +5249,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Campus Toggle */}
                         <button
                           onClick={async () => {
+                            if (student.isPendingOnboarding) {
+                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Barzahlung/Rechnung als Zahlungsart hinterlegt.`)) {
+                                return;
+                              }
+                              try {
+                                // 1. Onboarding abschließen (in users Tabelle verschieben)
+                                const { error: completeError } = await supabase.rpc('complete_onboarding', {
+                                  input_student_id: student.id,
+                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                });
+                                if (completeError) throw completeError;
+
+                                // 2. Aktivieren und Zahlungsart festlegen
+                                const { error: updateError } = await supabase
+                                  .from('users')
+                                  .update({ 
+                                    is_campus_active: true, 
+                                    student_billing_payment_method: 'cash' 
+                                  })
+                                  .eq('id', student.id);
+                                if (updateError) throw updateError;
+
+                                fetchDashboardData();
+                              } catch (err: any) {
+                                console.error("Error manually onboarding student:", err);
+                                alert("Fehler bei der manuellen Aktivierung: " + err.message);
+                              }
+                              return;
+                            }
+
                             const newVal = !student.is_campus_active;
                             const { error } = await supabase
                               .from('users')
@@ -5278,6 +5308,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Groove Toggle */}
                         <button
                           onClick={async () => {
+                            if (student.isPendingOnboarding) {
+                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Barzahlung/Rechnung hinterlegt.`)) {
+                                return;
+                              }
+                              try {
+                                // 1. Onboarding abschließen (in users Tabelle verschieben)
+                                const { error: completeError } = await supabase.rpc('complete_onboarding', {
+                                  input_student_id: student.id,
+                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                });
+                                if (completeError) throw completeError;
+
+                                // 2. Aktivieren und Zahlungsart festlegen
+                                const { error: updateError } = await supabase
+                                  .from('users')
+                                  .update({ 
+                                    is_groovelab_active: true, 
+                                    student_billing_payment_method: 'cash' 
+                                  })
+                                  .eq('id', student.id);
+                                if (updateError) throw updateError;
+
+                                fetchDashboardData();
+                              } catch (err: any) {
+                                console.error("Error manually onboarding student:", err);
+                                alert("Fehler bei der manuellen Aktivierung: " + err.message);
+                              }
+                              return;
+                            }
+
                             const newVal = !student.is_groovelab_active;
                             const { error } = await supabase
                               .from('users')
