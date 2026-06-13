@@ -216,6 +216,8 @@ Deno.serve(async (req) => {
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       `X-WR-CALNAME:${calendarName}`,
+      'X-PUBLISHED-TTL:PT1H',
+      'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
       'X-WR-TIMEZONE:Europe/Berlin',
       'BEGIN:VTIMEZONE',
       'TZID:Europe/Berlin',
