@@ -4639,9 +4639,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             schoolName.toLowerCase().includes('musäk');
 
     // Show all students belonging to the school
-    const campusStudentsOnly = students.filter((s: any) => {
-      return isBadSaeckingen;
-    });
+    const campusStudentsOnly = students;
 
     const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Allgemein')));
     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
@@ -12609,11 +12607,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 fontFamily: 'Urbanist',
                                 flexShrink: 0
                               }}>
-                                AL
+                                OZ
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                                  Allgemein
+                                  Ohne Zuweisung
                                 </span>
                                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
                                   Ohne Lehrerzuweisung
