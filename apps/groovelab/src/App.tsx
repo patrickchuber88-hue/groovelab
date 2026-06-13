@@ -206,7 +206,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
       src.includes('eguitar_17')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-      displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, targetUser?.role);
+      displaySrc = '/avatar_ghost.jpg';
     }
   }
 

@@ -310,7 +310,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         src.includes('eguitar_17')
       );
       if (!src || isInstrument || src === '/avatar_ghost.jpg') {
-        return getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, targetUser?.role);
+        return '/avatar_ghost.jpg';
       }
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
@@ -3542,6 +3542,23 @@ export function TeacherDashboard({
         const trulyActive = schoolSess;
         setActiveSessions(trulyActive);
 
+        // Auto-checkout stale session for current student if they are in view-only / not checked in locally
+        if (viewMode === 'student' && !isUserCheckedIn && userId) {
+          const staleSession = trulyActive.find(s => s && s.user_id === userId);
+          if (staleSession) {
+            console.log('[Groovelab] Stale session detected for current student on board, logging out from database...');
+            supabase.from('sessions')
+              .update({ check_out_time: new Date().toISOString() })
+              .eq('id', staleSession.id)
+              .then(() => {
+                if (onSessionChange) onSessionChange(null);
+                if (onLocationModeChange) onLocationModeChange('home');
+                fetchData();
+              });
+            return;
+          }
+        }
+
         // 4. Coaches
         const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
 
@@ -5046,7 +5063,7 @@ export function TeacherDashboard({
                     )}
                   </button>
                   <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
-                    {activeSessions.length} im Lab
+                    {activeSessions.filter(s => s.users?.role?.toLowerCase() === 'student').length} im Lab
                   </div>
                 </>
               )}
