@@ -5196,14 +5196,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       <div style={{ flex: '1.25', minWidth: '120px' }}>
                         <select
                           value={student.teacher_id || ''}
-                          onChange={async (e) => {
-                            const { error } = await supabase
-                              .from('users')
-                              .update({ teacher_id: e.target.value || null })
-                              .eq('id', student.id);
-                            if (error) alert(error.message);
-                            else fetchDashboardData();
-                          }}
+                           onChange={(e) => {
+                             handleUpdateStudentTeacher(student.id, e.target.value || null);
+                           }}
                           style={{ 
                             width: '100%', 
                             padding: '7px 12px', 
@@ -5829,11 +5824,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
   const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
     try {
-      const { error } = await supabase
+      // First try to update users table
+      const { data, error } = await supabase
         .from('users')
         .update({ teacher_id: teacherId })
-        .eq('id', studentId);
+        .eq('id', studentId)
+        .select();
+
       if (error) throw error;
+
+      // If no row was updated in users, then this student is still pending onboarding in the 'students' table
+      if (!data || data.length === 0) {
+        const { error: studentErr } = await supabase
+          .from('students')
+          .update({ teacher_id: teacherId })
+          .eq('id', studentId);
+        if (studentErr) throw studentErr;
+      }
+
       fetchDashboardData();
     } catch (err: any) {
       alert("Fehler beim Zuweisen der Lehrkraft: " + err.message);
