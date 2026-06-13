@@ -5063,7 +5063,13 @@ export function TeacherDashboard({
                     )}
                   </button>
                   <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
-                    {activeSessions.filter(s => s.users?.role?.toLowerCase() === 'student').length} im Lab
+                    {activeSessions.filter(s => {
+                      const u = s.users;
+                      if (!u) return false;
+                      const isStudent = u.role?.toLowerCase() === 'student';
+                      const isStaff = u.role?.toLowerCase() === 'teacher' || u.role?.toLowerCase() === 'admin';
+                      return isStudent && !isStaff && u.is_groovelab_active && s.gps_verified;
+                    }).length} im Lab
                   </div>
                 </>
               )}
