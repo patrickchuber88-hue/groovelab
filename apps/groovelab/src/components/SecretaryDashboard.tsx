@@ -5117,7 +5117,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         border: '1px solid #f1f5f9',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
                         minWidth: '850px',
-                        cursor: 'grab'
+                        cursor: 'grab',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none'
                       }}
                       className="student-drag-card"
                     >
