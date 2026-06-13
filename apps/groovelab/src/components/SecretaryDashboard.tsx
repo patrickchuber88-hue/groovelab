@@ -1375,9 +1375,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? (localStorage.getItem('contractStartDate') || localStorage.getItem('simulatedContractStartDate')) : null;
   });
+  const [simulatedToday, setSimulatedToday] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('simulatedToday') || '') : '';
+  });
+  const [isSimulatedDateLocked, setIsSimulatedDateLocked] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? !!localStorage.getItem('simulatedToday') : false;
+  });
   const [tempSimulatedDate, setTempSimulatedDate] = useState<string>(() => {
-    const val = typeof window !== 'undefined' ? (localStorage.getItem('contractStartDate') || localStorage.getItem('simulatedContractStartDate')) : null;
-    return val ? val.split('T')[0] : '2026-06-13';
+    if (typeof window !== 'undefined') {
+      const sim = localStorage.getItem('simulatedToday');
+      if (sim) return sim;
+    }
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   });
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
@@ -7868,54 +7881,79 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                Simuliertes Startdatum:
+                Datumssimulator (heute):
               </span>
               <input
                 type="date"
                 value={tempSimulatedDate}
                 onChange={(e) => setTempSimulatedDate(e.target.value)}
+                disabled={isSimulatedDateLocked}
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: '#166534',
+                  color: isSimulatedDateLocked ? '#15803d' : '#166534',
                   fontWeight: 900,
                   fontSize: '0.74rem',
                   outline: 'none',
-                  cursor: 'pointer',
+                  cursor: isSimulatedDateLocked ? 'default' : 'pointer',
+                  opacity: isSimulatedDateLocked ? 0.8 : 1,
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               />
-              <button
-                onClick={async () => {
-                  try {
-                    const { error } = await supabase
-                      .from('schools')
-                      .update({ contract_start_date: tempSimulatedDate })
-                      .eq('id', schoolId);
-                    if (error) throw error;
+              {!isSimulatedDateLocked ? (
+                <button
+                  onClick={() => {
+                    setSimulatedToday(tempSimulatedDate);
+                    localStorage.setItem('simulatedToday', tempSimulatedDate);
+                    setIsSimulatedDateLocked(true);
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    background: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(22,163,74,0.2)'
+                  }}
+                >
+                  Bestätigen
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const todayStr = `${yyyy}-${mm}-${dd}`;
                     
-                    setContractStartDate(tempSimulatedDate);
-                    localStorage.setItem('contractStartDate', tempSimulatedDate);
-                    alert("Startdatum erfolgreich simuliert und gespeichert!");
-                  } catch (err: any) {
-                    console.error("Error setting simulated date:", err);
-                    alert("Fehler beim Speichern des Startdatums.");
-                  }
-                }}
-                style={{
-                  padding: '4px 10px',
-                  background: '#16a34a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(22,163,74,0.2)'
-                }}
-              >
-                Bestätigen
-              </button>
+                    setSimulatedToday('');
+                    localStorage.removeItem('simulatedToday');
+                    setTempSimulatedDate(todayStr);
+                    setIsSimulatedDateLocked(false);
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(239,68,68,0.2)'
+                  }}
+                  title="Zurücksetzen auf heute"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             {/* Integrated School & User Pill */}
@@ -8123,7 +8161,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                   {(() => {
                     if (!isBillingBooked || dismissedInvoiceAlert) return null;
                     
-                    const today = new Date();
+                    const today = simulatedToday ? new Date(simulatedToday + 'T23:59:59') : new Date();
                     const y = today.getFullYear();
                     const m = today.getMonth() + 1;
                     const lastDay = new Date(y, m, 0).getDate();
@@ -8436,7 +8474,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </span>
                         </h3>
                         <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
-                          Heute ist {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
+                          Heute ist {(simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date()).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
                         </p>
                       </div>
                     </div>
@@ -15812,7 +15850,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 const startYear = contractDateObj.getFullYear();
                                 const startMonth = contractDateObj.getMonth() + 1; // 1-indexed
 
-                                const systemDate = new Date('2026-06-12T19:30:38+02:00');
+                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T19:30:38+02:00') : new Date('2026-06-12T19:30:38+02:00');
                                 const currentYear = systemDate.getFullYear();
                                 const currentMonth = systemDate.getMonth() + 1;
 
