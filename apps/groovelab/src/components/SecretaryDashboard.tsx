@@ -2266,8 +2266,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       // Fetch stations
       const { data: stationsData } = await supabase
         .from('stations')
-        .select('*')
-        .eq('school_id', schoolId);
+        .select('*, rooms!inner(*)')
+        .eq('rooms.school_id', schoolId);
       setStations(stationsData || []);
 
       // Fetch system alerts
