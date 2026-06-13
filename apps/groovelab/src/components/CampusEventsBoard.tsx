@@ -3029,14 +3029,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             style={{
               position: 'fixed',
               inset: 0,
-              zIndex: 1100, // Make sure it sits above standard modals
-              background: 'rgba(15,23,42,0.65)',
-              backdropFilter: 'blur(8px)',
+              zIndex: 1100,
+              background: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '24px',
-              animation: 'fadeIn 0.15s ease'
+              padding: '20px',
+              animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <div
@@ -3045,110 +3046,146 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 background: '#ffffff',
                 borderRadius: '24px',
                 width: '100%',
-                maxWidth: '520px',
-                boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                maxWidth: '460px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
                 overflow: 'hidden',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                position: 'relative'
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                position: 'relative',
+                padding: '32px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch'
               }}
             >
-              {/* Top close button */}
+              {/* iOS close button */}
               <button
                 onClick={() => setShowIcalModal(false)}
                 style={{
                   position: 'absolute',
-                  top: '20px',
-                  right: '20px',
+                  top: '16px',
+                  right: '16px',
                   border: 'none',
-                  background: '#f1f5f9',
+                  background: 'rgba(0, 0, 0, 0.05)',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
+                  width: '30px',
+                  height: '30px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64748b',
-                  transition: 'all 0.2s',
+                  color: '#86868b',
+                  transition: 'background 0.2s, color 0.2s',
                   zIndex: 10
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.08)'; e.currentTarget.style.color = '#1d1d1f'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; e.currentTarget.style.color = '#86868b'; }}
               >
-                <X size={16} />
+                <X size={14} strokeWidth={2.5} />
               </button>
 
-              {/* Banner Header styled like Apple Calendar Month Strip (Red) */}
+              {/* Dynamic Apple Calendar App Icon */}
               <div style={{
-                background: 'linear-gradient(135deg, #ff3b30 0%, #e02e24 100%)',
-                padding: '32px 24px',
-                color: '#ffffff',
+                width: '68px',
+                height: '68px',
+                borderRadius: '16px',
+                background: '#ffffff',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px'
+                overflow: 'hidden',
+                margin: '8px auto 20px auto',
+                userSelect: 'none'
               }}>
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(4px)',
-                  borderRadius: '16px',
-                  width: '48px',
-                  height: '48px',
+                  background: '#ff3b30',
+                  height: '20px',
+                  color: '#ffffff',
+                  fontSize: '9.5px',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  textTransform: 'uppercase'
                 }}>
-                  <CalendarDays size={24} color="#ffffff" />
+                  {new Date().toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '')}
                 </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 950, letterSpacing: '-0.025em' }}>
-                    Kalender abonnieren
-                  </h3>
-                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.82rem', fontWeight: 550, lineHeight: 1.4 }}>
-                    Synchronisiere deine Unterrichtstermine live mit deinem Smartphone (iPhone, Google Kalender, Outlook). Termine aktualisieren sich automatisch.
-                  </p>
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '26px',
+                  fontWeight: 700,
+                  color: '#1d1d1f',
+                  lineHeight: 1
+                }}>
+                  {new Date().getDate()}
                 </div>
               </div>
 
-              {/* Body */}
-              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Header Text */}
+              <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '22px',
+                  fontWeight: 700,
+                  color: '#1d1d1f',
+                  letterSpacing: '-0.02em'
+                }}>
+                  Kalender abonnieren
+                </h3>
+                <p style={{
+                  margin: '8px 0 0 0',
+                  color: '#86868b',
+                  fontSize: '13.5px',
+                  lineHeight: 1.45,
+                  fontWeight: 450,
+                  padding: '0 10px'
+                }}>
+                  Synchronisiere deine Unterrichtstermine live. Neue Termine aktualisieren sich vollautomatisch auf deinem Smartphone.
+                </p>
+              </div>
+
+              {/* Content / Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                {/* Option 1: One-Click Webcal Subscription */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Option 1: Direkt abonnieren
-                  </label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <a
-                      href={`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`}
-                      style={{
-                        flex: 1,
-                        textDecoration: 'none',
-                        background: '#1e293b',
-                        color: '#ffffff',
-                        padding: '12px 16px',
-                        borderRadius: '14px',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 14px rgba(30, 41, 59, 0.25)',
-                        transition: 'all 0.2s',
-                        textAlign: 'center'
-                      }}
-                      className="hover-scale"
-                    >
-                      <CalendarPlus size={16} /> Auf diesem Gerät abonnieren
-                    </a>
-                  </div>
+                {/* Option 1: Direct Subscription */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <a
+                    href={`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`}
+                    style={{
+                      textDecoration: 'none',
+                      background: '#007aff',
+                      color: '#ffffff',
+                      padding: '14px 20px',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      fontSize: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'background 0.2s',
+                      textAlign: 'center',
+                      boxShadow: '0 4px 12px rgba(0, 122, 255, 0.15)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#0066cc'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#007aff'; }}
+                  >
+                    <CalendarPlus size={16} /> Auf diesem Gerät abonnieren
+                  </a>
                 </div>
 
-                {/* Option 2: Copy link or import into Google Calendar */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Option 2: Manuell oder Google Kalender
-                  </label>
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(0, 0, 0, 0.06)' }}></div>
+                  <span style={{ fontSize: '12px', color: '#86868b', padding: '0 12px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 550 }}>oder</span>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(0, 0, 0, 0.06)' }}></div>
+                </div>
+
+                {/* Option 2: Copy link / Google Calendar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   
                   {/* Google Calendar Direct Import */}
                   <a
@@ -3157,41 +3194,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     rel="noopener noreferrer"
                     style={{
                       textDecoration: 'none',
-                      background: '#f8fafc',
-                      border: '1.5px solid #e2e8f0',
-                      color: '#334155',
-                      padding: '12px 16px',
-                      borderRadius: '14px',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
+                      background: '#f5f5f7',
+                      color: '#007aff',
+                      padding: '14px 20px',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      fontSize: '15px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      transition: 'all 0.2s'
+                      transition: 'background 0.2s'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#e8e8ed'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f5f5f7'; }}
                   >
-                    <Globe size={16} color="#4285F4" /> In Google Kalender importieren
+                    <Globe size={16} color="#007aff" /> In Google Kalender importieren
                   </a>
 
-                  {/* Copy Link Input */}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  {/* Copy Link Input Bar */}
+                  <div style={{ display: 'flex', background: '#f5f5f7', borderRadius: '12px', padding: '4px', alignItems: 'center', marginTop: '4px' }}>
                     <input
                       type="text"
                       readOnly
                       value={`${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`}
                       style={{
                         flex: 1,
-                        background: '#f8fafc',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '10px 14px',
-                        fontSize: '0.75rem',
-                        fontFamily: 'monospace',
-                        color: '#475569',
-                        outline: 'none'
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '10px 12px',
+                        fontSize: '12px',
+                        color: '#1d1d1f',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+                        outline: 'none',
+                        textOverflow: 'ellipsis'
                       }}
                       onClick={e => (e.target as HTMLInputElement).select()}
                     />
@@ -3203,57 +3239,43 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       }}
                       style={{
                         border: 'none',
-                        background: copied ? '#22c55e' : '#0f172a',
+                        background: copied ? '#34c759' : '#007aff',
                         color: '#ffffff',
                         padding: '10px 16px',
-                        borderRadius: '12px',
-                        fontWeight: 800,
-                        fontSize: '0.75rem',
+                        borderRadius: '10px',
+                        fontWeight: 600,
+                        fontSize: '13px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: 'background 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: copied ? '0 4px 12px rgba(34, 197, 150, 0.2)' : 'none'
+                        gap: '6px'
                       }}
                     >
-                      {copied ? <Check size={14} /> : null} {copied ? 'Kopiert' : 'Kopieren'}
+                      {copied ? <Check size={14} strokeWidth={2.5} /> : null}
+                      {copied ? 'Kopiert' : 'Kopieren'}
                     </button>
                   </div>
                 </div>
 
                 {/* Instructions */}
                 <div style={{
-                  background: '#f8fafc',
-                  border: '1.5px dashed #e2e8f0',
+                  background: '#f5f5f7',
                   borderRadius: '16px',
                   padding: '16px',
-                  fontSize: '0.75rem',
-                  color: '#64748b',
+                  fontSize: '12.5px',
+                  color: '#515154',
                   lineHeight: 1.5,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px'
+                  gap: '8px',
+                  marginTop: '8px'
                 }}>
-                  <span style={{ fontWeight: 800, color: '#334155' }}>💡 Kurzanleitung:</span>
+                  <span style={{ fontWeight: 650, color: '#1d1d1f' }}>💡 Kurzanleitung:</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span>• <b>iOS / macOS</b>: Klicke auf "Auf diesem Gerät abonnieren".</span>
-                    <span>• <b>Google / Android</b>: Klicke auf "In Google Kalender importieren".</span>
-                    <span>• <b>Andere</b>: Link kopieren und in deiner Kalender-App als Web-Kalender abonnieren.</span>
-                  </div>
-                  
-                  <div style={{ 
-                    marginTop: '8px', 
-                    padding: '10px 12px', 
-                    background: '#fffbeb', 
-                    borderRadius: '10px', 
-                    border: '1.5px solid #fef3c7', 
-                    fontSize: '0.7rem', 
-                    color: '#b45309',
-                    lineHeight: 1.4
-                  }}>
-                    <span style={{ fontWeight: 800, display: 'block', marginBottom: '2px' }}>⚠️ Lokale Entwicklung:</span>
-                    Bei einer lokalen Adresse (sslip.io) kann die Meldung „Unsichere Verbindung“ erscheinen. Klicke einfach auf „Fortfahren“. Auf dem Live-System entfällt dieser Schritt.
+                    <span>• <b>iOS / macOS</b>: Auf "Auf diesem Gerät abonnieren" tippen.</span>
+                    <span>• <b>Google / Android</b>: Auf "In Google Kalender importieren" tippen.</span>
+                    <span>• <b>Andere Apps</b>: Link kopieren und als Netzwerk-/Web-Kalender hinzufügen.</span>
                   </div>
                 </div>
 
