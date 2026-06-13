@@ -64,8 +64,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
   const [avatar, setAvatar] = useState<any | null>(null);
 
-  // Daily goal based on evolution level (Level 1 = 10m, Level 2 = 15m, Level 3 = 20m)
-  const dailyGoal = avatar?.evolution_level === 3 ? 20 : (avatar?.evolution_level === 2 ? 15 : 10);
+  const DEFAULT_FOKUS_LEVELS = {
+    level1: { kleine: 3, mittlere: 5, helden: 10 },
+    level2: { kleine: 5, mittlere: 10, helden: 15 },
+    level3: { kleine: 10, mittlere: 15, helden: 20 }
+  };
+
+  const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
+
+  const getFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
+    if (streak >= 9) return 'helden';
+    if (streak >= 4) return 'mittlere';
+    return 'kleine';
+  };
+
+  const getDailyGoal = () => {
+    const level = avatar?.evolution_level || 1;
+    const cat = getFlameCategory(avatar?.streak_flame || 0);
+    const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
+    const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
+    const levelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
+    return levelConfig[cat] || DEFAULT_FOKUS_LEVELS[levelKey][cat];
+  };
+
+  // Daily goal based on evolution level and flame level config
+  const dailyGoal = getDailyGoal();
   const [loggedMinutesToday, setLoggedMinutesToday] = useState<number>(0);
   const [ringProgress, setRingProgress] = useState<number>(0);
   const [hasExploded, setHasExploded] = useState<boolean>(false);
@@ -106,6 +129,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
+  const preStartCountdownRef = useRef(preStartCountdown);
+  useEffect(() => {
+    preStartCountdownRef.current = preStartCountdown;
+  }, [preStartCountdown]);
+
+  // Countdown timer effect for pre-start instructions
+  useEffect(() => {
+    if (preStartCountdown === null) return;
+    if (preStartCountdown > 0) {
+      const timer = setTimeout(() => {
+        setPreStartCountdown(preStartCountdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setPreStartCountdown(null);
+      setIsPhoneFlat(true); // default to flat/focused when starting
+    }
+  }, [preStartCountdown]);
+
   // Focus Timer interval effect & Anti-Cheat monitoring
   useEffect(() => {
     if (!timerRunning) {
@@ -142,11 +185,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // Timer interval
     const interval = setInterval(() => {
-      // In sensor mode, device must be flat, stable, and page must be visible.
-      // In desktop mode, only page visibility matters.
+      if (preStartCountdownRef.current !== null) {
+        return;
+      }
+      // In sensor mode, device must be flat, stable, page visible, and document focused.
+      // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
-        ? (isOrientedFlat && !isMoving && !document.hidden)
-        : !document.hidden;
+        ? (isOrientedFlat && !isMoving && !document.hidden && document.hasFocus())
+        : (!document.hidden && document.hasFocus());
 
       // Update states
       setIsPhoneFlat(isNowFlat);
@@ -166,22 +212,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return nextVal;
         });
       } else {
-        if (isExtraTimeRef.current) {
-          // In extra time, we don't reset to 0; we just pause the timer.
+        if (!isExtraTimeRef.current) {
+          // During the focus minutes: HARD RESET TO 0 IMMEDIATELY on interruption
+          setElapsedSeconds(0);
+          setIsExtraTime(false);
           setIsGraceActive(false);
+          setTimerRunning(false);
+          playBeep(330, 600); // Fail tone
+          if (navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          }
         } else {
-          // Normal focus period -> Grace period active
+          // Once the focus minutes are reached: START FRIENDLY COUNTDOWN
           setIsGraceActive(true);
           
           setGraceSecondsLeft(prevGrace => {
             if (prevGrace <= 1) {
-              // Grace period expired! Reset timer to 0
-              setElapsedSeconds(0);
+              // Grace period expired! Just pause the timer. Do NOT reset to 0.
+              setTimerRunning(false);
               setIsGraceActive(false);
-              playBeep(330, 600); // Fail tone
-              if (navigator.vibrate) {
-                navigator.vibrate([400, 100, 400]);
-              }
+              playBeep(440, 300); // Friendly end tone
               return 10;
             }
             
@@ -241,9 +291,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
     };
 
-    // Page Visibility listener
+    // Page Visibility & Window Focus listener
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden || !document.hasFocus()) {
         isOrientedFlat = false;
         currentFlatType = 'none';
         setIsPhoneFlat(false);
@@ -258,6 +308,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       currentFlatType = 'face-up';
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
@@ -267,6 +319,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         window.removeEventListener('devicemotion', handleMotion);
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
     };
   }, [timerRunning, dailyGoal, profile?.app_usage_mode]);
 
@@ -304,7 +358,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (userData.school_id) {
           const { data: schoolData } = await supabase
             .from('schools')
-            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial')
+            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial, opening_hours')
             .eq('id', userData.school_id)
             .single();
           if (schoolData) {
@@ -312,10 +366,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             hasCampusSub = schoolData.has_campus_subscription ?? false;
             hasGroovelabSub = schoolData.has_groovelab_subscription ?? false;
             isTrial = schoolData.is_trial ?? false;
+            setSchoolFokusLevels(schoolData.opening_hours?.fokus_levels || null);
           }
-        }
-
-        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
+        }        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
           setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
           setPageState('error');
           return;
@@ -712,7 +765,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   // Blitz-Übung loggen
-  const handleQuickLogPractice = async (minutes: number) => {
+  const handleQuickLogPractice = async (focusMinutes: number, extraMinutes: number = 0) => {
     if (practiceLoggedToday || !profile || loadingDashboard) return;
     setLoadingDashboard(true);
 
@@ -721,6 +774,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+      const minutes = focusMinutes + extraMinutes;
 
       // Aktuelle Stats abrufen
       const { data: currentStats } = await supabase
@@ -790,16 +844,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const totalMins = (currentStats?.total_focus_minutes || 0) + minutes;
       const monthlyMins = (currentStats?.monthly_focus_minutes || 0) + minutes;
       const newXp = (currentStats?.current_xp || 0) + (minutes * 10);
+      const flameLevelName = newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 4 ? 'Mittlere Flamme' : 'Kleine Flamme');
 
-      // 1. Fokus-Protokoll schreiben
-      await supabase.from('fokus_logs').insert({
-        user_id: profile.id,
-        duration_minutes: minutes,
-        duration_seconds: minutes * 60,
-        is_extra: false,
-        flame_level: newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 4 ? 'Mittlere Flamme' : 'Kleine Flamme'),
-        created_at: new Date().toISOString()
-      });
+      // 1. Fokus-Protokoll schreiben (aufgeteilt in Fokus und Extra)
+      if (focusMinutes > 0) {
+        await supabase.from('fokus_logs').insert({
+          user_id: profile.id,
+          duration_minutes: focusMinutes,
+          duration_seconds: focusMinutes * 60,
+          is_extra: false,
+          flame_level: flameLevelName,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      if (extraMinutes > 0) {
+        await supabase.from('fokus_logs').insert({
+          user_id: profile.id,
+          duration_minutes: extraMinutes,
+          duration_seconds: extraMinutes * 60,
+          is_extra: true,
+          flame_level: flameLevelName,
+          created_at: new Date().toISOString()
+        });
+      }
 
       // 2. Statistiken aktualisieren (student_stats)
       await supabase.from('student_stats').upsert({
@@ -869,8 +937,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       alert("Übe mindestens ein paar Sekunden, um deine Session zu speichern!");
       return;
     }
-    const loggedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
-    await handleQuickLogPractice(loggedMinutes);
+    const targetSeconds = dailyGoal * 60;
+    let focusMinutes = 0;
+    let extraMinutes = 0;
+    
+    const totalMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+    const targetMinsVal = dailyGoal;
+    
+    if (totalMinutes >= targetMinsVal) {
+      focusMinutes = targetMinsVal;
+      extraMinutes = totalMinutes - targetMinsVal;
+    } else {
+      focusMinutes = totalMinutes;
+      extraMinutes = 0;
+    }
+
+    await handleQuickLogPractice(focusMinutes, extraMinutes);
     setElapsedSeconds(0);
     setTimerRunning(false);
     setIsExtraTime(false);
@@ -897,15 +979,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       try {
         const permission = await (DeviceOrientationEvent as any).requestPermission();
         if (permission === 'granted') {
+          setPreStartCountdown(3);
           setTimerRunning(true);
         } else {
           alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff! 📱");
         }
       } catch (err) {
         console.error("iOS Sensor Permission error:", err);
+        setPreStartCountdown(3);
         setTimerRunning(true);
       }
     } else {
+      setPreStartCountdown(3);
       setTimerRunning(true);
     }
   };
@@ -1262,9 +1347,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return (
       <div style={{
         display: 'flex',
-        background: '#e2e8f0',
-        borderRadius: '16px',
-        padding: '4px',
+        background: '#e3e3e8',
+        borderRadius: '12px',
+        padding: '2px',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -1273,16 +1358,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           onClick={() => setActiveTab('action')}
           style={{
             flex: 1,
-            padding: '12px',
+            padding: '8px 12px',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '10px',
             background: activeTab === 'action' ? '#ffffff' : 'transparent',
-            color: activeTab === 'action' ? '#0f172a' : '#64748b',
+            color: activeTab === 'action' ? '#000000' : '#636366',
             fontSize: '0.85rem',
-            fontWeight: 800,
+            fontWeight: activeTab === 'action' ? 700 : 500,
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: activeTab === 'action' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+            transition: 'all 0.2s ease',
+            boxShadow: activeTab === 'action' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1296,23 +1381,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           onClick={() => setActiveTab('homework')}
           style={{
             flex: 1,
-            padding: '12px',
+            padding: '8px 12px',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '10px',
             background: activeTab === 'homework' ? '#ffffff' : 'transparent',
-            color: activeTab === 'homework' ? '#0f172a' : '#64748b',
+            color: activeTab === 'homework' ? '#000000' : '#636366',
             fontSize: '0.85rem',
-            fontWeight: 800,
+            fontWeight: activeTab === 'homework' ? 700 : 500,
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: activeTab === 'homework' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+            transition: 'all 0.2s ease',
+            boxShadow: activeTab === 'homework' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px'
           }}
         >
-          📖 Hausaufgaben
+          📚 Hausaufgaben
         </button>
       </div>
     );
@@ -1657,8 +1742,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Header Banner */}
           <div style={{
             background: isLessonDay 
-              ? 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' 
-              : 'linear-gradient(135deg, #14532d 0%, #064e3b 100%)',
+              ? 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)' 
+              : 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
             padding: '24px 20px',
             display: 'flex',
             alignItems: 'center',
@@ -1666,12 +1751,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             position: 'relative'
           }}>
             <div>
-              <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: '2px' }}>
-                KÜHLSCHRANK & AUTO MODUS
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
+                Groovelab Campus
               </span>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.025em' }}>
+              <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
                 {profile.first_name} {profile.last_name}
               </h1>
+            </div>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '1rem',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              {profile.first_name?.[0]}{profile.last_name?.[0]}
             </div>
           </div>
 
@@ -1772,44 +1874,68 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       {/* Streak flame */}
                       <div style={{
-                        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-                        border: '1.5px solid #fed7aa',
+                        background: '#ffffff',
+                        border: '1px solid #e5e5ea',
                         borderRadius: '20px',
-                        padding: '14px 10px',
+                        padding: '16px 14px',
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 4px 10px rgba(234, 88, 12, 0.03)'
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                       }}>
-                        <Flame size={24} color="#ea580c" fill="#ea580c" />
-                        <span style={{ fontSize: '1rem', fontWeight: 900, color: '#c2410c' }}>
-                          {stats?.streak_flame || avatar?.streak_flame || 0} Tage
-                        </span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase' }}>
-                          Übungs-Streak
-                        </span>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#fff3cd'
+                        }}>
+                          <Flame size={18} color="#ff9500" fill="#ff9500" />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
+                            {stats?.streak_flame || avatar?.streak_flame || 0} Tage
+                          </span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                            Übungs-Streak
+                          </span>
+                        </div>
                       </div>
 
                       {/* XP points */}
                       <div style={{
-                        background: 'linear-gradient(135deg, #fef9c3 0%, #fef3c7 100%)',
-                        border: '1.5px solid #fde047',
+                        background: '#ffffff',
+                        border: '1px solid #e5e5ea',
                         borderRadius: '20px',
-                        padding: '14px 10px',
+                        padding: '16px 14px',
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 4px 10px rgba(202, 138, 4, 0.03)'
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                       }}>
-                        <Sparkles size={24} color="#ca8a04" fill="#ca8a04" />
-                        <span style={{ fontSize: '1rem', fontWeight: 900, color: '#854d0e' }}>
-                          {stats?.current_xp || 0} XP
-                        </span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#713f12', textTransform: 'uppercase' }}>
-                          Erfahrungspunkte
-                        </span>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#e8f5e9'
+                        }}>
+                          <Sparkles size={18} color="#34c759" fill="#34c759" />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
+                            {stats?.current_xp || 0} XP
+                          </span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                            Erfahrungspunkte
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -1818,60 +1944,166 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       renderPracticeLoggedDone()
                     ) : (
                       <div style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #e2e8f0',
+                        background: timerRunning 
+                          ? (isExtraTime ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#000000') 
+                          : '#ffffff',
+                        border: timerRunning ? 'none' : '1px solid #e5e5ea',
                         borderRadius: '28px',
                         padding: '24px 20px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '20px',
-                        boxShadow: '0 8px 30px rgba(0,0,0,0.03)'
+                        boxShadow: timerRunning ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        color: timerRunning ? '#ffffff' : 'inherit',
+                        transition: 'all 0.5s ease'
                       }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                            FOKUS-TIMER
-                          </span>
-                          <h3 style={{ margin: '2px 0 0 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-                            Übesitzung starten
-                          </h3>
-                        </div>
-
-                        {/* Digital Timer Face in Apple Watch Style */}
-                        <div style={{
-                          width: '140px',
-                          height: '140px',
-                          borderRadius: '50%',
-                          background: '#0f172a',
-                          border: '4px solid #1e293b',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.4), 0 10px 20px rgba(15, 23, 42, 0.15)',
-                          position: 'relative'
-                        }}>
-                          <span style={{
-                            fontFamily: 'monospace, monospace',
-                            fontSize: '2rem',
-                            fontWeight: 900,
-                            color: '#ffffff',
-                            letterSpacing: '0.02em'
+                        {preStartCountdown !== null ? (
+                          /* Pre-start Instructions & Countdown Screen */
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '24px',
+                            textAlign: 'center',
+                            padding: '40px 20px',
+                            minHeight: '270px',
+                            boxSizing: 'border-box'
                           }}>
-                            {formatTime(elapsedSeconds)}
-                          </span>
-                          
-                          {/* Animated spinning loader when running */}
-                          {timerRunning && (
                             <div style={{
-                              position: 'absolute',
-                              inset: '6px',
-                              borderRadius: '50%',
-                              border: '2px solid transparent',
-                              borderTopColor: '#3b82f6',
-                              animation: 'spin 2s linear infinite'
-                            }} />
-                          )}
-                        </div>
+                              fontSize: '4.8rem',
+                              fontWeight: 900,
+                              color: '#34c759',
+                              fontFamily: 'monospace, sans-serif',
+                              lineHeight: 1,
+                              animation: 'pulseSoft 1.5s infinite ease-in-out'
+                            }}>
+                              {preStartCountdown}
+                            </div>
+                            <div>
+                              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', margin: '0 0 10px 0', letterSpacing: '-0.02em' }}>
+                                Handy hinlegen!
+                              </h3>
+                              <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 650, lineHeight: 1.5, margin: 0, maxWidth: '280px' }}>
+                                Nicht den Tab oder das Programm wechseln.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: timerRunning ? 'rgba(255,255,255,0.6)' : '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                FOKUS-TIMER
+                              </span>
+                              <h3 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 800, color: timerRunning ? '#ffffff' : '#000000', letterSpacing: '-0.02em' }}>
+                                {!timerRunning ? 'Übesitzung starten' : (isPhoneFlat ? 'Fokus aktiv... 🎯' : 'Unterbrochen')}
+                              </h3>
+                            </div>
+
+                            {/* Circular animated SVG progress ring */}
+                            <div style={{ 
+                              position: 'relative', 
+                              width: '210px', 
+                              height: '210px', 
+                              filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.25))' : (timerRunning ? (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(52, 199, 89, 0.15))' : 'drop-shadow(0 0 12px rgba(255, 59, 48, 0.2))') : 'none'),
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
+                                <circle cx="105" cy="105" r="95" fill="none" stroke={timerRunning ? 'rgba(255,255,255,0.12)' : '#f2f2f7'} strokeWidth="4" />
+                                <circle 
+                                  cx="105" 
+                                  cy="105" 
+                                  r="95" 
+                                  fill="none" 
+                                  stroke={isExtraTime ? '#ffffff' : (timerRunning ? (isPhoneFlat ? 'url(#greenGradientLanding)' : 'url(#redGradientLanding)') : 'url(#inactiveGradientLanding)')} 
+                                  strokeWidth="4" 
+                                  strokeDasharray={2 * Math.PI * 95}
+                                  strokeDashoffset={
+                                    !timerRunning && elapsedSeconds === 0
+                                      ? 2 * Math.PI * 95 // Empty circle if not started
+                                      : (isExtraTime 
+                                          ? 0 // Full circle in extra time
+                                          : 2 * Math.PI * 95 - (2 * Math.PI * 95 * Math.min(1, elapsedSeconds / (dailyGoal * 60))))
+                                  }
+                                  strokeLinecap="round"
+                                  style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
+                                />
+                                <defs>
+                                  <linearGradient id="inactiveGradientLanding" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#e5e5ea" />
+                                    <stop offset="100%" stopColor="#d1d1d6" />
+                                  </linearGradient>
+                                  <linearGradient id="greenGradientLanding" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#34c759" />
+                                    <stop offset="100%" stopColor="#248a3d" />
+                                  </linearGradient>
+                                  <linearGradient id="redGradientLanding" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#ff3b30" />
+                                    <stop offset="100%" stopColor="#c73e3a" />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                              <div style={{
+                                position: 'absolute',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <span style={{ fontSize: '3rem', fontWeight: 800, color: timerRunning ? '#ffffff' : '#000000', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                                  {!timerRunning && elapsedSeconds === 0 
+                                    ? `${String(dailyGoal).padStart(2, '0')}:00`
+                                    : formatTime(elapsedSeconds)
+                                  }
+                                </span>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: timerRunning ? 'rgba(255,255,255,0.7)' : '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em', marginTop: '6px' }}>
+                                  {timerRunning 
+                                    ? (isExtraTime ? 'Freies Üben' : (isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen')) 
+                                    : 'Ziel Fokuszeit'
+                                  }
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Gyro Sensor feedback - ONLY show when interrupted (not flat) to stay clean */}
+                            {timerRunning && !isPhoneFlat && (
+                              <div style={{
+                                width: '100%',
+                                maxWidth: '450px',
+                                padding: '16px 20px',
+                                borderRadius: '20px',
+                                background: isExtraTime 
+                                  ? 'rgba(255, 255, 255, 0.15)' 
+                                  : 'rgba(255, 59, 48, 0.15)',
+                                border: isExtraTime
+                                  ? '1px solid rgba(255, 255, 255, 0.3)'
+                                  : '1px solid rgba(255, 59, 48, 0.3)',
+                                color: '#ffffff',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                textAlign: 'center',
+                                lineHeight: 1.4,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                              }}>
+                                <div className={isExtraTime ? '' : 'animate-pulse'}>
+                                  <strong style={{ fontSize: '0.9rem', fontWeight: 800, display: 'block', marginBottom: '2px' }}>
+                                    {isExtraTime ? 'Fokus pausiert' : 'Fokus unterbrochen!'}
+                                  </strong>
+                                  <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
+                                    {isExtraTime 
+                                      ? (isDesktopFallback ? 'Wechsle zurück auf dieses Fenster, um weiter Extra-Zeit zu sammeln.' : 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.')
+                                      : (isDesktopFallback ? 'Wechsle sofort zurück auf dieses Fenster! Sonst fällt dein Timer sofort auf 0 zurück.' : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.')}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
 
                         {/* Controls */}
                         <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
@@ -1884,50 +2116,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 padding: '16px',
                                 borderRadius: '18px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                background: 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)',
                                 color: '#ffffff',
                                 fontSize: '0.95rem',
-                                fontWeight: 900,
+                                fontWeight: 800,
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)'
+                                boxShadow: '0 4px 15px rgba(0, 122, 255, 0.15)'
                               }}
                             >
-                              <Play size={16} fill="#ffffff" /> Starten
+                              <Play size={16} fill="#ffffff" /> Fokus starten
                             </button>
                           ) : (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (timerRunning) {
-                                    setTimerRunning(false);
-                                  } else {
-                                    handleStartTimer();
-                                  }
-                                }}
-                                style={{
-                                  flex: 1,
-                                  padding: '16px',
-                                  borderRadius: '18px',
-                                  border: '1.5px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  color: '#334155',
-                                  fontSize: '0.95rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '8px'
-                                }}
-                              >
-                                {timerRunning ? <Pause size={16} fill="#334155" /> : <Play size={16} fill="#334155" />}
-                                {timerRunning ? 'Pause' : 'Weiter'}
-                              </button>
                               <button
                                 type="button"
                                 onClick={handleFinishFocusSession}
@@ -1936,19 +2140,46 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   padding: '16px',
                                   borderRadius: '18px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  background: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
                                   color: '#ffffff',
                                   fontSize: '0.95rem',
-                                  fontWeight: 900,
+                                  fontWeight: 800,
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '8px',
-                                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.2)'
+                                  boxShadow: '0 4px 15px rgba(52, 199, 89, 0.15)'
                                 }}
                               >
-                                <Check size={16} strokeWidth={3} /> Beenden
+                                🏁 Beenden
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                                    setElapsedSeconds(0);
+                                    setTimerRunning(false);
+                                    setIsExtraTime(false);
+                                  }
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '16px',
+                                  borderRadius: '18px',
+                                  border: timerRunning ? '1.5px solid rgba(255,255,255,0.3)' : '1.5px solid #cbd5e1',
+                                  background: 'transparent',
+                                  color: timerRunning ? '#ffffff' : '#64748b',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px'
+                                }}
+                              >
+                                Abbrechen
                               </button>
                             </>
                           )}
@@ -1986,7 +2217,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {profile.app_usage_mode === 'student_only' && timerRunning && (
           <>
             {/* 1. Flat on Table Mode */}
-            {isPhoneFlat && (
+            {isPhoneFlat && !isDesktopFallback && (
               <div 
                 className="fokus-overlay-container"
                 style={{
@@ -2103,7 +2334,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             )}
 
             {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
-            {isGraceActive && !isPhoneFlat && (
+            {isGraceActive && !isPhoneFlat && !isDesktopFallback && (
               <div 
                 style={{
                   position: 'fixed',
@@ -2230,11 +2461,11 @@ const styles = {
   fullScreen: {
     position: 'fixed' as const,
     inset: 0,
-    background: '#f1f5f9',
+    background: '#f2f2f7',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: '"Outfit", "Inter", system-ui, sans-serif',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif',
     padding: '20px',
     overflowY: 'auto' as const,
   },
@@ -2242,8 +2473,8 @@ const styles = {
     background: 'white',
     borderRadius: '32px',
     width: '100%',
-    boxShadow: '0 25px 60px rgba(15,23,42,0.12)',
-    border: '1px solid #f1f5f9',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.04)',
+    border: '1px solid #e5e5ea',
     padding: '32px 28px',
     display: 'flex',
     flexDirection: 'column' as const,

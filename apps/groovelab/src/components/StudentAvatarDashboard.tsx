@@ -2211,6 +2211,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     isExtraTimeRef.current = isExtraTime;
   }, [isExtraTime]);
 
+  const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
+  const preStartCountdownRef = useRef(preStartCountdown);
+  useEffect(() => {
+    preStartCountdownRef.current = preStartCountdown;
+  }, [preStartCountdown]);
+
+  // Countdown timer effect for pre-start instructions
+  useEffect(() => {
+    if (preStartCountdown === null) return;
+    if (preStartCountdown > 0) {
+      const timer = setTimeout(() => {
+        setPreStartCountdown(preStartCountdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setPreStartCountdown(null);
+      setIsPhoneFlat(true); // default to flat/focused when starting
+    }
+  }, [preStartCountdown]);
+
   // Screen Wake Lock API Integration
   useEffect(() => {
     const acquireWakeLock = async () => {
@@ -2262,12 +2282,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
+  const DEFAULT_FOKUS_LEVELS = {
+    level1: { kleine: 3, mittlere: 5, helden: 10 },
+    level2: { kleine: 5, mittlere: 10, helden: 15 },
+    level3: { kleine: 10, mittlere: 15, helden: 20 }
+  };
 
-  const getTargetMinutes = (streak?: number) => {
+  const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
+
+  const getFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
+    if (streak >= 9) return 'helden';
+    if (streak >= 4) return 'mittlere';
+    return 'kleine';
+  };
+
+  const getTargetMinutes = (streak: number = 0) => {
     const level = avatar?.evolution_level || 1;
-    if (level === 3) return 20;
-    if (level === 2) return 15;
-    return 10;
+    const cat = getFlameCategory(streak);
+    const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
+    const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
+    const levelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
+    return levelConfig[cat] || DEFAULT_FOKUS_LEVELS[levelKey][cat];
   };
 
   // Animate SVG circular ring in celebration modal
@@ -2948,11 +2983,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
     // Timer interval
     const interval = setInterval(() => {
-      // In sensor mode, device must be flat, stable, and page must be visible.
-      // In desktop mode, only page visibility matters.
+      if (preStartCountdownRef.current !== null) {
+        return;
+      }
+
+      // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
-        ? (isOrientedFlat && !isMoving && !document.hidden)
-        : !document.hidden;
+        ? (isOrientedFlat && !isMoving && !document.hidden && document.hasFocus())
+        : (!document.hidden && document.hasFocus());
 
       // Update local states
       setIsPhoneFlat(isNowFlat);
@@ -2972,22 +3010,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           return nextVal;
         });
       } else {
-        if (isExtraTimeRef.current) {
-          // In extra time, we don't reset to 0; we just pause the timer.
+        if (!isExtraTimeRef.current) {
+          // During the focus minutes: HARD RESET TO 0 IMMEDIATELY on interruption
+          setSecondsElapsed(0);
+          setIsExtraTime(false);
           setIsGraceActive(false);
+          setSessionActive(false);
+          playBeep(330, 600); // Fail tone
+          if (navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          }
         } else {
-          // Normal focus period -> Grace period active
+          // Once the focus minutes are reached: START FRIENDLY COUNTDOWN
           setIsGraceActive(true);
           
           setGraceSecondsLeft(prevGrace => {
             if (prevGrace <= 1) {
-              // Grace period expired! Reset timer to 0
-              setSecondsElapsed(0);
+              // Grace period expired! Just pause the session. Do NOT reset to 0.
+              setSessionActive(false);
               setIsGraceActive(false);
-              playBeep(330, 600); // Fail tone
-              if (navigator.vibrate) {
-                navigator.vibrate([400, 100, 400]);
-              }
+              playBeep(440, 300); // Friendly end tone
               return 10;
             }
             
@@ -3047,9 +3089,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
     };
 
-    // Page Visibility listener
+    // Page Visibility & Window Focus listener
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden || !document.hasFocus()) {
         isOrientedFlat = false;
         currentFlatType = 'none';
         setIsPhoneFlat(false);
@@ -3064,6 +3106,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       currentFlatType = 'face-up';
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
@@ -3073,6 +3117,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         window.removeEventListener('devicemotion', handleMotion);
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
     };
   }, [sessionActive, avatar?.streak_flame]);
 
@@ -3108,16 +3154,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       let focusSeconds = 0;
       let extraSeconds = 0;
 
-      if (hasCompletedTargetToday) {
-        // Entire session is extra time
-        extraSeconds = secondsElapsed;
+      if (secondsElapsed >= targetSeconds) {
+        focusSeconds = targetSeconds;
+        extraSeconds = secondsElapsed - targetSeconds;
       } else {
-        if (secondsElapsed >= targetSeconds) {
-          focusSeconds = targetSeconds;
-          extraSeconds = secondsElapsed - targetSeconds;
-        } else {
-          focusSeconds = secondsElapsed;
-        }
+        focusSeconds = secondsElapsed;
+        extraSeconds = 0;
       }
 
       // Convert to minutes (at least 1 if we have seconds, or rounded)
@@ -3654,6 +3696,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       setStudentUser(user);
+      setSchoolFokusLevels(user.schools?.opening_hours?.fokus_levels || null);
       setIsAppUser(user.is_app_user ?? false);
       setIsPremiumUser((user.is_premium_user || user.is_active || user.is_campus_active) ?? false);
       setPushEnabled(user.push_notifications_enabled ?? false);
@@ -4532,14 +4575,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus Heute</span>
                   <Activity size={16} />
                 </div>
-                <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }}>{(() => {
+                <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '6px' }}>{(() => {
                   const todayStr = new Date().toISOString().split('T')[0];
                   const todayLogs = fokusLogs.filter(log => log.created_at && log.created_at.startsWith(todayStr));
-                  const totalSecs = todayLogs.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                  const finalSecs = totalSecs + (sessionActive ? secondsElapsed : 0);
-                  const m = Math.floor(finalSecs / 60);
-                  const s = finalSecs % 60;
-                  return `${m}:${String(s).padStart(2, '0')} Min`;
+                  
+                  // DB sums
+                  const dbFocusSecs = todayLogs.filter(l => !l.is_extra).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                  const dbExtraSecs = todayLogs.filter(l => l.is_extra).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                  
+                  // Live session sums
+                  let liveFocusSecs = 0;
+                  let liveExtraSecs = 0;
+                  if (sessionActive) {
+                    const targetSeconds = getTargetMinutes(avatar?.streak_flame || 0) * 60;
+                    if (secondsElapsed >= targetSeconds) {
+                      liveFocusSecs = targetSeconds;
+                      liveExtraSecs = secondsElapsed - targetSeconds;
+                    } else {
+                      liveFocusSecs = secondsElapsed;
+                    }
+                  }
+                  
+                  const totalFocusSecs = dbFocusSecs + liveFocusSecs;
+                  const totalExtraSecs = dbExtraSecs + liveExtraSecs;
+                  
+                  const focusMin = Math.floor(totalFocusSecs / 60);
+                  const extraMin = Math.floor(totalExtraSecs / 60);
+                  
+                  if (totalExtraSecs > 0) {
+                    return (
+                      <>
+                        <span>{focusMin}m</span>
+                        <span style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 800 }}>({extraMin}m Extra)</span>
+                      </>
+                    );
+                  }
+                  return `${focusMin} Min`;
                 })()}</span>
               </div>
 
@@ -4623,45 +4694,70 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* Fokus-Timer Box */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.75)',
+              background: sessionActive 
+                ? (isExtraTime ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#000000') 
+                : 'rgba(255, 255, 255, 0.75)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
+              border: sessionActive ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
               borderRadius: '32px',
               padding: '36px 30px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
+              boxShadow: sessionActive ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
               display: 'flex',
               flexDirection: 'column',
               gap: '28px',
               alignItems: 'center',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              color: sessionActive ? '#ffffff' : 'inherit',
+              transition: 'all 0.5s ease'
             }}>
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%', borderBottom: '1px solid rgba(241, 245, 249, 0.6)', paddingBottom: '18px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '14px', 
+                width: '100%', 
+                borderBottom: sessionActive ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(241, 245, 249, 0.6)', 
+                paddingBottom: '18px' 
+              }}>
                 <div style={{ 
-                  background: '#eff6ff', 
-                  color: '#2563eb', 
+                  background: sessionActive ? 'rgba(255, 255, 255, 0.12)' : '#eff6ff', 
+                  color: sessionActive ? '#ffffff' : '#2563eb', 
                   padding: '10px', 
                   borderRadius: '16px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)'
+                  boxShadow: sessionActive ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.08)'
                 }}>
                   <Clock size={20} />
                 </div>
                 <div>
-                  <h4 style={{ fontWeight: 800, fontSize: '20px', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Fokus-Timer</h4>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 550, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h4 style={{ 
+                    fontWeight: 800, 
+                    fontSize: '20px', 
+                    color: sessionActive ? '#ffffff' : '#0f172a', 
+                    margin: 0, 
+                    letterSpacing: '-0.02em' 
+                  }}>Fokus-Timer</h4>
+                  <p style={{ 
+                    fontSize: '0.78rem', 
+                    color: sessionActive ? 'rgba(255, 255, 255, 0.6)' : '#64748b', 
+                    margin: '4px 0 0 0', 
+                    fontWeight: 550, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px' 
+                  }}>
                     {isExtraTime ? (
                       <>
-                        <Award size={14} style={{ color: '#eab308', flexShrink: 0 }} />
-                        <span style={{ color: '#ca8a04', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
+                        <Award size={14} style={{ color: '#ffffff', flexShrink: 0 }} />
+                        <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
                       </>
                     ) : (
                       <>
-                        <Smartphone size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+                        <Smartphone size={14} style={{ color: sessionActive ? '#ffffff' : '#2563eb', flexShrink: 0 }} />
                         <span>Handy mit dem Display nach unten hinlegen</span>
                       </>
                     )}
@@ -4684,16 +4780,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     justifyContent: 'center'
                   }}>
                     <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="105" cy="105" r="90" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                      <circle cx="105" cy="105" r="95" fill="none" stroke="#f1f5f9" strokeWidth="4" />
                       <circle 
                         cx="105" 
                         cy="105" 
-                        r="90" 
+                        r="95" 
                         fill="none" 
                         stroke="url(#blueGradient)" 
-                        strokeWidth="10" 
-                        strokeDasharray={2 * Math.PI * 90}
-                        strokeDashoffset={2 * Math.PI * 90}
+                        strokeWidth="4" 
+                        strokeDasharray={2 * Math.PI * 95}
+                        strokeDashoffset={2 * Math.PI * 95}
                         strokeLinecap="round"
                       />
                       <defs>
@@ -4743,14 +4839,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           }
                         } catch (err) {
                           console.error(err);
+                          return;
                         }
                       }
-                      
-                      // Auto-select topic if none selected
                       setSelectedTopic('Allgemeines Üben');
                       setSecondsElapsed(0);
-                      setIsPhoneFlat(false);
-                      setIsExtraTime(hasCompletedTargetToday);
+                      setIsPhoneFlat(true);
+                      setIsExtraTime(false);
+                      setPreStartCountdown(3);
                       setSessionActive(true);
                     }}
                     style={{
@@ -4778,104 +4874,148 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 /* Timer running / Gyro orientation dashboard */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', alignItems: 'center' }}>
                   
-                  {/* Circular animated SVG progress ring */}
-                  <div style={{ 
-                    position: 'relative', 
-                    width: '210px', 
-                    height: '210px', 
-                    filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.25))' : (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(37, 99, 235, 0.2))' : 'drop-shadow(0 0 12px rgba(239, 68, 68, 0.25))'),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="105" cy="105" r="90" fill="none" stroke="#f1f5f9" strokeWidth="10" />
-                      <circle 
-                        cx="105" 
-                        cy="105" 
-                        r="90" 
-                        fill="none" 
-                        stroke={isExtraTime ? 'url(#greenGradient)' : (isPhoneFlat ? 'url(#blueGradientActive)' : 'url(#redGradient)')} 
-                        strokeWidth="10" 
-                        strokeDasharray={2 * Math.PI * 90}
-                        strokeDashoffset={
-                          isExtraTime 
-                            ? 0 // Full circle in extra time
-                            : 2 * Math.PI * 90 - (2 * Math.PI * 90 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
-                        }
-                        strokeLinecap="round"
-                        style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
-                      />
-                      <defs>
-                        <linearGradient id="blueGradientActive" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="100%" stopColor="#1d4ed8" />
-                        </linearGradient>
-                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#10b981" />
-                          <stop offset="100%" stopColor="#059669" />
-                        </linearGradient>
-                        <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#f87171" />
-                          <stop offset="100%" stopColor="#dc2626" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
+                  {preStartCountdown !== null ? (
+                    /* Pre-start Instructions & Countdown Screen */
                     <div style={{
-                      position: 'absolute',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: '24px',
+                      textAlign: 'center',
+                      padding: '40px 20px',
+                      minHeight: '270px',
+                      boxSizing: 'border-box'
                     }}>
-                      <span style={{ fontSize: '3rem', fontWeight: 800, color: '#0f172a', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                        {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
-                        {String(secondsElapsed % 60).padStart(2, '0')}
-                      </span>
-                        {isExtraTime ? (
-                          <>
-                            <Zap size={11} fill="currentColor" style={{ animation: 'pulse 1.5s infinite' }} />
-                            <span>Extra-Zeit aktiv</span>
-                          </>
-                        ) : (
-                          isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen'
-                        )}
-                    </div>
-                  </div>
-
-                  {/* Gyro Sensor feedback */}
-                  <div style={{
-                    width: '100%',
-                    maxWidth: '450px',
-                    padding: '18px 22px',
-                    borderRadius: '20px',
-                    background: isPhoneFlat ? 'rgba(236, 253, 245, 0.8)' : 'rgba(254, 242, 242, 0.8)',
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)',
-                    border: isPhoneFlat ? '1px solid rgba(167, 243, 208, 0.6)' : '1px solid rgba(252, 165, 165, 0.6)',
-                    color: isPhoneFlat ? '#065f46' : '#991b1b',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    lineHeight: 1.45,
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-                  }}>
-                    {isPhoneFlat ? (
+                      <div style={{
+                        fontSize: '4.8rem',
+                        fontWeight: 900,
+                        color: '#10b981',
+                        fontFamily: 'monospace, sans-serif',
+                        lineHeight: 1,
+                        animation: 'pulseSoft 1.5s infinite ease-in-out'
+                      }}>
+                        {preStartCountdown}
+                      </div>
                       <div>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>Perfekte Lage!</strong>
-                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Das Handy liegt mit dem Display nach unten. Der Timer läuft im Hintergrund.</span>
+                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', margin: '0 0 10px 0', letterSpacing: '-0.02em' }}>
+                          Handy hinlegen!
+                        </h3>
+                        <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 650, lineHeight: 1.5, margin: 0, maxWidth: '280px' }}>
+                          Nicht den Tab oder das Programm wechseln.
+                        </p>
                       </div>
-                    ) : (
-                      <div className={isExtraTime ? '' : 'animate-pulse'}>
-                        <strong style={{ fontSize: '0.95rem', fontWeight: 800, display: 'block', marginBottom: '3px' }}>{isExtraTime ? 'Session pausiert' : 'Fokus unterbrochen!'}</strong>
-                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
-                          {isExtraTime 
-                            ? 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.' 
-                            : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.'}
-                        </span>
+                    </div>
+                  ) : (
+                    /* Normal active timer layout */
+                    <>
+                      {/* Circular animated SVG progress ring */}
+                      <div style={{ 
+                        position: 'relative', 
+                        width: '210px', 
+                        height: '210px', 
+                        filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.25))' : (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.2))' : 'drop-shadow(0 0 12px rgba(239, 68, 68, 0.25))'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
+                          <circle cx="105" cy="105" r="95" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" />
+                          <circle 
+                            cx="105" 
+                            cy="105" 
+                            r="95" 
+                            fill="none" 
+                            stroke={isExtraTime ? '#ffffff' : (isPhoneFlat ? 'url(#greenGradient)' : 'url(#redGradient)')} 
+                            strokeWidth="4" 
+                            strokeDasharray={2 * Math.PI * 95}
+                            strokeDashoffset={
+                              isExtraTime 
+                                ? 0 // Full circle in extra time
+                                : 2 * Math.PI * 95 - (2 * Math.PI * 95 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
+                            }
+                            strokeLinecap="round"
+                            style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
+                          />
+                          <defs>
+                            <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#10b981" />
+                              <stop offset="100%" stopColor="#059669" />
+                            </linearGradient>
+                            <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#f87171" />
+                              <stop offset="100%" stopColor="#dc2626" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        <div style={{
+                          position: 'absolute',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <span style={{ fontSize: '3rem', fontWeight: 800, color: '#ffffff', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
+                            {String(secondsElapsed % 60).padStart(2, '0')}
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.62rem', 
+                            fontWeight: 700, 
+                            color: 'rgba(255,255,255,0.7)', 
+                            textTransform: 'uppercase', 
+                            letterSpacing: '0.08em', 
+                            marginTop: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {isExtraTime ? (
+                              <>
+                                <Zap size={11} fill="currentColor" style={{ animation: 'pulse 1.5s infinite' }} />
+                                <span>Extra-Zeit aktiv</span>
+                              </>
+                            ) : (
+                              isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen'
+                            )}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Gyro Sensor feedback - ONLY show when interrupted (not flat) to stay clean */}
+                      {!isPhoneFlat && (
+                        <div style={{
+                          width: '100%',
+                          maxWidth: '450px',
+                          padding: '16px 20px',
+                          borderRadius: '20px',
+                          background: isExtraTime 
+                            ? 'rgba(255, 255, 255, 0.15)' 
+                            : 'rgba(239, 68, 68, 0.15)',
+                          border: isExtraTime
+                            ? '1px solid rgba(255, 255, 255, 0.3)'
+                            : '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#ffffff',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          lineHeight: 1.4,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                        }}>
+                          <div className={isExtraTime ? '' : 'animate-pulse'}>
+                            <strong style={{ fontSize: '0.9rem', fontWeight: 800, display: 'block', marginBottom: '2px' }}>
+                              {isExtraTime ? 'Fokus pausiert' : 'Fokus unterbrochen!'}
+                            </strong>
+                            <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
+                              {isExtraTime 
+                                ? (isDesktopFallback ? 'Wechsle zurück auf dieses Fenster, um weiter Extra-Zeit zu sammeln.' : 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.')
+                                : (isDesktopFallback ? 'Wechsle sofort zurück auf dieses Fenster! Sonst fällt dein Timer sofort auf 0 zurück.' : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   {/* Style definitions for modern breathing and glowing animations */}
                   <style dangerouslySetInnerHTML={{__html: `
@@ -4899,7 +5039,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {sessionActive && (
                     <>
                       {/* 1. Flat on Table Mode */}
-                      {isPhoneFlat && (
+                      {isPhoneFlat && !isDesktopFallback && (
                         <div 
                           className="fokus-overlay-container"
                           style={{
@@ -4951,72 +5091,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
                             {String(secondsElapsed % 60).padStart(2, '0')}
                           </div>
-
-                          {/* Action buttons only visible on desktop fallback or hovered */}
-                          {isDesktopFallback && (
-                            <div className="fokus-controls" style={{ 
-                              position: 'absolute',
-                              bottom: '60px',
-                              display: 'flex', 
-                              gap: '16px', 
-                              zIndex: 100 
-                            }}>
-                              <button
-                                onClick={finishPracticeSession}
-                                style={{
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                  color: 'white',
-                                  border: 'none',
-                                  padding: '12px 28px',
-                                  borderRadius: '14px',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.2)',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
-                                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                              >
-                                🏁 Beenden
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
-                                    setSecondsElapsed(0);
-                                    setSessionActive(false);
-                                    setIsExtraTime(false);
-                                  }
-                                }}
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.08)',
-                                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                                  color: '#ffffff',
-                                  padding: '12px 24px',
-                                  borderRadius: '14px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                                  e.currentTarget.style.transform = 'scale(1.03)';
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                              >
-                                Abbrechen
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
 
                       {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
-                      {isGraceActive && !isPhoneFlat && (
+                      {isGraceActive && !isPhoneFlat && !isDesktopFallback && (
                         <div 
                           style={{
                             position: 'fixed',
@@ -5321,15 +5400,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       onClick={finishPracticeSession}
                       style={{
                         flex: 1,
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
+                        background: isExtraTime 
+                          ? 'linear-gradient(135deg, #ffffff 0%, #f4f4f5 100%)' 
+                          : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: isExtraTime ? '#065f46' : 'white',
                         border: 'none',
                         padding: '16px',
                         borderRadius: '20px',
                         fontWeight: 800,
                         cursor: 'pointer',
                         fontSize: '0.9rem',
-                        boxShadow: '0 8px 25px rgba(16, 185, 129, 0.2), 0 2px 4px rgba(0,0,0,0.05)',
+                        boxShadow: isExtraTime 
+                          ? '0 8px 25px rgba(255, 255, 255, 0.15)' 
+                          : '0 8px 25px rgba(16, 185, 129, 0.2), 0 2px 4px rgba(0,0,0,0.05)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -5341,6 +5424,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <button
                       onClick={() => {
                         if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                          setSecondsElapsed(0);
                           setSessionActive(false);
                           setIsExtraTime(false);
                         }
@@ -5348,10 +5432,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       style={{
                         padding: '16px 20px',
                         borderRadius: '20px',
-                        border: '1px solid rgba(252, 165, 165, 0.8)',
-                        background: 'rgba(254, 242, 242, 0.5)',
+                        border: isExtraTime 
+                          ? '1px solid rgba(255, 255, 255, 0.4)' 
+                          : (sessionActive ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid rgba(252, 165, 165, 0.8)'),
+                        background: isExtraTime 
+                          ? 'transparent' 
+                          : (sessionActive ? 'transparent' : 'rgba(254, 242, 242, 0.5)'),
                         backdropFilter: 'blur(4px)',
-                        color: '#ef4444',
+                        color: isExtraTime || sessionActive ? '#ffffff' : '#ef4444',
                         fontWeight: 700,
                         cursor: 'pointer',
                         fontSize: '0.9rem',
