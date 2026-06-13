@@ -2955,7 +2955,7 @@ function App() {
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
         supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
-        supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId)
+        supabase.from('sessions').select('user_id, station_id, users!inner(role, school_id, last_seen)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
         return [ {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err}, {error: err} ] as any;
@@ -5412,7 +5412,8 @@ function App() {
       .from('sessions')
       .select('user_id, station_id, users!inner(role, school_id, last_seen)')
       .is('check_out_time', null)
-      .eq('users.school_id', schoolId);
+      .eq('users.school_id', schoolId)
+      .eq('users.role', 'student');
     
     // Only count students who have an active session at a station
     const count = (activeSessions || []).filter(s => {
