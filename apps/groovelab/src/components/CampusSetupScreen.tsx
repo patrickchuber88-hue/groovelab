@@ -277,12 +277,14 @@ export function CampusSetupScreen({
                 <br />
                 <strong>{"{student_name}"}</strong> = Name des Schülers · 
                 <strong>{"{months_count}"}</strong> = Verbleibende Monate bis 31. August · 
-                <strong>{"{total_price}"}</strong> = Gesamtpreis (Monate x 0,40 EUR)
+                <strong>{"{total_price}"}</strong> = Gesamtpreis (Monate x 0,40 EUR) · 
+                <strong>{"{employee_name}"}</strong> = Name des Mitarbeiters · 
+                <strong>{"{school_name}"}</strong> = Name der Musikschule
               </p>
               <textarea
                 value={mailtoTemplate}
                 onChange={e => setMailtoTemplate(e.target.value)}
-                placeholder={`Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n[Name Ihrer Musikschule]`}
+                placeholder={`Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n{employee_name}\n{school_name}`}
                 style={{
                   width: '100%',
                   minHeight: '180px',

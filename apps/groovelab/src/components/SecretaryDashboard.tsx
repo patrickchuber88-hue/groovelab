@@ -4137,7 +4137,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   const generateMailtoLink = (student: any) => {
     const { monthsCount, totalPrice } = getRemainingMonthsAndPrice();
-    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n[Name Ihrer Musikschule]`;
+    const employeeName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''}`.trim() : 'Ihre Musikschule';
+    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
     
     let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
     
@@ -4145,6 +4146,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     template = template.replace(/{student_name}/g, studentName);
     template = template.replace(/{months_count}/g, monthsCount.toString());
     template = template.replace(/{total_price}/g, totalPrice.toFixed(2) + ' €');
+    template = template.replace(/{employee_name}/g, employeeName);
+    template = template.replace(/{school_name}/g, schoolName || 'Ihre Musikschule');
     
     const subject = `Campus-Freischaltung für ${studentName}`;
     return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(template)}`;
