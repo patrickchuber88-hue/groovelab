@@ -6482,9 +6482,6 @@ export function AdminDashboard({
     const handleCellDoubleClick = (dayIdx: number, hourStr: string) => {
       if (!selectedRoom) return;
 
-      const slotBookings = getBookingsForSlot(dayIdx, hourStr);
-      if (slotBookings.length > 0) return;
-
       const currentSelectedDate = parseLocalDate(bookingDate);
       const dayOfWeek = currentSelectedDate.getUTCDay();
       const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
@@ -6495,30 +6492,35 @@ export function AdminDashboard({
       const startStr = `${String(startH).padStart(2, '0')}:00`;
       const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
 
-      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
-      const creatorName = admin 
-        ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
-        : 'Lehrer';
-      const finalPurpose = isStaff ? creatorName : 'Unterricht';
-      const finalTeacherName = isStaff ? 'Schule' : creatorName;
+      if (showPreviewField && bookingDate === targetDateStr && bookingStartTime && bookingEndTime) {
+        // Second double click on same day: set end time based on the clicked hour slot
+        const parseToMin = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const formatFromMin = (mins: number) => {
+          const h = Math.floor(mins / 60) % 24;
+          const m = mins % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
 
-      const newBooking = {
-        id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-        roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
-        date: targetDateStr,
-        startTime: startStr,
-        endTime: endStr,
-        purpose: finalPurpose,
-        teacherId: userId,
-        teacherName: finalTeacherName
-      };
+        const currentStartMin = parseToMin(bookingStartTime);
+        const clickedEndMin = parseToMin(endStr);
 
-      setCampusBookings(prev => [...prev, newBooking]);
-      setDraftBooking(null);
-      setIsDateFilterActive(false);
-      setSuccessAnimationRoomId(selectedRoom.id);
-      setTimeout(() => setSuccessAnimationRoomId(null), 1000);
+        if (clickedEndMin > currentStartMin) {
+          setBookingEndTime(formatFromMin(clickedEndMin));
+        } else {
+          setBookingStartTime(startStr);
+        }
+      } else {
+        // First double click: start preview
+        setBookingDate(targetDateStr);
+        setBookingStartTime(startStr);
+        setBookingEndTime(endStr);
+      }
+      setIsDateFilterActive(true);
+      setShowMyBookingsOnly(false);
+      setShowPreviewField(true);
     };
 
 
@@ -7601,14 +7603,14 @@ export function AdminDashboard({
                                       }}
                                       title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
-                                        background: isOwnSchedule && !b.isPreview ? leftAccentColor : bg,
-                                        border: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
-                                        borderLeft: b.isPreview ? `2.2px dashed ${leftAccentColor}` : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`,
+                                        background: b.isPreview ? '#f0f9ff' : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg),
+                                        border: b.isPreview ? '2.2px dashed #0284c7' : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
+                                        borderLeft: b.isPreview ? '2.2px dashed #0284c7' : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`,
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
                                         fontWeight: 800,
-                                        color: isOwnSchedule && !b.isPreview ? '#ffffff' : textColor,
+                                        color: b.isPreview ? '#0369a1' : (isOwnSchedule && !b.isPreview ? '#ffffff' : textColor),
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
                                         left: `calc(${colLeft}% + 4px)`,
