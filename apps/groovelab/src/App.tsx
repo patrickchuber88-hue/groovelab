@@ -2648,6 +2648,17 @@ function App() {
       .channel(`realtime_app_sync_${user.id}`)
       .on(
         'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
+        async (payload: any) => {
+          console.log('[Realtime] Current user profile update detected, refetching...');
+          const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
+          if (updatedUser) {
+            setUser(updatedUser);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'sessions', filter: `user_id=eq.${user.id}` },
         () => {
           debouncedFetchDashboardData(user.id);
