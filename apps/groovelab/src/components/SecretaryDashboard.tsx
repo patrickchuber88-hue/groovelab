@@ -13039,7 +13039,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
                         </div>
                       ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '700px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '8px 6px', tableLayout: 'fixed', minWidth: '700px' }}>
                           <colgroup>
                             <col style={{ width: '130px' }} />
                             {[1,2,3,4,5,6,7].map(d => <col key={d} />)}
@@ -13134,7 +13134,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: '2px',
-                                                boxShadow: '0 4px 8px rgba(245,158,11,0.06)'
+                                                boxShadow: '0 4px 8px rgba(245,158,11,0.06)',
+                                                userSelect: 'none',
+                                                WebkitUserSelect: 'none'
                                               }}
                                             >
                                               <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(topPlan)}</span>
@@ -13186,7 +13188,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               }
 
                               return (
-                                <tr key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                                <tr id={`room-row-${room.id}`} key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                                   <td style={{ padding: '8px', verticalAlign: 'top', background: draggedPlanId && !isCompatible ? '#fef2f2' : 'transparent', transition: 'background 0.25s' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                       <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
@@ -13246,9 +13248,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           setDragOverCell({ roomId: null, day: null });
                                           handleDropOnMatrix(room.id, dayNum);
                                         }}
-                                        style={{ padding: '8px', verticalAlign: 'top' }}
+                                        style={{
+                                          padding: '0',
+                                          verticalAlign: 'top',
+                                          height: '1px'
+                                        }}
                                       >
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: borderStyle, background: cellBg, opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanId && draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
+                                        <div style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '5px',
+                                          minHeight: '64px',
+                                          height: '100%',
+                                          borderRadius: '12px',
+                                          border: borderStyle,
+                                          background: cellBg,
+                                          opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1,
+                                          padding: draggedPlanId && draggedPlanDay === dayNum ? '6px' : '4px',
+                                          transition: 'all 0.2s ease',
+                                          cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default',
+                                          boxSizing: 'border-box'
+                                        }}>
                                           {cellPlans.map(plan => {
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
                                             
@@ -13268,8 +13288,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                 key={plan.id}
                                                 draggable
                                                 onDragStart={() => handleDragStartMatrix(plan.id)}
+                                                onDragEnd={() => {
+                                                  setDraggedPlanId(null);
+                                                  setDraggedPlanDay(null);
+                                                }}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: themeBg, border: themeBorder, borderLeft: themeBorderLeft, borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s' }}
+                                                style={{ background: themeBg, border: themeBorder, borderLeft: themeBorderLeft, borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none' }}
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: themeText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -15003,6 +15027,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                 key={block.id}
                                                 draggable
                                                 onDragStart={() => handleDragStartMatrix(block.id)}
+                                                onDragEnd={() => {
+                                                  setDraggedPlanId(null);
+                                                  setDraggedPlanDay(null);
+                                                }}
                                                 style={{
                                                   background: '#ffffff',
                                                   borderBottom: idx < sortedArr.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
@@ -15010,7 +15038,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                   cursor: 'grab',
                                                   display: 'flex',
                                                   flexDirection: 'column',
-                                                  gap: '6px'
+                                                  gap: '6px',
+                                                  userSelect: 'none',
+                                                  WebkitUserSelect: 'none'
                                                 }}
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
