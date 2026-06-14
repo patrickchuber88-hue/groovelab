@@ -1897,7 +1897,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     })();
 
     const notesList = getHomeworkNotes();
-    const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
+    const activeHWs = progressItems
+      .filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '))
+      .filter((item, index, self) => 
+        self.findIndex(t => t.topic_name.trim() === item.topic_name.trim()) === index
+      );
 
     const price = schoolData ? getDynamicAnnualPriceLocal(schoolData.contract_start_date, false) : 0;
     
