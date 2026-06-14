@@ -267,6 +267,7 @@ Deno.serve(async (req) => {
 
     // 5. Query and load Campus-Termine for the user's school
     let campusEvents: any[] = [];
+    let allSchoolCampusEvents: any[] = [];
     if (schoolId) {
       const { data: campusData, error: campusErr } = await supabase
         .from('campus_events')
@@ -274,7 +275,8 @@ Deno.serve(async (req) => {
         .eq('school_id', schoolId);
 
       if (!campusErr && campusData) {
-        campusEvents = campusData;
+        allSchoolCampusEvents = campusData;
+        campusEvents = [...campusData];
         // Filter based on roles and visibility settings
         if (role === 'student') {
           campusEvents = campusEvents.filter((ev: any) => {
@@ -309,15 +311,18 @@ Deno.serve(async (req) => {
             subscribedEvents = rawSubscribed.map((ev: any, index: number) => {
               const title = ev.summary || 'Abonnierter Termin';
               const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
-              let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-              const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
+              
+              const isAllDay = (ev.rawStart && !ev.rawStart.includes('T')) || (ev.rawEnd && !ev.rawEnd.includes('T'));
+              let end = ev.dtend ? ev.dtend : ev.dtstart;
               if (ev.dtend && isAllDay) {
-                end.setDate(end.getDate() - 1);
+                const newEnd = new Date(end.getTime());
+                newEnd.setDate(newEnd.getDate() - 1);
+                end = newEnd;
               }
               const toYYYYMMDD = (d: Date) => {
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
+                const y = isAllDay ? d.getFullYear() : d.getUTCFullYear();
+                const m = String((isAllDay ? d.getMonth() : d.getUTCMonth()) + 1).padStart(2, '0');
+                const day = String(isAllDay ? d.getDate() : d.getUTCDate()).padStart(2, '0');
                 return `${y}-${m}-${day}`;
               };
               return {
@@ -326,7 +331,7 @@ Deno.serve(async (req) => {
                 description: ev.description || '',
                 event_date: ev.dtstart ? toYYYYMMDD(ev.dtstart) : '',
                 event_end_date: toYYYYMMDD(end),
-                start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
+                start_time: ev.dtstart ? (isAllDay ? '00:00' : ev.dtstart.toTimeString().substring(0, 5)) : '00:00',
                 category: isHoliday ? 'Ferien' : 'Schultermin',
                 is_subscribed: true,
                 rawStart: ev.rawStart,
@@ -336,7 +341,7 @@ Deno.serve(async (req) => {
 
             // Filter out external events that have customized overrides in the database
             subscribedEvents = subscribedEvents.filter((sub: any) => {
-              const hasCustomCopy = campusEvents.some((c: any) => 
+              const hasCustomCopy = allSchoolCampusEvents.some((c: any) => 
                 c.visibility !== 'private' &&
                 normalizeTitle(c.title) === normalizeTitle(sub.title) && 
                 c.event_date === sub.event_date && 
@@ -476,12 +481,13 @@ Deno.serve(async (req) => {
       let endDayStr = startDayStr;
       
       const endField = ev.event_end_date || ev.event_date;
-      const endDate = new Date(endField);
-      endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
-      const y = endDate.getFullYear();
-      const m = String(endDate.getMonth() + 1).padStart(2, '0');
-      const d = String(endDate.getDate()).padStart(2, '0');
-      endDayStr = `${y}${m}${d}`;
+      const [ey, em, ed] = endField.split('-').map(Number);
+      const endDate = new Date(Date.UTC(ey, em - 1, ed));
+      endDate.setUTCDate(endDate.getUTCDate() + 1); // DTEND is exclusive for DATE values
+      const yStr = endDate.getUTCFullYear();
+      const mStr = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+      const dStr = String(endDate.getUTCDate()).padStart(2, '0');
+      endDayStr = `${yStr}${mStr}${dStr}`;
 
       icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
       icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
@@ -503,12 +509,13 @@ Deno.serve(async (req) => {
       let endDayStr = startDayStr;
       
       const endField = ev.event_end_date || ev.event_date;
-      const endDate = new Date(endField);
-      endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
-      const y = endDate.getFullYear();
-      const m = String(endDate.getMonth() + 1).padStart(2, '0');
-      const d = String(endDate.getDate()).padStart(2, '0');
-      endDayStr = `${y}${m}${d}`;
+      const [ey, em, ed] = endField.split('-').map(Number);
+      const endDate = new Date(Date.UTC(ey, em - 1, ed));
+      endDate.setUTCDate(endDate.getUTCDate() + 1); // DTEND is exclusive for DATE values
+      const yStr = endDate.getUTCFullYear();
+      const mStr = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+      const dStr = String(endDate.getUTCDate()).padStart(2, '0');
+      endDayStr = `${yStr}${mStr}${dStr}`;
 
       icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
       icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
