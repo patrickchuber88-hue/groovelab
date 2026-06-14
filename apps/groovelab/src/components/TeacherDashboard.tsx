@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -828,6 +828,9 @@ export function TeacherDashboard({
   const localCheckedInRef = useRef(false);
   const isUserCheckedIn = localCheckedIn || (locationMode === 'lab' && !!session && (!!session.station_id || isTeacher));
   const [showKioskView, setShowKioskView] = useState(false);
+  const [showKioskPinSetup, setShowKioskPinSetup] = useState(false);
+  const [kioskPinInput, setKioskPinInput] = useState('');
+  const [targetKioskStation, setTargetKioskStation] = useState<any>(null);
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
   const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
   const [shakeLock, setShakeLock] = useState(false);
@@ -1113,6 +1116,16 @@ export function TeacherDashboard({
 
   const handleKioskStationSelect = async (station: any) => {
     if (!userId) return;
+
+    // Check if the student's birthday pin is not set yet
+    const isStudent = teacher?.role?.toLowerCase() === 'student';
+    if (isStudent && !teacher?.day_of_birth) {
+      setTargetKioskStation(station);
+      setKioskPinInput('');
+      setShowKioskPinSetup(true);
+      return;
+    }
+
     setCheckingInStatus('verifying');
     const now = new Date().toISOString();
 
@@ -3421,10 +3434,11 @@ export function TeacherDashboard({
     try {
       // 0. Shoutbox & Profile Info (Fetched in parallel first)
       let bIds: string[] = [];
-      const [mBandsRes, cBandsRes, tDataRes] = await Promise.all([
+      const [mBandsRes, cBandsRes, tDataRes, actDayRes] = await Promise.all([
         supabase.from('band_members').select('band_id').eq('user_id', userId),
         supabase.from('bands').select('id').eq('coach_id', userId),
-        supabase.from('users').select('*, schools(*)').eq('id', userId).single()
+        supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
+        supabase.from('activation_days').select('day_of_birth').eq('student_id', userId).maybeSingle()
       ]);
 
       const mBands = mBandsRes.data;
@@ -3437,6 +3451,10 @@ export function TeacherDashboard({
         if (fallbackUser) {
           tData = fallbackUser;
         }
+      }
+
+      if (tData) {
+        tData.day_of_birth = actDayRes?.data?.day_of_birth || null;
       }
 
       if (mBands) bIds.push(...mBands.map(b => b.band_id));
@@ -3568,22 +3586,8 @@ export function TeacherDashboard({
         const trulyActive = schoolSess;
         setActiveSessions(trulyActive);
 
-        // Auto-checkout stale session for current student if they are in view-only / not checked in locally
-        if (viewMode === 'student' && !isUserCheckedIn && userId) {
-          const staleSession = (sessData || []).find(s => s && s.user_id === userId);
-          if (staleSession) {
-            console.log('[Groovelab] Stale session detected for current student on board, logging out from database...');
-            supabase.from('sessions')
-              .update({ check_out_time: new Date().toISOString() })
-              .eq('id', staleSession.id)
-              .then(() => {
-                if (onSessionChange) onSessionChange(null);
-                if (onLocationModeChange) onLocationModeChange('home');
-                fetchData();
-              });
-            return;
-          }
-        }
+        // Auto-checkout stale session for current student removed to prevent race conditions and login/check-in loops.
+        // The frontend should align to the DB state rather than checking out valid sessions.
 
         // 4. Coaches
         const hidePresence = sessionStorage.getItem('groovelab_teacher_hide_presence') === 'true';
@@ -9975,6 +9979,188 @@ export function TeacherDashboard({
                     });
                   })()}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {showKioskPinSetup && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+              padding: '16px'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '32px',
+                width: '100%',
+                maxWidth: '360px',
+                padding: '32px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                position: 'relative'
+              }}>
+                <button 
+                  onClick={() => {
+                    setShowKioskPinSetup(false);
+                    setTargetKioskStation(null);
+                    setCheckingInStatus('idle');
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '24px',
+                    right: '24px',
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <X size={18} />
+                </button>
+
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706', marginBottom: '16px' }}>
+                  <Key size={28} />
+                </div>
+                
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Geburtstag PIN einrichten</h3>
+                <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+                  Bitte gib deinen Geburtstag (nur den Tag, z.B. 20) als PIN ein, um dich einzuloggen.
+                </p>
+
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+                  {[0, 1].map((idx) => (
+                    <div key={idx} style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '2px solid #cbd5e1',
+                      background: kioskPinInput.length > idx ? '#cbd5e1' : 'transparent',
+                      transition: 'all 0.15s ease'
+                    }} />
+                  ))}
+                </div>
+
+                {/* Keypad */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '12px',
+                  width: '100%',
+                  maxWidth: '280px',
+                  margin: '20px auto 0 auto'
+                }}>
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        if (k === 'C') {
+                          setKioskPinInput('');
+                        } else if (k === '⌫') {
+                          setKioskPinInput(prev => prev.slice(0, -1));
+                        } else {
+                          if (kioskPinInput.length < 2) {
+                            setKioskPinInput(prev => prev + k);
+                          }
+                        }
+                      }}
+                      style={{
+                        height: '56px',
+                        borderRadius: '16px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        fontSize: '1.25rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        outline: 'none',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={async () => {
+                    if (kioskPinInput.length !== 2) return;
+                    const day = parseInt(kioskPinInput, 10);
+                    if (isNaN(day) || day < 1 || day > 31) {
+                      alert("Bitte gib einen gültigen Tag (01-31) ein.");
+                      return;
+                    }
+                    
+                    try {
+                      setCheckingInStatus('verifying');
+                      const { error: adErr } = await supabase
+                        .from('activation_days')
+                        .insert({ student_id: userId, day_of_birth: day });
+                      if (adErr) throw adErr;
+
+                      const { error: userErr } = await supabase
+                        .from('users')
+                        .update({ is_pin_activated: true })
+                        .eq('id', userId);
+                      if (userErr) throw userErr;
+
+                      if (teacher) {
+                        teacher.day_of_birth = day;
+                        teacher.is_pin_activated = true;
+                      }
+
+                      setShowKioskPinSetup(false);
+                      
+                      if (targetKioskStation) {
+                        await handleKioskStationSelect(targetKioskStation);
+                      }
+                    } catch (err: any) {
+                      alert("Fehler beim Speichern: " + err.message);
+                      setCheckingInStatus('error');
+                    }
+                  }}
+                  disabled={kioskPinInput.length !== 2}
+                  style={{
+                    marginTop: '24px',
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '16px',
+                    background: kioskPinInput.length === 2 ? '#6366f1' : '#cbd5e1',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: kioskPinInput.length === 2 ? 'pointer' : 'default',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Bestätigen
+                </button>
               </div>
             </div>
           )}
