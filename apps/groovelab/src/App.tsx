@@ -8430,28 +8430,10 @@ function App() {
                                               bgColor = styleDetails.bgColor;
                                               textColor = styleDetails.textColor;
                                               border = styleDetails.border;
-                                            } else {
-                                              // Soft transparent purple/blue heatmap for other slots — linear progressive up to 8 stations!
-                                              if (totalCount > 0) {
-                                                const maxCapacity = 8;
-                                                const minOpacity = 0.08;
-                                                const maxOpacity = 0.68;
-                                                const count = Math.min(totalCount, maxCapacity);
-                                                const opacity = count <= 1 ? minOpacity : minOpacity + (count - 1) * ((maxOpacity - minOpacity) / (maxCapacity - 1));
-                                                bgColor = `rgba(79, 70, 229, ${opacity})`;
-                                                textColor = opacity >= 0.35 ? 'white' : '#4f46e5';
-                                                border = `1px solid rgba(79, 70, 229, ${opacity + 0.1})`;
-                                              }
                                             }
 
-                                            // 2. Determine Inner Content (Student Count or Teachers' initials)
-                                            if (totalCount > 0) {
-                                              content = (
-                                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>
-                                                  {totalCount}
-                                                </span>
-                                              );
-                                            } else if (teachersInSlot.length > 0) {
+                                            // 2. Determine Inner Content (Teachers' initials)
+                                            if (teachersInSlot.length > 0) {
                                               const initials = teachersInSlot
                                                 .map(t => t.profiles?.first_name?.[0] || 'L')
                                                 .join('+');
