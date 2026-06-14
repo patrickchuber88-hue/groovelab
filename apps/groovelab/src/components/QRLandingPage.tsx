@@ -178,9 +178,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // Detect mobile and check if deviceorientation is available
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const usesSensors = false; // Disabled to match desktop experience and show progress ring directly
+    const usesSensors = isMobile && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
     
-    setIsDesktopFallback(true);
+    setIsDesktopFallback(!usesSensors);
 
     let graceWarningPlayed = false;
 
@@ -189,10 +189,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (preStartCountdownRef.current !== null) {
         return;
       }
-      // In sensor mode, device must be flat, stable, page visible, and document focused.
       // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
-        ? (isOrientedFlat && !isMoving && !document.hidden && document.hasFocus())
+        ? (isOrientedFlat && !isMoving && !document.hidden && (isMobile ? true : document.hasFocus()))
         : (isMobile ? !document.hidden : (!document.hidden && document.hasFocus()));
 
       // Update states
@@ -213,41 +212,42 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return nextVal;
         });
       } else {
-        if (!isExtraTimeRef.current) {
-          // During the focus minutes: HARD RESET TO 0 IMMEDIATELY on interruption
-          setElapsedSeconds(0);
-          setIsExtraTime(false);
-          setIsGraceActive(false);
-          setTimerRunning(false);
-          playBeep(330, 600); // Fail tone
-          if (navigator.vibrate) {
-            navigator.vibrate([400, 100, 400]);
-          }
-        } else {
-          // Once the focus minutes are reached: START FRIENDLY COUNTDOWN
-          setIsGraceActive(true);
-          
-          setGraceSecondsLeft(prevGrace => {
-            if (prevGrace <= 1) {
-              // Grace period expired! Just pause the timer. Do NOT reset to 0.
+        // Start Grace Period countdown for BOTH normal practice time and extra time
+        setIsGraceActive(true);
+        
+        setGraceSecondsLeft(prevGrace => {
+          if (prevGrace <= 1) {
+            // Grace period expired!
+            if (!isExtraTimeRef.current) {
+              // Reset to 0 and end timer if in normal practice time
+              setElapsedSeconds(0);
+              setIsExtraTime(false);
+              setIsGraceActive(false);
+              setTimerRunning(false);
+              playBeep(330, 600); // Fail tone
+              if (navigator.vibrate) {
+                navigator.vibrate([400, 100, 400]);
+              }
+            } else {
+              // Just pause/end the timer (do not reset to 0) if in extra time
               setTimerRunning(false);
               setIsGraceActive(false);
               playBeep(440, 300); // Friendly end tone
-              return 10;
             }
-            
-            // Still in grace period, play warning tone once
-            if (!graceWarningPlayed) {
-              playBeep(660, 200); // Warning tone
-              if (navigator.vibrate) {
-                navigator.vibrate([100, 50, 100]);
-              }
-              graceWarningPlayed = true;
+            return 10;
+          }
+          
+          // Still in grace period, play warning tone once per interruption
+          if (!graceWarningPlayed) {
+            playBeep(660, 200); // Warning tone
+            if (navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
             }
-            
-            return prevGrace - 1;
-          });
-        }
+            graceWarningPlayed = true;
+          }
+          
+          return prevGrace - 1;
+        });
       }
     }, 1000);
 
@@ -294,7 +294,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // Page Visibility & Window Focus listener
     const handleVisibilityChange = () => {
-      if (document.hidden || !document.hasFocus()) {
+      const isWindowFocused = isMobile ? true : document.hasFocus();
+      if (document.hidden || !isWindowFocused) {
         isOrientedFlat = false;
         currentFlatType = 'none';
         setIsPhoneFlat(false);
@@ -981,7 +982,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const usesSensors = false; // Disabled to match desktop experience and show progress ring directly
+    const usesSensors = isMobile && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
 
     if (usesSensors && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
@@ -2231,7 +2232,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {profile.app_usage_mode === 'student_only' && timerRunning && (
           <>
             {/* 1. Flat on Table Mode */}
-            {isPhoneFlat && !isDesktopFallback && createPortal(
+            {false && isPhoneFlat && !isDesktopFallback && createPortal(
               <div 
                 className="fokus-overlay-container"
                 style={{
