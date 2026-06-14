@@ -1033,6 +1033,11 @@ function MobileBriefingView({
                       <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
                         {occ.start_time?.substring(0,5)} Uhr
                       </div>
+                      {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
+                        <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
+                          Dieser Termin wurde wieder auf die ursprüngliche reguläre Zeit zurückgesetzt. Bitte bestätige, dass du dies gesehen hast.
+                        </div>
+                      )}
                     </div>
                     
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
@@ -1629,6 +1634,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
+  const fetchBriefingOnly = async () => {
+    if (!studentId) return;
+    try {
+      const resp = await fetch(`/api/briefing/student?userId=${studentId}`);
+      if (resp && resp.ok) {
+        const bd = await resp.json();
+        if (bd && bd.success) {
+          setRawBriefingData(bd);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch briefing in real-time:', err);
+    }
+  };
+
   const handleOpenContributions = async (goalTitle: string, targetMinutes: number) => {
     setLoadingContributions(true);
     setContributionsModalData({
@@ -1825,6 +1845,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         () => {
           fetchSchedule();
           fetchSchoolYearSchedule();
+          fetchBriefingOnly();
         }
       )
       .subscribe();
@@ -8577,7 +8598,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       handleAcknowledgeCancellation(occ.id);
                                     }}
                                     style={{ 
-                                      background: isRegularReset ? '#10b981' : '#ef4444', 
+                                      background: (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? '#10b981' : '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
                                       padding: '4px 10px', 
@@ -8585,7 +8606,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       fontSize: '0.7rem', 
                                       fontWeight: 700, 
                                       cursor: 'pointer',
-                                      boxShadow: `0 2px 4px ${isRegularReset ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+                                      boxShadow: `0 2px 4px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
                                       transition: 'all 0.2s',
                                       flexShrink: 0,
                                       position: 'relative',
@@ -8596,7 +8617,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   </button>
                                 )}
                               </div>
-                              {isRegularReset && (
+                              {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
                                 <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
                                   Findet wieder regulär statt.
                                 </div>

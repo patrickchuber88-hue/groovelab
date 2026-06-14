@@ -1993,6 +1993,7 @@ export function TeacherDashboard({
 
   const [rawBriefingData, setRawBriefingData] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
+  const [briefingRefreshTicker, setBriefingRefreshTicker] = useState(0);
 
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
 
@@ -3285,7 +3286,7 @@ export function TeacherDashboard({
     };
 
     loadBriefing();
-  }, [userId, ticker]);
+  }, [userId, ticker, briefingRefreshTicker]);
 
   const unreadHelpCount = Math.max(0, helpRequests.length - lastSeenCounts.help);
   const unreadRehearsalCount = Math.max(0, rehearsalSuggestions.length - lastSeenCounts.rehearsal);
@@ -3391,12 +3392,21 @@ export function TeacherDashboard({
       })
       .subscribe();
 
+    const channelOccurrences = supabase
+      .channel('realtime_teacher_occurrences')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences' }, () => {
+        debouncedFetchData();
+        setBriefingRefreshTicker(prev => prev + 1);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channelSessions);
       supabase.removeChannel(channelHelp);
       supabase.removeChannel(channelSkills);
       supabase.removeChannel(channelBands);
       supabase.removeChannel(channelCrisis);
+      supabase.removeChannel(channelOccurrences);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [userId, activePlatform, selectedRoomId, locationMode]);

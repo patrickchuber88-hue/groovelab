@@ -702,8 +702,13 @@ export function ScheduleCalendarView({
     };
   }, [swapLinks, occurrences]);
 
+  const loadOccurrencesRef = useRef(loadOccurrences);
   useEffect(() => {
-    loadOccurrences();
+    loadOccurrencesRef.current = loadOccurrences;
+  });
+
+  useEffect(() => {
+    loadOccurrencesRef.current();
   }, [weekStart.getTime(), userId, JSON.stringify(boards), holidays]);
 
   useEffect(() => {
@@ -725,7 +730,7 @@ export function ScheduleCalendarView({
             (newRec && newRec.teacher_id === userId) ||
             (oldRec && oldRec.teacher_id === userId)
           ) {
-            loadOccurrences();
+            loadOccurrencesRef.current();
           }
         }
       )
@@ -773,7 +778,7 @@ export function ScheduleCalendarView({
     };
   }, [userId]);
 
-  const loadOccurrences = async () => {
+  async function loadOccurrences() {
     setLoading(true);
     setSwapLinks([]); 
     try {
@@ -1003,7 +1008,7 @@ export function ScheduleCalendarView({
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleResetWeek = async () => {
     const weekStartStr = toLocalYYYYMMDD(weekStart);
@@ -2050,10 +2055,19 @@ export function ScheduleCalendarView({
                     (occ.original_date && occ.original_date !== occ.date) ||
                     isRoomOverridden
                   );
+                  const isResetPending = !isBreak && !isVacant && !isSick &&
+                    occ.status === 'scheduled' &&
+                    occ.original_date &&
+                    occ.date === occ.original_date &&
+                    occ.student_acknowledged === false;
  
                   if (isRescheduled) {
                     cardBackground = 'rgba(253, 224, 71, 0.35)';
                     finalColors.border = '#facc15';
+                    finalColors.text = '#713f12';
+                  } else if (isResetPending) {
+                    cardBackground = '#fef9c3';
+                    finalColors.border = '#eab308';
                     finalColors.text = '#713f12';
                   }
  
@@ -2149,15 +2163,15 @@ export function ScheduleCalendarView({
                               {isSick ? 'Entfällt' : 'Abgesagt'}
                             </span>
                           )}
-                          {isRescheduled && (
+                          {(isRescheduled || isResetPending) && (
                             <span 
-                              title={occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)"}
+                              title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
                               style={{ 
                                 width: '8px', 
                                 height: '8px', 
                                 borderRadius: '50%', 
-                                background: (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b', 
-                                boxShadow: (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '0 0 6px #10b981' : '0 0 6px #f59e0b',
+                                background: isResetPending ? '#eab308' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#eab308'), 
+                                boxShadow: isResetPending ? '0 0 6px #eab308' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '0 0 6px #10b981' : '0 0 6px #eab308'),
                                 display: 'inline-block' 
                               }} 
                             />
