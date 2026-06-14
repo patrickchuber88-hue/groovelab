@@ -12271,6 +12271,55 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                     {/* DYNAMIC TEACHER LIST (HORIZONTAL ROWS) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowX: 'auto', width: '100%' }}>
+                      <style>{`
+                        .status-toggle-btn {
+                          border: none;
+                          padding: 5px 12px;
+                          border-radius: 10px;
+                          font-size: 0.74rem;
+                          font-weight: 700;
+                          min-width: 65px;
+                          text-align: center;
+                          cursor: pointer;
+                          transition: all 0.2s ease;
+                          font-family: 'Urbanist', sans-serif;
+                        }
+                        .status-toggle-btn:hover {
+                          transform: scale(1.05);
+                        }
+                        .status-toggle-btn.campus-active {
+                          background: #e2f6ea;
+                          color: #137333;
+                          box-shadow: 0 2px 8px rgba(34,197,94,0.12);
+                        }
+                        .status-toggle-btn.campus-active:hover {
+                          background: #d1f2dd !important;
+                        }
+                        .status-toggle-btn.campus-inactive {
+                          background: #f5f5f7;
+                          color: #86868b;
+                        }
+                        .status-toggle-btn.campus-inactive:hover {
+                          background: #e9e9eb !important;
+                          color: #1d1d1f;
+                        }
+                        .status-toggle-btn.groove-active {
+                          background: #fef3c7;
+                          color: #b45309;
+                          box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                        }
+                        .status-toggle-btn.groove-active:hover {
+                          background: #fde68a !important;
+                        }
+                        .status-toggle-btn.groove-inactive {
+                          background: #f5f5f7;
+                          color: #86868b;
+                        }
+                        .status-toggle-btn.groove-inactive:hover {
+                          background: #e9e9eb !important;
+                          color: #1d1d1f;
+                        }
+                      `}</style>
                       {filteredTeachers.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                           Keine Lehrkräfte gefunden. Lege ein neues Profil an oder passe deine Filter an.
@@ -12358,30 +12407,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     e.stopPropagation();
                                     handleToggleTeacherModule(t, 'campus');
                                   }}
-                                  style={{
-                                    border: 'none',
-                                    padding: '5px 12px',
-                                    borderRadius: '10px',
-                                    background: isCampus ? '#e2f6ea' : '#f5f5f7',
-                                    color: isCampus ? '#137333' : '#86868b',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                    minWidth: '65px',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    fontFamily: 'Urbanist',
-                                    boxShadow: isCampus ? '0 2px 8px rgba(34,197,94,0.12)' : 'none'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.05)';
-                                    if (isCampus) e.currentTarget.style.background = '#d1f2dd';
-                                    else e.currentTarget.style.background = '#e9e9eb';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.background = isCampus ? '#e2f6ea' : '#f5f5f7';
-                                  }}
+                                  className={`status-toggle-btn ${isCampus ? 'campus-active' : 'campus-inactive'}`}
                                 >
                                   Campus
                                 </button>
@@ -12390,30 +12416,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     e.stopPropagation();
                                     handleToggleTeacherModule(t, 'groovelab');
                                   }}
-                                  style={{
-                                    border: 'none',
-                                    padding: '5px 12px',
-                                    borderRadius: '10px',
-                                    background: isGroove ? '#fef3c7' : '#f5f5f7',
-                                    color: isGroove ? '#b45309' : '#86868b',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                    minWidth: '65px',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    fontFamily: 'Urbanist',
-                                    boxShadow: isGroove ? '0 2px 8px rgba(245,158,11,0.12)' : 'none'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.05)';
-                                    if (isGroove) e.currentTarget.style.background = '#fde68a';
-                                    else e.currentTarget.style.background = '#e9e9eb';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.background = isGroove ? '#fef3c7' : '#f5f5f7';
-                                  }}
+                                  className={`status-toggle-btn ${isGroove ? 'groove-active' : 'groove-inactive'}`}
                                 >
                                   Groovelab
                                 </button>
