@@ -1170,11 +1170,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       
       if (!isMaster) {
         if (!isAdminOrSecretary) {
+          const isTrial = userSchool?.is_trial ?? false;
+
+          // Contract start date & booking check (Only for non-trial schools)
+          if (!isTrial) {
+            if (!userSchool?.is_billing_booked || !userSchool?.contract_start_date) {
+              alert("Login verweigert. Der Vertrag deiner Musikschule ist noch nicht aktiv.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+
+            const contractStartDate = new Date(userSchool.contract_start_date);
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear();
+            const currentMonth = currentDate.getMonth(); // 0-indexed
+            const contractYear = contractStartDate.getFullYear();
+            const contractMonth = contractStartDate.getMonth(); // 0-indexed
+
+            if (currentYear < contractYear || (currentYear === contractYear && currentMonth < contractMonth)) {
+              const startMonthName = contractStartDate.toLocaleString('de-DE', { month: 'long' });
+              const startYearVal = contractStartDate.getFullYear();
+              alert(`Login verweigert. Lehrer- und Schülerprofile dürfen sich erst ab dem Vertragsstart (${startMonthName} ${startYearVal}) einloggen.`);
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+          }
+
           // Check school's module subscriptions based on active login portal
           const hasCampusSub = userSchool?.has_campus_subscription ?? false;
           const hasGroovelabSub = userSchool?.has_groovelab_subscription ?? false;
-
-          const isTrial = userSchool?.is_trial ?? false;
 
           if (isGroovelabKiosk) {
             if (!hasGroovelabSub && !isTrial) {
@@ -1203,12 +1229,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               setParentInstrument(user.instrument || '');
               
               // Load the day of birth if not loaded yet
-              let dayVal = user.day_of_birth;
-              if (!dayVal) {
-                const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
-                dayVal = actDay?.day_of_birth || '';
+              const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+              if (!user.school_id && userSchool?.id) {
+                user.school_id = userSchool.id;
               }
-              setParentDayOfBirth(String(dayVal));
+
+              // Block students and teachers from logging in if school billing/contract is not active
+              const isSchoolBillingBooked = userSchool?.is_billing_booked ?? false;
+              const isStudentOrTeacher = user.role === 'student' || user.role === 'teacher';
+              if (isStudentOrTeacher && !isSchoolBillingBooked) {
+                throw new Error('Deine Musikschule hat das Abrechnungssystem noch nicht freigeschaltet. Bitte wende dich an deine Schulleitung.');
+              }
+
+              if (user.role === 'student') {
+                const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
+                user.day_of_birth = actDay?.day_of_birth || null;
+              }
+              setParentDayOfBirth(String(user.day_of_birth || ''));
               setParentOnboardingStep('payment_selection');
               setExpandedSection('parentOnboarding');
               setLoading(false);
@@ -1881,6 +1918,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       if (!user.school_id && userSchool?.id) {
         user.school_id = userSchool.id;
+      }
+
+      // Block students and teachers from logging in if school billing/contract is not active
+      const isSchoolBillingBooked = userSchool?.is_billing_booked ?? false;
+      const isStudentOrTeacher = user.role === 'student' || user.role === 'teacher';
+      if (isStudentOrTeacher && !isSchoolBillingBooked) {
+        throw new Error('Deine Musikschule hat das Abrechnungssystem noch nicht freigeschaltet. Bitte wende dich an deine Schulleitung.');
       }
 
       if (user.role === 'student') {
