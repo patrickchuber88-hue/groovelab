@@ -11886,7 +11886,7 @@ export function AdminDashboard({
 
       try {
         const updateData = isStudent 
-          ? { qr_token: newToken } 
+          ? { qr_token: newToken, is_campus_active: true, is_groovelab_active: true } 
           : { teacher_qr_token: newToken };
 
         const { error } = await supabase
@@ -11901,17 +11901,19 @@ export function AdminDashboard({
           setSelectedQRUser({
             ...selectedQRUser,
             qr_token: isStudent ? newToken : selectedQRUser.qr_token,
-            teacher_qr_token: !isStudent ? newToken : selectedQRUser.teacher_qr_token
+            teacher_qr_token: !isStudent ? newToken : selectedQRUser.teacher_qr_token,
+            is_campus_active: isStudent ? true : selectedQRUser.is_campus_active,
+            is_groovelab_active: isStudent ? true : selectedQRUser.is_groovelab_active
           });
 
           // Sync the global lists in AdminDashboard
           if (isStudent) {
-            setStudents(prev => prev.map(u => u.id === selectedQRUser.id ? { ...u, qr_token: newToken } : u));
+            setStudents(prev => prev.map(u => u.id === selectedQRUser.id ? { ...u, qr_token: newToken, is_campus_active: true, is_groovelab_active: true } : u));
           } else {
             setTeachers(prev => prev.map(u => u.id === selectedQRUser.id ? { ...u, teacher_qr_token: newToken } : u));
           }
 
-          alert('QR-Code erfolgreich neu generiert!');
+          alert(isStudent ? 'QR-Code erfolgreich neu generiert und Benutzerkonto reaktiviert!' : 'QR-Code erfolgreich neu generiert!');
         }
       } catch (err: any) {
         console.error('Error updating qr_token in AdminDashboard:', err);

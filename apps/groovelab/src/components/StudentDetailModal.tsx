@@ -225,7 +225,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     try {
       const { error } = await supabase
         .from('users')
-        .update({ qr_token: newUuid })
+        .update({ 
+          qr_token: newUuid,
+          is_campus_active: true,
+          is_groovelab_active: true
+        })
         .eq('id', student.id);
         
       if (error) {
@@ -233,7 +237,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       } else {
         setLocalQrToken(newUuid);
         student.qr_token = newUuid;
-        alert('QR-Code erfolgreich neu generiert!');
+        student.is_campus_active = true;
+        student.is_groovelab_active = true;
+        alert('QR-Code erfolgreich neu generiert und Benutzerkonto reaktiviert!');
       }
     } catch (err: any) {
       console.error('Error updating qr_token:', err);

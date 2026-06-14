@@ -5514,7 +5514,7 @@ export function TeacherDashboard({
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: '130px',
+                          minHeight: '200px',
                           flex: isFreeDay ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
@@ -5522,7 +5522,7 @@ export function TeacherDashboard({
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: '116px',
+                              width: '190px',
                               height: '100%',
                               flexShrink: 0,
                               position: 'relative',
@@ -5546,7 +5546,7 @@ export function TeacherDashboard({
                             </div>
                             
                             <div style={{ 
-                              padding: '12px 20px', 
+                              padding: '24px 32px', 
                               display: 'flex', 
                               flexDirection: 'column', 
                               justifyContent: 'center',

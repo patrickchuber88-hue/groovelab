@@ -9495,14 +9495,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                       transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                       width: '100%',
-                      minHeight: '130px',
+                      minHeight: '200px',
                       boxSizing: 'border-box',
                       overflow: 'hidden'
                     }}>
                     <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                       {/* Full Height Graphic on the left */}
                       <div style={{
-                        width: '116px',
+                        width: '190px',
                         height: '100%',
                         flexShrink: 0,
                         position: 'relative',
@@ -9524,7 +9524,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       </div>
                       
                       <div style={{ 
-                        padding: '12px 20px', 
+                        padding: '24px 32px', 
                         display: 'flex', 
                         flexDirection: 'column', 
                         justifyContent: 'center',
