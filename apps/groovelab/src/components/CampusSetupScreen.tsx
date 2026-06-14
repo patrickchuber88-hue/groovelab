@@ -49,6 +49,9 @@ export function CampusSetupScreen({
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [showDetailedStats, setShowDetailedStats] = useState(true);
 
+  // 4. Probezeit & Aktivierungen
+  const [mailtoTemplate, setMailtoTemplate] = useState('');
+
   // Load configuration from database
   useEffect(() => {
     if (effectiveSchool) {
@@ -66,6 +69,7 @@ export function CampusSetupScreen({
       setXpActive(campusConfig.xp_active !== false);
       setShowLeaderboard(campusConfig.show_leaderboard !== false);
       setShowDetailedStats(campusConfig.show_detailed_stats !== false);
+      setMailtoTemplate(campusConfig.mailto_template || '');
     }
   }, [effectiveSchool]);
 
@@ -89,7 +93,8 @@ export function CampusSetupScreen({
           flames_active: flamesActive,
           xp_active: xpActive,
           show_leaderboard: showLeaderboard,
-          show_detailed_stats: showDetailedStats
+          show_detailed_stats: showDetailedStats,
+          mailto_template: mailtoTemplate
         }
       };
 
@@ -253,6 +258,47 @@ export function CampusSetupScreen({
               setShowDetailedStats,
               <Clock size={18} />
             )}
+          </div>
+        </div>
+
+        {/* Section 4: Probezeit & Aktivierungen */}
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={18} color={brandColor} /> 4. Probezeit &amp; Aktivierungen
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>
+                E-Mail-Vorlage für Probezeit-Bestätigungen (mailto)
+              </label>
+              <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                Passe hier den Text an, der für den E-Mail-Entwurf an die Eltern generiert wird.
+                Folgende Platzhalter werden automatisch ersetzt:
+                <br />
+                <strong>{"{student_name}"}</strong> = Name des Schülers · 
+                <strong>{"{months_count}"}</strong> = Verbleibende Monate bis 31. August · 
+                <strong>{"{total_price}"}</strong> = Gesamtpreis (Monate x 0,40 EUR)
+              </p>
+              <textarea
+                value={mailtoTemplate}
+                onChange={e => setMailtoTemplate(e.target.value)}
+                placeholder={`Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n[Name Ihrer Musikschule]`}
+                style={{
+                  width: '100%',
+                  minHeight: '180px',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  lineHeight: '1.5',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  background: '#f8fafc',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
           </div>
         </div>
 

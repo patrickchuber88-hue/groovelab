@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -2442,7 +2442,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid')
+        .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -4108,6 +4108,84 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     setStudentCsvText('');
     setIsStudentCsvExpanded(false);
     fetchDashboardData();
+  };
+
+  const getRemainingMonthsAndPrice = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0 = Jan, 11 = Dec
+    const currentYear = now.getFullYear();
+    
+    let targetYear = currentYear;
+    if (currentMonth >= 8) { // Sept (8) or later
+      targetYear = currentYear + 1;
+    }
+    
+    const targetDate = new Date(targetYear, 8, 1); // Sept 1st of target year
+    
+    const yearDiff = targetDate.getFullYear() - now.getFullYear();
+    const monthDiff = targetDate.getMonth() - now.getMonth();
+    let monthsCount = yearDiff * 12 + monthDiff;
+    
+    if (monthsCount < 1) monthsCount = 1;
+    if (monthsCount > 12) monthsCount = 12;
+    
+    const pricePerMonth = 0.40;
+    const totalPrice = parseFloat((monthsCount * pricePerMonth).toFixed(2));
+    
+    return { monthsCount, totalPrice };
+  };
+
+  const generateMailtoLink = (student: any) => {
+    const { monthsCount, totalPrice } = getRemainingMonthsAndPrice();
+    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n[Name Ihrer Musikschule]`;
+    
+    let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
+    
+    const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+    template = template.replace(/{student_name}/g, studentName);
+    template = template.replace(/{months_count}/g, monthsCount.toString());
+    template = template.replace(/{total_price}/g, totalPrice.toFixed(2) + ' €');
+    
+    const subject = `Campus-Freischaltung für ${studentName}`;
+    return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(template)}`;
+  };
+
+  const handleConfirmStudentTrial = async (studentId: string) => {
+    if (!window.confirm("Möchtest du diesen Schüler dauerhaft für den Campus freischalten (Probezeit beenden)?")) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_trial: false,
+          trial_ends_at: null,
+          is_campus_active: true
+        })
+        .eq('id', studentId);
+      if (error) throw error;
+      alert("Schüler wurde erfolgreich dauerhaft aktiviert!");
+      fetchDashboardData();
+    } catch (err: any) {
+      alert("Fehler bei der Aktivierung: " + err.message);
+    }
+  };
+
+  const handleDeactivateStudentTrial = async (studentId: string) => {
+    if (!window.confirm("Möchtest du die Probezeit dieses Schülers sofort beenden und den Account inaktivieren?")) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_campus_active: false,
+          is_trial: false,
+          trial_ends_at: null
+        })
+        .eq('id', studentId);
+      if (error) throw error;
+      alert("Probezeit beendet. Schülerprofil ist nun inaktiv.");
+      fetchDashboardData();
+    } catch (err: any) {
+      alert("Fehler beim Inaktivieren: " + err.message);
+    }
   };
 
   const renderSubjectsBoard = () => {
@@ -12218,6 +12296,100 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       </div>
                     </div>
                   </div>
+
+                  {/* Trial Activations Card */}
+                  {(() => {
+                    const trialStudents = students.filter(s => s.is_trial && s.trial_ends_at && new Date(s.trial_ends_at).getTime() > Date.now());
+                    return (
+                      <div className="google-card" style={{ padding: '24px' }}>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
+                        </h4>
+                        <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+                          Die folgenden Schüler befinden sich in der 7-tägigen Probezeit. Klicke auf das Briefumschlag-Icon, um die E-Mail-Vorlage für die Eltern zu öffnen. Nach Erhalt der Bestätigung kannst du den Account dauerhaft freischalten.
+                        </p>
+                        
+                        {trialStudents.length === 0 ? (
+                          <div style={{ padding: '20px', borderRadius: '16px', background: '#f8fafc', border: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                            Aktuell befinden sich keine Schüler in der 7-tägigen Probezeit.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {trialStudents.map(student => {
+                              const daysLeft = Math.ceil((new Date(student.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                              return (
+                                <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <strong style={{ fontSize: '0.9rem', color: '#1f2937', fontWeight: 800 }}>
+                                      {student.first_name} {student.last_name}
+                                    </strong>
+                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                                      🎸 {student.instrument || 'Nicht festgelegt'}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 700 }}>
+                                      ⏳ Probezeit läuft noch {daysLeft} Tag(e) (bis {new Date(student.trial_ends_at).toLocaleDateString('de-DE')})
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <a 
+                                      href={generateMailtoLink(student)}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '40px',
+                                        height: '40px',
+                                        borderRadius: '12px',
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      title="E-Mail an Eltern entwerfen"
+                                    >
+                                      <Mail size={18} />
+                                    </a>
+                                    <button
+                                      onClick={() => handleConfirmStudentTrial(student.id)}
+                                      style={{
+                                        padding: '10px 16px',
+                                        borderRadius: '12px',
+                                        background: '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.2)'
+                                      }}
+                                    >
+                                      Freischalten
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeactivateStudentTrial(student.id)}
+                                      style={{
+                                        padding: '10px 16px',
+                                        borderRadius: '12px',
+                                        background: '#fee2e2',
+                                        color: '#b91c1c',
+                                        border: '1px solid #fca5a5',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      Inaktivieren
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

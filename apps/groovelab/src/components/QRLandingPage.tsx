@@ -697,6 +697,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
   };
 
+  const handleStartTrial = async () => {
+    if (!profile) return;
+    setActivationLoading(true);
+    setActivationError(null);
+    try {
+      const { data: updatedUser, error: rpcErr } = await supabase.rpc('start_student_trial', {
+        p_qr_token: token
+      });
+      if (rpcErr) throw rpcErr;
+
+      sessionStorage.setItem('groovelab_user_id', profile.id);
+      sessionStorage.setItem('groovelab_qr_token', token);
+
+      markPairedForToken(token);
+
+      setProfile(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          is_campus_active: true,
+          is_groovelab_active: schoolData?.has_groovelab_subscription ? true : prev.is_groovelab_active
+        };
+      });
+
+      setActivationStep('success');
+      playSuccessChime();
+    } catch (err: any) {
+      console.error('[QRLanding] Start Trial error:', err);
+      setActivationError(err.message || 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+    } finally {
+      setActivationLoading(false);
+    }
+  };
+
   // Synthetischer Audio-Erfolgston (HTML5 AudioContext)
   const playSuccessChime = () => {
     try {
@@ -2119,16 +2153,24 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
 
             {/* Activation callout or Notice */}
+            {activationError && (
+              <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '16px', color: '#991b1b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={16} />
+                <span>{activationError}</span>
+              </div>
+            )}
+
             {activationAllowed ? (
               <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #a7f3d0', background: '#f0fdf4', textAlign: 'center'}}>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                  <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus aktivieren</h3>
+                  <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus testen</h3>
                   <p style={{margin: 0, fontSize: '0.85rem', color: '#047857', lineHeight: 1.5, fontWeight: 550}}>
-                    Schalte deinen Online-Campus mit Übe-Timer, interaktiven Hausaufgaben, Statistiken und Badges frei!
+                    Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
                   </p>
                 </div>
                 <button
-                  onClick={() => setActivationStep('email')}
+                  onClick={handleStartTrial}
+                  disabled={activationLoading}
                   style={{
                     width: '100%',
                     padding: '16px 20px',
@@ -2144,10 +2186,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    opacity: activationLoading ? 0.7 : 1
                   }}
                 >
-                  <Sparkles size={18} /> Jetzt freischalten
+                  <Sparkles size={18} /> {activationLoading ? 'Wird gestartet...' : 'Jetzt 7 Tage kostenlos testen'}
                 </button>
               </div>
             ) : (
