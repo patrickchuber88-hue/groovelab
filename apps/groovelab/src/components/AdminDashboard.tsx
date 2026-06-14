@@ -1912,16 +1912,14 @@ export function AdminDashboard({
 
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
-    if (!currentAdmin) {
-      const { data: adminData } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('id', userId)
-        .single();
-      if (adminData) {
-        setAdmin(adminData);
-        currentAdmin = adminData;
-      }
+    const { data: adminData } = await supabase
+      .from('users')
+      .select('*, schools(*)')
+      .eq('id', userId)
+      .single();
+    if (adminData) {
+      setAdmin(adminData);
+      currentAdmin = adminData;
     }
 
     if (currentAdmin?.school_id) {
@@ -5677,10 +5675,44 @@ export function AdminDashboard({
     // Map bookings and weekly schedules
     // Merge consecutive schedules for this campus view
     const mergedSchedules = (() => {
-      if (!schedules || schedules.length === 0) return [];
+      const virtualGroovelabSchedules: any[] = [];
+      const opHours = admin?.schools?.opening_hours || {};
+      const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const DAYS_MAP = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      for (let d = 1; d <= 7; d++) {
+        const dayKey = dayKeys[d];
+        const dayHours = opHours[dayKey];
+        if (dayHours && dayHours.active === true && dayHours.roomId) {
+          const startTimeStr = dayHours.start || '14:00';
+          const endTimeStr = dayHours.end || '18:00';
+          // Calculate duration in minutes
+          const [shStr, smStr] = startTimeStr.split(':');
+          const [ehStr, emStr] = endTimeStr.split(':');
+          const duration = (parseInt(ehStr) * 60 + parseInt(emStr)) - (parseInt(shStr) * 60 + parseInt(smStr));
+
+          virtualGroovelabSchedules.push({
+            id: `virtual_groovelab_schedule_${d}`,
+            room_id: dayHours.roomId,
+            day_of_week: DAYS_MAP[d],
+            teacher_id: 'groovelab',
+            teacher: { first_name: 'Groove', last_name: 'Lab' },
+            teacher_name: 'Groove Lab',
+            purpose: 'GrooveLab Plattform',
+            time_slot: startTimeStr,
+            start_time: startTimeStr,
+            end_time: endTimeStr,
+            duration: duration,
+            status: 'approved',
+            is_approved: true
+          });
+        }
+      }
+
+      const allSchedules = [...(schedules || []), ...virtualGroovelabSchedules];
+      if (allSchedules.length === 0) return [];
       
       const groups: { [key: string]: any[] } = {};
-      schedules.forEach((s: any) => {
+      allSchedules.forEach((s: any) => {
         const key = `${s.room_id}_${s.day_of_week}_${s.teacher_id}`;
         if (!groups[key]) groups[key] = [];
         groups[key].push(s);
@@ -7555,8 +7587,8 @@ export function AdminDashboard({
 
                                 {slotBookings.map((b: any, bIdx: number) => {
                                   const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
-                                  const colWidth = 100 / slotBookings.length;
-                                  const colLeft = bIdx * colWidth;
+                                  const colWidth = 100;
+                                  const colLeft = 0;
                                   const isSchedule = b.isSchedule;
                                   const isOwnSchedule = isSchedule && isOwnBooking;
                                   const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';

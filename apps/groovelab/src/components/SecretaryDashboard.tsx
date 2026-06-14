@@ -1429,6 +1429,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // School Data & Subscription
   const [schoolName, setSchoolName] = useState<string>('');
+  const [openingHours, setOpeningHours] = useState<any>(null);
   const [schoolZipCode, setSchoolZipCode] = useState<string>('');
   const [schoolCity, setSchoolCity] = useState<string>('');
   const [schoolStreet, setSchoolStreet] = useState<string>('');
@@ -2349,13 +2350,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours')
         .eq('id', schoolId)
         .single();
 
       if (schoolErr) throw schoolErr;
       if (schoolData) {
         setSchoolName(schoolData.name);
+        setOpeningHours(schoolData.opening_hours);
         setSchoolZipCode(schoolData.zip_code || '');
         setSchoolCity(schoolData.city || '');
         setSchoolStreet(schoolData.street || '');
@@ -2841,7 +2843,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         };
       });
 
-      setMatrixAllocations(initialAllocations);
+      // Generate GrooveLab opening hours blocks as virtual plans for the groovelab teacher
+      const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const groovelabBlocks: any[] = [];
+      const opHours = schoolData?.opening_hours || {};
+      for (let d = 1; d <= 7; d++) {
+        const dayKey = dayKeys[d];
+        const dayHours = opHours[dayKey];
+        if (dayHours && dayHours.active === true) {
+          const key = `groovelab_${d}`;
+          const roomId = draftMap[key] !== undefined ? draftMap[key] : (dayHours.roomId || null);
+          groovelabBlocks.push({
+            id: key,
+            teacherId: 'groovelab',
+            teacherName: 'Groove Lab',
+            instrument: 'Plattform',
+            dayOfWeek: d,
+            startTime: dayHours.start || '14:00',
+            endTime: dayHours.end || '18:00',
+            roomId,
+            status: 'approved',
+            slots: []
+          });
+        }
+      }
+
+      setMatrixAllocations([...initialAllocations, ...groovelabBlocks]);
 
       // Calculate stats
       const activeAlertsCount = mappedAlerts.filter(a => !a.resolved && a.type === 'capacity_overrun').length;
@@ -6688,8 +6715,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // CSP Solver for Room Allocation
   const runAutoRoomAllocation = () => {
-    // 1. Sort plans: variable ordering (drums/schlagzeug first since they are the most constrained)
+    // 1. Sort plans: variable ordering (GrooveLab first because it only goes to one room, then drums/schlagzeug)
     const sortedPlans = [...matrixAllocations].sort((a, b) => {
+      const aIsGroovelab = a.teacherId === 'groovelab';
+      const bIsGroovelab = b.teacherId === 'groovelab';
+      if (aIsGroovelab && !bIsGroovelab) return -1;
+      if (!aIsGroovelab && bIsGroovelab) return 1;
+
       const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
       const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
       if (aIsDrums && !bIsDrums) return -1;
@@ -6730,97 +6762,113 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       }
     });
 
+    const activeRooms = rooms.filter(r => r.is_campus_active !== false);
+
     for (const plan of sortedPlans) {
       if (plan.roomId) continue;
 
       let bestRoomId: string | null = null;
-      let candidates = [...rooms];
-      const instr = plan.instrument?.toLowerCase() || '';
 
-      // Instrument matching using name and r.equipment
-      if (instr.includes('schlagzeug') || instr.includes('drums')) {
-        candidates = rooms.filter(r => {
-          const eq = r.equipment;
-          const hasEquip = Array.isArray(eq) && (eq.includes('drums') || eq.includes('schlagzeug') || eq.includes('drum'));
-          return hasEquip || r.name.toLowerCase().includes('schlagzeug') || r.name.toLowerCase().includes('drums') || r.name.toLowerCase().includes('band') || r.name.toLowerCase().includes('drum');
-        });
-        if (candidates.length === 0) candidates = [...rooms];
-      } else if (instr.includes('klavier') || instr.includes('piano')) {
-        candidates = rooms.filter(r => {
-          const eq = r.equipment;
-          const hasEquip = Array.isArray(eq) && (eq.includes('piano') || eq.includes('klavier') || eq.includes('keys'));
-          return hasEquip || r.name.toLowerCase().includes('klavier') || r.name.toLowerCase().includes('piano') || r.name.toLowerCase().includes('flügel');
-        });
-        if (candidates.length === 0) candidates = [...rooms];
-      }
+      if (plan.teacherId === 'groovelab') {
+        const groovelabRoom = activeRooms.find(r => r.name.toLowerCase() === 'groovelab');
+        if (groovelabRoom) {
+          const hasConflict = sortedPlans.some(p => {
+            const allocatedRoom = assigned[p.id] || p.roomId;
+            return allocatedRoom === groovelabRoom.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+          });
+          if (!hasConflict) {
+            bestRoomId = groovelabRoom.id;
+          }
+        }
+      } else {
+        let candidates = [...activeRooms];
+        const instr = plan.instrument?.toLowerCase() || '';
 
-      // Prioritize Teacher's favorite rooms (Lieblingsräume)
-      const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
-      const teacherProfile = allTeachersList.find(t => t.id === plan.teacherId);
-      const preferredRooms = teacherProfile?.preferred_room_ids || [];
-      if (preferredRooms.length > 0) {
-        for (const prId of preferredRooms) {
-          const prRoom = rooms.find(r => r.id === prId);
-          if (prRoom && !isRoomUnsuitable(prRoom, plan.instrument)) {
+        // Instrument matching using name and r.equipment
+        if (instr.includes('schlagzeug') || instr.includes('drums')) {
+          candidates = activeRooms.filter(r => {
+            const eq = r.equipment;
+            const hasEquip = Array.isArray(eq) && (eq.includes('drums') || eq.includes('schlagzeug') || eq.includes('drum'));
+            return hasEquip || r.name.toLowerCase().includes('schlagzeug') || r.name.toLowerCase().includes('drums') || r.name.toLowerCase().includes('band') || r.name.toLowerCase().includes('drum');
+          });
+          if (candidates.length === 0) candidates = [...activeRooms];
+        } else if (instr.includes('klavier') || instr.includes('piano')) {
+          candidates = activeRooms.filter(r => {
+            const eq = r.equipment;
+            const hasEquip = Array.isArray(eq) && (eq.includes('piano') || eq.includes('klavier') || eq.includes('keys'));
+            return hasEquip || r.name.toLowerCase().includes('klavier') || r.name.toLowerCase().includes('piano') || r.name.toLowerCase().includes('flügel');
+          });
+          if (candidates.length === 0) candidates = [...activeRooms];
+        }
+
+        // Prioritize Teacher's favorite rooms (Lieblingsräume)
+        const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
+        const teacherProfile = allTeachersList.find(t => t.id === plan.teacherId);
+        const preferredRooms = teacherProfile?.preferred_room_ids || [];
+        if (preferredRooms.length > 0) {
+          for (const prId of preferredRooms) {
+            const prRoom = activeRooms.find(r => r.id === prId);
+            if (prRoom && !isRoomUnsuitable(prRoom, plan.instrument)) {
+              const hasConflict = sortedPlans.some(p => {
+                const allocatedRoom = assigned[p.id] || p.roomId;
+                return allocatedRoom === prId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+              });
+              if (!hasConflict) {
+                bestRoomId = prId;
+                break;
+              }
+            }
+          }
+        }
+
+        // Soft Constraint check: prioritize historically assigned rooms for this teacher (must be suitable)
+        if (!bestRoomId) {
+          const historicalRoomId = teacherHistory[plan.teacherId];
+          if (historicalRoomId) {
+            const histRoom = activeRooms.find(r => r.id === historicalRoomId);
+            if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
+              const hasConflict = sortedPlans.some(p => {
+                const allocatedRoom = assigned[p.id] || p.roomId;
+                return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+              });
+              if (!hasConflict) {
+                bestRoomId = historicalRoomId;
+              }
+            }
+          }
+        }
+
+        // If no historical match, search candidate rooms first
+        if (!bestRoomId) {
+          for (const room of candidates) {
+            if (isRoomUnsuitable(room, plan.instrument)) continue;
+
             const hasConflict = sortedPlans.some(p => {
               const allocatedRoom = assigned[p.id] || p.roomId;
-              return allocatedRoom === prId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+              return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
             });
+
             if (!hasConflict) {
-              bestRoomId = prId;
+              bestRoomId = room.id;
               break;
             }
           }
         }
-      }
 
-      // Soft Constraint check: prioritize historically assigned rooms for this teacher (must be suitable)
-      if (!bestRoomId) {
-        const historicalRoomId = teacherHistory[plan.teacherId];
-        if (historicalRoomId) {
-          const histRoom = rooms.find(r => r.id === historicalRoomId);
-          if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
+        // Fallback: search all rooms if candidate rooms are exhausted or full
+        if (!bestRoomId) {
+          for (const room of activeRooms) {
+            if (isRoomUnsuitable(room, plan.instrument)) continue;
+
             const hasConflict = sortedPlans.some(p => {
               const allocatedRoom = assigned[p.id] || p.roomId;
-              return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
+              return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
             });
+
             if (!hasConflict) {
-              bestRoomId = historicalRoomId;
+              bestRoomId = room.id;
+              break;
             }
-          }
-        }
-      }
-
-      // If no historical match, search candidate rooms first
-      if (!bestRoomId) {
-        for (const room of candidates) {
-          if (isRoomUnsuitable(room, plan.instrument)) continue;
-          
-          const hasConflict = sortedPlans.some(p => {
-            const allocatedRoom = assigned[p.id] || p.roomId;
-            return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-          });
-
-          if (!hasConflict) {
-            bestRoomId = room.id;
-            break;
-          }
-        }
-      }
-
-      // Fallback: search all rooms if candidate rooms are exhausted or full
-      if (!bestRoomId) {
-        for (const room of rooms) {
-          if (isRoomUnsuitable(room, plan.instrument)) continue;
-
-          const hasConflict = sortedPlans.some(p => {
-            const allocatedRoom = assigned[p.id] || p.roomId;
-            return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-          });
-
-          if (!hasConflict) {
-            bestRoomId = room.id;
-            break;
           }
         }
       }
@@ -6856,6 +6904,37 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       }
 
       await Promise.all(promises);
+
+      // Also save the virtual groovelab room assignments inside the school's opening_hours JSON
+      const groovelabRoomsMap: Record<number, string | null> = {};
+      matrixAllocations.forEach((p: any) => {
+        if (p.teacherId === 'groovelab') {
+          groovelabRoomsMap[p.dayOfWeek] = p.roomId;
+        }
+      });
+
+      const updatedOpHours = { ...openingHours };
+      const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      let changed = false;
+      for (let d = 1; d <= 7; d++) {
+        const dayKey = dayKeys[d];
+        if (updatedOpHours[dayKey] && groovelabRoomsMap[d] !== undefined) {
+          updatedOpHours[dayKey] = {
+            ...updatedOpHours[dayKey],
+            roomId: groovelabRoomsMap[d]
+          };
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const { error: opHoursError } = await supabase
+          .from('schools')
+          .update({ opening_hours: updatedOpHours })
+          .eq('id', schoolId);
+        if (opHoursError) throw opHoursError;
+      }
+
       localStorage.removeItem(`groovelab_matrix_allocations_draft_${schoolId}`);
       alert('Raumzuteilung erfolgreich gespeichert und alle Stundenpläne freigegeben!');
       fetchDashboardData();
@@ -7062,24 +7141,70 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
 
   // Drag and drop matrix logic
-  const handleDragStartMatrix = (planId: string) => {
-    setDraggedPlanId(planId);
-    const plan = matrixAllocations.find(p => p.id === planId);
-    setDraggedPlanDay(plan?.dayOfWeek ?? null);
+  const handleDragStartMatrix = (e: React.DragEvent, planId: string) => {
+    try {
+      e.dataTransfer.setData("text/plain", planId);
+      e.dataTransfer.effectAllowed = "move";
+    } catch (err) {
+      console.warn("dataTransfer error", err);
+    }
+    setTimeout(() => {
+      setDraggedPlanId(planId);
+      const plan = matrixAllocations.find(p => p.id === planId);
+      setDraggedPlanDay(plan?.dayOfWeek ?? null);
+    }, 0);
   };
 
-  const handleDropOnMatrix = (targetRoomId: string | null, targetDay: number) => {
-    if (!draggedPlanId || draggedPlanDay === null) return;
+  const handleDropOnMatrix = (e: React.DragEvent | null, targetRoomId: string | null, targetDay: number) => {
+    let activePlanId = draggedPlanId;
+    if (e && e.dataTransfer) {
+      try {
+        const dataId = e.dataTransfer.getData("text/plain");
+        if (dataId) activePlanId = dataId;
+      } catch (err) {
+        console.warn("dataTransfer error on drop", err);
+      }
+    }
+    const plan = activePlanId ? matrixAllocations.find(p => p.id === activePlanId) : null;
+    const activePlanDay = plan?.dayOfWeek ?? draggedPlanDay;
+
+    console.log("handleDropOnMatrix start:", { activePlanId, activePlanDay, targetRoomId, targetDay });
+    if (!activePlanId || activePlanDay === null) {
+      console.log("handleDropOnMatrix exit 1: no activePlanId or activePlanDay");
+      return;
+    }
     // ── Day-lock: only allow drops within the same weekday column ──
-    if (targetDay !== draggedPlanDay) {
+    if (targetDay !== activePlanDay) {
+      console.log("handleDropOnMatrix exit 2: targetDay !== activePlanDay", { targetDay, activePlanDay });
       setDraggedPlanId(null);
       setDraggedPlanDay(null);
       return;
     }
+    const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayHours = openingHours?.[dayKeys[targetDay]];
+    console.log("handleDropOnMatrix resolved plan & hours:", { plan, dayHours });
+    const isGroovelabPlan = plan && plan.teacherId === 'groovelab';
+    
+    if (isGroovelabPlan && dayHours) {
+      if (dayHours.active === false) {
+        if (!confirm('Das Groovelab ist an diesem Tag geschlossen. Möchtest du die Zuweisung trotzdem durchführen?')) {
+          setDraggedPlanId(null);
+          setDraggedPlanDay(null);
+          return;
+        }
+      } else {
+        if (plan && dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
+          if (!confirm(`Die Unterrichtszeit (${plan.startTime}–${plan.endTime}) liegt außerhalb der Öffnungszeiten des Groovelabs (${dayHours.start}–${dayHours.end}). Zuweisung trotzdem durchführen?`)) {
+            setDraggedPlanId(null);
+            setDraggedPlanDay(null);
+            return;
+          }
+        }
+      }
+    }
 
     if (targetRoomId) {
       const room = rooms.find(r => r.id === targetRoomId);
-      const plan = matrixAllocations.find(p => p.id === draggedPlanId);
       if (room && plan) {
         const unsuitable = room.unsuitable_instruments || (() => {
           try {
@@ -7097,7 +7222,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
 
     setMatrixAllocations(prev => prev.map(p => {
-      if (p.id === draggedPlanId) {
+      if (p.id === activePlanId) {
         return { ...p, roomId: targetRoomId };
       }
       return p;
@@ -12894,6 +13019,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         ) : (
                           <div style={{ minWidth: '800px', position: 'relative' }}>
                             
+                            {/* Closed notification overlay */}
+                            {(() => {
+                              const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                              const liveHours = openingHours?.[dayKeys[liveViewDay]];
+                              const isLiveClosed = liveHours?.active === false;
+                              if (isLiveClosed) {
+                                return (
+                                  <div style={{ background: '#fef2f2', border: '1.5px solid #fee2e2', color: '#ef4444', padding: '16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                                    <AlertCircle size={20} />
+                                    <div>
+                                      <strong style={{ fontSize: '0.88rem', display: 'block', fontWeight: 800 }}>Groovelab geschlossen</strong>
+                                      <span style={{ fontSize: '0.78rem', opacity: 0.9, fontWeight: 600 }}>Das Groovelab ist am {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][liveViewDay]} geschlossen. (Die hier gezeigten Timelines gelten für Groovelab-Räume)</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
                             {/* Hour Header Bar */}
                             <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>
                               <div style={{ width: '180px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raum</div>
@@ -12942,6 +13086,78 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           <div key={i} style={{ borderLeft: '1.5px dashed rgba(226, 232, 240, 0.7)', height: '100%' }} />
                                         ))}
                                       </div>
+
+                                      {/* Inactive/Closed Zone Overlays */}
+                                      {(() => {
+                                        // Only show inactive overlays for GrooveLab rooms
+                                        const isGroovelabRoom = room.name.toLowerCase().includes('groovelab');
+                                        if (!isGroovelabRoom) return null;
+
+                                        const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                        const liveHours = openingHours?.[dayKeys[liveViewDay]];
+                                        if (!liveHours || liveHours.active === false) return null;
+                                        if (!liveHours.start || !liveHours.end) return null;
+
+                                        const tToM = (t: string) => {
+                                          const [h, m] = t.split(':').map(Number);
+                                          return h * 60 + m;
+                                        };
+
+                                        const startMin = tToM(liveHours.start);
+                                        const endMin = tToM(liveHours.end);
+
+                                        // Timeline is 13:00 (780 mins) to 21:00 (1260 mins). Duration 480 mins.
+                                        const leftZoneWidth = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
+                                        const rightZoneLeft = Math.max(0, Math.min(100, ((endMin - 780) / 480) * 100));
+                                        const rightZoneWidth = 100 - rightZoneLeft;
+
+                                        return (
+                                          <>
+                                            {leftZoneWidth > 0 && (
+                                              <div style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: `${leftZoneWidth}%`,
+                                                background: 'repeating-linear-gradient(45deg, rgba(241,245,249,0.5), rgba(241,245,249,0.5) 5px, rgba(226,232,240,0.5) 5px, rgba(226,232,240,0.5) 10px)',
+                                                borderRight: '1px solid rgba(203,213,225,0.4)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#94a3b8',
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                pointerEvents: 'none',
+                                                zIndex: 1
+                                              }}>
+                                                Geschlossen
+                                              </div>
+                                            )}
+                                            {rightZoneWidth > 0 && (
+                                              <div style={{
+                                                position: 'absolute',
+                                                left: `${rightZoneLeft}%`,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: `${rightZoneWidth}%`,
+                                                background: 'repeating-linear-gradient(45deg, rgba(241,245,249,0.5), rgba(241,245,249,0.5) 5px, rgba(226,232,240,0.5) 5px, rgba(226,232,240,0.5) 10px)',
+                                                borderLeft: '1px solid rgba(203,213,225,0.4)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#94a3b8',
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                pointerEvents: 'none',
+                                                zIndex: 1
+                                              }}>
+                                                Geschlossen
+                                              </div>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
 
                                       {/* Absolute Positioned Allocations */}
                                       {roomAllocations.map(plan => {
@@ -13079,7 +13295,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <td
                                     key={dayNum}
                                     onDragOver={(e) => e.preventDefault()}
-                                    onDrop={() => handleDropOnMatrix(null, dayNum)}
+                                    onDrop={(e) => handleDropOnMatrix(e, null, dayNum)}
                                     style={{ padding: '8px', verticalAlign: 'top', minHeight: '72px', position: 'relative' }}
                                   >
                                     {unassigned.length === 0 ? (
@@ -13098,72 +13314,56 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         Leer
                                       </div>
                                     ) : (
-                                      <div style={{ position: 'relative', width: '100%', minHeight: '64px', marginBottom: unassigned.length > 1 ? '8px' : '0' }}>
-                                        {/* Stapel-Effekt (Hintergrundkarten) */}
-                                        {unassigned.length >= 3 && (
-                                          <div style={{ position: 'absolute', bottom: '-8px', left: '8px', right: '8px', height: '52px', background: '#fefbeb', border: '1px solid #fef3c7', borderRadius: '10px', zIndex: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} />
-                                        )}
-                                        {unassigned.length >= 2 && (
-                                          <div style={{ position: 'absolute', bottom: '-4px', left: '4px', right: '4px', height: '52px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '10px', zIndex: 1, boxShadow: '0 2px 4px rgba(245,158,11,0.03)' }} />
-                                        )}
-                                        
-                                        {/* Hauptkarte (Vordergrund) */}
-                                        {(() => {
-                                          const topPlan = unassigned[0];
-                                          return (
-                                            <div
-                                              draggable
-                                              onDragStart={() => handleDragStartMatrix(topPlan.id)}
-                                              onDragEnd={() => {
-                                                setDraggedPlanId(null);
-                                                setDraggedPlanDay(null);
-                                              }}
-                                              onClick={(e) => {
-                                                setSelectedDayPlan(topPlan);
-                                                e.stopPropagation();
-                                              }}
-                                              style={{
-                                                position: 'relative',
-                                                zIndex: 2,
-                                                background: '#fffbeb',
-                                                border: '1px solid #fde68a',
-                                                borderLeft: '4px solid #f59e0b',
-                                                borderRadius: '10px',
-                                                padding: '7px 9px',
-                                                cursor: 'grab',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '2px',
-                                                boxShadow: '0 4px 8px rgba(245,158,11,0.06)',
-                                                userSelect: 'none',
-                                                WebkitUserSelect: 'none'
-                                              }}
-                                            >
-                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(topPlan)}</span>
-                                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{topPlan.instrument}</span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {topPlan.startTime}–{topPlan.endTime}</span>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                                        {unassigned.map(plan => (
+                                          <div
+                                            key={plan.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
+                                            onDragEnd={() => {
+                                              setDraggedPlanId(null);
+                                              setDraggedPlanDay(null);
+                                            }}
+                                            onClick={(e) => {
+                                              setSelectedDayPlan(plan);
+                                              e.stopPropagation();
+                                            }}
+                                            title={`${getPlanDisplayName(plan)} (${plan.instrument})`}
+                                            style={{
+                                              position: 'relative',
+                                              background: '#fffbeb',
+                                              border: '1px solid #fde68a',
+                                              borderLeft: '4px solid #f59e0b',
+                                              borderRadius: '10px',
+                                              padding: '7px 9px',
+                                              cursor: 'grab',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '2px',
+                                              boxShadow: '0 4px 8px rgba(245, 158, 11, 0.06)',
+                                              userSelect: 'none',
+                                              WebkitUserSelect: 'none'
+                                            }}
+                                          >
+                                            <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(plan)}</span>
+                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                            {(() => {
+                                              // Only validate for GrooveLab slots
+                                              const isGroovelabPlan = plan.teacherId === 'groovelab';
+                                              if (!isGroovelabPlan) return null;
+
+                                              const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                              const dayHours = openingHours?.[dayKeys[dayNum]];
+                                              if (!dayHours) return null;
                                               
-                                              {/* Anzahl-Badge */}
-                                              {unassigned.length > 1 && (
-                                                <span style={{
-                                                  position: 'absolute',
-                                                  top: '-6px',
-                                                  right: '-6px',
-                                                  background: '#f59e0b',
-                                                  color: 'white',
-                                                  fontSize: '0.58rem',
-                                                  fontWeight: 900,
-                                                  padding: '2px 5px',
-                                                  borderRadius: '6px',
-                                                  boxShadow: '0 2px 4px rgba(245,158,11,0.25)',
-                                                  zIndex: 10
-                                                }}>
-                                                  +{unassigned.length - 1}
-                                                </span>
-                                              )}
-                                            </div>
-                                          );
-                                        })()}
+                                              if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
+                                                return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+                                              }
+                                              return null;
+                                            })()}
+                                          </div>
+                                        ))}
                                       </div>
                                     )}
                                   </td>
@@ -13244,9 +13444,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         key={dayNum}
                                         onDragOver={(e) => e.preventDefault()}
                                         onDragEnter={() => setDragOverCell({ roomId: room.id, day: dayNum })}
-                                        onDrop={() => {
+                                        onDrop={(e) => {
                                           setDragOverCell({ roomId: null, day: null });
-                                          handleDropOnMatrix(room.id, dayNum);
+                                          handleDropOnMatrix(e, room.id, dayNum);
                                         }}
                                         style={{
                                           padding: '0',
@@ -13287,7 +13487,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               <div
                                                 key={plan.id}
                                                 draggable
-                                                onDragStart={() => handleDragStartMatrix(plan.id)}
+                                                onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
                                                 onDragEnd={() => {
                                                   setDraggedPlanId(null);
                                                   setDraggedPlanDay(null);
@@ -13295,16 +13495,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                 onClick={() => setSelectedDayPlan(plan)}
                                                 style={{ background: themeBg, border: themeBorder, borderLeft: themeBorderLeft, borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none' }}
                                               >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                                <div style={{ pointerEvents: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: themeText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {getPlanDisplayName(plan)}
                                                   </span>
                                                   {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
                                                 </div>
-                                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
-                                                <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
                                                   ⏱ {plan.startTime}–{plan.endTime}
                                                 </span>
+                                                {(() => {
+                                                  // Only validate for GrooveLab slots
+                                                  const isGroovelabPlan = plan.teacherId === 'groovelab';
+                                                  if (!isGroovelabPlan) return null;
+
+                                                  const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                                  const dayHours = openingHours?.[dayKeys[dayNum]];
+                                                  if (!dayHours) return null;
+                                                  if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
+                                                    return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+                                                  }
+                                                  return null;
+                                                })()}
                                               </div>
                                             );
                                           })}
@@ -13547,25 +13760,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       {/* Slot list */}
                       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
-                        {selectedDayPlan.slots.map((slot: any, idx: number) => {
-                          const isBreak = !slot.student_id && !selectedDayPlan.id.startsWith('adhoc_');
-                          return (
-                            <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
-                                  {isBreak ? '☕ Pause' : slot.student_name}
-                                </span>
-                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
-                                  {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
-                                </span>
-                              </div>
-                              <div style={{ textAlign: 'right' }}>
-                                <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
-                                <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700, display: 'block', marginTop: '1px' }}>{slot.duration} Min</span>
-                              </div>
+                        {selectedDayPlan.teacherId === 'groovelab' ? (
+                          <div style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: '#f8fafc', borderLeft: '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
+                                GrooveLab Betriebszeit
+                              </span>
+                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                                Virtueller Termin für Raumzuteilung
+                              </span>
                             </div>
-                          );
-                        })}
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
+                                {selectedDayPlan.startTime}–{selectedDayPlan.endTime}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          selectedDayPlan.slots.map((slot: any, idx: number) => {
+                            const isBreak = !slot.student_id && !selectedDayPlan.id.startsWith('adhoc_');
+                            return (
+                              <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
+                                    {isBreak ? '☕ Pause' : slot.student_name}
+                                  </span>
+                                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                                    {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+                                  </span>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
+                                  <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700, display: 'block', marginTop: '1px' }}>{slot.duration} Min</span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   )}
@@ -14800,6 +15031,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             allTeachersList.push(t);
                           }
                         });
+                        // Inject virtual GrooveLab teacher
+                        allTeachersList.push({
+                          id: 'groovelab',
+                          firstName: 'Groove',
+                          lastName: 'Lab',
+                          instrument: 'Plattform',
+                          role: 'teacher'
+                        });
 
                         allTeachersList.forEach(t => {
                           grouped[t.id] = {
@@ -15026,7 +15265,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               <div 
                                                 key={block.id}
                                                 draggable
-                                                onDragStart={() => handleDragStartMatrix(block.id)}
+                                                onDragStart={(e) => handleDragStartMatrix(e, block.id)}
                                                 onDragEnd={() => {
                                                   setDraggedPlanId(null);
                                                   setDraggedPlanDay(null);
@@ -15043,7 +15282,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                   WebkitUserSelect: 'none'
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ pointerEvents: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                   <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     <Calendar size={11} style={{ color: '#007aff' }} />
                                                     {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][block.dayOfWeek]}
@@ -19497,20 +19736,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   </div>
                   <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
                     <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
-                    {selectedDayPlan.slots.map((slot: any, idx: number) => {
-                      const isBreak = !slot.student_id;
-                      return (
-                        <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
-                            <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
-                              {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
+                    {selectedDayPlan.teacherId === 'groovelab' ? (
+                      <div style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: '#f8fafc', borderLeft: '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>GrooveLab Betriebszeit</span>
+                          <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                            Virtueller Termin für Raumzuteilung
+                          </span>
                         </div>
-                      );
-                    })}
+                        <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
+                          {selectedDayPlan.startTime}–{selectedDayPlan.endTime}
+                        </span>
+                      </div>
+                    ) : (
+                      selectedDayPlan.slots.map((slot: any, idx: number) => {
+                        const isBreak = !slot.student_id;
+                        return (
+                          <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                                {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: isBreak ? '#b45309' : '#0f172a' }}>{slot.time_slot}</span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
