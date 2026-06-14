@@ -314,11 +314,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [pinSetupInput, setPinSetupInput] = useState('');
   const [pinVerificationInput, setPinVerificationInput] = useState('');
   const [pinVerificationIsWithinRoom, setPinVerificationIsWithinRoom] = useState(false);
+  const [pinVerificationAttempts, setPinVerificationAttempts] = useState(0);
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showAgb, setShowAgb] = useState(false);
+  const [showParentAgb, setShowParentAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
@@ -382,6 +384,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'payment_selection' | 'preferences' | 'success'>('verify');
   const [studentPaymentMethod, setStudentPaymentMethod] = useState<'debit' | 'cash'>('debit');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
@@ -391,21 +394,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       9: 12,  // September
       10: 11, // October
       11: 10, // November
-      12: 8,  // December
-      1: 7,   // January
-      2: 6,   // February
-      3: 5,   // March
-      4: 4,   // April
-      5: 3,   // May
-      6: 0,   // June
-      7: 0,   // July
-      8: 0    // August
+      12: 9,  // December
+      1: 8,   // January
+      2: 7,   // February
+      3: 6,   // March
+      4: 5,   // April
+      5: 4,   // May
+      6: 3,   // June
+      7: 2,   // July
+      8: 1    // August
     };
 
     const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
-    if (monthsRemaining === 0) {
-      return 4.80;
-    }
     const basePrice = 4.80;
     return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
   };
@@ -449,7 +449,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadQrCode = () => {
     if (!onboardCreatedUser) return;
-    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${onboardCreatedUser.qr_token}`;
+    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`https://campus-groovelab.de/qr/${onboardCreatedUser.qr_token}`)}`;
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -655,7 +655,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 Musikschule: {onboardSchoolName || 'unbenannt'} (nachfolgend „Auftraggeber“)</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 1 Gegenstand und Dauer der Verarbeitung</h5>
-                <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (standardmäßig anonymisierte Nachnamen) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
+                <p>Der Auftragnehmer stellt dem Auftraggeber die Software-Plattform „GrooveLab App“ als digitales Logbuch- und Raumverwaltungssystem zur Verfügung. Die Verarbeitung umfasst personenbezogene Daten der Schüler (Vorname, Nachname und der Tag des Geburtstags des Kindes; Vornamen werden zur Erhöhung der Sicherheit explizit verschlüsselt gespeichert) und Coaches (Check-ins, Lernfortschritte) des Auftraggebers.</p>
                 
                 <h5 style={{ margin: '12px 0 6px 0', fontWeight: 800 }}>§ 2 Technische und Organisatorische Maßnahmen (TOM)</h5>
                 <p>Der Auftragnehmer sichert angemessene technische und organisatorische Maßnahmen nach Art. 32 DSGVO zu, um die Datensicherheit und Vertraulichkeit zu gewährleisten (z.B. Row Level Security Mandantentrennung, verschlüsselte Verbindungen). Die Datenverarbeitung und das Hosting erfolgen ausschließlich in Deutschland auf der Infrastruktur von Hetzner Online GmbH (Hetzner.com).</p>
@@ -742,7 +742,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.1)'
                 }}>
                   <img 
-                    src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${onboardCreatedUser.qr_token}`} 
+                    src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`https://campus-groovelab.de/qr/${onboardCreatedUser.qr_token}`)}`} 
                     alt="Admin QR Ausweis" 
                     style={{ width: '180px', height: '180px', display: 'block', borderRadius: '12px' }}
                   />
@@ -1194,10 +1194,31 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           // Enforce activation check (must have at least one active module)
           if (!user.is_campus_active && !user.is_groovelab_active) {
-            alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
+            if (user.role === 'student') {
+              alert("Dein Schüler-Profil ist noch inaktiv. Wir leiten dich jetzt zur Aktivierungsseite weiter...");
+              setVerifiedStudentId(user.id);
+              setVerifiedStudentDetails(user);
+              setParentFirstName(user.first_name || '');
+              setParentLastName(user.last_name || '');
+              setParentInstrument(user.instrument || '');
+              
+              // Load the day of birth if not loaded yet
+              let dayVal = user.day_of_birth;
+              if (!dayVal) {
+                const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
+                dayVal = actDay?.day_of_birth || '';
+              }
+              setParentDayOfBirth(String(dayVal));
+              setParentOnboardingStep('payment_selection');
+              setExpandedSection('parentOnboarding');
+              setLoading(false);
+              return;
+            } else {
+              alert("Dein Zugang ist nicht aktiv. Bitte wende dich an deine Musikschule.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
           }
 
           // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
@@ -1501,9 +1522,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setPinSetupInput(prev => prev + val);
       }
     } else {
+      const limit = pinVerificationUser?.role === 'student' ? 2 : 4;
       if (val === 'back') {
         setPinVerificationInput(prev => prev.slice(0, -1));
-      } else if (pinVerificationInput.length < 4) {
+      } else if (pinVerificationInput.length < limit) {
         setPinVerificationInput(prev => prev + val);
       }
     }
@@ -1861,6 +1883,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = userSchool.id;
       }
 
+      if (user.role === 'student') {
+        const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
+        user.day_of_birth = actDay?.day_of_birth || null;
+      }
+
       // Automatically resolve schoolData from the database if not present in the URL parameter
       if (!schoolData && userSchool) {
         setSchoolData(userSchool);
@@ -1940,7 +1967,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // Intercept login for PIN setup or verification if it's an Ausweis ID login
       const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
       if (!isQrLogin) {
-        if (!user.is_pin_activated) {
+        const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
+        const isPinActivated = user.role === 'student' ? !!studentBirthDay : user.is_pin_activated;
+
+        if (!isPinActivated) {
           setPinSetupUser(user);
           setPinVerificationIsWithinRoom(isWithinAnyRoom);
           setPinSetupInput('');
@@ -1950,6 +1980,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           setPinVerificationUser(user);
           setPinVerificationIsWithinRoom(isWithinAnyRoom);
           setPinVerificationInput('');
+          setPinVerificationAttempts(0);
           setLoading(false);
           return;
         }
@@ -2097,6 +2128,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.school_id = userSchool.id;
       }
 
+      if (user.role === 'student') {
+        const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
+        user.day_of_birth = actDay?.day_of_birth || null;
+      }
+
       // Automatically resolve schoolData from the database if not present in the URL parameter
       if (!schoolData && userSchool) {
         setSchoolData(userSchool);
@@ -2199,8 +2235,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
-      // If the user's PIN is not activated yet, they MUST set their personal PIN first to secure the manual login path
-      if (!user.is_pin_activated) {
+      const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
+      const isPinActivated = user.role === 'student' ? !!studentBirthDay : user.is_pin_activated;
+
+      if (!isPinActivated) {
         setPinSetupUser(user);
         setPinVerificationIsWithinRoom(isWithinAnyRoom);
         setPinSetupInput('');
@@ -3363,6 +3401,35 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         {parentOnboardingStep === 'verify' && (
           <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '16px',
+              padding: '16px',
+              color: '#ffffff',
+              fontSize: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <span style={{ fontSize: '10px', color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-VORSCHAU / AKTIVIERUNG</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '6px' }}>
+                <span style={{ fontWeight: 700 }}>GrooveLab Schüler-Account:</span>
+                <strong style={{ color: '#4ade80' }}>
+                  {getDynamicAnnualPriceLocal(schoolData?.contract_start_date, false).toFixed(2).replace('.', ',')} € (einmalig)
+                </strong>
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>
+                Schüler können ihren Account selbst über den QR-Code aktivieren.<br />
+                Erlaubte Bezahlmethode: <strong>
+                  {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) && 'Lastschrift & Barzahlung'}
+                  {schoolData?.student_billing_option === 'debit' && 'Lastschrift'}
+                  {schoolData?.student_billing_option === 'cash' && 'Barzahlung'}
+                  {schoolData?.student_billing_option === 'option1' && 'Lastschrift & Barzahlung'}
+                </strong>
+              </div>
+            </div>
+
             <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
               Bitte gib die Daten deines Kindes exakt so ein, wie sie auf der Anmeldung stehen.
             </p>
@@ -3649,17 +3716,36 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             )}
 
+            <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '4px', textAlign: 'left' }}>
+              <input 
+                type="checkbox" 
+                required
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{ accentColor: '#22c55e', marginTop: '3px', cursor: 'pointer', flexShrink: 0 }}
+              />
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)', lineHeight: '1.4' }}>
+                Ich bestätige, dass ich volljährig bin bzw. als Erziehungsberechtigter des Schülers handle, stimme den{' '}
+                <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} style={{ textDecoration: 'underline', color: '#4ade80', cursor: 'pointer', fontWeight: 700 }}>AGB</span>{' '}
+                sowie der{' '}
+                <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ textDecoration: 'underline', color: '#4ade80', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span>{' '}
+                zu und willige in die zahlungspflichtige Aktivierung für das laufende Schuljahr über {
+                  studentPaymentMethod === 'debit' ? 'Abbuchung' : 'Barzahlung'
+                } ein.
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={parentOnboardingLoading}
+              disabled={parentOnboardingLoading || !agreedToTerms}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#34a853',
+                background: agreedToTerms ? '#34a853' : '#7f8c8d',
                 color: '#ffffff',
-                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
+                fontWeight: 800, fontSize: '14px', cursor: agreedToTerms ? 'pointer' : 'not-allowed', transition: 'all 0.2s', marginTop: '8px'
               }}
             >
-              {parentOnboardingLoading ? 'Speichere...' : 'Weiter zu den Terminen'}
+              {parentOnboardingLoading ? 'Speichere...' : 'Kostenpflichtig aktivieren'}
             </button>
 
             <button
@@ -4259,7 +4345,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 3 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & COMPLIANCE</h4>
                 <p style={{ margin: 0 }}><strong>1. Passwortlose QR-Code-Authentifizierung:</strong> Der Zugang für Endnutzer erfolgt passwortlos über eine eindeutige URL, die als scanbarer QR-Code verschlüsselt ist. Der Kunde verpflichtet sich, seine Lehrkräfte und Mitarbeiter im sorgsamen Umgang mit den QR-Codes zu schulen. Die QR-Codes dürfen ausschließlich den jeweils berechtigten Endnutzern persönlich oder durch Aufkleben auf das physische Noten-/Hausaufgabenheft zur Verfügung gestellt werden.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Zweistufige Verifikations-Schranke (Anti-Theft Device-Pairing):</strong> Um unbefugten Zugriff auf personenbezogene Logistik- und Schülerdaten bei physischem Verlust des QR-Codes auszuschließen, erzwingt die Software beim Aufruf auf einem neuen, nicht registrierten Endgerät die Eingabe eines dem Endnutzer bekannten, schülerbezogenen Sicherheitsmerkmals (PIN) als einmaligen Freischalt-Code. Nach erfolgreicher Eingabe wird auf dem Endgerät ein kryptografischer Schlüssel zur permanenten Autorisierung hinterlegt (Device-Pairing), wodurch nachfolgende Scans ohne erneute Code-Eingabe ermöglicht werden. Der Kunde ist verpflichtet, seine Endnutzer darüber zu informieren, dass bei Verlust des physischen QR-Codes oder des registrierten Endgeräts unverzüglich eine Sperrung des Tokens über das Lehrer-Cockpit oder die Verwaltung zu veranlassen ist. Der Anbieter sperrt den betroffenen Token in Echtzeit nach Eingang der Sperraufforderung im System.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Zweistufige Verifikations-Schranke (Anti-Theft Device-Pairing):</strong> Um unbefugten Zugriff auf personenbezogene Logistik- und Schülerdaten bei physischem Verlust des QR-Codes auszuschließen, erzwingt die Software beim Aufruf auf einem neuen, nicht registrierten Endgerät die Eingabe eines dem Endnutzer bekannten, schülerbezogenen Sicherheitsmerkmals (PIN) als einmaligen Freischalt-Code. Nach erfolgreicher Eingabe wird auf dem Endgerät ein kryptografischer Schlüssel zur permanenten Autorisierung hinterlegt (Device-Pairing), wodurch nachfolgende Scans ohne erneute Code-Eingabe ermöglicht werden. Gibt der Endnutzer dreimal hintereinander eine falsche PIN ein, wird das Benutzerkonto aus Sicherheitsgründen automatisch gesperrt; eine Entsperrung ist dann nur über die Verwaltung der Musikschule möglich. Der Kunde ist verpflichtet, seine Endnutzer darüber zu informieren, dass bei Verlust des physischen QR-Codes oder des registrierten Endgeräts unverzüglich eine Sperrung des Tokens über das Lehrer-Cockpit oder die Verwaltung zu veranlassen ist. Der Anbieter sperrt den betroffenen Token in Echtzeit nach Eingang der Sperraufforderung im System.</p>
               </div>
 
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
@@ -4274,7 +4360,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 5 GEWÄHRLEISTUNG (MÄNGELHAFTUNG) & HAFTUNGSBEGRENZUNG</h4>
-                <p style={{ margin: 0 }}><strong>1. Display-Down-Zwangstimer & Gerätesensorik:</strong> Der integrierte Übe-Timer nutzt die Lagesensoren der Endgeräte (DeviceOrientation API). Zur Vermeidung von Frustration und Drucksituationen für Kinder gewährt das System eine 15-sekündige Toleranzzeit (Grace Period) bei Lageveränderungen. Eine Gewährleistung für die korrekte Funktion des Timers auf Endgeräten, deren physikalische Sensoren fehlerhaft kalibriert sind oder deren Betriebssystem die Sensorabfrage blockiert, ist ausgeschlossen.</p>
+                <p style={{ margin: 0 }}><strong>1. Display-Down-Zwangstimer & Gerätesensorik:</strong> Der integrierte Übe-Timer nutzt die Lagesensoren der Endgeräte (DeviceOrientation API). Zur Vermeidung von Frustration und Drucksituationen für Kinder gewährt das System eine 10-sekündige Toleranzzeit (Grace Period) bei Lageveränderungen. Eine Gewährleistung für die korrekte Funktion des Timers auf Endgeräten, deren physikalische Sensoren fehlerhaft kalibriert sind oder deren Betriebssystem die Sensorabfrage blockiert, ist ausgeschlossen.</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>2. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit, die auf einer vorsätzlichen oder fahrlässigen Pflichtverletzung des Anbieters oder seiner Erfüllungsgehilfen beruhen. Für sonstige Schäden haftet der Anbieter nur bei Vorsatz oder grober Fahrlässigkeit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftung bei Verletzung einer Kardinalpflicht ist auf den vertragstypischen, bei Vertragsabschluss vorhersehbaren Schaden begrenzt. Die Haftung für entgangenen Gewinn, Betriebsunterbrechungsschäden oder sonstige mittelbare Schäden des Kunden ist ausgeschlossen.</p>
               </div>
 
@@ -4314,6 +4400,131 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 <p style={{ margin: 0 }}><strong>1. Rechtswahl:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts.</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>2. Gerichtsstand:</strong> Ausschließlicher Gerichtsstand für alle Streitigkeiten aus oder im Zusammenhang mit diesem Vertrag ist der Geschäftssitz des Anbieters (Rheinfelden).</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>3. Salvatorische Klausel:</strong> Sollten einzelne Bestimmungen dieses Vertrages unwirksam oder undurchführbar sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen davon unberührt. Die Parteien verpflichten sich, die unwirksame Bestimmung durch eine wirksame Regelung zu ersetzen, die dem wirtschaftlichen und rechtlichen Zweck der unwirksamen Bestimmung am nächsten kommt.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* B2C Nutzungsbedingungen (Student/Parent) Modal */}
+      {showParentAgb && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.40)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+            border: '1px solid #f1f5f9',
+            padding: '36px',
+            maxWidth: '680px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <button 
+              onClick={() => setShowParentAgb(false)} 
+              style={{
+                position: 'absolute',
+                top: '24px',
+                right: '24px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                <FileText size={28} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Nutzungsbedingungen</h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nutzungsbedingungen für Schüler & Eltern (B2C)</p>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '13px', 
+              color: '#475569', 
+              lineHeight: '1.6', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              textAlign: 'left'
+            }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700 }}>Vertragspartner und Anbieter:</p>
+                <p style={{ margin: '4px 0 0 0' }}>Simplified Work GbR, Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                  <strong>Geltungsbereich:</strong> Für die private Nutzung durch Schüler und Eltern (B2C)<br/>
+                  <strong>Stand und Gültigkeit:</strong> Juni 2026
+                </p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+                <p style={{ margin: 0 }}>Der Anbieter stellt eine Web-App namens „Campus-Groovelab“ zur Ergänzung und spielerischen Unterstützung des Musikunterrichts (mit Übe-Timer, XP-Punkten, Streaks etc.) bereit. Diese Bedingungen regeln die Nutzung der Plattform durch die Schüler bzw. deren Erziehungsberechtigte.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 1 LEISTUNGSUMFANG & KOSTENFREIHEIT</h4>
+                <p style={{ margin: 0 }}>Die Nutzung der App selbst ist für den Schüler bzw. die Eltern lizenzgebührenfrei. Die Bereitstellung erfolgt über das Internet im Wege eines Software-as-a-Service (SaaS)-Modells. Ein Rechtsanspruch auf die dauerhafte Bereitstellung bestimmter Zusatzfunktionen besteht nicht.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 2 ABRECHNUNG ÜBER DIE MUSIKSCHULE</h4>
+                <p style={{ margin: 0 }}>Soweit für die Aktivierung oder den Betrieb des Profils Gebühren fällig werden, werden diese direkt über die Kooperations-Musikschule nach den dort vereinbarten Abrechnungswegen (z.B. Barzahlung oder Einzug mit der monatlichen Unterrichtsgebühr) erhoben. Es entstehen durch diese Nutzungsbedingungen keine unmittelbaren Zahlungsansprüche des Anbieters gegen den Schüler oder die Eltern.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 3 ZUGANGSSICHERHEIT & AUTOMATISCHE SPERRUNG</h4>
+                <p style={{ margin: 0 }}><strong>1. Passwortloser Login:</strong> Der Zugang erfolgt passwortlos über einen individuellen QR-Code. Dieser QR-Code ist sorgfältig aufzubewahren und vor dem Zugriff durch unbefugte Dritte zu schützen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. PIN-Sicherung & Auto-Sperre:</strong> Zum Schutz vor unbefugtem Zugriff bei Verlust des QR-Codes ist bei der Erstanmeldung auf einem neuen Gerät die Eingabe eines Sicherheitsmerkmals (Tag des Geburtstags als PIN) erforderlich. Wird dieses Merkmal dreimal hintereinander falsch eingegeben, sperrt das System den Zugang automatisch. Die Entsperrung kann über die Musikschule veranlasst werden.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 4 DATENSCHUTZ</h4>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer Daten hat höchste Priorität. Es werden nur die für den Betrieb notwendigen Daten verarbeitet (Vorname, Nachname sowie der Tag des Geburtstags des Kindes). Vornamen werden zur Erhöhung der Sicherheit im System explizit verschlüsselt gespeichert. Die Datenhaltung erfolgt ausschließlich auf zertifizierten Servern in Deutschland (Hetzner Online GmbH) unter strikter Einhaltung der DSGVO.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 5 ÜBE-TIMER & RECHTE AN SPIELSTÄNDEN</h4>
+                <p style={{ margin: 0 }}><strong>1. Übe-Timer:</strong> Der integrierte Übe-Timer nutzt die Lagesensoren deines Endgeräts. Um Druck zu vermeiden, gilt eine 10-sekündige Toleranzzeit (Grace Period) bei Lageveränderungen.</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Gamification:</strong> Spielstände (XP, Streaks, Flammen) dienen rein der Motivation. Es besteht kein Rechtsanspruch auf das Bestehen oder die Wiederherstellung von Spielständen oder virtuellen Auszeichnungen.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 6 HAFTUNGSBESCHRÄNKUNG</h4>
+                <p style={{ margin: 0 }}>Der Anbieter haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit sowie bei Vorsatz und grober Fahrlässigkeit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht), wobei die Haftung auf den vertragstypischen, vorhersehbaren Schaden begrenzt ist.</p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 7 RECHTSWAHL</h4>
+                <p style={{ margin: 0 }}>Es gilt das Recht der Bundesrepublik Deutschland. Bei Verbrauchern gilt diese Rechtswahl nur insoweit, als nicht der gewährte Schutz durch zwingende Bestimmungen des Rechts des Staates, in dem der Verbraucher seinen gewöhnlichen Aufenthalt hat, entzogen wird.</p>
               </div>
             </div>
           </div>
@@ -4394,7 +4605,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             }}>
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
-                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Zur Einhaltung der Datenminimierung werden Nachnamen von Schülern standardmäßig anonymisiert (nur die Initiale wird gespeichert, z.B. Max M.).</p>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
               </div>
 
               <div>
@@ -4404,7 +4615,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
-                <p style={{ margin: 0 }}>GrooveLab prüft beim Einloggen kurz deinen Gerätestandort (GPS), um sicherzustellen, dass du dich im GrooveLab-Raum der Musikschule befindest. Diese Standortdaten werden rein lokal in deinem Browser berechnet und nicht an Server übertragen. In der Datenbank wird lediglich ein Bestätigungswert (Erfolgreich/Fehlgeschlagen) für deine aktive Session hinterlegt. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+                <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem Zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>GrooveLab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
               </div>
 
               <div>
@@ -5230,11 +5441,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN eingeben</h3>
             <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
               Login für <strong>{pinVerificationUser.first_name} {pinVerificationUser.last_name}</strong> ({pinVerificationUser.ausweis_nummer}).<br/>
-              Bitte gib deine 4-stellige PIN ein.
+              {pinVerificationUser.role === 'student' ? 'Bitte gib deinen Geburtstag (nur den Tag, z.B. 05) als PIN ein.' : 'Bitte gib deine 4-stellige PIN ein.'}
             </p>
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              {[0, 1, 2, 3].map((idx) => (
+              {Array.from({ length: pinVerificationUser.role === 'student' ? 2 : 4 }).map((_, idx) => (
                 <div key={idx} style={{
                   width: '18px',
                   height: '18px',
@@ -5250,11 +5461,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
             <button
               onClick={async () => {
-                if (pinVerificationInput.length !== 4) return;
+                const dayOfBirthVal = Array.isArray(pinVerificationUser.activation_days) ? pinVerificationUser.activation_days[0]?.day_of_birth : pinVerificationUser.activation_days?.day_of_birth;
+                const studentBirthDay = dayOfBirthVal ? String(dayOfBirthVal).padStart(2, '0') : '';
+                const expectedLength = pinVerificationUser.role === 'student' ? 2 : 4;
+                if (pinVerificationInput.length !== expectedLength) return;
                 
-                if (pinVerificationInput === pinVerificationUser.personal_pin) {
+                const isMatch = pinVerificationUser.role === 'student'
+                  ? (parseInt(pinVerificationInput) === parseInt(studentBirthDay))
+                  : (pinVerificationInput === pinVerificationUser.personal_pin);
+
+                if (isMatch) {
                   const user = pinVerificationUser;
                   setPinVerificationUser(null);
+                  setPinVerificationAttempts(0);
                   
                   const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
                   if (isTeacher) {
@@ -5273,21 +5492,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom);
                   }
                 } else {
-                  alert('Die eingegebene PIN ist nicht korrekt.');
+                  const newAttempts = pinVerificationAttempts + 1;
+                  setPinVerificationAttempts(newAttempts);
+
+                  if (pinVerificationUser.role === 'student' && newAttempts >= 3) {
+                    try {
+                      await supabase
+                        .from('users')
+                        .update({ is_campus_active: false, is_groovelab_active: false })
+                        .eq('id', pinVerificationUser.id);
+                      alert('Dieses Konto wurde nach 3 Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an die Musikschule.');
+                    } catch (e) {
+                      console.error(e);
+                    }
+                    setPinVerificationUser(null);
+                  } else {
+                    const limit = pinVerificationUser.role === 'student' ? 3 : 5;
+                    const remaining = limit - newAttempts;
+                    if (remaining <= 0) {
+                      alert('Zu viele Fehlversuche. Bitte wende dich an deine Schule.');
+                      setPinVerificationUser(null);
+                    } else {
+                      alert(`Die eingegebene PIN ist nicht korrekt. Noch ${remaining} Versuch${remaining === 1 ? '' : 'e'}.`);
+                    }
+                  }
                   setPinVerificationInput('');
                 }
               }}
-              disabled={pinVerificationInput.length !== 4}
+              disabled={pinVerificationInput.length !== (pinVerificationUser.role === 'student' ? 2 : 4)}
               style={{
                 width: '100%',
                 padding: '14px',
                 borderRadius: '16px',
-                background: pinVerificationInput.length === 4 ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
+                background: pinVerificationInput.length === (pinVerificationUser.role === 'student' ? 2 : 4) ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
                 color: '#0f172a',
                 fontWeight: 800,
                 border: 'none',
                 marginTop: '24px',
-                cursor: pinVerificationInput.length === 4 ? 'pointer' : 'not-allowed',
+                cursor: pinVerificationInput.length === (pinVerificationUser.role === 'student' ? 2 : 4) ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s'
               }}
             >

@@ -1342,7 +1342,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [hasGroovelabSub, setHasGroovelabSub] = useState<boolean>(false);
   const [campusActivatedThisMonth, setCampusActivatedThisMonth] = useState<boolean>(false);
   const [groovelabActivatedThisMonth, setGroovelabActivatedThisMonth] = useState<boolean>(false);
-  const [studentBillingOption, setStudentBillingOption] = useState<string>('option1');
+  const [studentBillingOption, setStudentBillingOption] = useState<string>('both');
   const [isBillingBooked, setIsBillingBooked] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('isBillingBooked') === 'true';
   });
@@ -1409,24 +1409,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       9: 12,  // September
       10: 11, // October
       11: 10, // November
-      12: 8,  // December
-      1: 7,   // January
-      2: 6,   // February
-      3: 5,   // March
-      4: 4,   // April
-      5: 3,   // May
-      6: 0,   // June
-      7: 0,   // July
-      8: 0    // August
+      12: 9,  // December
+      1: 8,   // January
+      2: 7,   // February
+      3: 6,   // March
+      4: 5,   // April
+      5: 4,   // May
+      6: 3,   // June
+      7: 2,   // July
+      8: 1    // August
     };
 
     const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
-    if (monthsRemaining === 0) {
-      // June, July, August: Flat starter rate between 49 and 99 EUR for the school (69 EUR standard, 35 EUR co-financed)
-      const schoolSize = students.length || 7;
-      const targetFlatTotal = isCoFinancing ? 35.00 : 69.00;
-      return parseFloat((targetFlatTotal / schoolSize).toFixed(2));
-    }
     // Proportional calculation based on standard full-year prices (4.80 standard)
     const basePrice = 4.80;
     return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
@@ -1445,7 +1439,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           groovelab_activated_this_month: false,
           contract_start_date: simulated || null,
           contract_ends_at: null,
-          student_billing_option: 'option1',
+          student_billing_option: 'both',
           extra_billing_option: 'option1',
           user_quota: 150,
           pending_user_quota: null
@@ -1459,7 +1453,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     setIsBillingBooked(false);
     setBookedExtraUsers(0);
     setExtraUsersSliderVal(0);
-    setStudentBillingOption('option1');
+    setStudentBillingOption('both');
     setExtraBillingOption('option1');
     setNextBillingOption('');
     setNextBillingOptionEffectiveAt('');
@@ -1518,8 +1512,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   // Global pricing calculations for use in briefing & invoice lists
   const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
   const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
-  const activeModulesCount_global = billedCampus_global ? 1 : 0;
-  const moduleCost_global = activeModulesCount_global * 4.99;
+  const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
+  const moduleCost_global = (billedCampus_global ? 4.99 : 0) + (billedGroovelab_global ? 4.99 : 0);
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const studentLevyMonthly_global = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
@@ -2015,13 +2009,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           setBookedExtraUsers(0);
           localStorage.setItem('bookedExtraUsers', '0');
           setExtraUsersSliderVal(0);
-          setStudentBillingOption('option1');
+          setStudentBillingOption('both');
         } else {
           setIsBillingBooked(true);
           localStorage.setItem('isBillingBooked', 'true');
           if (hasCampus) setHasCampusSub(true);
           if (hasGroove) setHasGroovelabSub(true);
-          setStudentBillingOption(schoolData.student_billing_option || 'option1');
+          setStudentBillingOption(schoolData.student_billing_option || 'both');
         }
         
         setPendingUserQuota(schoolData.pending_user_quota);
@@ -4977,7 +4971,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                   <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeCampusCount}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Lizenzen</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
                 </div>
               </div>
 
@@ -4999,7 +4993,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                   <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Lizenzen</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
                 </div>
               </div>
 
@@ -8225,8 +8219,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           <button
                             onClick={() => {
                               setSecretarySubTab('licenses');
-                              const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                              const annualPricePerStudent = studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
+                              const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
+                              const annualPricePerStudent = (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                               const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
                               
                               const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
@@ -14597,23 +14591,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               </p>
 
               {(() => {
-                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:30:38+02:00');
+                const effectiveContractStartDateStr = isBillingBooked
+                  ? contractStartDate
+                  : (simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString());
+                const contractDateObj = effectiveContractStartDateStr ? new Date(effectiveContractStartDateStr) : new Date('2026-06-12T19:30:38+02:00');
                 const cMonth = contractDateObj.getMonth() + 1;
-                const isStarterFlat = cMonth === 6 || cMonth === 7 || cMonth === 8;
+                const isStarterFlat = false;
                 const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
-                const activeModulesCount = billedCampus ? 1 : 0;
-                const moduleCost = activeModulesCount * 4.99;
+                const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
+                const moduleCost = (billedCampus ? 4.99 : 0) + (billedGroovelab ? 4.99 : 0);
                 const studentLevyMonthly = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
                 const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
 
                 const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + students.length * 0.09;
                 const studentSharePreview = 0;
-                const isAnnual = studentBillingOption === 'option1';
+                const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
                 
                 // Slider prospective change variables (Real-time preview)
                 const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.40 : 0);
-                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(contractStartDate, false) : 0);
+                const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(effectiveContractStartDateStr, false) : 0);
                 const isAnnualAdditional = extraBillingOption === 'option1';
                 const schoolShareAdditional = 0;
 
@@ -14692,7 +14689,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 1 von 3</span>
                                 <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Welche Module möchtest du nutzen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Campus-Lizenzgebühr selbst ist kostenlos. Server- & Service-Bereitstellungskosten fallen nur für Team-Profile und gebuchte Schüler an.
+                                  Wähle die gewünschten Bereiche für deine Musikschule aus. Die Plattform-Nutzung selbst ist kostenlos. Server- &amp; Service-Bereitstellungskosten fallen nur für Team-Profile und gebuchte Schüler an.
                                 </p>
                               </div>
 
@@ -14775,7 +14772,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '8px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Team-Bereitstellung (Server & Service):</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
+                                  <strong>DB &amp; Service Team:</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
                                 </span>
                               </div>
 
@@ -14810,35 +14807,41 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                               <div>
                                 <span style={{ fontSize: '0.58rem', background: '#f5f3ff', color: '#6d28d9', padding: '3px 8px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schritt 2 von 3</span>
-                                <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Abrechnungsmethode für Schüler festlegen</h4>
+                                <h4 style={{ margin: '6px 0 4px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Monatliche Sammelabrechnung über die Musikschule</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Bestimme, wie die monatlichen Server- & Service-Bereitstellungsgebühren für Schüler (<strong>{students.length} Schüler registriert</strong>) getragen und eingezogen werden.
+                                  Die Abrechnung der Schüler-Zugänge erfolgt gesammelt als monatliche Rechnung direkt an deine Musikschule. Schüler (bzw. deren Erziehungsberechtigte) aktivieren ihren Zugang eigenständig per QR-Code. Die einmalige Jahrespauschale für das restliche Schuljahr (aktuell <strong>{getDynamicAnnualPrice(effectiveContractStartDateStr, false).toFixed(2).replace('.', ',')} €</strong> pro Schüler) wird von den Eltern direkt an deine Musikschule entrichtet.<br /><br />
+                                  Welche Bezahlmethoden möchtest du für die Eltern zur Auswahl freigeben?
                                 </p>
                               </div>
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 {[
                                   {
-                                    id: 'option2',
+                                    id: 'both',
+                                    icon: (
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                    ),
+                                    title: 'Abbuchung & Barzahlung erlauben (Beides)',
+                                    badge: 'Empfohlen',
+                                    desc: 'Schüler können wählen, ob der Betrag von der nächsten Monatsrate abgebucht oder in bar mitgebracht wird.'
+                                  },
+                                  {
+                                    id: 'debit',
                                     icon: (
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                                     ),
-                                    title: 'Option 2: Monatsumlage (Schüler zahlt vollständig)',
-                                    badge: 'Monatlich',
-                                    desc: 'Der Schüler zahlt monatlich 0,40 € / Mo. Die Musikschule zahlt für Schüler 0,00 €.'
+                                    title: 'Nur Einzug mit der Monatsrate erlauben',
+                                    badge: 'Lastschrift',
+                                    desc: 'Die Gebühr wird per Lastschrift mit der nächsten Monatsrate der Musikschule eingezogen.'
                                   },
                                   {
-                                    id: 'option1',
+                                    id: 'cash',
                                     icon: (
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', display: 'inline-block', opacity: 0.8 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                                     ),
-                                    title: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
-                                      ? 'Option 1: Einsteiger-Flatrate (Schüler zahlt vollständig)'
-                                      : 'Option 1: Jahrespauschale (Schüler zahlt vollständig)',
-                                    badge: ((contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 >= 6 && (contractStartDate ? new Date(contractStartDate) : new Date()).getMonth() + 1 <= 8)
-                                      ? 'Einsteiger-Flat (bis Aug.)'
-                                      : '10% Rabatt',
-                                    desc: `Der Schüler zahlt einmalig ${getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € (Flatrate bis Aug.). Die Musikschule zahlt für Schüler 0,00 €.`
+                                    title: 'Nur Barzahlung erlauben',
+                                    badge: 'Barzahlung',
+                                    desc: 'Schüler müssen den Betrag bar zum nächsten Unterricht mitbringen und der Lehrkraft/Verwaltung übergeben.'
                                   }
                                 ].map((opt) => {
                                   const isSelected = studentBillingOption === opt.id;
@@ -14999,7 +15002,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 
                                 <button 
                                   onClick={async () => {
-                                    const nowStr = new Date().toISOString();
+                                    const nowStr = simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString();
                                     try {
                                       const { error } = await supabase
                                         .from('schools')
@@ -15013,6 +15016,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                                       setContractStartDate(nowStr);
                                       localStorage.setItem('contractStartDate', nowStr);
+                                      if (simulatedToday) {
+                                        localStorage.setItem('simulatedContractStartDate', nowStr);
+                                      }
                                       setIsBillingBooked(true);
                                       localStorage.setItem('isBillingBooked', 'true');
                                       setIsCancelled(false);
@@ -15067,74 +15073,63 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             textAlign: 'left'
                           }}>
                             <div style={{ borderBottom: '1px solid #e9d5ff', paddingBottom: '12px' }}>
-                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bestell-Zusammenfassung</span>
+                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-ZUSAMMENFASSUNG</span>
                               <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Vorschau der Buchung</h4>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Software-Lizenz:</span>
+                                <span>Software-Plattform:</span>
                                 <strong style={{ color: '#16a34a' }}>0,00 €</strong>
                               </div>
 
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Campus-Plattformzugriff:</span>
+                                  <span>Server &amp; Service Gebühren Campus:</span>
                                   <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>GrooveLab-Plattformzugriff:</span>
-                                  <strong style={{ color: '#16a34a' }}>Inklusive (in Grundgebühr abgedeckt)</strong>
+                                  <span>Server &amp; Service Gebühren Groovelab:</span>
+                                  <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Team-Profile ({allTeachers.length + employees.length}):</span>
+                                <span>DB &amp; Service Team (0,49 € x {allTeachers.length + employees.length} aktive Profile):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                <span>DB &amp; Service Schüler (0,09 € x {students.length} passive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(students.length * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                              </div>
+
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                <span>Server- & Service-Gebühr (Zwischensumme):</span>
+                                <span>Server- &amp; Service-Gebühr (Zwischensumme):</span>
                                 <strong>{isStarterFlat ? '0,00 €' : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
-                              {checkoutStep >= 2 && (
-                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase' }}>Schüler-Abrechnung:</span>
-                                  
-                                  {studentBillingOption === 'option1' && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                      <span>Einmalzahlung Schüler ({getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} € pro Schüler):</span>
-                                      <strong>{(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} € / Jahr</strong>
-                                    </div>
-                                  )}
-
-                                  {studentBillingOption === 'option2' && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b21a8' }}>
-                                      <span>Schüler-Monatsumlage (0,40 € pro Schüler):</span>
-                                      <strong>{(students.length * 0.40).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                    </div>
-                                  )}
+                              {checkoutStep >= 2 && (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') && (
+                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                  Schüler können ihren Account selbst über den QR-Code aktivieren. Erlaubt: <strong>
+                                    {studentBillingOption === 'both' && 'Lastschrift & Barzahlung'}
+                                    {studentBillingOption === 'debit' && 'Lastschrift'}
+                                    {studentBillingOption === 'cash' && 'Barzahlung'}
+                                    {studentBillingOption === 'option1' && 'Lastschrift & Barzahlung'}
+                                  </strong>
                                 </div>
                               )}
                             </div>
 
-                             <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
-                                <span>{isStarterFlat ? 'Schulanteil (Einsteiger-Flatrate bis 31. Aug.):' : 'Schulanteil:'}</span>
+                                <span>Schulanteil:</span>
                                 <strong style={{ fontWeight: 800 }}>
                                   {isStarterFlat ? '69,00 €' : (checkoutStep >= 2 ? `${currentTotalB2B.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
-
-                              {checkoutStep >= 2 && !isStarterFlat && studentBillingOption === 'option2' && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b21a8' }}>
-                                  <span>Schülerumlage ({students.length} × 0,40 €):</span>
-                                  <strong style={{ fontWeight: 800 }}>{studentLevyMonthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                </div>
-                              )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                 <span style={{ fontWeight: 900 }}>Monatliche Rate:</span>
@@ -15146,29 +15141,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
                               </span>
 
-                              {checkoutStep >= 2 && !isStarterFlat && studentBillingOption === 'option1' && (
-                                <div style={{ 
-                                  background: '#f0f9ff', 
-                                  border: '1.5px solid #bae6fd', 
-                                  borderRadius: '12px', 
-                                  padding: '10px 14px', 
-                                  marginTop: '6px',
-                                  fontSize: '0.8rem', 
-                                  color: '#0369a1',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '2px'
-                                }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Zuzüglich Anteil Schüler ({students.length} × {getDynamicAnnualPrice(contractStartDate, false).toFixed(2).replace('.', ',')} €):</span>
-                                    <strong style={{ fontWeight: 850 }}>{(students.length * getDynamicAnnualPrice(contractStartDate, false)).toFixed(2).replace('.', ',')} €</strong>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: '4px', marginTop: '4px', fontSize: '0.84rem', color: '#0284c7' }}>
-                                    <strong>Einzug im 1. Monat:</strong>
-                                    <strong>{(currentTotalB2B + (students.length * getDynamicAnnualPrice(contractStartDate, false))).toFixed(2).replace('.', ',')} €</strong>
-                                  </div>
-                                </div>
-                              )}
+
                             </div>
                           </div>
 
@@ -15190,11 +15163,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             }}>
                               <span style={{ fontSize: '1rem' }}>💡</span>
                               <span>
-                                {studentBillingOption === 'option1' && (
-                                  <>Die Jahrespauschale (4,80 €) entspricht etwa dem Preis für <strong>ein Gitarren-Plektrum Set</strong>.</>
-                                )}
-                                {studentBillingOption === 'option2' && (
-                                  <>Die Monatsumlage (0,40 €) entspricht etwa dem Porto für <strong>eine Briefmarke</strong>.</>
+                                {(studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') && (
+                                  <>Die Gebührenpauschale (max. 4,80 € / Jahr) entspricht etwa dem Preis für <strong>ein Gitarren-Plektrum Set</strong>.</>
                                 )}
                               </span>
                             </div>
@@ -15316,14 +15286,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             return isCreatedThisMonth && isCurrentlyActive;
                           }).length;
 
-                          const activationFeePerStudent = studentBillingOption === 'option1' ? 4.80 : 0.40;
+                          const activationFeePerStudent = (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') ? 4.80 : 0.40;
                           const currentMonthActivationsAmount = studentsAddedThisMonth * activationFeePerStudent;
 
                           return (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '20px' }}>
                               {/* Card 1: Active Modules & License Info */}
                               <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Module &amp; Software-Lizenz</span>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Module &amp; Software-Plattform</span>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', fontWeight: 700, color: hasCampusSub ? '#16a34a' : '#94a3b8' }}>
                                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: hasCampusSub ? '#d1fae5' : '#f1f5f9', width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{hasCampusSub ? '✓' : '✗'}</span>
@@ -15336,16 +15306,28 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 </div>
                                 <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Software-Lizenz:</span>
+                                    <span>Software-Plattform:</span>
                                     <strong style={{ color: '#16a34a' }}>100% kostenlos</strong>
                                   </div>
+                                  {hasCampusSub && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Server &amp; Service Gebühren Campus:</span>
+                                      <strong>4,99 € / Mo.</strong>
+                                    </div>
+                                  )}
+                                  {hasGroovelabSub && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Server &amp; Service Gebühren Groovelab:</span>
+                                      <strong>4,99 € / Mo.</strong>
+                                    </div>
+                                  )}
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Campus-Plattformzugriff:</span>
-                                    <strong>{(activeModulesCount * 4.99).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                    <span>DB &amp; Service Team ({allTeachers.length + employees.length} Profile):</span>
+                                    <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>Server-Betrieb Team ({allTeachers.length + employees.length} Profile):</span>
-                                    <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                    <span>DB &amp; Service Schüler ({students.length} Profile):</span>
+                                    <strong>{(students.length * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
                                   <div style={{ 
                                     marginTop: '8px',
@@ -15435,7 +15417,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '10px', marginTop: 'auto' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
                                     <span style={{ color: '#8e8e93' }}>💳 Erlaubte Zahlungsarten:</span>
-                                    <strong style={{ fontWeight: 600 }}>Abbuchung &amp; Barzahlung</strong>
+                                    <strong style={{ fontWeight: 600 }}>
+                                      {studentBillingOption === 'both' && 'Abbuchung & Bar'}
+                                      {studentBillingOption === 'debit' && 'Nur Abbuchung'}
+                                      {studentBillingOption === 'cash' && 'Nur Barzahlung'}
+                                      {(studentBillingOption === 'option1' || !studentBillingOption) && 'Abbuchung & Bar'}
+                                    </strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
                                     <span style={{ color: '#8e8e93' }}>🚀 Neue Aktivierungen diesen Monat:</span>
@@ -15443,7 +15430,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f' }}>
                                     <span style={{ color: '#8e8e93' }}>📊 Umlagesatz (Sammelrechnung):</span>
-                                    <strong style={{ fontWeight: 600 }}>{activationFeePerStudent.toFixed(2).replace('.', ',')} € {studentBillingOption === 'option1' ? 'einmalig' : '/ Mo.'}</strong>
+                                    <strong style={{ fontWeight: 600 }}>{activationFeePerStudent.toFixed(2).replace('.', ',')} € einmalig</strong>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#1d1d1f', borderTop: '1px dashed rgba(0, 0, 0, 0.05)', paddingTop: '4px', marginTop: '2px' }}>
                                     <span style={{ color: '#8e8e93' }}>💳 Per Abbuchung:</span>
@@ -15834,8 +15821,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <h4 style={{ margin: '0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#1e293b' }}>Rechnungs-Historie</h4>
                             <div style={{ border: '1px solid #e2e8f0', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
                               {(() => {
-                                const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2';
-                                const annualPricePerStudent = studentBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
+                                const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
+                                const annualPricePerStudent = (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                                 const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
                                 
                                 const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
@@ -18997,7 +18984,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               {(() => {
                 const token = manageTeacher.teacherQrToken || '';
                 const isActive = manageTeacher.isActive || manageTeacher.is_active;
-                const link = token;
+                const link = token ? (token.startsWith('http') ? token : `https://campus-groovelab.de/qr/${token}`) : '';
                 const label = isActive ? 'Login-QR-Code (Ausweis)' : 'Aktivierungs-QR-Code';
                 return link ? (
                   <div style={{
@@ -19299,13 +19286,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const isInf = selectedInvoice.type === 'INF' || !selectedInvoice.type; // Fallback to INF
         const isAkt = selectedInvoice.type === 'AKT';
         const billedCampus = hasCampusSub || campusActivatedThisMonth;
-        const mCost = billedCampus ? 4.99 : 0;
+        const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
+        const campusCost = billedCampus ? 4.99 : 0;
+        const groovelabCost = billedGroovelab ? 4.99 : 0;
+        const mCost = campusCost + groovelabCost;
 
         const schoolShareTotal = isInf ? selectedInvoice.amount : 0;
         const studentShareTotal = isAkt ? selectedInvoice.amount : 0;
 
         // Count rendered rows to dynamically compress layout if needed
-        let lineCount = isInf ? 4 : 2;
+        let lineCount = isInf ? (billedGroovelab ? 5 : 4) : 2;
 
         const isLongInvoice = lineCount > 5;
         const dynamicPadding = isLongInvoice ? '16px 24px' : '24px 30px';
@@ -19509,20 +19499,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         </tr>
 
                         {/* Position 2: Campus platform access */}
-                        {mCost > 0 && (
+                        {campusCost > 0 && (
                           <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: dynamicTdPadding }}>
-                              <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Plattformzugriff (Server-Modul)</strong>
+                              <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
                               <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
                             </td>
                             <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                               {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
                             </td>
                             <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                              {mCost.toFixed(2).replace('.', ',')} €
+                              {campusCost.toFixed(2).replace('.', ',')} €
                             </td>
                             <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                              {((selectedInvoice.isCurrentMonth ? 1 : 12) * mCost).toFixed(2).replace('.', ',')} €
+                              {((selectedInvoice.isCurrentMonth ? 1 : 12) * campusCost).toFixed(2).replace('.', ',')} €
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Position 2.5: Groovelab platform access */}
+                        {groovelabCost > 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: dynamicTdPadding }}>
+                              <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {groovelabCost.toFixed(2).replace('.', ',')} €
+                            </td>
+                            <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                              {((selectedInvoice.isCurrentMonth ? 1 : 12) * groovelabCost).toFixed(2).replace('.', ',')} €
                             </td>
                           </tr>
                         )}
@@ -19530,8 +19539,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Position 3: Team-Members */}
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: dynamicTdPadding }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Betrieb &amp; Servicegebühr (Team-Profile)</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder (Lehrkräfte/Verwaltung)</span>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{allTeachers.length + employees.length} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User)</span>
                           </td>
                           <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                             {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -19547,8 +19556,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                         {/* Position 4: School Base Fee for DB creation */}
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: dynamicTdPadding }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank-Erstellung &amp; Speicherplatz (Schulanteil)</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {students.length} Schüler (0,09 € / Mo.)</span>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {students.length} Schüler (0,09 € / Mo. pro User)</span>
                           </td>
                           <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                             {selectedInvoice.isCurrentMonth ? 1 : 12} {selectedInvoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -19990,7 +19999,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             }}>
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
-                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Zur Einhaltung der Datenminimierung werden Nachnamen von Schülern standardmäßig anonymisiert (nur die Initiale wird gespeichert, z.B. Max M.).</p>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
               </div>
 
               <div>
@@ -20000,7 +20009,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
-                <p style={{ margin: 0 }}>GrooveLab prüft beim Einloggen kurz deinen Gerätestandort (GPS), um sicherzustellen, dass du dich im GrooveLab-Raum der Musikschule befindest. Diese Standortdaten werden rein lokal in deinem Browser berechnet und nicht an Server übertragen. In der Datenbank wird lediglich ein Bestätigungswert (Erfolgreich/Fehlgeschlagen) für deine aktive Session hinterlegt. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+                <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>GrooveLab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
               </div>
 
               <div>

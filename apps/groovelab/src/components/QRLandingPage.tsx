@@ -54,7 +54,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinAttempts, setPinAttempts] = useState(0);
-  const MAX_ATTEMPTS = 5;
+  const MAX_ATTEMPTS = 3;
 
   // Student Dashboard & Gamification States
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -347,6 +347,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (userError || !userData) {
           sessionStorage.removeItem('groovelab_qr_token');
           setErrorMsg('Dieser QR-Code ist ungültig oder gehört keinem Nutzer.');
+          setPageState('error');
+          return;
+        }
+
+        if (!userData.is_campus_active && !userData.is_groovelab_active) {
+          sessionStorage.removeItem('groovelab_qr_token');
+          setErrorMsg('Dieses Profil wurde nach 3 PIN-Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Musikschule.');
           setPageState('error');
           return;
         }
@@ -1043,7 +1050,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const remaining = MAX_ATTEMPTS - (pinAttempts + 1);
         setPinAttempts(prev => prev + 1);
         if (remaining <= 0) {
-          setPinError('Zu viele Fehlversuche. Bitte wende dich an deine Schule.');
+          setPinError('Zu viele Fehlversuche. Dieses Konto wurde aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Schule.');
+          if (profile?.id) {
+            await supabase
+              .from('users')
+              .update({ is_campus_active: false, is_groovelab_active: false })
+              .eq('id', profile.id);
+          }
         } else {
           setPinError(`Falsche PIN. Noch ${remaining} Versuch${remaining === 1 ? '' : 'e'}.`);
         }
