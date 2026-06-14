@@ -4085,6 +4085,7 @@ export function AdminDashboard({
   );
 
   const renderBandsTab = () => {
+    const brandColor = activePlatform === 'campus' ? (admin?.schools?.brand_color || '#16a34a') : '#eab308';
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
     const filteredBands = allBands.filter(band => {
