@@ -1681,10 +1681,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       const viewHeight = window.innerHeight;
       const centerY = viewHeight / 2;
       const deltaY = clientY - centerY;
+      const absDelta = Math.abs(deltaY);
       
-      // Calculate speed based on distance from center
-      if (Math.abs(deltaY) > 50) {
-        currentSpeed = deltaY * 0.15; 
+      // Calmer speed: dead zone of 80px, capped at 7px per frame (very smooth and readable)
+      if (absDelta > 80) {
+        const direction = Math.sign(deltaY);
+        const maxScrollContainerDist = viewHeight / 2 - 80;
+        const ratio = Math.min(1, (absDelta - 80) / Math.max(1, maxScrollContainerDist));
+        currentSpeed = direction * ratio * 7; 
       } else {
         currentSpeed = 0;
       }
@@ -13199,7 +13203,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
                                     
                                     // Visual highlight styling based on compatibility & real-time dragover hover
-                                    let borderStyle = '2px dashed transparent';
+                                    let borderStyle = '1px solid #f1f5f9';
                                     let cellBg = 'transparent';
 
                                     const isCellHovered = dragOverCell.roomId === room.id && dragOverCell.day === dayNum;
@@ -13217,19 +13221,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     if (draggedPlanId && draggedPlanDay === dayNum) {
                                       if (isCellHovered) {
                                         if (hasDragOverlap) {
-                                          borderStyle = '2.5px dashed #ef4444';
-                                          cellBg = 'rgba(239, 68, 68, 0.08)';
+                                          borderStyle = '2px solid #ef4444';
+                                          cellBg = 'rgba(239, 68, 68, 0.07)';
                                         } else if (isCompatible) {
-                                          borderStyle = '2.5px dashed #34a853';
-                                          cellBg = 'rgba(52, 168, 83, 0.08)';
+                                          borderStyle = '2px solid #34a853';
+                                          cellBg = 'rgba(52, 168, 83, 0.07)';
                                         } else {
-                                          borderStyle = '2.5px dashed #f59e0b';
-                                          cellBg = 'rgba(245, 158, 11, 0.08)';
+                                          borderStyle = '2px solid #f59e0b';
+                                          cellBg = 'rgba(245, 158, 11, 0.07)';
                                         }
                                       } else {
-                                        // Highlight column target zones subtly
-                                        borderStyle = '1.5px dashed rgba(148, 163, 184, 0.35)';
-                                        cellBg = 'rgba(241, 245, 249, 0.2)';
+                                        // Highlight column target zones as a clean soft aligned grid
+                                        borderStyle = '1px solid rgba(52, 168, 83, 0.2)';
+                                        cellBg = 'rgba(52, 168, 83, 0.015)';
                                       }
                                     }
 
