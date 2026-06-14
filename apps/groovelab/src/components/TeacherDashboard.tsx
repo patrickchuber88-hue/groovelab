@@ -270,8 +270,14 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         return '/avatars/gitarre_avatar_new.png';
       }
     } else {
-      // GrooveLab rules: strictly block instrument avatars and fall back to musician avatars
-      const isInstrument = src && (
+      const isStudent = src && (
+        src.includes('student_') ||
+        src.includes('bandstyle_') ||
+        src.includes('teen_') ||
+        src.includes('avatar_boy') ||
+        src.includes('avatar_girl')
+      );
+      const isInstrument = !isStudent && src && (
         src.includes('avatar.png') || 
         src.includes('avatar_new') ||
         src.includes('_avatar') ||
@@ -303,11 +309,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         src.includes('saxophon_avatar') || 
         src.includes('blockfloete_avatar') || 
         src.includes('bariton_avatar') || 
-        src.includes('oboe_avatar') ||
-        src.includes('realistic') ||
-        src.includes('acoustic') ||
-        src.includes('focused') ||
-        src.includes('eguitar_17')
+        src.includes('oboe_avatar')
       );
       if (!src || isInstrument || src === '/avatar_ghost.jpg') {
         return '/avatar_ghost.jpg';
@@ -10801,33 +10803,33 @@ export function TeacherDashboard({
                       const instLower = inst.toLowerCase().trim();
                       
                       // Determine visual photo files based on instrument name
-                      let imgFile = 'guitar_avatar.png';
+                      let imgFile = 'gitarre_avatar_new.png';
                       if (instLower.includes('klavier') || instLower.includes('piano') || instLower.includes('tasten')) {
-                        imgFile = 'piano_avatar.png';
+                        imgFile = 'klavier_avatar_new.png';
                       } else if (instLower.includes('gitar') || instLower.includes('guitar')) {
-                        imgFile = 'guitar_avatar.png';
+                        imgFile = 'gitarre_avatar_new.png';
                       } else if (instLower.includes('bass')) {
                         imgFile = 'bass_avatar.png';
                       } else if (instLower.includes('schlag') || instLower.includes('drum') || instLower.includes('percussion')) {
-                        imgFile = 'drums_avatar.png';
+                        imgFile = 'schlagzeug_avatar.png';
                       } else if (instLower.includes('gesang') || instLower.includes('stimme') || instLower.includes('sing') || instLower.includes('vocals')) {
-                        imgFile = 'vocals_avatar.png';
+                        imgFile = 'gesang_avatar.png';
                       } else if (instLower.includes('geige') || instLower.includes('violine') || instLower.includes('streich') || instLower.includes('cello')) {
-                        imgFile = instLower.includes('cello') ? 'cello_avatar.png' : 'violin_avatar.png';
+                        imgFile = instLower.includes('cello') ? 'cello_avatar_new.png' : 'violine_avatar_new.png';
                       } else if (instLower.includes('sax')) {
-                        imgFile = 'saxophone_avatar.png';
+                        imgFile = 'saxophon_avatar_new.png';
                       } else if (instLower.includes('klarinette')) {
-                        imgFile = 'clarinet_avatar.png';
+                        imgFile = 'klarinette_avatar_new.png';
                       } else if (instLower.includes('flöte')) {
-                        imgFile = 'flute_avatar.png';
+                        imgFile = 'querfloete_avatar.png';
                       } else if (instLower.includes('horn')) {
-                        imgFile = 'horn_avatar.png';
+                        imgFile = 'horn_avatar_new.png';
                       } else if (instLower.includes('posaune')) {
-                        imgFile = 'trombone_avatar.png';
+                        imgFile = 'posaune_avatar.png';
                       } else if (instLower.includes('trompete')) {
-                        imgFile = 'trumpet_avatar.png';
+                        imgFile = 'trompete_avatar_new.png';
                       } else {
-                        imgFile = 'guitar_avatar.png';
+                        imgFile = 'gitarre_avatar_new.png';
                       }
 
                       const isActive = studentInstrumentFilter.toLowerCase().trim() === instLower;

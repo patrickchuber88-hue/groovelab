@@ -210,7 +210,14 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     if (activePlatform === 'campus') {
       originalUrl = getInstrumentAvatarUrl(user.instrument);
     } else {
-      const isInstrumentAvatar = user.photo_url && (
+      const isStudentAvatar = user.photo_url && (
+        user.photo_url.includes('student_') ||
+        user.photo_url.includes('bandstyle_') ||
+        user.photo_url.includes('teen_') ||
+        user.photo_url.includes('avatar_boy') ||
+        user.photo_url.includes('avatar_girl')
+      );
+      const isInstrumentAvatar = !isStudentAvatar && user.photo_url && (
         user.photo_url.includes('avatar.png') || 
         user.photo_url.includes('guitar_avatar') || 
         user.photo_url.includes('gitarre_avatar_new') || 

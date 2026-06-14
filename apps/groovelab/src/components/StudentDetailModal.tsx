@@ -68,7 +68,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   if (isPlatformCampus) {
     displayAvatarSrc = getInstrumentAvatarUrl(student.instrument);
   } else {
-    const isInstrumentAvatar = student.photo_url && (
+    const isStudentAvatar = student.photo_url && (
+      student.photo_url.includes('student_') ||
+      student.photo_url.includes('bandstyle_') ||
+      student.photo_url.includes('teen_') ||
+      student.photo_url.includes('avatar_boy') ||
+      student.photo_url.includes('avatar_girl')
+    );
+    const isInstrumentAvatar = !isStudentAvatar && student.photo_url && (
       student.photo_url.includes('avatar.png') || 
       student.photo_url.includes('guitar_avatar') || 
       student.photo_url.includes('gitarre_avatar_new') || 

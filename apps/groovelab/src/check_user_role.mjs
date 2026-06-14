@@ -6,11 +6,11 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsIm
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('*')
-    .ilike('first_name', '%Patrick%');
-  console.log('Patrick Users:', users);
+  const { data: planning, error } = await supabase
+    .from('lab_planning')
+    .select('*');
+  console.log('LAB PLANNING ENTRIES:', planning);
+  console.log('ERROR:', error);
 }
 
 run();

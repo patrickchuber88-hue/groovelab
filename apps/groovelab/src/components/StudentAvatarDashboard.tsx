@@ -60,14 +60,12 @@ const maskEmail = (email: string | null | undefined): string => {
 };
 
 const STUDENT_AVATARS = [
-  // E-Gitarre
+  // E-Gitarre (15)
   { id: 'student_boy_guitar_1', label: 'E-Gitarre (Boy Black)', url: '/avatars/student_boy_black_guitar.png', category: 'E-Gitarre' },
   { id: 'student_girl_guitar_1', label: 'E-Gitarre (Girl Blonde)', url: '/avatars/student_girl_blonde_guitar.png', category: 'E-Gitarre' },
   { id: 'student_boy_blonde_guitar', label: 'E-Gitarre (Boy Blonde)', url: '/avatars/student_boy_blonde_guitar.png', category: 'E-Gitarre' },
   { id: 'student_girl_black_guitar', label: 'E-Gitarre (Girl Black)', url: '/avatars/student_girl_black_guitar.png', category: 'E-Gitarre' },
   { id: 'student_eguitar_alt', label: 'E-Gitarre (Hero)', url: '/avatars/student_eguitar_1.png', category: 'E-Gitarre' },
-  { id: 'student_teen_boy_guitar_1', label: 'E-Gitarre (Teen Boy)', url: '/avatars/student_teen_boy_guitar_1.png', category: 'E-Gitarre' },
-  { id: 'student_teen_boy_guitar_2', label: 'E-Gitarre (Teen Boy 2)', url: '/avatars/student_teen_boy_guitar_2.png', category: 'E-Gitarre' },
   { id: 'bandstyle_boy_eguitar', label: 'Band E-Gitarre (Boy)', url: '/avatars/bandstyle_boy_eguitar.png', category: 'E-Gitarre' },
   { id: 'bandstyle_girl_eguitar', label: 'Band E-Gitarre (Girl)', url: '/avatars/bandstyle_girl_eguitar.png', category: 'E-Gitarre' },
   { id: 'teen_boy_eguitar_realistic', label: 'E-Gitarre (Realistic Boy)', url: '/avatars/teen_boy_eguitar_realistic.png', category: 'E-Gitarre' },
@@ -75,12 +73,11 @@ const STUDENT_AVATARS = [
   { id: 'teen_boy_eguitar_17', label: 'E-Gitarre (Hero Boy)', url: '/avatars/teen_boy_eguitar_17.png', category: 'E-Gitarre' },
   { id: 'teen_boy_acoustic_guitar', label: 'Akustik-Gitarre (Boy)', url: '/avatars/teen_boy_acoustic_guitar.png', category: 'E-Gitarre' },
   { id: 'teen_girl_acoustic_guitar', label: 'Akustik-Gitarre (Girl)', url: '/avatars/teen_girl_acoustic_guitar.png', category: 'E-Gitarre' },
-  { id: 'avatar_boy_guitar', label: 'Klassen-Gitarre (Boy)', url: '/avatar_boy_guitar.jpg', category: 'E-Gitarre' },
-  { id: 'avatar_girl_guitar', label: 'Klassen-Gitarre (Girl)', url: '/avatar_girl_guitar.jpg', category: 'E-Gitarre' },
-  { id: 'avatar_gitarre', label: 'Gitarre (Icon)', url: '/avatars/gitarre_avatar_new.png', category: 'E-Gitarre' },
-  { id: 'avatar_egitarre', label: 'E-Gitarre (Icon)', url: '/avatars/egitarre_avatar.png', category: 'E-Gitarre' },
+  { id: 'student_eguitar_new_1', label: 'E-Gitarre (Neu 1)', url: '/avatars/student_eguitar_new_1.png', category: 'E-Gitarre' },
+  { id: 'student_eguitar_new_2', label: 'E-Gitarre (Neu 2)', url: '/avatars/student_eguitar_new_2.png', category: 'E-Gitarre' },
+  { id: 'student_eguitar_new_3', label: 'E-Gitarre (Neu 3)', url: '/avatars/student_eguitar_new_3.png', category: 'E-Gitarre' },
 
-  // E-Piano / Keyboard
+  // E-Piano / Keyboard (15)
   { id: 'student_boy_piano_1', label: 'E-Piano (Boy)', url: '/avatars/student_boy_black_piano.png', category: 'E-Piano' },
   { id: 'student_girl_piano_1', label: 'E-Piano (Girl)', url: '/avatars/student_girl_black_piano.png', category: 'E-Piano' },
   { id: 'student_piano_alt', label: 'E-Piano (Hero)', url: '/avatars/student_piano_1.png', category: 'E-Piano' },
@@ -95,53 +92,62 @@ const STUDENT_AVATARS = [
   { id: 'bandstyle_girl_epiano', label: 'Band E-Piano (Girl)', url: '/avatars/bandstyle_girl_epiano.png', category: 'E-Piano' },
   { id: 'avatar_boy_piano', label: 'Klassen-Piano (Boy)', url: '/avatar_boy_piano.jpg', category: 'E-Piano' },
   { id: 'avatar_girl_piano', label: 'Klassen-Piano (Girl)', url: '/avatar_girl_piano.jpg', category: 'E-Piano' },
-  { id: 'avatar_piano', label: 'E-Piano (Icon)', url: '/avatars/klavier_avatar_new.png', category: 'E-Piano' },
+  { id: 'student_epiano_new_1', label: 'E-Piano (Neu 1)', url: '/avatars/student_epiano_new_1.png', category: 'E-Piano' },
 
-  // E-Drums
+  // E-Drums (15)
   { id: 'student_boy_drums_1', label: 'E-Drum (Boy Black)', url: '/avatars/student_boy_black_drums.png', category: 'E-Drum' },
   { id: 'student_girl_drums_1', label: 'E-Drum (Girl Blonde)', url: '/avatars/student_girl_blonde_drums.png', category: 'E-Drum' },
   { id: 'student_boy_blonde_drums', label: 'E-Drum (Boy Blonde)', url: '/avatars/student_boy_blonde_drums.png', category: 'E-Drum' },
   { id: 'student_girl_black_drums', label: 'E-Drum (Girl Black)', url: '/avatars/student_girl_black_drums.png', category: 'E-Drum' },
   { id: 'student_drums_alt', label: 'E-Drum (Hero)', url: '/avatars/student_drums_1.png', category: 'E-Drum' },
-  { id: 'student_teen_boy_drums_1', label: 'E-Drum (Teen Boy)', url: '/avatars/student_teen_boy_drums_1.png', category: 'E-Drum' },
   { id: 'student_boy_drums_2', label: 'E-Drum (Boy 2)', url: '/avatars/student_boy_drums_2.png', category: 'E-Drum' },
   { id: 'student_girl_drums_2', label: 'E-Drum (Girl 2)', url: '/avatars/student_girl_drums_2.png', category: 'E-Drum' },
   { id: 'student_boy_drums_3', label: 'E-Drum (Boy 3)', url: '/avatars/student_boy_drums_3.png', category: 'E-Drum' },
   { id: 'student_girl_drums_3', label: 'E-Drum (Girl 3)', url: '/avatars/student_girl_drums_3.png', category: 'E-Drum' },
   { id: 'bandstyle_boy_edrums', label: 'Band E-Drum (Boy)', url: '/avatars/bandstyle_boy_edrums.png', category: 'E-Drum' },
   { id: 'bandstyle_girl_edrums', label: 'Band E-Drum (Girl)', url: '/avatars/bandstyle_girl_edrums.png', category: 'E-Drum' },
-  { id: 'teen_boy_edrums_realistic', label: 'E-Drum (Realistic Boy)', url: '/avatars/teen_boy_edrums_realistic.png', category: 'E-Drum' },
   { id: 'avatar_boy_drums', label: 'Klassen-Drums (Boy)', url: '/avatar_boy_drums.jpg', category: 'E-Drum' },
   { id: 'avatar_girl_drums', label: 'Klassen-Drums (Girl)', url: '/avatar_girl_drums.jpg', category: 'E-Drum' },
-  { id: 'avatar_drums', label: 'Schlagzeug (Icon)', url: '/avatars/schlagzeug_avatar.png', category: 'E-Drum' },
+  { id: 'student_edrums_new_1', label: 'E-Drum (Neu 1)', url: '/avatars/student_edrums_new_1.png', category: 'E-Drum' },
+  { id: 'student_edrums_new_2', label: 'E-Drum (Neu 2)', url: '/avatars/student_edrums_new_2.png', category: 'E-Drum' },
 
-  // E-Bass
-  { id: 'student_boy_bass_1', label: 'E-Bass (Boy Black)', url: '/avatars/student_boy_black_bass.png', category: 'E-Bass' },
+  // E-Bass (15)
   { id: 'student_girl_bass_1', label: 'E-Bass (Girl Black)', url: '/avatars/student_girl_black_bass.png', category: 'E-Bass' },
   { id: 'student_bass_alt', label: 'E-Bass (Hero)', url: '/avatars/student_bass_1.png', category: 'E-Bass' },
-  { id: 'student_teen_boy_bass_1', label: 'E-Bass (Teen Boy)', url: '/avatars/student_teen_boy_bass_1.png', category: 'E-Bass' },
-  { id: 'student_boy_ebass_1', label: 'E-Bass (Boy 1)', url: '/avatars/student_boy_ebass_1.png', category: 'E-Bass' },
   { id: 'student_girl_ebass_1', label: 'E-Bass (Girl 1)', url: '/avatars/student_girl_ebass_1.png', category: 'E-Bass' },
   { id: 'bandstyle_boy_ebass', label: 'Band E-Bass (Boy)', url: '/avatars/bandstyle_boy_ebass.png', category: 'E-Bass' },
   { id: 'bandstyle_girl_ebass', label: 'Band E-Bass (Girl)', url: '/avatars/bandstyle_girl_ebass.png', category: 'E-Bass' },
-  { id: 'teen_boy_ebass_realistic', label: 'E-Bass (Realistic Boy)', url: '/avatars/teen_boy_ebass_realistic.png', category: 'E-Bass' },
   { id: 'avatar_boy_bass', label: 'Klassen-Bass (Boy)', url: '/avatar_boy_bass.jpg', category: 'E-Bass' },
   { id: 'avatar_girl_bass', label: 'Klassen-Bass (Girl)', url: '/avatar_girl_bass.jpg', category: 'E-Bass' },
-  { id: 'avatar_ebass', label: 'E-Bass (Icon)', url: '/avatars/ebass_avatar.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_1', label: 'E-Bass (Neu 1)', url: '/avatars/student_ebass_new_1.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_2', label: 'E-Bass (Neu 2)', url: '/avatars/student_ebass_new_2.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_3', label: 'E-Bass (Neu 3)', url: '/avatars/student_ebass_new_3.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_4', label: 'E-Bass (Neu 4)', url: '/avatars/student_ebass_new_4.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_5', label: 'E-Bass (Neu 5)', url: '/avatars/student_ebass_new_5.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_6', label: 'E-Bass (Neu 6)', url: '/avatars/student_ebass_new_6.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_7', label: 'E-Bass (Neu 7)', url: '/avatars/student_ebass_new_7.png', category: 'E-Bass' },
+  { id: 'student_ebass_new_8', label: 'E-Bass (Neu 8)', url: '/avatars/student_ebass_new_8.png', category: 'E-Bass' },
 
-  // Gesang
+  // Gesang (15)
   { id: 'student_boy_vocals_1', label: 'Gesang (Boy Red)', url: '/avatars/student_boy_red_vocals.png', category: 'Gesang' },
   { id: 'student_girl_vocals_1', label: 'Gesang (Girl Red)', url: '/avatars/student_girl_red_vocals.png', category: 'Gesang' },
   { id: 'student_boy_vocals_new', label: 'Gesang (Boy 1)', url: '/avatars/student_boy_vocals_1.png', category: 'Gesang' },
   { id: 'student_girl_vocals_new', label: 'Gesang (Girl 1)', url: '/avatars/student_girl_vocals_1.png', category: 'Gesang' },
   { id: 'student_vocals_alt', label: 'Gesang (Hero)', url: '/avatars/student_vocals_1.png', category: 'Gesang' },
-  { id: 'avatar_vocals', label: 'Gesang (Icon)', url: '/avatars/gesang_avatar.png', category: 'Gesang' },
+  { id: 'student_vocals_new_2', label: 'Gesang (Neu 2)', url: '/avatars/student_vocals_new_2.png', category: 'Gesang' },
+  { id: 'student_vocals_new_3', label: 'Gesang (Neu 3)', url: '/avatars/student_vocals_new_3.png', category: 'Gesang' },
+  { id: 'student_vocals_new_4', label: 'Gesang (Neu 4)', url: '/avatars/student_vocals_new_4.png', category: 'Gesang' },
+  { id: 'student_vocals_new_5', label: 'Gesang (Neu 5)', url: '/avatars/student_vocals_new_5.png', category: 'Gesang' },
+  { id: 'student_vocals_new_6', label: 'Gesang (Neu 6)', url: '/avatars/student_vocals_new_6.png', category: 'Gesang' },
+  { id: 'student_vocals_new_7', label: 'Gesang (Neu 7)', url: '/avatars/student_vocals_new_7.png', category: 'Gesang' },
+  { id: 'student_vocals_new_8', label: 'Gesang (Neu 8)', url: '/avatars/student_vocals_new_8.png', category: 'Gesang' },
+  { id: 'student_vocals_new_9', label: 'Gesang (Neu 9)', url: '/avatars/student_vocals_new_9.png', category: 'Gesang' },
+  { id: 'student_vocals_new_10', label: 'Gesang (Neu 10)', url: '/avatars/student_vocals_new_10.png', category: 'Gesang' },
+  { id: 'student_vocals_new_11', label: 'Gesang (Neu 11)', url: '/avatars/student_vocals_new_11.png', category: 'Gesang' },
 
   // Allgemein / Sonstige
-  { id: 'avatar_boy_general', label: 'Klassen-Schüler (Boy)', url: '/avatar_boy.jpg', category: 'Alle' },
-  { id: 'avatar_girl_general', label: 'Klassen-Schülerin (Girl)', url: '/avatar_girl.jpg', category: 'Alle' },
-  { id: 'avatar_boy_comic_general', label: 'Comic Schüler (Boy)', url: '/avatar_boy_1777237224310.png', category: 'Alle' },
-  { id: 'avatar_girl_comic_general', label: 'Comic Schülerin (Girl)', url: '/avatar_girl_1777237237899.png', category: 'Alle' }
+  { id: 'avatar_boy_general', label: 'Klassen-Schüler (Boy)', url: '/avatar_boy.jpg', category: 'Sonstige' },
+  { id: 'avatar_girl_general', label: 'Klassen-Schülerin (Girl)', url: '/avatar_girl.jpg', category: 'Sonstige' }
 ];
 
 interface StudentAvatarDashboardProps {

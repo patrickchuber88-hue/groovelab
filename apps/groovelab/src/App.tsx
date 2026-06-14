@@ -167,7 +167,14 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
     }
   } else {
     // GrooveLab platform: strictly block instrument avatars and fall back to musician avatars
-    const isInstrumentAvatar = src && (
+    const isStudentAvatar = src && (
+      src.includes('student_') ||
+      src.includes('bandstyle_') ||
+      src.includes('teen_') ||
+      src.includes('avatar_boy') ||
+      src.includes('avatar_girl')
+    );
+    const isInstrumentAvatar = !isStudentAvatar && src && (
       src.includes('avatar.png') || 
       src.includes('avatar_new') ||
       src.includes('_avatar') ||
@@ -199,11 +206,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
       src.includes('saxophon_avatar') || 
       src.includes('blockfloete_avatar') || 
       src.includes('bariton_avatar') || 
-      src.includes('oboe_avatar') ||
-      src.includes('realistic') ||
-      src.includes('acoustic') ||
-      src.includes('focused') ||
-      src.includes('eguitar_17')
+      src.includes('oboe_avatar')
     );
     if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
       displaySrc = '/avatar_ghost.jpg';
@@ -2410,88 +2413,94 @@ function App() {
   ];
 
   const STUDENT_AVATARS = [
-    // E-Gitarre
-    { id: 'student_boy_guitar_1', url: '/avatars/student_boy_black_guitar.png' },
-    { id: 'student_girl_guitar_1', url: '/avatars/student_girl_blonde_guitar.png' },
-    { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png' },
-    { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png' },
-    { id: 'student_eguitar_alt', url: '/avatars/student_eguitar_1.png' },
-    { id: 'student_teen_boy_guitar_1', url: '/avatars/student_teen_boy_guitar_1.png' },
-    { id: 'student_teen_boy_guitar_2', url: '/avatars/student_teen_boy_guitar_2.png' },
-    { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png' },
-    { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png' },
-    { id: 'teen_boy_eguitar_realistic', url: '/avatars/teen_boy_eguitar_realistic.png' },
-    { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png' },
-    { id: 'teen_boy_eguitar_17', url: '/avatars/teen_boy_eguitar_17.png' },
-    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png' },
-    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png' },
-    { id: 'avatar_boy_guitar', url: '/avatar_boy_guitar.jpg' },
-    { id: 'avatar_girl_guitar', url: '/avatar_girl_guitar.jpg' },
-    { id: 'avatar_gitarre', url: '/avatars/gitarre_avatar_new.png' },
-    { id: 'avatar_egitarre', url: '/avatars/egitarre_avatar.png' },
+    // E-Gitarre (15)
+    { id: 'student_boy_guitar_1', url: '/avatars/student_boy_black_guitar.png', category: 'E-Gitarre' },
+    { id: 'student_girl_guitar_1', url: '/avatars/student_girl_blonde_guitar.png', category: 'E-Gitarre' },
+    { id: 'student_boy_blonde_guitar', url: '/avatars/student_boy_blonde_guitar.png', category: 'E-Gitarre' },
+    { id: 'student_girl_black_guitar', url: '/avatars/student_girl_black_guitar.png', category: 'E-Gitarre' },
+    { id: 'student_eguitar_alt', url: '/avatars/student_eguitar_1.png', category: 'E-Gitarre' },
+    { id: 'bandstyle_boy_eguitar', url: '/avatars/bandstyle_boy_eguitar.png', category: 'E-Gitarre' },
+    { id: 'bandstyle_girl_eguitar', url: '/avatars/bandstyle_girl_eguitar.png', category: 'E-Gitarre' },
+    { id: 'teen_boy_eguitar_realistic', url: '/avatars/teen_boy_eguitar_realistic.png', category: 'E-Gitarre' },
+    { id: 'teen_girl_eguitar_focused', url: '/avatars/teen_girl_eguitar_focused.png', category: 'E-Gitarre' },
+    { id: 'teen_boy_eguitar_17', url: '/avatars/teen_boy_eguitar_17.png', category: 'E-Gitarre' },
+    { id: 'teen_boy_acoustic_guitar', url: '/avatars/teen_boy_acoustic_guitar.png', category: 'E-Gitarre' },
+    { id: 'teen_girl_acoustic_guitar', url: '/avatars/teen_girl_acoustic_guitar.png', category: 'E-Gitarre' },
+    { id: 'student_eguitar_new_1', url: '/avatars/student_eguitar_new_1.png', category: 'E-Gitarre' },
+    { id: 'student_eguitar_new_2', url: '/avatars/student_eguitar_new_2.png', category: 'E-Gitarre' },
+    { id: 'student_eguitar_new_3', url: '/avatars/student_eguitar_new_3.png', category: 'E-Gitarre' },
 
-    // E-Piano / Keyboard
-    { id: 'student_boy_piano_1', url: '/avatars/student_boy_black_piano.png' },
-    { id: 'student_girl_piano_1', url: '/avatars/student_girl_black_piano.png' },
-    { id: 'student_piano_alt', url: '/avatars/student_piano_1.png' },
-    { id: 'student_boy_piano_2', url: '/avatars/student_boy_piano_2.png' },
-    { id: 'student_girl_piano_2', url: '/avatars/student_girl_piano_2.png' },
-    { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png' },
-    { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png' },
-    { id: 'student_boy_keyboard_1', url: '/avatars/student_boy_keyboard_1.png' },
-    { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png' },
-    { id: 'student_tech_1', url: '/avatars/student_tech_1.png' },
-    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png' },
-    { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png' },
-    { id: 'avatar_boy_piano', url: '/avatar_boy_piano.jpg' },
-    { id: 'avatar_girl_piano', url: '/avatar_girl_piano.jpg' },
-    { id: 'avatar_piano', url: '/avatars/klavier_avatar_new.png' },
+    // E-Piano / Keyboard (15)
+    { id: 'student_boy_piano_1', url: '/avatars/student_boy_black_piano.png', category: 'E-Piano' },
+    { id: 'student_girl_piano_1', url: '/avatars/student_girl_black_piano.png', category: 'E-Piano' },
+    { id: 'student_piano_alt', url: '/avatars/student_piano_1.png', category: 'E-Piano' },
+    { id: 'student_boy_piano_2', url: '/avatars/student_boy_piano_2.png', category: 'E-Piano' },
+    { id: 'student_girl_piano_2', url: '/avatars/student_girl_piano_2.png', category: 'E-Piano' },
+    { id: 'student_girl_lightbrown_piano', url: '/avatars/student_girl_lightbrown_piano.png', category: 'E-Piano' },
+    { id: 'student_boy_lightbrown_piano', url: '/avatars/student_boy_lightbrown_piano.png', category: 'E-Piano' },
+    { id: 'student_boy_keyboard_1', url: '/avatars/student_boy_keyboard_1.png', category: 'E-Piano' },
+    { id: 'student_boy_producer_1', url: '/avatars/student_boy_producer_1.png', category: 'E-Piano' },
+    { id: 'student_tech_1', url: '/avatars/student_tech_1.png', category: 'E-Piano' },
+    { id: 'bandstyle_boy_epiano', url: '/avatars/bandstyle_boy_epiano.png', category: 'E-Piano' },
+    { id: 'bandstyle_girl_epiano', url: '/avatars/bandstyle_girl_epiano.png', category: 'E-Piano' },
+    { id: 'avatar_boy_piano', url: '/avatar_boy_piano.jpg', category: 'E-Piano' },
+    { id: 'avatar_girl_piano', url: '/avatar_girl_piano.jpg', category: 'E-Piano' },
+    { id: 'student_epiano_new_1', url: '/avatars/student_epiano_new_1.png', category: 'E-Piano' },
 
-    // E-Drums
-    { id: 'student_boy_drums_1', url: '/avatars/student_boy_black_drums.png' },
-    { id: 'student_girl_drums_1', url: '/avatars/student_girl_blonde_drums.png' },
-    { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png' },
-    { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png' },
-    { id: 'student_drums_alt', url: '/avatars/student_drums_1.png' },
-    { id: 'student_teen_boy_drums_1', url: '/avatars/student_teen_boy_drums_1.png' },
-    { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png' },
-    { id: 'student_girl_drums_2', url: '/avatars/student_girl_drums_2.png' },
-    { id: 'student_boy_drums_3', url: '/avatars/student_boy_drums_3.png' },
-    { id: 'student_girl_drums_3', url: '/avatars/student_girl_drums_3.png' },
-    { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png' },
-    { id: 'bandstyle_girl_edrums', url: '/avatars/bandstyle_girl_edrums.png' },
-    { id: 'teen_boy_edrums_realistic', url: '/avatars/teen_boy_edrums_realistic.png' },
-    { id: 'avatar_boy_drums', url: '/avatar_boy_drums.jpg' },
-    { id: 'avatar_girl_drums', url: '/avatar_girl_drums.jpg' },
-    { id: 'avatar_drums', url: '/avatars/schlagzeug_avatar.png' },
+    // E-Drums (15)
+    { id: 'student_boy_drums_1', url: '/avatars/student_boy_black_drums.png', category: 'E-Drum' },
+    { id: 'student_girl_drums_1', url: '/avatars/student_girl_blonde_drums.png', category: 'E-Drum' },
+    { id: 'student_boy_blonde_drums', url: '/avatars/student_boy_blonde_drums.png', category: 'E-Drum' },
+    { id: 'student_girl_black_drums', url: '/avatars/student_girl_black_drums.png', category: 'E-Drum' },
+    { id: 'student_drums_alt', url: '/avatars/student_drums_1.png', category: 'E-Drum' },
+    { id: 'student_boy_drums_2', url: '/avatars/student_boy_drums_2.png', category: 'E-Drum' },
+    { id: 'student_girl_drums_2', url: '/avatars/student_girl_drums_2.png', category: 'E-Drum' },
+    { id: 'student_boy_drums_3', url: '/avatars/student_boy_drums_3.png', category: 'E-Drum' },
+    { id: 'student_girl_drums_3', url: '/avatars/student_girl_drums_3.png', category: 'E-Drum' },
+    { id: 'bandstyle_boy_edrums', url: '/avatars/bandstyle_boy_edrums.png', category: 'E-Drum' },
+    { id: 'bandstyle_girl_edrums', url: '/avatars/bandstyle_girl_edrums.png', category: 'E-Drum' },
+    { id: 'avatar_boy_drums', url: '/avatar_boy_drums.jpg', category: 'E-Drum' },
+    { id: 'avatar_girl_drums', url: '/avatar_girl_drums.jpg', category: 'E-Drum' },
+    { id: 'student_edrums_new_1', url: '/avatars/student_edrums_new_1.png', category: 'E-Drum' },
+    { id: 'student_edrums_new_2', url: '/avatars/student_edrums_new_2.png', category: 'E-Drum' },
 
-    // E-Bass
-    { id: 'student_boy_bass_1', url: '/avatars/student_boy_black_bass.png' },
-    { id: 'student_girl_bass_1', url: '/avatars/student_girl_black_bass.png' },
-    { id: 'student_bass_alt', url: '/avatars/student_bass_1.png' },
-    { id: 'student_teen_boy_bass_1', url: '/avatars/student_teen_boy_bass_1.png' },
-    { id: 'student_boy_ebass_1', url: '/avatars/student_boy_ebass_1.png' },
-    { id: 'student_girl_ebass_1', url: '/avatars/student_girl_ebass_1.png' },
-    { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png' },
-    { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png' },
-    { id: 'teen_boy_ebass_realistic', url: '/avatars/teen_boy_ebass_realistic.png' },
-    { id: 'avatar_boy_bass', url: '/avatar_boy_bass.jpg' },
-    { id: 'avatar_girl_bass', url: '/avatar_girl_bass.jpg' },
-    { id: 'avatar_ebass', url: '/avatars/ebass_avatar.png' },
+    // E-Bass (15)
+    { id: 'student_girl_bass_1', url: '/avatars/student_girl_black_bass.png', category: 'E-Bass' },
+    { id: 'student_bass_alt', url: '/avatars/student_bass_1.png', category: 'E-Bass' },
+    { id: 'student_girl_ebass_1', url: '/avatars/student_girl_ebass_1.png', category: 'E-Bass' },
+    { id: 'bandstyle_boy_ebass', url: '/avatars/bandstyle_boy_ebass.png', category: 'E-Bass' },
+    { id: 'bandstyle_girl_ebass', url: '/avatars/bandstyle_girl_ebass.png', category: 'E-Bass' },
+    { id: 'avatar_boy_bass', url: '/avatar_boy_bass.jpg', category: 'E-Bass' },
+    { id: 'avatar_girl_bass', url: '/avatar_girl_bass.jpg', category: 'E-Bass' },
+    { id: 'student_ebass_new_1', url: '/avatars/student_ebass_new_1.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_2', url: '/avatars/student_ebass_new_2.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_3', url: '/avatars/student_ebass_new_3.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_4', url: '/avatars/student_ebass_new_4.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_5', url: '/avatars/student_ebass_new_5.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_6', url: '/avatars/student_ebass_new_6.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_7', url: '/avatars/student_ebass_new_7.png', category: 'E-Bass' },
+    { id: 'student_ebass_new_8', url: '/avatars/student_ebass_new_8.png', category: 'E-Bass' },
 
-    // Gesang
-    { id: 'student_boy_vocals_1', url: '/avatars/student_boy_red_vocals.png' },
-    { id: 'student_girl_vocals_1', url: '/avatars/student_girl_red_vocals.png' },
-    { id: 'student_boy_vocals_new', url: '/avatars/student_boy_vocals_1.png' },
-    { id: 'student_girl_vocals_new', url: '/avatars/student_girl_vocals_1.png' },
-    { id: 'student_vocals_alt', url: '/avatars/student_vocals_1.png' },
-    { id: 'avatar_vocals', url: '/avatars/gesang_avatar.png' },
+    // Gesang (15)
+    { id: 'student_boy_vocals_1', url: '/avatars/student_boy_red_vocals.png', category: 'Gesang' },
+    { id: 'student_girl_vocals_1', url: '/avatars/student_girl_red_vocals.png', category: 'Gesang' },
+    { id: 'student_boy_vocals_new', url: '/avatars/student_boy_vocals_1.png', category: 'Gesang' },
+    { id: 'student_girl_vocals_new', url: '/avatars/student_girl_vocals_1.png', category: 'Gesang' },
+    { id: 'student_vocals_alt', url: '/avatars/student_vocals_1.png', category: 'Gesang' },
+    { id: 'student_vocals_new_2', url: '/avatars/student_vocals_new_2.png', category: 'Gesang' },
+    { id: 'student_vocals_new_3', url: '/avatars/student_vocals_new_3.png', category: 'Gesang' },
+    { id: 'student_vocals_new_4', url: '/avatars/student_vocals_new_4.png', category: 'Gesang' },
+    { id: 'student_vocals_new_5', url: '/avatars/student_vocals_new_5.png', category: 'Gesang' },
+    { id: 'student_vocals_new_6', url: '/avatars/student_vocals_new_6.png', category: 'Gesang' },
+    { id: 'student_vocals_new_7', url: '/avatars/student_vocals_new_7.png', category: 'Gesang' },
+    { id: 'student_vocals_new_8', url: '/avatars/student_vocals_new_8.png', category: 'Gesang' },
+    { id: 'student_vocals_new_9', url: '/avatars/student_vocals_new_9.png', category: 'Gesang' },
+    { id: 'student_vocals_new_10', url: '/avatars/student_vocals_new_10.png', category: 'Gesang' },
+    { id: 'student_vocals_new_11', url: '/avatars/student_vocals_new_11.png', category: 'Gesang' },
 
     // Allgemein / Sonstige
-    { id: 'avatar_boy_general', url: '/avatar_boy.jpg' },
-    { id: 'avatar_girl_general', url: '/avatar_girl.jpg' },
-    { id: 'avatar_boy_comic_general', url: '/avatar_boy_1777237224310.png' },
-    { id: 'avatar_girl_comic_general', url: '/avatar_girl_1777237237899.png' }
+    { id: 'avatar_boy_general', url: '/avatar_boy.jpg', category: 'Sonstige' },
+    { id: 'avatar_girl_general', url: '/avatar_girl.jpg', category: 'Sonstige' }
   ];
 
   const TEACHER_AVATARS = [
@@ -2506,7 +2515,9 @@ function App() {
   ];
   const [customBandName, setCustomBandName] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [failedAvatarUrls, setFailedAvatarUrls] = useState<string[]>([]);
   const [avatarPickerType, setAvatarPickerType] = useState<'band' | 'student'>('band');
+  const [avatarInstrumentFilter, setAvatarInstrumentFilter] = useState<'Alle' | 'E-Gitarre' | 'E-Piano' | 'E-Drum' | 'E-Bass' | 'Gesang'>('Alle');
 
   const [isSharedView, setIsSharedView] = useState(false);
 
@@ -2660,7 +2671,32 @@ function App() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sessions', filter: `user_id=eq.${user.id}` },
-        () => {
+        (payload: any) => {
+          console.log('[Realtime] Session change detected:', payload);
+          
+          const currentStationId = localStorage.getItem('groovelab_station_id');
+          const isKiosk = currentStationId && currentStationId !== 'skip';
+
+          if (isKiosk) {
+            // 1. If user checked in at a different station, auto logout this one
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const newStationId = payload.new.station_id;
+              if (newStationId && newStationId !== currentStationId) {
+                console.warn('[Realtime] User checked in at another station. Logging out this station.');
+                handleLogout(false);
+                return;
+              }
+            }
+            // 2. If the active session for this station was checked out, auto logout
+            if (payload.eventType === 'UPDATE' && payload.new && payload.new.check_out_time) {
+              if (payload.new.station_id === currentStationId) {
+                console.warn('[Realtime] Session checked out. Logging out this station.');
+                handleLogout(false);
+                return;
+              }
+            }
+          }
+
           debouncedFetchDashboardData(user.id);
         }
       )
@@ -5228,7 +5264,7 @@ function App() {
 
     if (isDeviceKiosk && roomId) {
       console.log('[Logout] Redirecting Kiosk device to school room:', roomId);
-      localStorage.removeItem('groovelab_station_id');
+      // Keep groovelab_station_id so the kiosk device remains configured for that station!
       localStorage.setItem('groovelab_kiosk_room_id', roomId);
 
       // Clear local credentials/states
@@ -7672,7 +7708,7 @@ function App() {
               <>
                 <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '100%', margin: '0 auto', width: '100%', marginTop: '14px' }}>
               {/* Top: Massive Hero Card */}
-              <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '340px' }}>
+              <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', display: 'flex', overflow: 'hidden', minHeight: '440px' }}>
                 <div style={{ flex: '0 0 40%', background: '#f8fafc', position: 'relative', overflow: 'hidden' }}>
                   <StudioAvatar src={user.photo_url || '/avatar_ghost.jpg'} user={user} style={{ position: 'absolute', inset: 0 }} />
                   {/* Edit Button Overlay */}
@@ -12678,6 +12714,46 @@ function App() {
                  </button>
               </div>
 
+              {avatarPickerType !== 'band' && (
+                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '62px' }}>
+                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                        {(['Alle', 'E-Gitarre', 'E-Piano', 'E-Drum', 'E-Bass', 'Gesang'] as const).map(inst => {
+                           const isSelected = avatarInstrumentFilter === inst;
+                           return (
+                              <button
+                                 key={inst}
+                                 type="button"
+                                 onClick={() => setAvatarInstrumentFilter(inst)}
+                                 style={{
+                                    padding: '10px 20px',
+                                    borderRadius: '14px',
+                                    border: 'none',
+                                    background: isSelected ? brandColor : 'transparent',
+                                    color: isSelected ? 'white' : 'rgba(255,255,255,0.7)',
+                                    fontWeight: 800,
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: isSelected ? `0 0 15px ${brandColor}88` : 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                 }}
+                              >
+                                 {inst === 'Alle' && '🌐'}
+                                 {inst === 'E-Gitarre' && '🎸'}
+                                 {inst === 'E-Piano' && '🎹'}
+                                 {inst === 'E-Drum' && '🥁'}
+                                 {inst === 'E-Bass' && '🎸'}
+                                 {inst === 'Gesang' && '🎤'}
+                                 {inst}
+                              </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+               )}
+
               <div style={{ 
                  display: 'flex', 
                  flexWrap: 'wrap',
@@ -12691,12 +12767,49 @@ function App() {
                 {(() => {
                   if (avatarPickerType === 'band') return BAND_AVATARS;
                   const role = (user?.role || '').toLowerCase();
+                  let list: any[] = STUDENT_AVATARS;
                   if (activePlatform === 'campus') {
-                    if (role === 'student') return STUDENT_AVATARS;
-                    return CAMPUS_AVATARS;
+                    if (role !== 'student') list = CAMPUS_AVATARS;
+                  } else if (role === 'teacher' || role === 'admin') {
+                    list = TEACHER_AVATARS;
                   }
-                  if (role === 'teacher' || role === 'admin') return TEACHER_AVATARS;
-                  return STUDENT_AVATARS;
+                  if (avatarInstrumentFilter !== 'Alle') {
+                    list = list.filter((av: any) => av.category === avatarInstrumentFilter);
+                  }
+
+                  // Filter out broken images dynamically
+                  list = list.filter((av: any) => !failedAvatarUrls.includes(av.url));
+                  
+                  // Sort alternatingly by girl, boy, girl, boy...
+                  const getAvatarGender = (av: any) => {
+                    const id = (av.id || '').toLowerCase();
+                    const url = (av.url || '').toLowerCase();
+                    if (id.includes('girl') || id.includes('female') || url.includes('girl') || url.includes('female')) return 'girl';
+                    if (id.includes('boy') || id.includes('male') || url.includes('boy') || url.includes('male')) return 'boy';
+                    if (id.includes('guitar_alt') || id.includes('eguitar_alt') || id.includes('drums_alt') || id.includes('bass_alt') || id.includes('vocals_alt')) return 'boy';
+                    if (id.includes('piano_alt') || id.includes('tech_alt') || id.includes('producer')) return 'girl';
+                    return 'neutral';
+                  };
+
+                  // Separate Sonstige/general avatars to place them at the very end
+                  const sonstige = list.filter((av: any) => av.category === 'Sonstige' || av.id.includes('general'));
+                  const others = list.filter((av: any) => av.category !== 'Sonstige' && !av.id.includes('general'));
+
+                  const girls = others.filter(av => getAvatarGender(av) === 'girl');
+                  const boys = others.filter(av => getAvatarGender(av) === 'boy');
+                  const neutral = others.filter(av => getAvatarGender(av) === 'neutral');
+                  
+                  const alternated: any[] = [];
+                  const maxLen = Math.max(girls.length, boys.length);
+                  for (let i = 0; i < maxLen; i++) {
+                    if (i < girls.length) alternated.push(girls[i]);
+                    if (i < boys.length) alternated.push(boys[i]);
+                  }
+                  alternated.push(...neutral);
+                  alternated.push(...sonstige);
+                  list = alternated;
+                  
+                  return list;
                 })().map(av => {
                    const isSelected = avatarPickerType === 'band' 
                      ? selectedBandForProfile?.photo_url === av.url 
