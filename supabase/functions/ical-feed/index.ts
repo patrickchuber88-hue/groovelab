@@ -464,55 +464,27 @@ Deno.serve(async (req) => {
       icsContent.push('END:VEVENT')
     }
 
-    // 7b. Write Custom Campus-Termine (from database)
+    // 7b. Write Custom Campus-Termine (from database) - ALWAYS as all-day events
     for (const ev of campusEvents) {
-      const isHoliday = ev.category === 'Ferien' || ev.category === 'Feiertag';
       const locName = ev.room?.name || ev.location_extern || 'Musikschule';
 
       icsContent.push('BEGIN:VEVENT');
       icsContent.push(`UID:${ev.id}@groovelab.de`);
       icsContent.push(`DTSTAMP:${stampStr}Z`);
 
-      if (isHoliday) {
-        // All day event formatting
-        const startDayStr = formatAllDayDate(ev.event_date);
-        let endDayStr = startDayStr;
-        if (ev.event_end_date) {
-          const endDate = new Date(ev.event_end_date);
-          endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
-          const y = endDate.getFullYear();
-          const m = String(endDate.getMonth() + 1).padStart(2, '0');
-          const d = String(endDate.getDate()).padStart(2, '0');
-          endDayStr = `${y}${m}${d}`;
-        } else {
-          // Single day holiday
-          const startDate = new Date(ev.event_date);
-          startDate.setDate(startDate.getDate() + 1);
-          const y = startDate.getFullYear();
-          const m = String(startDate.getMonth() + 1).padStart(2, '0');
-          const d = String(startDate.getDate()).padStart(2, '0');
-          endDayStr = `${y}${m}${d}`;
-        }
-        icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
-        icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
-      } else {
-        // Timed event formatting
-        const [yr, mon, dy] = ev.event_date.split('-').map(Number);
-        const [hr, min] = (ev.start_time || '00:00').split(':').map(Number);
-        const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0));
-        
-        let endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // Default 1 hour duration
-        if (ev.end_time) {
-          const [eHr, eMin] = ev.end_time.split(':').map(Number);
-          endDt = new Date(Date.UTC(yr, mon - 1, dy, eHr, eMin, 0));
-        } else if (ev.event_end_date) {
-          const [eYr, eMon, eDy] = ev.event_end_date.split('-').map(Number);
-          endDt = new Date(Date.UTC(eYr, eMon - 1, eDy, hr, min, 0));
-        }
+      const startDayStr = formatAllDayDate(ev.event_date);
+      let endDayStr = startDayStr;
+      
+      const endField = ev.event_end_date || ev.event_date;
+      const endDate = new Date(endField);
+      endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
+      const y = endDate.getFullYear();
+      const m = String(endDate.getMonth() + 1).padStart(2, '0');
+      const d = String(endDate.getDate()).padStart(2, '0');
+      endDayStr = `${y}${m}${d}`;
 
-        icsContent.push(`DTSTART;TZID=Europe/Berlin:${formatIcalDate(startDt)}`);
-        icsContent.push(`DTEND;TZID=Europe/Berlin:${formatIcalDate(endDt)}`);
-      }
+      icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
+      icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
 
       icsContent.push(`SUMMARY:${escapeText(ev.title)}`);
       icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
@@ -521,40 +493,25 @@ Deno.serve(async (req) => {
       icsContent.push('END:VEVENT');
     }
 
-    // 7c. Write Subscribed External Calendar Events
+    // 7c. Write Subscribed External Calendar Events - ALWAYS as all-day events
     for (const ev of subscribedEvents) {
-      const isHoliday = ev.category === 'Ferien';
       icsContent.push('BEGIN:VEVENT');
       icsContent.push(`UID:ext-${ev.id}@groovelab.de`);
       icsContent.push(`DTSTAMP:${stampStr}Z`);
 
-      if (isHoliday) {
-        const startDayStr = formatAllDayDate(ev.event_date);
-        let endDayStr = startDayStr;
-        if (ev.event_end_date) {
-          const endDate = new Date(ev.event_end_date);
-          endDate.setDate(endDate.getDate() + 1);
-          const y = endDate.getFullYear();
-          const m = String(endDate.getMonth() + 1).padStart(2, '0');
-          const d = String(endDate.getDate()).padStart(2, '0');
-          endDayStr = `${y}${m}${d}`;
-        }
-        icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
-        icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
-      } else {
-        const [yr, mon, dy] = ev.event_date.split('-').map(Number);
-        const [hr, min] = (ev.start_time || '00:00').split(':').map(Number);
-        const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0));
-        
-        let endDt = new Date(startDt.getTime() + 60 * 60 * 1000);
-        if (ev.event_end_date) {
-          const [eYr, eMon, eDy] = ev.event_end_date.split('-').map(Number);
-          endDt = new Date(Date.UTC(eYr, eMon - 1, eDy, hr, min, 0));
-        }
+      const startDayStr = formatAllDayDate(ev.event_date);
+      let endDayStr = startDayStr;
+      
+      const endField = ev.event_end_date || ev.event_date;
+      const endDate = new Date(endField);
+      endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
+      const y = endDate.getFullYear();
+      const m = String(endDate.getMonth() + 1).padStart(2, '0');
+      const d = String(endDate.getDate()).padStart(2, '0');
+      endDayStr = `${y}${m}${d}`;
 
-        icsContent.push(`DTSTART;TZID=Europe/Berlin:${formatIcalDate(startDt)}`);
-        icsContent.push(`DTEND;TZID=Europe/Berlin:${formatIcalDate(endDt)}`);
-      }
+      icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
+      icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
 
       icsContent.push(`SUMMARY:${escapeText(ev.title)}`);
       icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
