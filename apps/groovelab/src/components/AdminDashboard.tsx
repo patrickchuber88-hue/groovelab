@@ -19,6 +19,11 @@ const cleanRoomName = (name: string | null | undefined): string => {
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
 };
 
+const capitalizeName = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return str.trim().split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
 const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
 Manuel Wagner
 Friedrichstr. 33
@@ -2103,10 +2108,11 @@ export function AdminDashboard({
             const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
             const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
             const isStaff = db.profiles?.role?.toLowerCase() === 'secretary' || db.profiles?.role?.toLowerCase() === 'admin';
-            const creatorName = db.profiles ? (db.profiles.first_name ? db.profiles.first_name.toLowerCase() : '') : 'lehrer';
-            const displayTeacherName = db.profiles ? `${db.profiles.first_name} ${db.profiles.last_name}` : 'Lehrer';
+            const creatorName = db.profiles 
+              ? `${capitalizeName(db.profiles.first_name)} ${capitalizeName(db.profiles.last_name)}`.trim()
+              : 'Lehrer';
             
-            const teacherName = isStaff ? 'Schule' : displayTeacherName;
+            const teacherName = isStaff ? 'Schule' : creatorName;
             const dbTitle = db.title || 'Unterricht';
             const purpose = isStaff && (dbTitle === 'Unterricht' || dbTitle.startsWith('Unterricht:') || dbTitle === 'Eigennutzung') ? creatorName : dbTitle;
 
@@ -5994,6 +6000,20 @@ export function AdminDashboard({
             const startHour = parseInt(bookingStartTime.split(':')[0]);
             const endHour = parseInt(bookingEndTime.split(':')[0]);
             if (slotHour >= startHour && slotHour < endHour) {
+              const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+              const creatorName = admin 
+                ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
+                : 'Lehrer';
+              const defaultPurpose = bookingPurpose || 'Eigennutzung';
+              
+              let finalPurpose = defaultPurpose;
+              if (isStaff) {
+                if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
+                  finalPurpose = creatorName;
+                }
+              }
+              const finalTeacherName = isStaff ? 'Schule' : creatorName;
+
               draftPreviewBooking.push({
                 id: 'preview_draft_booking',
                 roomId: selectedRoom.id,
@@ -6001,9 +6021,9 @@ export function AdminDashboard({
                 date: bookingDate,
                 startTime: bookingStartTime,
                 endTime: bookingEndTime,
-                purpose: bookingPurpose || 'Eigennutzung',
+                purpose: finalPurpose,
                 teacherId: userId,
-                teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer',
+                teacherName: finalTeacherName,
                 isPreview: true
               });
             }
@@ -6273,8 +6293,9 @@ export function AdminDashboard({
     const handleAddBooking = (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
       const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
-      const creatorName = admin ? (admin.first_name ? admin.first_name.toLowerCase() : '') : 'lehrer';
-      const displayCreatorName = admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer';
+      const creatorName = admin 
+        ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
+        : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
@@ -6286,7 +6307,7 @@ export function AdminDashboard({
           finalPurpose = creatorName;
         }
       }
-      const finalTeacherName = isStaff ? 'Schule' : displayCreatorName;
+      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (isRecurring) {
         // Build the recurring schedule
@@ -6349,8 +6370,9 @@ export function AdminDashboard({
       if (!selectedBooking) return;
 
       const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
-      const creatorName = admin ? (admin.first_name ? admin.first_name.toLowerCase() : '') : 'lehrer';
-      const displayCreatorName = admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer';
+      const creatorName = admin 
+        ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
+        : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
@@ -6362,7 +6384,7 @@ export function AdminDashboard({
           finalPurpose = creatorName;
         }
       }
-      const finalTeacherName = isStaff ? 'Schule' : displayCreatorName;
+      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
