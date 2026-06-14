@@ -425,48 +425,95 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     return match ? `${match[1]}:${match[2]}` : '00:00';
   };
 
-  const handleSelectEvent = (ev: any) => {
-    // Resolve catColor/catBg
-    let catColor = '#64748b';
-    let catBg = '#f1f5f9';
-    if (ev.category === 'Konzert') {
-      catColor = '#a855f7';
-      catBg = '#f3e8ff';
-    } else if (ev.category === 'Probe') {
-      catColor = '#f59e0b';
-      catBg = '#fef3c7';
-    } else if (ev.category === 'Sonstiges') {
-      catColor = '#3b82f6';
-      catBg = '#eff6ff';
-    } else if (ev.category === 'Ferien' || ev.category === 'Feiertag') {
-      catColor = '#10b981';
-      catBg = '#ecfdf5';
+  const getEventColors = (ev: any) => {
+    const COLOR_MAP: Record<string, { color: string, bg: string }> = {
+      '#a855f7': { color: '#a855f7', bg: '#f3e8ff' }, // Lila
+      '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
+      '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
+      '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
+      '#10b981': { color: '#10b981', bg: '#ecfdf5' }, // Grün
+    };
+
+    if (ev.color && COLOR_MAP[ev.color]) {
+      return COLOR_MAP[ev.color];
     }
 
+    const tLower = (ev.title || '').toLowerCase();
+    const cLower = (ev.category || '').toLowerCase();
+
+    if (cLower.includes('ferien') || cLower.includes('feiertag') || tLower.includes('ferien') || tLower.includes('feiertag') || tLower.includes('schulfrei') || tLower.includes('holiday') || tLower.includes('break')) {
+      return { color: '#10b981', bg: '#ecfdf5' };
+    }
+    if (cLower.includes('vorspiel') || cLower.includes('klassenvorspiel') || tLower.includes('vorspiel') || tLower.includes('klassenvorspiel') || tLower.includes('schülervorspiel') || tLower.includes('recital')) {
+      return { color: '#3b82f6', bg: '#eff6ff' };
+    }
+    if (cLower.includes('konzert') || cLower.includes('auftritt') || cLower.includes('fest') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig') || tLower.includes('fest') || tLower.includes('sommerfest') || tLower.includes('weihnachtsfeier') || tLower.includes('party')) {
+      return { color: '#a855f7', bg: '#f3e8ff' };
+    }
+    if (cLower.includes('probe') || cLower.includes('ensemble') || cLower.includes('bandprobe') || tLower.includes('probe') || tLower.includes('bandprobe') || tLower.includes('ensemble') || tLower.includes('rehearsal')) {
+      return { color: '#f59e0b', bg: '#fef3c7' };
+    }
+    if (cLower.includes('konferenz') || cLower.includes('sitzung') || cLower.includes('meeting') || tLower.includes('konferenz') || tLower.includes('sitzung') || tLower.includes('meeting') || tLower.includes('besprechung') || tLower.includes('lehrerkonferenz') || tLower.includes('fortbildung')) {
+      return { color: '#ef4444', bg: '#fee2e2' };
+    }
+
+    if (ev.is_subscribed) {
+      return { color: '#64748b', bg: '#f1f5f9' };
+    }
+    return { color: '#6366f1', bg: '#e0e7ff' };
+  };
+
+  const handleSelectEvent = (ev: any) => {
+    const colors = getEventColors(ev);
     const isMyEvent = ev.created_by === userId;
-    setSelectedEvent({ ...ev, isMyEvent, catColor, catBg });
+    setSelectedEvent({ ...ev, isMyEvent, catColor: colors.color, catBg: colors.bg });
     // Pre-fill visibility editor for admin/secretary
     setEditVisibility(ev.visibility || 'all');
   };
 
   // Save ONLY visibility for a campus_event (admin/secretary only)
   const saveVisibility = async () => {
-    if (!selectedEvent || selectedEvent.is_subscribed) return;
+    if (!selectedEvent) return;
     setSavingVisibility(true);
     try {
-      const { data, error } = await supabase
-        .from('campus_events')
-        .update({ visibility: editVisibility, is_public: editVisibility === 'all' })
-        .eq('id', selectedEvent.id)
-        .select('*, room:room_id(id, name)')
-        .single();
-      if (error) throw error;
-      if (data) {
-        setCustomEvents(prev => prev.map(x => x.id === data.id ? data : x));
-        setSelectedEvent((prev: any) => ({ ...prev, visibility: data.visibility }));
+      if (selectedEvent.is_subscribed) {
+        // Create a custom event database override for this subscribed event
+        const { data, error } = await supabase
+          .from('campus_events')
+          .insert({
+            school_id: schoolId,
+            title: selectedEvent.title,
+            description: selectedEvent.description || '',
+            event_date: selectedEvent.event_date,
+            start_time: selectedEvent.start_time + ':00',
+            category: selectedEvent.category || 'Schultermin',
+            created_by: userId,
+            visibility: editVisibility,
+            is_public: editVisibility === 'all'
+          })
+          .select('*, room:room_id(id, name)')
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCustomEvents(prev => [...prev, data]);
+          setSelectedEvent(null); // Close modal
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('campus_events')
+          .update({ visibility: editVisibility, is_public: editVisibility === 'all' })
+          .eq('id', selectedEvent.id)
+          .select('*, room:room_id(id, name)')
+          .single();
+        if (error) throw error;
+        if (data) {
+          setCustomEvents(prev => prev.map(x => x.id === data.id ? data : x));
+          setSelectedEvent(null); // Close modal
+        }
       }
     } catch (err: any) {
-      alert('Speichern fehlgeschlagen: ' + err.message);
+      alert('Speichern der Sichtbarkeit fehlgeschlagen: ' + err.message);
     } finally {
       setSavingVisibility(false);
     }
@@ -1072,7 +1119,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Delete event handler
   const handleDeleteEvent = async (id: string) => {
-    if (!confirm('Möchtest du diesen Termin wirklich löschen?')) return;
+    const ev = customEvents.find(x => x.id === id);
+    const isOverride = ev && subscribedEvents.some(sub => 
+      normalizeTitle(sub.title) === normalizeTitle(ev.title) && 
+      sub.event_date === ev.event_date && 
+      normalizeTime(sub.start_time) === normalizeTime(ev.start_time)
+    );
+
+    const confirmMsg = isOverride 
+      ? 'Möchtest du die Sichtbarkeitseinstellung dieses abonnierten Termins wirklich zurücksetzen?'
+      : 'Möchtest du diesen Termin wirklich löschen?';
+
+    if (!confirm(confirmMsg)) return;
 
     try {
       const { error } = await supabase
@@ -1793,40 +1851,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const dateObj = new Date(ev.event_date);
               const isMyEvent = ev.created_by === userId;
 
-              // Color codes for categories
-              let catColor = '#64748b'; // Default gray
-              let catBg = '#f1f5f9';
+              const isOverride = !isSubscribed && subscribedEvents.some(sub => 
+                normalizeTitle(sub.title) === normalizeTitle(ev.title) && 
+                sub.event_date === ev.event_date && 
+                normalizeTime(sub.start_time) === normalizeTime(ev.start_time)
+              );
+
+              const colors = getEventColors(ev);
+              const catColor = colors.color;
+              const catBg = colors.bg;
 
               const isHolidayEvent = ev.category === 'Ferien' || ev.category === 'Feiertag' || (ev.title || '').toLowerCase().includes('ferien') || (ev.title || '').toLowerCase().includes('feiertag');
               const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
-
-              const COLOR_MAP: Record<string, { color: string, bg: string }> = {
-                '#a855f7': { color: '#a855f7', bg: '#f3e8ff' }, // Lila
-                '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
-                '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
-                '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
-                '#10b981': { color: '#10b981', bg: '#ecfdf5' }, // Grün
-              };
-
-              if (ev.color && COLOR_MAP[ev.color]) {
-                catColor = COLOR_MAP[ev.color].color;
-                catBg = COLOR_MAP[ev.color].bg;
-              } else if (isHolidayEvent) {
-                catColor = '#10b981'; // Green
-                catBg = '#ecfdf5';
-              } else if (isKlassenvorspiel) {
-                catColor = '#3b82f6'; // Blue
-                catBg = '#eff6ff';
-              } else if (ev.category === 'Konzert') {
-                catColor = '#a855f7'; // Purple
-                catBg = '#f3e8ff';
-              } else if (ev.category === 'Probe') {
-                catColor = '#f59e0b'; // Amber
-                catBg = '#fef3c7';
-              } else if (isSubscribed) {
-                catColor = '#64748b';
-                catBg = '#f1f5f9';
-              }
 
               const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
 
@@ -1892,17 +1928,34 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <span style={{
                         fontSize: '0.68rem',
                         fontWeight: 600,
-                        color: '#6e6e73',
-                        background: '#f5f5f7',
+                        color: (isSubscribed || isOverride) ? '#6e6e73' : '#0369a1',
+                        background: (isSubscribed || isOverride) ? '#f5f5f7' : '#e0f2fe',
                         padding: '3px 8px',
                         borderRadius: '6px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        {isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
-                        {isSubscribed ? 'Abonniert (iCal)' : 'Eigener Termin'}
+                        {(isSubscribed || isOverride) ? <Globe size={10} /> : <Lock size={10} />}
+                        {isSubscribed ? 'Abonniert (iCal)' : isOverride ? 'Abonniert (Sichtbarkeit angepasst)' : 'Eigener Termin'}
                       </span>
+
+                      {ev.visibility && (
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          color: ev.visibility === 'all' ? '#10b981' : ev.visibility === 'teachers' ? '#a855f7' : '#3b82f6',
+                          background: ev.visibility === 'all' ? '#ecfdf5' : ev.visibility === 'teachers' ? '#f3e8ff' : '#eff6ff',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <Eye size={10} />
+                          {ev.visibility === 'all' ? 'Alle' : ev.visibility === 'teachers' ? 'Nur Lehrer' : ev.visibility === 'students' ? 'Nur Schüler' : 'Privat'}
+                        </span>
+                      )}
                     </div>
 
                     {!isSubscribed && isMyEvent && (
@@ -2775,12 +2828,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       {/* ── Event Detail Modal ── */}
       {selectedEvent && (() => {
         const ev = selectedEvent;
+        const colors = getEventColors(ev);
         const hasFestInTitle = (ev.title || '').toLowerCase().includes('fest');
-        const isKlassenvorspiel = ev.category === 'Klassenvorspiel' || (ev.title || '').toLowerCase().includes('klassenvorspiel');
-        const catColor = hasFestInTitle ? '#ff5e3a' : (ev.catColor || '#64748b');
-        const catBg = hasFestInTitle ? '#ff5e3a14' : (ev.catBg || '#f1f5f9');
+        const catColor = colors.color;
+        const catBg = colors.bg;
         const isSubscribed = ev.is_subscribed;
-        const canEditVisibility = (role === 'admin' || role === 'secretary') && !isSubscribed;
+        const isOverride = !isSubscribed && subscribedEvents.some(sub => 
+          normalizeTitle(sub.title) === normalizeTitle(ev.title) && 
+          sub.event_date === ev.event_date && 
+          normalizeTime(sub.start_time) === normalizeTime(ev.start_time)
+        );
+        const canEditVisibility = (role === 'admin' || role === 'secretary');
         const currentVisibility = ev.visibility || 'all';
 
         const visibilityLabel: Record<string, string> = {
@@ -2842,13 +2900,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                   <span style={{
                     fontSize: '0.62rem', fontWeight: 800,
-                    color: isSubscribed ? '#475569' : '#0369a1',
-                    background: isSubscribed ? '#f1f5f9' : '#e0f2fe',
+                    color: (isSubscribed || isOverride) ? '#475569' : '#0369a1',
+                    background: (isSubscribed || isOverride) ? '#f1f5f9' : '#e0f2fe',
                     padding: '4px 10px', borderRadius: '8px',
                     display: 'flex', alignItems: 'center', gap: '4px'
                   }}>
-                    {isSubscribed ? <Globe size={10} /> : <Lock size={10} />}
-                    {isSubscribed ? 'iCal Kalender' : 'Eigener Termin'}
+                    {(isSubscribed || isOverride) ? <Globe size={10} /> : <Lock size={10} />}
+                    {isSubscribed ? 'iCal Kalender' : isOverride ? 'iCal Kalender (Sichtbarkeit angepasst)' : 'Eigener Termin'}
                   </span>
                 </div>
                 <button
@@ -3008,7 +3066,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     onMouseOut={e => { e.currentTarget.style.background = '#fef2f2'; }}
                   >
                     <Trash2 size={14} />
-                    Termin löschen
+                    {isOverride ? 'Sichtbarkeit zurücksetzen' : 'Termin löschen'}
                   </button>
                 )}
               </div>
@@ -3175,6 +3233,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   >
                     <CalendarPlus size={16} /> Auf diesem Gerät abonnieren
                   </a>
+                  <p style={{
+                    margin: '4px 0 0 0',
+                    color: '#86868b',
+                    fontSize: '11px',
+                    lineHeight: 1.4,
+                    fontWeight: 500,
+                    textAlign: 'center',
+                    padding: '0 8px'
+                  }}>
+                    💡 <strong>Entwickler-Tipp:</strong> Wir empfehlen, das automatische Aktualisierungsintervall in den Einstellungen deines Kalenders auf <strong>1 Std.</strong> einzustellen, um Änderungen zeitnah zu synchronisieren.
+                  </p>
                 </div>
 
                 {/* Divider */}

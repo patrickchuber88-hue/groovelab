@@ -30,6 +30,69 @@ const getInitials = (firstName: string, lastName: string): string => {
   return [firstInit, lastInit].filter(Boolean).join(' ');
 }
 
+// Normalize helpers for deduplication
+const normalizeTitle = (t: string) => (t || '').trim().toLowerCase();
+const normalizeTime = (t: string) => {
+  if (!t) return '00:00';
+  const parts = t.split(':');
+  return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+};
+
+// Parse ICS dates in Deno
+const parseICSDate = (icsDateStr: string): Date => {
+  const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
+  const year = parseInt(cleanStr.substring(0, 4));
+  const month = parseInt(cleanStr.substring(4, 6)) - 1;
+  const day = parseInt(cleanStr.substring(6, 8));
+
+  if (cleanStr.includes('T')) {
+    const hour = parseInt(cleanStr.substring(9, 11));
+    const min = parseInt(cleanStr.substring(11, 13));
+    const sec = parseInt(cleanStr.substring(13, 15));
+    return new Date(Date.UTC(year, month, day, hour, min, sec));
+  }
+  return new Date(year, month, day);
+};
+
+// Simple zeilenbasierter ICS Parser
+const parseICS = (icsText: string): any[] => {
+  const events: any[] = [];
+  const lines = icsText.split(/\r?\n/);
+  let currentEvent: any = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === 'BEGIN:VEVENT') {
+      currentEvent = {};
+    } else if (line === 'END:VEVENT' && currentEvent) {
+      if (currentEvent.summary && currentEvent.dtstart) {
+        events.push(currentEvent);
+      }
+      currentEvent = null;
+    } else if (currentEvent) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        const key = line.substring(0, colonIdx);
+        const value = line.substring(colonIdx + 1);
+
+        if (key.startsWith('SUMMARY')) {
+          currentEvent.summary = value;
+        } else if (key.startsWith('DESCRIPTION')) {
+          currentEvent.description = value.replace(/\\n/g, '\n');
+        } else if (key.startsWith('DTSTART')) {
+          currentEvent.rawStart = value;
+          currentEvent.dtstart = parseICSDate(value);
+        } else if (key.startsWith('DTEND')) {
+          currentEvent.rawEnd = value;
+          currentEvent.dtend = parseICSDate(value);
+        } else if (key.startsWith('LOCATION')) {
+          currentEvent.location = value;
+        }
+      }
+    }
+  }
+  return events;
+};
 
 // Main Edge Function Handler
 Deno.serve(async (req) => {
@@ -68,7 +131,7 @@ Deno.serve(async (req) => {
 
     // 1. Fetch user associated with this secure QR token or user ID (fallback)
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token || '');
-    let userQuery = supabase.from('users').select('id, first_name, last_name, role');
+    let userQuery = supabase.from('users').select('id, first_name, last_name, role, school_id');
     if (isUuid) {
       userQuery = userQuery.or(`qr_token.eq.${token},id.eq.${token}`);
     } else {
@@ -91,9 +154,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { id: userId, role, first_name, last_name } = user
+    const { id: userId, role, first_name, last_name, school_id: schoolId } = user
 
-    // 2. Load standard recurring schedules for the user
+    // 2. Load standard recurring schedules for the user (Unterrichtstermine)
     let scheduleQuery = supabase
       .from('schedules')
       .select(`
@@ -112,7 +175,7 @@ Deno.serve(async (req) => {
     const { data: schedules, error: schErr } = await scheduleQuery
     if (schErr) throw schErr
 
-    // 3. Load overrides/occurrences
+    // 3. Load overrides/occurrences (Unterrichtstermine Abweichungen)
     let occurrenceQuery = supabase
       .from('schedule_occurrences')
       .select(`
@@ -131,7 +194,6 @@ Deno.serve(async (req) => {
     if (occErr) throw occErr
 
     // 4. Merge regular weekly schedules and occurrences into actual calendar dates
-    // Standard school year timeline: Sept 1st to July 31st (excluding August)
     const now = new Date()
     const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
     const schoolYearStart = new Date(`${schoolStartYear}-09-01`)
@@ -144,16 +206,14 @@ Deno.serve(async (req) => {
       for (const sch of schedules) {
         let current = new Date(schoolYearStart)
         while (current <= schoolYearEnd) {
-          const currentDay = current.getDay() || 7 // Sunday maps to 7
+          const currentDay = current.getDay() || 7
           const diff = sch.day_of_week - currentDay
           const targetDate = new Date(current)
           targetDate.setDate(current.getDate() + diff)
 
-          // Filter out dates outside the school year boundaries, and exclude August (month index 7)
           if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd && targetDate.getMonth() !== 7) {
             const dateStr = targetDate.toISOString().substring(0, 10)
 
-            // Look for matching manual occurrences/overrides
             const actual = occurrences?.find((occ: any) => 
               (occ.schedule_id === sch.id) && 
               (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
@@ -189,7 +249,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Add remaining manual occurrences not tied to virtual projections
     if (occurrences) {
       for (const occ of occurrences) {
         if (!usedActualIds.has(occ.id)) {
@@ -201,14 +260,99 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sort chronologically
     allMergedOccurrences.sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date)
       return (a.start_time || '').localeCompare(b.start_time || '')
     })
 
-    // 5. Generate RFC 5545 iCalendar data stream
-    const calendarName = `Unterricht (${first_name} ${last_name})`
+    // 5. Query and load Campus-Termine for the user's school
+    let campusEvents: any[] = [];
+    if (schoolId) {
+      const { data: campusData, error: campusErr } = await supabase
+        .from('campus_events')
+        .select('*, room:room_id(name)')
+        .eq('school_id', schoolId);
+
+      if (!campusErr && campusData) {
+        campusEvents = campusData;
+        // Filter based on roles and visibility settings
+        if (role === 'student') {
+          campusEvents = campusEvents.filter((ev: any) => {
+            const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
+            return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
+          });
+        } else if (role === 'teacher') {
+          campusEvents = campusEvents.filter((ev: any) => {
+            return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'teachers' || ev.visibility === 'students';
+          });
+        }
+        // Admins and Secretaries can see all events
+      }
+    }
+
+    // 6. Query and fetch school's subscribed external iCal feed if exists
+    let subscribedEvents: any[] = [];
+    if (schoolId) {
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('calendar_url')
+        .eq('id', schoolId)
+        .maybeSingle();
+
+      if (schoolData?.calendar_url) {
+        try {
+          const res = await fetch(schoolData.calendar_url);
+          if (res.ok) {
+            const icsText = await res.text();
+            const rawSubscribed = parseICS(icsText);
+
+            subscribedEvents = rawSubscribed.map((ev: any, index: number) => {
+              const title = ev.summary || 'Abonnierter Termin';
+              const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
+              let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+              const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
+              if (ev.dtend && isAllDay) {
+                end.setDate(end.getDate() - 1);
+              }
+              const toYYYYMMDD = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+              };
+              return {
+                id: `subscribed-${index}`,
+                title: title,
+                description: ev.description || '',
+                event_date: ev.dtstart ? toYYYYMMDD(ev.dtstart) : '',
+                event_end_date: toYYYYMMDD(end),
+                start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
+                category: isHoliday ? 'Ferien' : 'Schultermin',
+                is_subscribed: true,
+                rawStart: ev.rawStart,
+                rawEnd: ev.rawEnd
+              };
+            });
+
+            // Filter out external events that have customized overrides in the database
+            subscribedEvents = subscribedEvents.filter((sub: any) => {
+              const hasCustomCopy = campusEvents.some((c: any) => 
+                c.visibility !== 'private' &&
+                normalizeTitle(c.title) === normalizeTitle(sub.title) && 
+                c.event_date === sub.event_date && 
+                normalizeTime(c.start_time) === normalizeTime(sub.start_time)
+              );
+              return !hasCustomCopy;
+            });
+          }
+        } catch (fetchErr) {
+          console.error('Failed to fetch school calendar_url in Edge Function:', fetchErr);
+        }
+      }
+    }
+
+    // 7. Generate RFC 5545 iCalendar data stream
+    const calendarName = `Campus & Unterricht (${first_name} ${last_name})`
     let icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -250,11 +394,16 @@ Deno.serve(async (req) => {
 
     const stampStr = formatIcalDate(new Date())
 
+    // Helper to format ISO Date to YYYYMMDD for all-day events
+    const formatAllDayDate = (dateStr: string) => {
+      return dateStr.replace(/-/g, '');
+    }
+
+    // 7a. Write Unterrichtstermine (Lessons)
     for (const occ of allMergedOccurrences) {
       const [yr, mon, dy] = occ.date.split('-').map(Number)
       const [hr, min] = occ.start_time.split(':').map(Number)
       
-      // Construct start/end dates in UTC using local hour mapping to match VTIMEZONE context
       const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0))
       const endDt = new Date(startDt.getTime() + (occ.duration || 45) * 60 * 1000)
 
@@ -267,7 +416,6 @@ Deno.serve(async (req) => {
       const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
       const studentInitials = occ.student ? getInitials(occ.student.first_name, occ.student.last_name) : 'Schüler'
 
-      // Set elegant, customized calendar titles depending on whether user is student or teacher
       let summary = ''
       if (role === 'student') {
         summary = isCanceled 
@@ -279,7 +427,6 @@ Deno.serve(async (req) => {
           : `🎵 Unterricht mit ${studentInitials}`
       }
 
-      // Add detailed description for convenient smartphone viewing
       let descriptionLines = []
       descriptionLines.push(`Status: ${isCanceled ? 'Abgesagt ❌' : 'Bestätigt 📅'}`)
       descriptionLines.push(`Schüler: ${studentInitials}`)
@@ -299,17 +446,14 @@ Deno.serve(async (req) => {
       icsContent.push(`LOCATION:${escapeText(occ.room_name)}`)
       icsContent.push(`STATUS:${statusText}`)
 
-      // Add alarms/reminders for active events
       if (!isCanceled) {
         const valarmDateStr = occ.date.replace(/-/g, '')
-        // Alarm 1: 08:00 AM morning check
         icsContent.push('BEGIN:VALARM')
         icsContent.push('ACTION:DISPLAY')
         icsContent.push(`TRIGGER;VALUE=DATE-TIME;TZID=Europe/Berlin:${valarmDateStr}T080000`)
         icsContent.push(`DESCRIPTION:Erinnerung: Heute ist dein Unterrichtstermin!`)
         icsContent.push('END:VALARM')
 
-        // Alarm 2: 30 minutes transition warning
         icsContent.push('BEGIN:VALARM')
         icsContent.push('ACTION:DISPLAY')
         icsContent.push('TRIGGER:-PT30M')
@@ -320,18 +464,116 @@ Deno.serve(async (req) => {
       icsContent.push('END:VEVENT')
     }
 
+    // 7b. Write Custom Campus-Termine (from database)
+    for (const ev of campusEvents) {
+      const isHoliday = ev.category === 'Ferien' || ev.category === 'Feiertag';
+      const locName = ev.room?.name || ev.location_extern || 'Musikschule';
+
+      icsContent.push('BEGIN:VEVENT');
+      icsContent.push(`UID:${ev.id}@groovelab.de`);
+      icsContent.push(`DTSTAMP:${stampStr}Z`);
+
+      if (isHoliday) {
+        // All day event formatting
+        const startDayStr = formatAllDayDate(ev.event_date);
+        let endDayStr = startDayStr;
+        if (ev.event_end_date) {
+          const endDate = new Date(ev.event_end_date);
+          endDate.setDate(endDate.getDate() + 1); // DTEND is exclusive for DATE values
+          const y = endDate.getFullYear();
+          const m = String(endDate.getMonth() + 1).padStart(2, '0');
+          const d = String(endDate.getDate()).padStart(2, '0');
+          endDayStr = `${y}${m}${d}`;
+        } else {
+          // Single day holiday
+          const startDate = new Date(ev.event_date);
+          startDate.setDate(startDate.getDate() + 1);
+          const y = startDate.getFullYear();
+          const m = String(startDate.getMonth() + 1).padStart(2, '0');
+          const d = String(startDate.getDate()).padStart(2, '0');
+          endDayStr = `${y}${m}${d}`;
+        }
+        icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
+        icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
+      } else {
+        // Timed event formatting
+        const [yr, mon, dy] = ev.event_date.split('-').map(Number);
+        const [hr, min] = (ev.start_time || '00:00').split(':').map(Number);
+        const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0));
+        
+        let endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // Default 1 hour duration
+        if (ev.end_time) {
+          const [eHr, eMin] = ev.end_time.split(':').map(Number);
+          endDt = new Date(Date.UTC(yr, mon - 1, dy, eHr, eMin, 0));
+        } else if (ev.event_end_date) {
+          const [eYr, eMon, eDy] = ev.event_end_date.split('-').map(Number);
+          endDt = new Date(Date.UTC(eYr, eMon - 1, eDy, hr, min, 0));
+        }
+
+        icsContent.push(`DTSTART;TZID=Europe/Berlin:${formatIcalDate(startDt)}`);
+        icsContent.push(`DTEND;TZID=Europe/Berlin:${formatIcalDate(endDt)}`);
+      }
+
+      icsContent.push(`SUMMARY:${escapeText(ev.title)}`);
+      icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
+      icsContent.push(`LOCATION:${escapeText(locName)}`);
+      icsContent.push('STATUS:CONFIRMED');
+      icsContent.push('END:VEVENT');
+    }
+
+    // 7c. Write Subscribed External Calendar Events
+    for (const ev of subscribedEvents) {
+      const isHoliday = ev.category === 'Ferien';
+      icsContent.push('BEGIN:VEVENT');
+      icsContent.push(`UID:ext-${ev.id}@groovelab.de`);
+      icsContent.push(`DTSTAMP:${stampStr}Z`);
+
+      if (isHoliday) {
+        const startDayStr = formatAllDayDate(ev.event_date);
+        let endDayStr = startDayStr;
+        if (ev.event_end_date) {
+          const endDate = new Date(ev.event_end_date);
+          endDate.setDate(endDate.getDate() + 1);
+          const y = endDate.getFullYear();
+          const m = String(endDate.getMonth() + 1).padStart(2, '0');
+          const d = String(endDate.getDate()).padStart(2, '0');
+          endDayStr = `${y}${m}${d}`;
+        }
+        icsContent.push(`DTSTART;VALUE=DATE:${startDayStr}`);
+        icsContent.push(`DTEND;VALUE=DATE:${endDayStr}`);
+      } else {
+        const [yr, mon, dy] = ev.event_date.split('-').map(Number);
+        const [hr, min] = (ev.start_time || '00:00').split(':').map(Number);
+        const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0));
+        
+        let endDt = new Date(startDt.getTime() + 60 * 60 * 1000);
+        if (ev.event_end_date) {
+          const [eYr, eMon, eDy] = ev.event_end_date.split('-').map(Number);
+          endDt = new Date(Date.UTC(eYr, eMon - 1, eDy, hr, min, 0));
+        }
+
+        icsContent.push(`DTSTART;TZID=Europe/Berlin:${formatIcalDate(startDt)}`);
+        icsContent.push(`DTEND;TZID=Europe/Berlin:${formatIcalDate(endDt)}`);
+      }
+
+      icsContent.push(`SUMMARY:${escapeText(ev.title)}`);
+      icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
+      icsContent.push(`LOCATION:${escapeText(ev.location || 'Musikschule')}`);
+      icsContent.push('STATUS:CONFIRMED');
+      icsContent.push('END:VEVENT');
+    }
+
     icsContent.push('END:VCALENDAR')
 
     const icsBody = icsContent.join('\r\n')
 
-    // Serve raw .ics calendar feed with dynamic attachments
     return new Response(icsBody, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': `attachment; filename="groovelab-unterricht.ics"`,
-        'Cache-Control': 'public, max-age=600' // cache for 10 minutes to protect DB while keeping it dynamic
+        'Cache-Control': 'public, max-age=3600'
       }
     })
 
