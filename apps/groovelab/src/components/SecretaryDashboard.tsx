@@ -1078,6 +1078,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [adHocStartTime, setAdHocStartTime] = useState<string>('14:00');
   const [adHocDuration, setAdHocDuration] = useState<number>(45);
   const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
+  const [pendingBookings, setPendingBookings] = useState<any[]>([]);
+  const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -1086,6 +1088,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [tickets, setTickets] = useState<any[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
+  const [showLogbookModal, setShowLogbookModal] = useState<boolean>(false);
+  const [logbookBookings, setLogbookBookings] = useState<any[]>([]);
+  const [editingLogbookBookingId, setEditingLogbookBookingId] = useState<string | null>(null);
+  const [editBookingDate, setEditBookingDate] = useState<string>('');
+  const [editBookingStartTime, setEditBookingStartTime] = useState<string>('');
+  const [editBookingEndTime, setEditBookingEndTime] = useState<string>('');
+  const [editBookingTitle, setEditBookingTitle] = useState<string>('');
+  const [editBookingRoomId, setEditBookingRoomId] = useState<string>('');
   const [newEventTitle, setNewEventTitle] = useState<string>('');
   const [newEventDesc, setNewEventDesc] = useState<string>('');
   const [newEventTarget, setNewEventTarget] = useState<'all' | 'students' | 'teachers'>('all');
@@ -1692,6 +1702,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     if (!schoolId) return;
     
     fetchCrisisNotifications();
+    fetchPendingBookings();
+
+    const handleRefresh = () => {
+      fetchPendingBookings();
+    };
+    window.addEventListener('refresh-bookings', handleRefresh);
 
     let crisisTimeout: any = null;
     let dashboardTimeout: any = null;
@@ -1733,12 +1749,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         debouncedFetchDashboardData();
         debouncedFetchCrisisNotifications();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_bookings' }, (payload: any) => {
+        fetchPendingBookings();
+        if (payload.eventType === 'INSERT' && payload.new && payload.new.status === 'pending') {
+          showRealtimeNotification('Neue vorläufige Raumbuchung erhalten!');
+        }
+      })
       .subscribe();
 
     return () => {
       if (crisisTimeout) clearTimeout(crisisTimeout);
       if (dashboardTimeout) clearTimeout(dashboardTimeout);
       supabase.removeChannel(channel);
+      window.removeEventListener('refresh-bookings', handleRefresh);
     };
   }, [schoolId]);
 
@@ -1957,9 +1980,201 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     fetchLiveStatusData();
   }, [schoolId]);
 
+  const showRealtimeNotification = (message: string) => {
+    setRealtimeToast({ message, visible: true });
+    
+    setTimeout(() => {
+      setRealtimeToast(prev => ({ ...prev, visible: false }));
+    }, 5000);
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('Campus Musäk', {
+          body: message,
+          icon: '/favicon.ico'
+        });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('Campus Musäk', {
+              body: message,
+              icon: '/favicon.ico'
+            });
+          }
+        });
+      }
+    }
+  };
+
+  const fetchPendingBookings = async () => {
+    if (!schoolId) return;
+    try {
+      const { data, error } = await supabase
+        .from('room_bookings')
+        .select(`
+          id,
+          room_id,
+          date,
+          start_time,
+          end_time,
+          title,
+          booked_by,
+          rooms:room_id (
+            name
+          ),
+          profiles:users!booked_by (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('school_id', schoolId)
+        .eq('status', 'pending')
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      setPendingBookings(data || []);
+    } catch (err) {
+      console.error('Error fetching pending room bookings:', err);
+    }
+  };
+
+  const handleConfirmBooking = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({ status: 'approved' })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setPendingBookings(prev => prev.filter(b => b.id !== id));
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+      alert('Raumbuchung erfolgreich bestätigt.');
+    } catch (err: any) {
+      alert('Fehler beim Bestätigen: ' + err.message);
+    }
+  };
+
+  const handleRejectBooking = async (id: string) => {
+    if (!window.confirm('Möchtest du diese vorläufige Raumbuchung wirklich ablehnen und löschen?')) return;
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setPendingBookings(prev => prev.filter(b => b.id !== id));
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+      alert('Raumbuchung abgelehnt und gelöscht.');
+    } catch (err: any) {
+      alert('Fehler beim Ablehnen: ' + err.message);
+    }
+  };
+
+  const fetchLogbookBookings = async () => {
+    if (!schoolId) return;
+    try {
+      const { data, error } = await supabase
+        .from('room_bookings')
+        .select(`
+          id,
+          room_id,
+          date,
+          start_time,
+          end_time,
+          title,
+          booked_by,
+          status,
+          rooms:room_id (
+            id,
+            name
+          ),
+          profiles:booked_by (
+            first_name,
+            last_name,
+            role
+          )
+        `)
+        .eq('school_id', schoolId)
+        .order('date', { ascending: false })
+        .order('start_time', { ascending: false });
+
+      if (error) throw error;
+      setLogbookBookings(data || []);
+    } catch (err: any) {
+      console.error('Error fetching logbook bookings:', err);
+    }
+  };
+
+  const handleUpdateLogbookBooking = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({
+          date: editBookingDate,
+          start_time: editBookingStartTime.length === 5 ? `${editBookingStartTime}:00` : editBookingStartTime,
+          end_time: editBookingEndTime.length === 5 ? `${editBookingEndTime}:00` : editBookingEndTime,
+          title: editBookingTitle,
+          room_id: editBookingRoomId
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      alert('Raumbuchung erfolgreich aktualisiert.');
+      setEditingLogbookBookingId(null);
+      fetchLogbookBookings();
+      fetchPendingBookings();
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren: ' + err.message);
+    }
+  };
+
+  const handleDeleteLogbookBooking = async (id: string) => {
+    if (!window.confirm('Möchtest du diese Raumbuchung wirklich löschen?')) return;
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      alert('Raumbuchung erfolgreich gelöscht.');
+      fetchLogbookBookings();
+      fetchPendingBookings();
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+    } catch (err: any) {
+      alert('Fehler beim Löschen: ' + err.message);
+    }
+  };
+
+  const handleConfirmLogbookBooking = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('room_bookings')
+        .update({ status: 'approved' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      alert('Raumbuchung erfolgreich bestätigt.');
+      fetchLogbookBookings();
+      fetchPendingBookings();
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+    } catch (err: any) {
+      alert('Fehler beim Bestätigen: ' + err.message);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      fetchPendingBookings();
 
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
@@ -7607,7 +7822,382 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           border-bottom: 1px solid var(--border-light);
           transition: background 0.2s;
         }
+        @keyframes slideInToast {
+          from {
+            transform: translateX(120%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .slide-in-toast {
+          animation: slideInToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
       `}} />
+
+      {/* Real-time pending booking push toast notification */}
+      {realtimeToast.visible && (
+        <div 
+          className="slide-in-toast"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            right: '24px',
+            zIndex: 99999,
+            background: '#ffffff',
+            border: '1px solid #fed7aa',
+            borderRadius: '16px',
+            padding: '16px 20px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: '380px'
+          }}
+        >
+          <div style={{ background: '#fff7ed', color: '#ea580c', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <DoorOpen size={18} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+              Neue Raumbuchung erhalten
+            </span>
+            <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+              {realtimeToast.message}
+            </span>
+          </div>
+          <button
+            onClick={() => setRealtimeToast(prev => ({ ...prev, visible: false }))}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ROOM BOOKINGS LOGBOOK MODAL */}
+      {showLogbookModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.3)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '960px',
+            maxHeight: '85vh',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid rgba(0, 0, 0, 0.05)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px 32px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#f8fafc'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  📖 Raumbuchungen Logbuch
+                </h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                  Verwalte und bearbeite alle Raumbuchungen deiner Schule nachträglich.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLogbookModal(false);
+                  setEditingLogbookBookingId(null);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#475569',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              flex: 1,
+              padding: '32px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px'
+            }}>
+              {logbookBookings.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '48px 24px',
+                  color: '#64748b'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Keine Buchungen vorhanden</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.8 }}>Es wurden noch keine Raumbuchungen vorgenommen.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {logbookBookings.map((b) => {
+                    const isEditing = editingLogbookBookingId === b.id;
+                    const teacherName = b.profiles 
+                      ? `${b.profiles.first_name || ''} ${b.profiles.last_name || ''}`.trim()
+                      : 'Unbekannt';
+                    const roomName = b.rooms?.name || 'Unbekannt';
+                    const dateFormatted = new Date(b.date).toLocaleDateString('de-DE', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    });
+
+                    return (
+                      <div 
+                        key={b.id}
+                        style={{
+                          background: isEditing ? '#f8fafc' : '#ffffff',
+                          border: isEditing ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '16px',
+                          boxShadow: isEditing ? '0 4px 12px rgba(59, 130, 246, 0.04)' : 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {isEditing ? (
+                          /* EDITING FORM */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Titel / Zweck</label>
+                                <input
+                                  type="text"
+                                  value={editBookingTitle}
+                                  onChange={(e) => setEditBookingTitle(e.target.value)}
+                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Raum</label>
+                                <select
+                                  value={editBookingRoomId}
+                                  onChange={(e) => setEditBookingRoomId(e.target.value)}
+                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box', background: '#ffffff' }}
+                                >
+                                  {rooms.map((r: any) => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Datum</label>
+                                <input
+                                  type="date"
+                                  value={editBookingDate}
+                                  onChange={(e) => setEditBookingDate(e.target.value)}
+                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Startzeit</label>
+                                <input
+                                  type="time"
+                                  value={editBookingStartTime}
+                                  onChange={(e) => setEditBookingStartTime(e.target.value)}
+                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Endzeit</label>
+                                <input
+                                  type="time"
+                                  value={editBookingEndTime}
+                                  onChange={(e) => setEditBookingEndTime(e.target.value)}
+                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                              <button
+                                onClick={() => setEditingLogbookBookingId(null)}
+                                style={{
+                                  background: '#e2e8f0',
+                                  border: 'none',
+                                  color: '#334155',
+                                  padding: '8px 16px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'background 0.15s'
+                                }}
+                              >
+                                Abbrechen
+                              </button>
+                              <button
+                                onClick={() => handleUpdateLogbookBooking(b.id)}
+                                style={{
+                                  background: '#3b82f6',
+                                  border: 'none',
+                                  color: '#ffffff',
+                                  padding: '8px 16px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'background 0.15s'
+                                }}
+                              >
+                                Speichern
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* VIEWING MODE */
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '240px', flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{b.title || 'Eigennutzung'}</span>
+                                <span style={{
+                                  background: b.status === 'pending' ? '#fff7ed' : '#f0fdf4',
+                                  color: b.status === 'pending' ? '#c2410c' : '#15803d',
+                                  border: b.status === 'pending' ? '1px solid #fed7aa' : '1px solid #bbf7d0',
+                                  padding: '2px 8px',
+                                  borderRadius: '9999px',
+                                  fontSize: '0.64rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {b.status === 'pending' ? '⏳ Vorläufig' : '✓ Bestätigt'}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                                <span style={{ marginRight: '12px' }}>📍 Raum: <strong>{roomName}</strong></span>
+                                <span style={{ marginRight: '12px' }}>👤 Gebucht von: <strong>{teacherName}</strong></span>
+                                <span>📅 {dateFormatted} ({b.start_time.substring(0, 5)} - {b.end_time.substring(0, 5)})</span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {b.status === 'pending' && (
+                                <button
+                                  onClick={() => handleConfirmLogbookBooking(b.id)}
+                                  style={{
+                                    background: '#10b981',
+                                    border: 'none',
+                                    color: '#ffffff',
+                                    padding: '8px 14px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                >
+                                  Bestätigen
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setEditingLogbookBookingId(b.id);
+                                  setEditBookingTitle(b.title || '');
+                                  setEditBookingRoomId(b.room_id || '');
+                                  setEditBookingDate(b.date || '');
+                                  setEditBookingStartTime(b.start_time.substring(0, 5));
+                                  setEditBookingEndTime(b.end_time.substring(0, 5));
+                                }}
+                                style={{
+                                  background: '#f1f5f9',
+                                  border: 'none',
+                                  color: '#475569',
+                                  padding: '8px 14px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                              >
+                                Bearbeiten
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLogbookBooking(b.id)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  padding: '8px 14px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                              >
+                                Löschen
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR */}
       <div 
@@ -8601,7 +9191,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     </div>
                   </div>
 
-                  {/* WIDGET: Systemische Terminkonflikte */}
+                  {/* WIDGET: Vorläufige Raumbuchungen */}
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -8609,21 +9199,54 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                     border: '1px solid rgba(0, 0, 0, 0.05)'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ShieldAlert size={16} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#fff7ed', color: '#ea580c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <DoorOpen size={16} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Vorläufige Raumbuchungen der Lehrkräfte
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Freigabe erforderlich ({pendingBookings.length})
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          System-Kollisionsprüfer
-                        </h3>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          Prüfung auf Überschneidungen
-                        </span>
-                      </div>
+                      <button
+                        onClick={() => {
+                          fetchLogbookBookings();
+                          setShowLogbookModal(true);
+                        }}
+                        style={{
+                          background: '#f2f2f7', // Apple neutral gray
+                          border: 'none',
+                          color: '#1c1c1e', // Apple primary dark text
+                          padding: '6px 14px',
+                          borderRadius: '9999px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          letterSpacing: '-0.01em',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e5e5ea';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f2f2f7';
+                        }}
+                      >
+                        <BookOpen size={13} style={{ color: '#1c1c1e' }} />
+                        <span>Logbuch öffnen</span>
+                      </button>
                     </div>
 
-                    {scheduleConflicts.length === 0 ? (
+                    {pendingBookings.length === 0 ? (
                       <div style={{
                         background: 'rgba(16, 185, 129, 0.04)',
                         border: '1px solid rgba(16, 185, 129, 0.1)',
@@ -8636,11 +9259,116 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       }}>
                         <CheckCircle size={20} color="#10b981" />
                         <div>
-                          <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Konfliktfreier Stundenplan</strong>
-                          <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Alle aktiven Stundenpläne sind sauber strukturiert. Keine Raum- oder Lehrerdoppelbelegungen gefunden.</span>
+                          <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Keine ausstehenden Raumbuchungen</strong>
+                          <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Aktuell gibt es keine vorläufigen Raumbuchungen von Lehrkräften, die bestätigt werden müssen.</span>
                         </div>
                       </div>
                     ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {pendingBookings.map((b) => {
+                          const dateObj = new Date(b.date);
+                          const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                          const teacherName = b.profiles ? `${b.profiles.first_name || ''} ${b.profiles.last_name || ''}`.trim() : 'Lehrkraft';
+                          const roomName = b.rooms ? b.rooms.name : 'Unbekannter Raum';
+
+                          return (
+                            <div key={b.id} style={{
+                              background: '#fefefe',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '16px',
+                              padding: '14px 18px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '16px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {roomName} &bull; {b.title || 'Unterricht'}
+                                </span>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
+                                  Datum: <strong style={{ color: '#0f172a' }}>{dateFormatted}</strong> ({b.start_time} - {b.end_time} Uhr)
+                                </span>
+                                <span style={{ fontSize: '0.70rem', color: '#94a3b8' }}>
+                                  Gebucht von: <strong style={{ color: '#475569' }}>{teacherName}</strong>
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                <button
+                                  onClick={() => handleConfirmBooking(b.id)}
+                                  style={{
+                                    background: '#10b981',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(16, 185, 129, 0.2)'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                >
+                                  Bestätigen
+                                </button>
+                                <button
+                                  onClick={() => handleRejectBooking(b.id)}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.08)',
+                                    color: '#ef4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#ef4444';
+                                    e.currentTarget.style.color = '#ffffff';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                                    e.currentTarget.style.color = '#ef4444';
+                                  }}
+                                >
+                                  Ablehnen
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WIDGET: Systemische Terminkonflikte (Only shown if conflicts exist) */}
+                  {scheduleConflicts.length > 0 && (
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ShieldAlert size={16} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            System-Kollisionsprüfer
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                            Prüfung auf Überschneidungen
+                          </span>
+                        </div>
+                      </div>
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {scheduleConflicts.map((conflict, idx) => (
                           <div key={idx} style={{
@@ -8660,8 +9388,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* WIDGET: Stundenplaneinreichungen */}
                   <div style={{
@@ -8857,41 +9585,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     )}
                   </div>
 
-                  {/* WIDGET: Schultermine */}
+                  {/* WIDGET: Live Campus Feed */}
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
-                    padding: '24px',
+                    padding: '28px 24px',
                     boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                     border: '1px solid rgba(0, 0, 0, 0.05)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Calendar size={16} color="#fbbf24" />
-                        </div>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Schultermine
-                          </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Wichtige Termine der Musikschule
-                          </span>
-                        </div>
+                        <Sparkles size={20} color="#fbbf24" style={{ flexShrink: 0 }} />
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1a253c', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif", letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          Live Campus Feed
+                        </h3>
                       </div>
                       <button 
                         onClick={() => setShowAddEventModal(!showAddEventModal)}
                         style={{
-                          background: 'transparent',
+                          background: '#f2f2f7',
                           border: 'none',
-                          color: '#d97706',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
+                          color: '#1c1c1e',
+                          padding: '6px 14px',
+                          borderRadius: '9999px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '6px',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#e5e5ea'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#f2f2f7'}
                       >
                         {showAddEventModal ? 'Schließen' : '＋ Neu'}
                       </button>
@@ -8921,41 +9648,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                           console.error(err);
                         }
                       }} style={{
-                        background: 'rgba(245, 158, 11, 0.02)',
-                        border: '1px dashed rgba(245, 158, 11, 0.2)',
-                        padding: '8px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        padding: '16px',
                         borderRadius: '16px',
-                        marginBottom: '12px',
+                        marginBottom: '20px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '8px'
+                        gap: '12px'
                       }}>
                         <input 
-                          placeholder="Termin Titel..." 
+                          placeholder="Titel..." 
                           value={newEventTitle} 
                           onChange={(e) => setNewEventTitle(e.target.value)}
                           required
                           style={{
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(0,0,0,0.08)',
-                            fontSize: '0.8rem',
-                            fontFamily: 'inherit'
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.82rem',
+                            fontFamily: 'inherit',
+                            width: '100%',
+                            boxSizing: 'border-box'
                           }}
                         />
                         <textarea 
-                          placeholder="Beschreibung (z.B. Uhrzeit, Ort)..." 
+                          placeholder="Mitteilung schreiben..." 
                           value={newEventDesc} 
                           onChange={(e) => setNewEventDesc(e.target.value)}
                           required
                           style={{
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(0,0,0,0.08)',
-                            fontSize: '0.8rem',
-                            minHeight: '60px',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.82rem',
+                            minHeight: '80px',
                             resize: 'vertical',
-                            fontFamily: 'inherit'
+                            fontFamily: 'inherit',
+                            width: '100%',
+                            boxSizing: 'border-box'
                           }}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -8963,11 +9694,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             value={newEventTarget} 
                             onChange={(e: any) => setNewEventTarget(e.target.value)}
                             style={{
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(0,0,0,0.08)',
-                              fontSize: '0.7rem',
-                              background: '#fff'
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.74rem',
+                              background: '#ffffff',
+                              fontFamily: 'inherit'
                             }}
                           >
                             <option value="all">Sichtbar für alle</option>
@@ -8975,59 +9707,144 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             <option value="students">Nur Schüler</option>
                           </select>
                           <button type="submit" style={{
-                            background: '#d97706',
-                            color: '#fff',
+                            background: '#1c1c1e',
+                            color: '#ffffff',
                             border: 'none',
-                            borderRadius: '8px',
-                            padding: '6px 12px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            cursor: 'pointer'
-                          }}>Speichern</button>
+                            borderRadius: '9999px',
+                            padding: '8px 16px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#2c2c2e'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#1c1c1e'}
+                          >
+                            Speichern
+                          </button>
                         </div>
                       </form>
                     )}
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {schoolEvents.length === 0 ? (
                         <div style={{
-                          background: 'rgba(245, 158, 11, 0.04)',
-                          border: '1px solid rgba(245, 158, 11, 0.1)',
-                          color: '#d97706',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          color: '#64748b',
                           borderRadius: '16px',
-                          padding: '16px',
+                          padding: '24px 16px',
                           textAlign: 'center'
                         }}>
-                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Keine Schultermine erfasst</strong>
-                          <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>
-                            Erstelle eine Campus-Mitteilung, um hier Termine oder Ankündigungen anzuzeigen.
+                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700 }}>Keine Campus-Feeds vorhanden</strong>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>
+                            Erstelle eine Campus-Mitteilung, um hier wichtige Infos anzuzeigen.
                           </span>
                         </div>
                       ) : (
-                        schoolEvents.slice(0, 6).map((evt) => {
+                        schoolEvents.slice(0, 6).map((evt, idx) => {
                           const dateObj = new Date(evt.created_at);
-                          const formattedDate = dateObj.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+                          const day = dateObj.getDate();
+                          const month = dateObj.getMonth() + 1;
+                          const year = dateObj.getFullYear();
+                          const formattedDate = `${day}.${month}.${year}`;
+
+                          // Target label styling matching Apple's minimal gray badges
+                          let targetLabel = 'ALLE';
+                          let targetBg = '#f1f5f9';
+                          let targetColor = '#475569';
+                          if (evt.target_type === 'teachers') {
+                            targetLabel = 'LEHRKRÄFTE';
+                            targetBg = '#fef3c7';
+                            targetColor = '#b45309';
+                          } else if (evt.target_type === 'students') {
+                            targetLabel = 'SCHÜLER';
+                            targetBg = '#e0f2fe';
+                            targetColor = '#0369a1';
+                          }
+
                           return (
-                            <div key={evt.id} style={{
-                              padding: '12px 16px',
-                              borderRadius: '16px',
-                              border: '1px solid rgba(245, 158, 11, 0.1)',
-                              background: 'rgba(245, 158, 11, 0.03)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                                <strong style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 750 }}>
+                            <div 
+                              key={evt.id} 
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingBottom: '4px',
+                                borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none',
+                                paddingTop: idx > 0 ? '18px' : '0px',
+                                position: 'relative'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{
+                                  background: targetBg,
+                                  color: targetColor,
+                                  padding: '4px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: '0.64rem',
+                                  fontWeight: 800,
+                                  letterSpacing: '0.02em'
+                                }}>
+                                  {targetLabel}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 600 }}>
+                                    {formattedDate}
+                                  </span>
+                                  <button
+                                    onClick={async () => {
+                                      if (!window.confirm('Diese Mitteilung wirklich löschen?')) return;
+                                      try {
+                                        const { error } = await supabase
+                                          .from('campus_announcements')
+                                          .delete()
+                                          .eq('id', evt.id);
+                                        if (!error) {
+                                          fetchDashboardData();
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#ef4444',
+                                      cursor: 'pointer',
+                                      padding: '2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      opacity: 0.3,
+                                      transition: 'opacity 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.3'}
+                                    title="Löschen"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <strong style={{
+                                  fontSize: '0.96rem',
+                                  color: '#1a253c',
+                                  fontWeight: 800,
+                                  fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
+                                }}>
                                   {evt.title}
                                 </strong>
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, flexShrink: 0 }}>
-                                  {formattedDate}
-                                </span>
+                                <p style={{
+                                  margin: 0,
+                                  fontSize: '0.84rem',
+                                  color: '#475569',
+                                  lineHeight: 1.45,
+                                  fontWeight: 500
+                                }}>
+                                  {evt.message}
+                                </p>
                               </div>
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
-                                {evt.message}
-                              </span>
                             </div>
                           );
                         })

@@ -2098,6 +2098,7 @@ export function AdminDashboard({
               end_time,
               title,
               booked_by,
+              status,
               profiles:users!booked_by (
                 first_name,
                 last_name,
@@ -2130,7 +2131,8 @@ export function AdminDashboard({
                 purpose: purpose,
                 teacherId: db.booked_by,
                 teacherName: teacherName,
-                isDbBooking: true
+                isDbBooking: true,
+                status: db.status
               };
             });
             setDbRoomBookings(mapped);
@@ -6297,7 +6299,7 @@ export function AdminDashboard({
     // Derived selected room to keep logic aligned
     const selectedRoom = roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
 
-    const handleAddBooking = (roomId: string) => {
+    const handleAddBooking = async (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
       const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
       const creatorName = admin 
@@ -6345,19 +6347,32 @@ export function AdminDashboard({
 
         setSchedules(prev => [...prev, newSchedule]);
       } else {
-        const newBooking = {
-          id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-          roomId,
-          roomName,
-          date: bookingDate,
-          startTime: bookingStartTime,
-          endTime: bookingEndTime,
-          purpose: finalPurpose,
-          teacherId: userId,
-          teacherName: finalTeacherName
-        };
+        const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
+        const status = isStaff ? 'approved' : 'pending';
 
-        setCampusBookings(prev => [...prev, newBooking]);
+        try {
+          const { error } = await supabase
+            .from('room_bookings')
+            .insert({
+              school_id: resolvedSchoolId,
+              room_id: roomId,
+              booked_by: userId,
+              date: bookingDate,
+              start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+              end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+              title: finalPurpose,
+              status: status
+            });
+            
+          if (error) throw error;
+          
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          await fetchData();
+        } catch (dbErr: any) {
+          console.error('Error inserting room booking:', dbErr);
+          alert('Fehler beim Speichern der Raumbuchung: ' + dbErr.message);
+          return;
+        }
       }
 
       setIsDateFilterActive(false);
@@ -6373,7 +6388,7 @@ export function AdminDashboard({
       setRecurringInterval(1);
     };
 
-    const handleUpdateBooking = () => {
+    const handleUpdateBooking = async () => {
       if (!selectedBooking) return;
 
       const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
@@ -6395,33 +6410,56 @@ export function AdminDashboard({
 
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
-        const roomName = rooms.find((r: any) => r.id === selectedBooking.roomId)?.name || selectedBooking.roomName || 'Raum';
-        const override = {
-          id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-          roomId: selectedBooking.roomId,
-          roomName,
-          date: bookingDate,
-          startTime: bookingStartTime,
-          endTime: bookingEndTime,
-          purpose: finalPurpose,
-          teacherId: userId,
-          teacherName: finalTeacherName
-        };
-        setCampusBookings(prev => [...prev, override]);
-      } else {
-        setCampusBookings(prev => prev.map((b: any) => {
-          if (b.id === selectedBooking.id) {
-            return {
-              ...b,
+        const resolvedSchoolId = admin?.school_id || (rooms.find((r: any) => r.id === selectedBooking.roomId)?.school_id);
+        const status = isStaff ? 'approved' : 'pending';
+
+        try {
+          const { error } = await supabase
+            .from('room_bookings')
+            .insert({
+              school_id: resolvedSchoolId,
+              room_id: selectedBooking.roomId,
+              booked_by: userId,
               date: bookingDate,
-              startTime: bookingStartTime,
-              endTime: bookingEndTime,
-              purpose: finalPurpose,
-              teacherName: finalTeacherName
-            };
-          }
-          return b;
-        }));
+              start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+              end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+              title: finalPurpose,
+              status: status
+            });
+            
+          if (error) throw error;
+          
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          await fetchData();
+        } catch (dbErr: any) {
+          console.error('Error inserting room booking override:', dbErr);
+          alert('Fehler beim Speichern der Raumbuchung: ' + dbErr.message);
+          return;
+        }
+      } else {
+        // Update database booking
+        const status = isStaff ? 'approved' : 'pending';
+        try {
+          const { error } = await supabase
+            .from('room_bookings')
+            .update({
+              date: bookingDate,
+              start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+              end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+              title: finalPurpose,
+              status: status
+            })
+            .eq('id', selectedBooking.id);
+
+          if (error) throw error;
+
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          await fetchData();
+        } catch (dbErr: any) {
+          console.error('Error updating room booking:', dbErr);
+          alert('Fehler beim Aktualisieren der Raumbuchung: ' + dbErr.message);
+          return;
+        }
       }
 
       setSelectedBooking(null);
@@ -7519,6 +7557,7 @@ export function AdminDashboard({
                                   const isOwnSchedule = isSchedule && isOwnBooking;
                                   const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
                                   const hasConflict = isRescheduled && slotBookings.length > 1;
+                                  const isPending = b.status === 'pending';
                                   
                                   // Apple Calendar Color Schemes
                                   let bg = 'rgba(142, 142, 147, 0.12)';
@@ -7603,9 +7642,21 @@ export function AdminDashboard({
                                       }}
                                       title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
-                                        background: b.isPreview ? '#f0f9ff' : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg),
-                                        border: b.isPreview ? '2.2px dashed #0284c7' : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`,
-                                        borderLeft: b.isPreview ? '2.2px dashed #0284c7' : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`,
+                                        background: b.isPreview 
+                                          ? '#f0f9ff' 
+                                          : (isPending 
+                                            ? `repeating-linear-gradient(135deg, rgba(175, 82, 222, 0.04), rgba(175, 82, 222, 0.04) 10px, rgba(175, 82, 222, 0.12) 10px, rgba(175, 82, 222, 0.12) 20px)`
+                                            : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg)),
+                                        border: b.isPreview 
+                                          ? '2.2px dashed #0284c7' 
+                                          : (isPending 
+                                            ? `1.5px dashed ${leftAccentColor}` 
+                                            : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`),
+                                        borderLeft: b.isPreview 
+                                          ? '2.2px dashed #0284c7' 
+                                          : (isPending 
+                                            ? `3.5px dashed ${leftAccentColor}` 
+                                            : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`),
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
@@ -7830,6 +7881,28 @@ export function AdminDashboard({
                                               width: 'fit-content'
                                             }}>
                                               ⚠️ Doppelbelegung
+                                            </div>
+                                          )}
+
+                                          {/* Pending/Vorläufig badge */}
+                                          {isPending && (
+                                            <div style={{
+                                              fontSize: '0.58rem',
+                                              fontWeight: 900,
+                                              textTransform: 'uppercase',
+                                              color: '#c2410c',
+                                              background: '#fff7ed',
+                                              border: '1.5px dashed #ea580c',
+                                              padding: '1px 3px',
+                                              borderRadius: '4px',
+                                              width: 'fit-content',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '2px',
+                                              marginTop: '2px',
+                                              marginBottom: '2px'
+                                            }}>
+                                              ⏳ Vorläufig
                                             </div>
                                           )}
 
