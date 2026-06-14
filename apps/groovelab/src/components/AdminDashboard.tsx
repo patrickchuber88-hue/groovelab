@@ -1441,6 +1441,7 @@ export function AdminDashboard({
   const [snapToGrid, setSnapToGrid] = useState(true);
   const canvasRef = React.useRef<HTMLDivElement>(null);
   const calendarScrollRef = React.useRef<HTMLDivElement>(null);
+  const loadedWeekRangeRef = React.useRef<{ start: string; end: string } | null>(null);
 
   useEffect(() => {
     if (customizingRoom) {
@@ -1852,9 +1853,10 @@ export function AdminDashboard({
   }, [forceTab]);
 
   useEffect(() => {
-    window.addEventListener('refresh-bookings', fetchData);
+    const handleRefresh = () => { fetchData(true); };
+    window.addEventListener('refresh-bookings', handleRefresh);
     return () => {
-      window.removeEventListener('refresh-bookings', fetchData);
+      window.removeEventListener('refresh-bookings', handleRefresh);
     };
   }, []);
 
@@ -1906,9 +1908,9 @@ export function AdminDashboard({
         }
       }, 150);
     }
-  }, [activeTab, selectedCampusRoomId, bookingDate]);
+  }, [activeTab, selectedCampusRoomId]);
 
-  const fetchData = async () => {
+  const fetchData = async (force = false) => {
     let currentAdmin = admin;
     if (!currentAdmin) {
       const { data: adminData } = await supabase
@@ -2056,12 +2058,6 @@ export function AdminDashboard({
           }
         }
 
-        const { data: schedulesData } = await supabase
-          .from('schedules')
-          .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
-          .eq('school_id', adminData.school_id);
-        setSchedules(schedulesData || []);
-
         const d = new Date(bookingDate);
         const day = d.getDay();
         const diff = d.getDate() - (day === 0 ? 6 : day - 1);
@@ -2074,89 +2070,100 @@ export function AdminDashboard({
         const startDateStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
         const endDateStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
 
-        const { data: occursData } = await supabase
-          .from('schedule_occurrences')
-          .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
-          .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
+        const weekChanged = force ||
+                            !loadedWeekRangeRef.current || 
+                            loadedWeekRangeRef.current.start !== startDateStr || 
+                            loadedWeekRangeRef.current.end !== endDateStr;
 
-        // Will set schedule occurrences after loading room overrides so we can map overrides
-        // setScheduleOccurrences(occursData || []);
+        if (weekChanged) {
+          const { data: schedulesData } = await supabase
+            .from('schedules')
+            .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+            .eq('school_id', adminData.school_id);
+          setSchedules(schedulesData || []);
 
-        // Fetch room_bookings from database for the selected week
-        const { data: dbBookingsData } = await supabase
-          .from('room_bookings')
-          .select(`
-            id,
-            room_id,
-            date,
-            start_time,
-            end_time,
-            title,
-            booked_by,
-            profiles:users!booked_by (
-              first_name,
-              last_name,
-              role
-            )
-          `)
-          .eq('school_id', adminData.school_id)
-          .gte('date', startDateStr)
-          .lte('date', endDateStr);
+          const { data: occursData } = await supabase
+            .from('schedule_occurrences')
+            .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+            .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
 
-        if (dbBookingsData) {
-          const mapped = dbBookingsData.map((db: any) => {
-            const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
-            const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
-            const isStaff = db.profiles?.role?.toLowerCase() === 'secretary' || db.profiles?.role?.toLowerCase() === 'admin';
-            const creatorName = db.profiles 
-              ? `${capitalizeName(db.profiles.first_name)} ${capitalizeName(db.profiles.last_name)}`.trim()
-              : 'Lehrer';
-            
-            const teacherName = isStaff ? 'Schule' : creatorName;
-            const dbTitle = db.title || 'Unterricht';
-            const purpose = isStaff && (dbTitle === 'Unterricht' || dbTitle.startsWith('Unterricht:') || dbTitle === 'Eigennutzung') ? creatorName : dbTitle;
+          // Fetch room_bookings from database for the selected week
+          const { data: dbBookingsData } = await supabase
+            .from('room_bookings')
+            .select(`
+              id,
+              room_id,
+              date,
+              start_time,
+              end_time,
+              title,
+              booked_by,
+              profiles:users!booked_by (
+                first_name,
+                last_name,
+                role
+              )
+            `)
+            .eq('school_id', adminData.school_id)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr);
 
-            return {
-              id: db.id,
-              roomId: db.room_id,
-              date: db.date,
-              startTime: startTimeStr,
-              endTime: endTimeStr,
-              purpose: purpose,
-              teacherId: db.booked_by,
-              teacherName: teacherName,
-              isDbBooking: true
-            };
-          });
-          setDbRoomBookings(mapped);
-        } else {
-          setDbRoomBookings([]);
-        }
+          if (dbBookingsData) {
+            const mapped = dbBookingsData.map((db: any) => {
+              const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
+              const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
+              const isStaff = db.profiles?.role?.toLowerCase() === 'secretary' || db.profiles?.role?.toLowerCase() === 'admin';
+              const creatorName = db.profiles 
+                ? `${capitalizeName(db.profiles.first_name)} ${capitalizeName(db.profiles.last_name)}`.trim()
+                : 'Lehrer';
+              
+              const teacherName = isStaff ? 'Schule' : creatorName;
+              const dbTitle = db.title || 'Unterricht';
+              const purpose = isStaff && (dbTitle === 'Unterricht' || dbTitle.startsWith('Unterricht:') || dbTitle === 'Eigennutzung') ? creatorName : dbTitle;
 
-        // Map room overrides onto loaded occurrences so their room is correct
-        let mappedOccurs = occursData || [];
-        if (dbBookingsData && occursData) {
-          mappedOccurs = occursData.map((occ: any) => {
-            const booking = dbBookingsData.find(b => 
-              b.date === occ.date && 
-              b.start_time.substring(0, 5) === occ.start_time.substring(0, 5) &&
-              b.booked_by === occ.teacher_id
-            );
-            if (booking) {
               return {
-                ...occ,
-                schedules: occ.schedules ? {
-                  ...occ.schedules,
-                  room_id: booking.room_id
-                } : {
-                  room_id: booking.room_id
-                }
+                id: db.id,
+                roomId: db.room_id,
+                date: db.date,
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                purpose: purpose,
+                teacherId: db.booked_by,
+                teacherName: teacherName,
+                isDbBooking: true
               };
-            }
-            return occ;
-          });
+            });
+            setDbRoomBookings(mapped);
+          } else {
+            setDbRoomBookings([]);
+          }
+
+          // Map room overrides onto loaded occurrences so their room is correct
+          let mappedOccurs = occursData || [];
+          if (dbBookingsData && occursData) {
+            mappedOccurs = occursData.map((occ: any) => {
+              const booking = dbBookingsData.find(b => 
+                b.date === occ.date && 
+                b.start_time.substring(0, 5) === occ.start_time.substring(0, 5) &&
+                b.booked_by === occ.teacher_id
+              );
+              if (booking) {
+                return {
+                  ...occ,
+                  schedules: occ.schedules ? {
+                    ...occ.schedules,
+                    room_id: booking.room_id
+                  } : {
+                    room_id: booking.room_id
+                  }
+                };
+              }
+              return occ;
+            });
+          }
+          setScheduleOccurrences(mappedOccurs);
+          loadedWeekRangeRef.current = { start: startDateStr, end: endDateStr };
         }
-        setScheduleOccurrences(mappedOccurs);
 
         let { data: stationsData } = await supabase
           .from('stations')
@@ -6428,22 +6435,47 @@ export function AdminDashboard({
 
 
     const handleCellClick = (dayIdx: number, hourStr: string, e: React.MouseEvent<HTMLDivElement>) => {
-      const currentSelectedDate = new Date(bookingDate);
-      const dayOfWeek = currentSelectedDate.getDay();
-      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-      const targetDate = new Date(currentSelectedDate.setDate(diffToMon + dayIdx));
-      const targetDateStr = targetDate.toISOString().split('T')[0];
+      const currentSelectedDate = parseLocalDate(bookingDate);
+      const dayOfWeek = currentSelectedDate.getUTCDay();
+      const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      currentSelectedDate.setUTCDate(diffToMon + dayIdx);
+      const targetDateStr = `${currentSelectedDate.getUTCFullYear()}-${String(currentSelectedDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentSelectedDate.getUTCDate()).padStart(2, '0')}`;
 
       const startH = parseInt(hourStr.split(':')[0]);
       const startStr = `${String(startH).padStart(2, '0')}:00`;
       const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
 
-      setBookingDate(targetDateStr);
-      setBookingStartTime(startStr);
-      setBookingEndTime(endStr);
+      if (showPreviewField && bookingDate === targetDateStr && bookingStartTime && bookingEndTime) {
+        // Same day: merge the time slots!
+        const parseToMin = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const formatFromMin = (mins: number) => {
+          const h = Math.floor(mins / 60) % 24;
+          const m = mins % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+
+        const currentStartMin = parseToMin(bookingStartTime);
+        const currentEndMin = parseToMin(bookingEndTime);
+        const clickedStartMin = parseToMin(startStr);
+        const clickedEndMin = parseToMin(endStr);
+
+        const newStartMin = Math.min(currentStartMin, clickedStartMin);
+        const newEndMin = Math.max(currentEndMin, clickedEndMin);
+
+        setBookingStartTime(formatFromMin(newStartMin));
+        setBookingEndTime(formatFromMin(newEndMin));
+      } else {
+        // Different day or no preview: start new selection
+        setBookingDate(targetDateStr);
+        setBookingStartTime(startStr);
+        setBookingEndTime(endStr);
+      }
       setIsDateFilterActive(true);
       setShowMyBookingsOnly(false); // Make sure booking sidebar is shown
-
+      setShowPreviewField(true); // Force preview card to show immediately on first click
     };
 
 
@@ -6453,15 +6485,22 @@ export function AdminDashboard({
       const slotBookings = getBookingsForSlot(dayIdx, hourStr);
       if (slotBookings.length > 0) return;
 
-      const currentSelectedDate = new Date(bookingDate);
-      const dayOfWeek = currentSelectedDate.getDay();
-      const diffToMon = currentSelectedDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-      const targetDate = new Date(currentSelectedDate.setDate(diffToMon + dayIdx));
-      const targetDateStr = targetDate.toISOString().split('T')[0];
+      const currentSelectedDate = parseLocalDate(bookingDate);
+      const dayOfWeek = currentSelectedDate.getUTCDay();
+      const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+      currentSelectedDate.setUTCDate(diffToMon + dayIdx);
+      const targetDateStr = `${currentSelectedDate.getUTCFullYear()}-${String(currentSelectedDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentSelectedDate.getUTCDate()).padStart(2, '0')}`;
 
       const startH = parseInt(hourStr.split(':')[0]);
       const startStr = `${String(startH).padStart(2, '0')}:00`;
       const endStr = `${String(startH + 1).padStart(2, '0')}:00`;
+
+      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+      const creatorName = admin 
+        ? `${capitalizeName(admin.first_name)} ${capitalizeName(admin.last_name)}`.trim()
+        : 'Lehrer';
+      const finalPurpose = isStaff ? creatorName : 'Unterricht';
+      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       const newBooking = {
         id: 'cb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
@@ -6470,9 +6509,9 @@ export function AdminDashboard({
         date: targetDateStr,
         startTime: startStr,
         endTime: endStr,
-        purpose: 'Unterricht',
+        purpose: finalPurpose,
         teacherId: userId,
-        teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+        teacherName: finalTeacherName
       };
 
       setCampusBookings(prev => [...prev, newBooking]);
@@ -7715,7 +7754,7 @@ export function AdminDashboard({
                                             {/* Teacher Name */}
                                             {durationHrs >= 0.75 && (
                                               <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                                {b.teacherName}
+                                                {b.teacherName === 'Schule' ? <strong style={{ fontWeight: 900 }}>Schule</strong> : b.teacherName}
                                               </div>
                                             )}
                                           </div>
@@ -7756,7 +7795,7 @@ export function AdminDashboard({
                                           {/* Teacher Name */}
                                           {durationHrs >= 0.75 && (
                                             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                              {b.teacherName}
+                                              {b.teacherName === 'Schule' ? <strong style={{ fontWeight: 900 }}>Schule</strong> : b.teacherName}
                                             </div>
                                           )}
 
@@ -7903,7 +7942,11 @@ export function AdminDashboard({
                             {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
                           </span>
                           <div style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
-                            {b.teacherName === 'Schule' ? `Schule • ${b.roomName}` : b.roomName}
+                            {b.teacherName === 'Schule' ? (
+                              <>
+                                <strong style={{ fontWeight: 900 }}>Schule</strong> • {b.roomName}
+                              </>
+                            ) : b.roomName}
                           </div>
                           {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
                             <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
