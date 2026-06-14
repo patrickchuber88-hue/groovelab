@@ -178,9 +178,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // Detect mobile and check if deviceorientation is available
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const usesSensors = isMobile && (typeof window.DeviceOrientationEvent !== 'undefined');
+    const usesSensors = false; // Disabled to match desktop experience and show progress ring directly
     
-    setIsDesktopFallback(!usesSensors);
+    setIsDesktopFallback(true);
 
     let graceWarningPlayed = false;
 
@@ -981,7 +981,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const usesSensors = isMobile && (typeof window.DeviceOrientationEvent !== 'undefined');
+    const usesSensors = false; // Disabled to match desktop experience and show progress ring directly
 
     if (usesSensors && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
