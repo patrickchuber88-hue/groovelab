@@ -1252,6 +1252,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       alert('Fehler beim Aktualisieren: ' + err.message);
     }
   };
+
+  const handleToggleTeacherModule = async (teacher: any, moduleType: 'campus' | 'groovelab') => {
+    try {
+      const isCampus = teacher.isCampusActive || teacher.is_campus_active;
+      const isGroove = teacher.isGroovelabActive || teacher.is_groovelab_active;
+      
+      const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
+      const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_campus_active: newCampusValue,
+          is_groovelab_active: newGrooveValue,
+        })
+        .eq('id', teacher.id);
+
+      if (error) throw error;
+      
+      if (manageTeacher && manageTeacher.id === teacher.id) {
+        setManageTeacher({
+          ...manageTeacher,
+          isCampusActive: newCampusValue,
+          is_campus_active: newCampusValue,
+          isGroovelabActive: newGrooveValue,
+          is_groovelab_active: newGrooveValue,
+        });
+      }
+      
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Umschalten: ' + err.message);
+    }
+  };
   const [holidayXpActive, setHolidayXpActive] = useState<boolean>(() => {
     return localStorage.getItem('groovelab_holiday_xp_active') === 'true';
   });
@@ -12285,30 +12319,70 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                               {/* Status Badges (Campus & Groove) */}
                               <div style={{ flex: '1.25', minWidth: '130px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                <span style={{
-                                  padding: '5px 12px',
-                                  borderRadius: '10px',
-                                  background: isCampus ? '#e2f6ea' : '#f5f5f7',
-                                  color: isCampus ? '#137333' : '#86868b',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 700,
-                                  minWidth: '55px',
-                                  textAlign: 'center'
-                                }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleTeacherModule(t, 'campus');
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    padding: '5px 12px',
+                                    borderRadius: '10px',
+                                    background: isCampus ? '#e2f6ea' : '#f5f5f7',
+                                    color: isCampus ? '#137333' : '#86868b',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    minWidth: '65px',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Urbanist',
+                                    boxShadow: isCampus ? '0 2px 8px rgba(34,197,94,0.12)' : 'none'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    if (isCampus) e.currentTarget.style.background = '#d1f2dd';
+                                    else e.currentTarget.style.background = '#e9e9eb';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.background = isCampus ? '#e2f6ea' : '#f5f5f7';
+                                  }}
+                                >
                                   Campus
-                                </span>
-                                <span style={{
-                                  padding: '5px 12px',
-                                  borderRadius: '10px',
-                                  background: isGroove ? '#fef3c7' : '#f5f5f7',
-                                  color: isGroove ? '#b45309' : '#86868b',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 700,
-                                  minWidth: '55px',
-                                  textAlign: 'center'
-                                }}>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleTeacherModule(t, 'groovelab');
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    padding: '5px 12px',
+                                    borderRadius: '10px',
+                                    background: isGroove ? '#fef3c7' : '#f5f5f7',
+                                    color: isGroove ? '#b45309' : '#86868b',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    minWidth: '65px',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Urbanist',
+                                    boxShadow: isGroove ? '0 2px 8px rgba(245,158,11,0.12)' : 'none'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    if (isGroove) e.currentTarget.style.background = '#fde68a';
+                                    else e.currentTarget.style.background = '#e9e9eb';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.background = isGroove ? '#fef3c7' : '#f5f5f7';
+                                  }}
+                                >
                                   Groovelab
-                                </span>
+                                </button>
                               </div>
 
                               {/* Pupil Count */}
