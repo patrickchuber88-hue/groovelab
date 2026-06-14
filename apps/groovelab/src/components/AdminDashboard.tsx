@@ -8779,7 +8779,9 @@ export function AdminDashboard({
               </div>
               <div style={{ width: '1px', height: '32px', background: '#cbd5e1' }} />
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>{stations.length}</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
+                  {stations.filter(s => rooms.some(r => r.id === s.room_id) && s.name.toLowerCase() !== 'lehrer ipad').length}
+                </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>iPads Gesamt</div>
               </div>
             </div>
