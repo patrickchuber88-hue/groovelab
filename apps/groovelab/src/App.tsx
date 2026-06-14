@@ -7389,7 +7389,7 @@ function App() {
                   alignItems: 'stretch',
                   boxShadow: '0 8px 32px rgba(52, 168, 83, 0.08)',
                   overflow: 'hidden',
-                  minHeight: '160px',
+                  minHeight: '200px',
                   boxSizing: 'border-box' as const,
                   position: 'relative',
                 }}>
