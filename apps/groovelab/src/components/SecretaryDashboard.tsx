@@ -1072,6 +1072,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status' | 'rooms'>('briefing');
+  const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_subjects');
+    return saved !== 'false';
+  });
+  const [enabledCampusCooperations, setEnabledCampusCooperations] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_cooperations');
+    return saved !== 'false';
+  });
+  const [enabledCampusRooms, setEnabledCampusRooms] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_rooms');
+    return saved !== 'false';
+  });
+  const [enabledCampusEvents, setEnabledCampusEvents] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_events');
+    return saved !== 'false';
+  });
+  const [enabledCampusSchedules, setEnabledCampusSchedules] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_schedules');
+    return saved !== 'false';
+  });
+  const [enabledCalendarWidget, setEnabledCalendarWidget] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_calendar_widget');
+    return saved !== 'false';
+  });
+  const [enabledQrLogin, setEnabledQrLogin] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_qr_login');
+    return saved !== 'false';
+  });
+
+  const handleToggleSetting = (key: string, value: boolean, setter: (val: boolean) => void) => {
+    localStorage.setItem(key, String(value));
+    setter(value);
+  };
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
@@ -7744,7 +7777,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           case 'briefing': return '🎓 Campus-Zentrale';
           case 'onboarding': return 'Lehrer-Onboarding';
           case 'schedules': return 'Stundenpläne';
-          case 'status': return 'Status & API';
+          case 'status': return 'Einstellungen';
           default: return '🎓 Campus Verwaltung';
         }
       case 'groovelab':
@@ -8438,15 +8471,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           {/* If activeTab is Campus */}
           {activeTab === 'campus' && [
             { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
-            { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
+            enabledCampusSubjects && { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
-            { id: 'cooperations', label: 'Kooperationen', icon: Users },
-            { id: 'rooms', label: 'Räume', icon: DoorOpen },
-            { id: 'events', label: 'Termine', icon: Calendar },
-            { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
-            { id: 'status', label: 'Status & API', icon: Sliders }
-          ].map((item) => {
+            enabledCampusCooperations && { id: 'cooperations', label: 'Kooperationen', icon: Users },
+            enabledCampusRooms && { id: 'rooms', label: 'Räume', icon: DoorOpen },
+            enabledCampusEvents && { id: 'events', label: 'Termine', icon: Calendar },
+            enabledCampusSchedules && { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
+            { id: 'status', label: 'Einstellungen', icon: Sliders }
+          ].filter((item): item is { id: string; label: string; icon: any; count?: number } => !!item).map((item) => {
             const Icon = item.icon;
             const isSelected = campusSubTab === item.id;
             return (
@@ -13462,27 +13495,305 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 </div>
               )}
 
-              {/* Subtab: Status & API */}
+              {/* Subtab: Einstellungen (formerly Status & API) */}
               {campusSubTab === 'status' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="google-card" style={{ paddingLeft: '44px' }}>
-                    <div className="google-kpi-bar bg-google-green" />
-                    <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800 }}>Campus Modul aktivieren</h3>
-                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: isBillingBooked ? 'not-allowed' : 'pointer' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>🎓 Campus System aktivieren</span>
-                      <input
-                        type="checkbox"
-                        checked={hasCampusSub}
-                        disabled={isBillingBooked}
-                        onChange={(e) => handleToggleCampusSub(e.target.checked)}
-                        style={{ width: '18px', height: '18px', accentColor: '#34a853', cursor: isBillingBooked ? 'not-allowed' : 'pointer' }}
-                      />
-                    </label>
-                    {isBillingBooked && (
-                      <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '6px', display: 'block' }}>
-                        🔒 Dieses Modul ist Teil deiner aktiven Buchung für das Schuljahr 2026/2027 und kann nicht deaktiviert werden.
+                <div style={{
+                  fontFamily: 'Urbanist, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                  color: '#1d1d1f',
+                  width: '100%',
+                  maxWidth: '800px',
+                  margin: '0 auto',
+                  padding: '12px 8px 48px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '32px'
+                }}>
+                  {/* CSS for Apple iOS Style Toggles */}
+                  <style dangerouslySetInnerHTML={{__html: `
+                    .apple-toggle {
+                      position: relative;
+                      display: inline-block;
+                      width: 51px;
+                      height: 31px;
+                      flex-shrink: 0;
+                    }
+                    .apple-toggle input {
+                      opacity: 0;
+                      width: 0;
+                      height: 0;
+                    }
+                    .apple-toggle-slider {
+                      position: absolute;
+                      cursor: pointer;
+                      top: 0; left: 0; right: 0; bottom: 0;
+                      background-color: #e9e9eb;
+                      transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                      border-radius: 34px;
+                    }
+                    .apple-toggle-slider:before {
+                      position: absolute;
+                      content: "";
+                      height: 27px;
+                      width: 27px;
+                      left: 2px;
+                      bottom: 2px;
+                      background-color: white;
+                      transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                      border-radius: 50%;
+                      box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 3px 1px rgba(0,0,0,0.06);
+                    }
+                    .apple-toggle input:checked + .apple-toggle-slider {
+                      background-color: #34c759;
+                    }
+                    .apple-toggle input:checked + .apple-toggle-slider:before {
+                      transform: translateX(20px);
+                    }
+                    .apple-cell-hover:hover {
+                      background-color: rgba(0, 0, 0, 0.015) !important;
+                    }
+                  `}} />
+
+                  {/* Header Title & Subtitle */}
+                  <div style={{ padding: '0 8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(52, 199, 89, 0.12)', color: '#249d3d', padding: '4px 10px', borderRadius: '100px' }}>
+                        Campus Customizer
                       </span>
-                    )}
+                    </div>
+                    <h2 style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 6px 0', color: '#1d1d1f', fontFamily: 'Urbanist' }}>Einstellungen</h2>
+                    <p style={{ fontSize: '0.95rem', color: '#86868b', margin: 0, fontWeight: 500, lineHeight: 1.45 }}>
+                      Verwalte die aktive Funktions- und Boardstruktur deiner Musikschule. Deaktivierte Funktionen werden nahtlos aus allen Menüs und Sichten ausgeblendet.
+                    </p>
+                  </div>
+
+                  {/* SECTION 1: MODULE & NAVIGATIONS-BOARDS */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px 12px' }}>
+                      Menü-Boards de-/aktivieren
+                    </h3>
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '20px',
+                      border: '1px solid rgba(0, 0, 0, 0.07)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 6px 30px rgba(0, 0, 0, 0.025)'
+                    }}>
+                      
+                      {/* Cell: Unterrichtsfächer */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)' }}>
+                            <BookOpen size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Unterrichtsfächer</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt die Definition spezifischer Instrumente & Fächer für Lehrkräfte.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCampusSubjects}
+                            onChange={(e) => handleToggleSetting('gl_setting_subjects', e.target.checked, setEnabledCampusSubjects)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      {/* Cell: Kooperationen */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                            <Users size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Kooperationen</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Verwaltet externe Kooperationspartnerschaften (z.B. Kitas, Grundschulen).</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCampusCooperations}
+                            onChange={(e) => handleToggleSetting('gl_setting_cooperations', e.target.checked, setEnabledCampusCooperations)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      {/* Cell: Räume */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                            <DoorOpen size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Räume</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Konfiguriert physische Unterrichtsräume und überwacht deren Schlüssel-Status.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCampusRooms}
+                            onChange={(e) => handleToggleSetting('gl_setting_rooms', e.target.checked, setEnabledCampusRooms)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      {/* Cell: Termine */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(236, 72, 153, 0.2)' }}>
+                            <Calendar size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Termine</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Verwaltet zentrale Ferienzeiten, Schulfeste und interne Event-Planung.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCampusEvents}
+                            onChange={(e) => handleToggleSetting('gl_setting_events', e.target.checked, setEnabledCampusEvents)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      {/* Cell: Stundenpläne */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}>
+                            <ClipboardList size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Stundenpläne</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Aktiviert den Prüf- und Freigabe-Workflow für eingereichte Lehrerstundenpläne.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCampusSchedules}
+                            onChange={(e) => handleToggleSetting('gl_setting_schedules', e.target.checked, setEnabledCampusSchedules)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: SPECIALIZED FUNCTIONS */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px 12px' }}>
+                      Schnittstellen & Widgets
+                    </h3>
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '20px',
+                      border: '1px solid rgba(0, 0, 0, 0.07)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 6px 30px rgba(0, 0, 0, 0.025)'
+                    }}>
+
+                      {/* Cell: Kalender-Widget auf Startseite */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.2)' }}>
+                            <LayoutDashboard size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Kalender-Widget auf Startseite</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Blendet die heutige Betriebsübersicht im Startseiten-Panel ein.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledCalendarWidget}
+                            onChange={(e) => handleToggleSetting('gl_setting_calendar_widget', e.target.checked, setEnabledCalendarWidget)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      {/* Cell: QR-Code Authentifizierung */}
+                      <div className="apple-cell-hover" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '18px 24px',
+                        transition: 'background-color 0.2s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(100, 116, 139, 0.2)' }}>
+                            <Key size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>QR-Code Authentifizierung</div>
+                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt passwortlosen Portal-Zugang für Endnutzer via scannbare QR-Codes.</div>
+                          </div>
+                        </div>
+                        <label className="apple-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledQrLogin}
+                            onChange={(e) => handleToggleSetting('gl_setting_qr_login', e.target.checked, setEnabledQrLogin)}
+                          />
+                          <span className="apple-toggle-slider"></span>
+                        </label>
+                      </div>
+
+                    </div>
                   </div>
                 </div>
               )}
@@ -13490,11 +13801,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             </div>
 
             {/* Right Sidebar Pane */}
-            {campusSubTab !== 'events' && campusSubTab !== 'rooms' && (
+            {campusSubTab !== 'events' && campusSubTab !== 'rooms' && campusSubTab !== 'status' && (
               <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
               
               {/* Briefing/Startseite Sidebar */}
-              {campusSubTab === 'briefing' && (
+              {campusSubTab === 'briefing' && enabledCalendarWidget && (
                 <div className="google-card" style={{ padding: '20px' }}>
                   <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#137333', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     📅 Campus Kalender
@@ -14997,37 +15308,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 </div>
               )}
 
-              {/* Status & API Sidebar */}
-              {campusSubTab === 'status' && (
-                <div className="google-card" style={{ padding: '20px' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#34a853', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    ⚡ Schnittstellen-Status
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                      <span style={{ fontWeight: 650, color: '#166534' }}>Supabase Datenbank Connection</span>
-                      <span style={{ color: '#137333', fontWeight: 900 }}>OK ✓</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                      <span style={{ fontWeight: 650, color: '#166534' }}>Campus Sync Engine (Cron)</span>
-                      <span style={{ color: '#137333', fontWeight: 900 }}>OK ✓</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                      <span style={{ fontWeight: 650, color: '#166534' }}>GrooveLab Kiosk Sync API</span>
-                      <span style={{ color: '#137333', fontWeight: 900 }}>OK ✓</span>
-                    </div>
-
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: '12px', marginTop: '4px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#475569' }}>Sicherheits-Tipp:</strong>
-                      <p style={{ margin: 0, color: '#5f6368', lineHeight: '1.4', fontSize: '0.78rem' }}>
-                        Regeneriere den Campus-Token bei personellen Änderungen im Kollegium, um unbefugten Zugriff auf Stundenpläne zu verhindern.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               </div>
             )}
