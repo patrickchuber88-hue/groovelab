@@ -6,12 +6,17 @@ const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 async function run() {
-  const schoolId = '74713df2-6176-4a41-a8cd-9fbebe34e9b8';
-  const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
-  console.log("Rooms detail:");
-  rooms.forEach(r => {
-    console.log(`- Room: "${r.name}" (${r.id}), is_groovelab_active: ${r.is_groovelab_active}`);
-  });
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('*')
+    .ilike('first_name', '%dominik%')
+    .limit(1);
+
+  if (error) {
+    console.error("Error fetching user:", error);
+    return;
+  }
+  console.log("Dominik User data:", JSON.stringify(user, null, 2));
 }
 
 run();

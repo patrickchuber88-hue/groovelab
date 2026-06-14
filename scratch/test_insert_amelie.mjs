@@ -6,14 +6,13 @@ const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 async function testInsert() {
-  const userId = "0f22f0ba-df3c-457e-b600-7c4c2bce745c"; // Dominik
-  const stationId = "fa505f9b-75b4-4c0c-933e-20ca006d9877"; // E-Bass station or similar
+  const userId = "64e54fef-e644-43cc-8071-eac432bb7fee"; // Amelie Klein (is_active = true)
+  const stationId = "fa505f9b-75b4-4c0c-933e-20ca006d9877";
 
-  console.log("1. Cleaning up active sessions for Dominik...");
-  const cleanup = await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('user_id', userId).is('check_out_time', null);
-  console.log("Cleanup status:", cleanup.status);
+  console.log("1. Cleaning up active sessions for Amelie...");
+  await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('user_id', userId).is('check_out_time', null);
 
-  console.log("2. Inserting a new session...");
+  console.log("2. Inserting a new session for Amelie...");
   const insertRes = await supabase.from('sessions').insert({
     user_id: userId,
     station_id: stationId,
@@ -30,16 +29,16 @@ async function testInsert() {
 
   const sessionId = insertRes.data[0].id;
 
-  console.log("Waiting 2 seconds to see if it gets checked out automatically...");
+  console.log("Waiting 2 seconds...");
   await new Promise(r => setTimeout(r, 2000));
 
-  const { data: verifySession, error: verifyError } = await supabase
+  const { data: verifySession } = await supabase
     .from('sessions')
     .select('*')
     .eq('id', sessionId)
     .single();
 
-  console.log("Session state after 2 seconds:", JSON.stringify(verifySession, null, 2));
+  console.log("Session state after 2 seconds for Amelie:", JSON.stringify(verifySession, null, 2));
 }
 
 testInsert();

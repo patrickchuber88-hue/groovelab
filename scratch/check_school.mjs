@@ -5,13 +5,17 @@ const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-async function run() {
-  const schoolId = '74713df2-6176-4a41-a8cd-9fbebe34e9b8';
-  const { data: rooms } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
-  console.log("Rooms detail:");
-  rooms.forEach(r => {
-    console.log(`- Room: "${r.name}" (${r.id}), is_groovelab_active: ${r.is_groovelab_active}`);
-  });
+async function checkSchool() {
+  const schoolId = "74713df2-6176-4a41-a8cd-9fbebe34e9b8";
+
+  const { data: school, error } = await supabase
+    .from('schools')
+    .select('*')
+    .eq('id', schoolId)
+    .single();
+
+  console.log("School error:", error);
+  console.log("School details:", JSON.stringify(school, null, 2));
 }
 
-run();
+checkSchool();
