@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -2230,7 +2231,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {profile.app_usage_mode === 'student_only' && timerRunning && (
           <>
             {/* 1. Flat on Table Mode */}
-            {isPhoneFlat && !isDesktopFallback && (
+            {isPhoneFlat && !isDesktopFallback && createPortal(
               <div 
                 className="fokus-overlay-container"
                 style={{
@@ -2344,10 +2345,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 )}
               </div>
-            )}
+            , document.body)}
 
             {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
-            {isGraceActive && !isPhoneFlat && !isDesktopFallback && (
+            {isGraceActive && !isPhoneFlat && !isDesktopFallback && createPortal(
               <div 
                 style={{
                   position: 'fixed',
@@ -2459,7 +2460,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </button>
                 </div>
               </div>
-            )}
+            , document.body)}
           </>
         )}
       </div>

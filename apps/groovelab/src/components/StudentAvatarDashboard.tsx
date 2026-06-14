@@ -10,6 +10,7 @@ import {
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CampusEventsBoard } from './CampusEventsBoard';
+import { createPortal } from 'react-dom';
 
 const showMissionsFeature = false;
 
@@ -5039,7 +5040,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {sessionActive && (
                     <>
                       {/* 1. Flat on Table Mode */}
-                      {isPhoneFlat && !isDesktopFallback && (
+                      {isPhoneFlat && !isDesktopFallback && createPortal(
                         <div 
                           className="fokus-overlay-container"
                           style={{
@@ -5091,11 +5092,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
                             {String(secondsElapsed % 60).padStart(2, '0')}
                           </div>
-                        </div>
+                        </div>,
+                        document.body
                       )}
 
                       {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
-                      {isGraceActive && !isPhoneFlat && !isDesktopFallback && (
+                      {isGraceActive && !isPhoneFlat && !isDesktopFallback && createPortal(
                         <div 
                           style={{
                             position: 'fixed',
@@ -5205,13 +5207,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               Fokus beenden & Sichern
                             </button>
                           </div>
-                        </div>
+                        </div>,
+                        document.body
                       )}
                     </>
                   )}
 
                   {/* 3. Celebration / Success Logbook Overlay */}
-                  {showCelebration && celebrationDetails && (
+                  {showCelebration && celebrationDetails && createPortal(
                     <div 
                       style={{
                         position: 'fixed',
@@ -5393,7 +5396,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </button>
                       </div>
                     </div>
-                  )}
+                  , document.body)}
 
                   <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
                     <button
@@ -5873,7 +5876,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               } else if (isToday) {
                                 borderLeftColor = '#eab308'; // Yellow (Active)
                               } else {
-                                borderLeftColor = '#ef4444'; // Red (Not practiced / target not reached)
+                                borderLeftColor = '#94a3b8'; // Slate/Grey (Not practiced / target not reached)
                               }
 
                               const timeUntilMidnight = (() => {
@@ -6014,7 +6017,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       <div 
                                         style={{ 
                                           background: '#ffffff', 
-                                          border: '1px dashed rgba(239, 68, 68, 0.25)', 
+                                          border: '1px dashed rgba(148, 163, 184, 0.25)', 
                                           borderRadius: '16px', 
                                           padding: '12px 14px',
                                           display: 'flex',
@@ -6023,18 +6026,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                           alignItems: 'center',
                                           gap: '12px',
                                           borderLeft: `4px solid ${borderLeftColor}`,
-                                          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.01)'
+                                          boxShadow: '0 2px 8px rgba(148, 163, 184, 0.01)'
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ef4444', fontFamily: 'monospace' }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'monospace' }}>
                                             {group.date}
                                           </span>
                                           <span style={{ 
                                             fontSize: '0.58rem', 
                                             fontWeight: 900, 
-                                            background: 'rgba(239, 68, 68, 0.08)', 
-                                            color: '#ef4444', 
+                                            background: 'rgba(148, 163, 184, 0.08)', 
+                                            color: '#94a3b8', 
                                             padding: '1px 6px', 
                                             borderRadius: '100px', 
                                             letterSpacing: '0.04em', 
@@ -10593,7 +10596,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       {/* ======================================================== */}
       {/* DIGITAL DETOX ACTIVE TIMER OVERLAY (AMOLED Black Screen)  */}
       {/* ======================================================== */}
-      {showDetox && (
+      {showDetox && createPortal(
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -10724,7 +10727,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Contributions breakdown pie chart modal */}
