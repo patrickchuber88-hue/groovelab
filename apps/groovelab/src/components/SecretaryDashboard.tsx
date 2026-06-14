@@ -12897,28 +12897,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime
                                         );
 
-                                        // Beautiful pastel coloring depending on instrument
+                                        // Beautiful pastel coloring replaced with uniform green
                                         let themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
                                         let themeBorder = '#10b981';
                                         let themeText = '#065f46';
-                                        
-                                        if (isConflict) {
-                                          themeBg = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
-                                          themeBorder = '#ef4444';
-                                          themeText = '#991b1b';
-                                        } else if (plan.instrument?.toLowerCase().includes('schlagzeug') || plan.instrument?.toLowerCase().includes('drums')) {
-                                          themeBg = 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)';
-                                          themeBorder = '#3b82f6';
-                                          themeText = '#1e3a8a';
-                                        } else if (plan.instrument?.toLowerCase().includes('piano') || plan.instrument?.toLowerCase().includes('klavier') || plan.instrument?.toLowerCase().includes('keys')) {
-                                          themeBg = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
-                                          themeBorder = '#a855f7';
-                                          themeText = '#581c87';
-                                        } else if (plan.id.startsWith('adhoc_')) {
-                                          themeBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                                          themeBorder = '#f59e0b';
-                                          themeText = '#78350f';
-                                        }
 
                                         return (
                                           <div
