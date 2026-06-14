@@ -1650,55 +1650,53 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
+  const [dragOverCell, setDragOverCell] = useState<{ roomId: string | null; day: number | null }>({ roomId: null, day: null });
 
-  // Auto-scroll when dragging schedule blocks near top/bottom edges of the screen
+  // Dynamic centering auto-scroll when dragging schedule blocks (high performance requestAnimationFrame)
   useEffect(() => {
     if (!draggedPlanId) return;
 
-    let scrollInterval: any = null;
+    let currentSpeed = 0;
+    let animationFrameId: number | null = null;
+    const scrollContainer = document.getElementById('secretary-main-scroll-container');
+
+    const updateScroll = () => {
+      if (currentSpeed !== 0) {
+        if (scrollContainer) {
+          scrollContainer.scrollBy(0, currentSpeed);
+        } else {
+          window.scrollBy(0, currentSpeed);
+        }
+      }
+      animationFrameId = requestAnimationFrame(updateScroll);
+    };
+
+    // Start the scroll loop
+    animationFrameId = requestAnimationFrame(updateScroll);
 
     const handleGlobalDragOver = (e: DragEvent) => {
-      const threshold = 180; // Distance in pixels from viewport edge to trigger scrolling
-      const speed = 15;     // Scroll speed multiplier
+      e.preventDefault();
       
       const clientY = e.clientY;
       const viewHeight = window.innerHeight;
+      const centerY = viewHeight / 2;
+      const deltaY = clientY - centerY;
       
-      if (scrollInterval) {
-        clearInterval(scrollInterval);
-        scrollInterval = null;
-      }
-      
-      let scrollAmount = 0;
-      if (clientY < threshold) {
-        // Dragging near top of viewport -> scroll up
-        scrollAmount = -((threshold - clientY) / threshold) * speed;
-      } else if (clientY > viewHeight - threshold) {
-        // Dragging near bottom of viewport -> scroll down
-        scrollAmount = ((clientY - (viewHeight - threshold)) / threshold) * speed;
-      }
-      
-      if (scrollAmount !== 0) {
-        scrollInterval = setInterval(() => {
-          window.scrollBy(0, scrollAmount);
-          
-          // Also try scrolling any specific scrollable container inside the dashboard layout
-          const dashboardBody = document.querySelector('.google-dashboard-body') || 
-                                document.querySelector('.campus-grid') || 
-                                document.documentElement;
-          if (dashboardBody && dashboardBody !== document.documentElement) {
-            dashboardBody.scrollBy(0, scrollAmount);
-          }
-        }, 16);
+      // Calculate speed based on distance from center
+      if (Math.abs(deltaY) > 50) {
+        currentSpeed = deltaY * 0.15; 
+      } else {
+        currentSpeed = 0;
       }
     };
 
     const handleGlobalDragEnd = () => {
-      if (scrollInterval) {
-        clearInterval(scrollInterval);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
       setDraggedPlanId(null);
       setDraggedPlanDay(null);
+      setDragOverCell({ roomId: null, day: null });
     };
 
     window.addEventListener('dragover', handleGlobalDragOver);
@@ -1707,11 +1705,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     return () => {
       window.removeEventListener('dragover', handleGlobalDragOver);
       window.removeEventListener('dragend', handleGlobalDragEnd);
-      if (scrollInterval) {
-        clearInterval(scrollInterval);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
     };
   }, [draggedPlanId]);
+
   const [hoveredUnassignedDayNum, setHoveredUnassignedDayNum] = useState<number | null>(null);
   const [clickedUnassignedDayNum, setClickedUnassignedDayNum] = useState<number | null>(null);
   const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
@@ -9011,7 +9010,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         )}
 
         {/* Main scrollable body content */}
-        <div style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
+        <div id="secretary-main-scroll-container" style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -13199,16 +13198,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   {[1,2,3,4,5,6,7].map(dayNum => {
                                     const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
                                     
-                                    // Visual highlight styling based on compatibility
+                                    // Visual highlight styling based on compatibility & real-time dragover hover
                                     let borderStyle = '2px dashed transparent';
                                     let cellBg = 'transparent';
+
+                                    const isCellHovered = dragOverCell.roomId === room.id && dragOverCell.day === dayNum;
+                                    const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
+
+                                    let hasDragOverlap = false;
+                                    if (draggedPlan && cellPlans.length > 0) {
+                                      hasDragOverlap = cellPlans.some(p => 
+                                        p.id !== draggedPlan.id && 
+                                        p.startTime < draggedPlan.endTime && 
+                                        draggedPlan.startTime < p.endTime
+                                      );
+                                    }
+
                                     if (draggedPlanId && draggedPlanDay === dayNum) {
-                                      if (isCompatible) {
-                                        borderStyle = '2px dashed #34a853';
-                                        cellBg = 'rgba(52, 168, 83, 0.03)';
+                                      if (isCellHovered) {
+                                        if (hasDragOverlap) {
+                                          borderStyle = '2.5px dashed #ef4444';
+                                          cellBg = 'rgba(239, 68, 68, 0.08)';
+                                        } else if (isCompatible) {
+                                          borderStyle = '2.5px dashed #34a853';
+                                          cellBg = 'rgba(52, 168, 83, 0.08)';
+                                        } else {
+                                          borderStyle = '2.5px dashed #f59e0b';
+                                          cellBg = 'rgba(245, 158, 11, 0.08)';
+                                        }
                                       } else {
-                                        borderStyle = '2px dashed #f59e0b';
-                                        cellBg = 'rgba(245, 158, 11, 0.03)';
+                                        // Highlight column target zones subtly
+                                        borderStyle = '1.5px dashed rgba(148, 163, 184, 0.35)';
+                                        cellBg = 'rgba(241, 245, 249, 0.2)';
                                       }
                                     }
 
@@ -13216,7 +13237,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       <td
                                         key={dayNum}
                                         onDragOver={(e) => e.preventDefault()}
-                                        onDrop={() => handleDropOnMatrix(room.id, dayNum)}
+                                        onDragEnter={() => setDragOverCell({ roomId: room.id, day: dayNum })}
+                                        onDrop={() => {
+                                          setDragOverCell({ roomId: null, day: null });
+                                          handleDropOnMatrix(room.id, dayNum);
+                                        }}
                                         style={{ padding: '8px', verticalAlign: 'top' }}
                                       >
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '64px', borderRadius: '10px', border: borderStyle, background: cellBg, opacity: draggedPlanId && draggedPlanDay !== dayNum ? 0.35 : 1, padding: draggedPlanId && draggedPlanDay === dayNum ? '4px' : '0', transition: 'all 0.2s', cursor: draggedPlanId && draggedPlanDay !== dayNum ? 'not-allowed' : 'default' }}>
