@@ -69,6 +69,7 @@ interface BypassTeacher {
   isGroovelabActive?: boolean;
   isActive?: boolean;
   role?: string;
+  roles?: string[];
   isPinActivated?: boolean;
   sick_until?: string | null;
   preferred_room_ids?: string[];
@@ -80,6 +81,7 @@ interface GrooveLabCoach {
   lastName: string;
   email: string;
   role: string;
+  roles?: string[];
   instrument: string;
   isActive: boolean;
   isCampusActive?: boolean;
@@ -685,6 +687,7 @@ interface SecretaryDashboardProps {
   schoolId: string;
   userId?: string;
   onLogout?: () => void;
+  onRoleSwitched?: (newRole: string) => void;
 }
 
 const getAlphabeticalColor = (name: string) => {
@@ -1011,7 +1014,7 @@ const parseRoomName = (name: string) => {
   };
 };
 
-export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDashboardProps) {
+export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched }: SecretaryDashboardProps) {
   const getSchoolNumericId = (id: string): number => {
     if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
     let hash = 0;
@@ -1128,7 +1131,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
     const loadOwnProfile = async () => {
       const { data } = await supabase
         .from('users')
-        .select('id, first_name, last_name, nickname, photo_url, role, email, instrument')
+        .select('id, first_name, last_name, nickname, photo_url, role, roles, email, instrument')
         .eq('id', userId)
         .single();
       if (data) setCurrentUserProfile(data);
@@ -1230,7 +1233,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         .update({
           first_name: updatedData.firstName,
           last_name: updatedData.lastName,
-          email: updatedData.email,
+          email: (updatedData.email && updatedData.email.trim()) ? updatedData.email.trim() : null,
           instrument: updatedData.instrument,
           required_equipment: updatedData.requiredEquipment || [],
           ausweis_nummer: updatedData.ausweisNummer,
@@ -2270,7 +2273,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
       const { data: allUsers, error: usersErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid')
+        .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid')
         .eq('school_id', schoolId);
 
       if (usersErr) throw usersErr;
@@ -2326,7 +2329,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         map[u.id] = fullName;
         userInstrumentMap[u.id] = u.instrument || '';
 
-        if (u.role === 'admin' || u.role === 'secretary') {
+        const isEmployee = u.role === 'admin' || u.role === 'secretary' ||
+          (u.roles && (u.roles.includes('admin') || u.roles.includes('secretary')));
+        if (isEmployee) {
           employeesList.push(u);
         }
 
@@ -2337,7 +2342,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
           });
         }
 
-        if (u.role === 'teacher' || u.role === 'admin') {
+        if (u.role === 'teacher' || u.role === 'admin' || (u.roles && (u.roles.includes('teacher') || u.roles.includes('admin')))) {
           const currentStudentCount = allUsers?.filter(usr => usr.role === 'student' && usr.teacher_id === u.id).length || 0;
           if (!u.is_active) {
             bypassList.push({
@@ -2355,6 +2360,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
               isGroovelabActive: u.is_groovelab_active,
               isActive: u.is_active ?? false,
               role: u.role,
+              roles: u.roles,
               isPinActivated: u.is_pin_activated,
               sick_until: u.sick_until,
               preferred_room_ids: u.preferred_room_ids || []
@@ -2367,6 +2373,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 lastName: u.last_name,
                 email: u.email || '',
                 role: u.role,
+                roles: u.roles,
                 instrument: u.instrument || '',
                 isActive: u.is_active ?? true,
                 isCampusActive: u.is_campus_active,
@@ -2386,6 +2393,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 lastName: u.last_name,
                 email: u.email || '',
                 role: u.role,
+                roles: u.roles,
                 instrument: u.instrument || '',
                 isCampusActive: u.is_campus_active,
                 isGroovelabActive: u.is_groovelab_active,
@@ -2436,12 +2444,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       setUserMap(map);
       setCoaches(coachesList);
       setCampusTeachers(campusTeachersList);
-      setAllTeachers(allUsers?.filter(u => u.role === 'teacher').map(u => ({
+      setAllTeachers(allUsers?.filter(u => u.role === 'teacher' || (u.roles && u.roles.includes('teacher'))).map(u => ({
         id: u.id,
         firstName: u.first_name,
         lastName: u.last_name,
         email: u.email || '',
         role: u.role,
+        roles: u.roles,
         instrument: u.instrument || '',
         isActive: u.is_active ?? true,
         isCampusActive: u.is_campus_active,
@@ -3551,15 +3560,70 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
   const handleUpdateEmployeeRole = async (employeeId: string, newRole: string) => {
     try {
+      const { data: user, error: fetchErr } = await supabase
+        .from('users')
+        .select('role, roles')
+        .eq('id', employeeId)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      let newRoles = Array.isArray(user?.roles) ? [...user.roles] : [user?.role || 'secretary'];
+      if (!newRoles.includes(newRole)) {
+        newRoles.push(newRole);
+      }
+
       const { error } = await supabase
         .from('users')
-        .update({ role: newRole })
+        .update({ 
+          role: newRole,
+          roles: newRoles
+        })
         .eq('id', employeeId);
       if (error) throw error;
-      alert(`Mitarbeiter-Rolle erfolgreich auf "${newRole === 'admin' ? 'Admin' : 'Verwaltung'}" aktualisiert.`);
+      alert(`Mitarbeiter-Rolle erfolgreich aktualisiert.`);
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
+    }
+  };
+
+  const handleToggleTeacherRole = async (emp: any) => {
+    try {
+      const currentRoles = Array.isArray(emp.roles) ? emp.roles : [emp.role];
+      let newRoles: string[];
+      let primaryRole = emp.role;
+      const updateFields: any = {};
+      
+      if (currentRoles.includes('teacher')) {
+        newRoles = currentRoles.filter((r: string) => r !== 'teacher');
+        if (primaryRole === 'teacher') {
+          primaryRole = newRoles.find((r: string) => r === 'admin' || r === 'secretary') || 'secretary';
+        }
+        updateFields.is_campus_active = false;
+        updateFields.is_groovelab_active = false;
+      } else {
+        newRoles = [...currentRoles, 'teacher'];
+        updateFields.is_campus_active = true;
+        updateFields.is_groovelab_active = true;
+      }
+      
+      if (newRoles.length === 0) {
+        newRoles = [primaryRole];
+      }
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          roles: newRoles,
+          role: primaryRole,
+          ...updateFields
+        })
+        .eq('id', emp.id);
+        
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren der Lehrer-Rolle: ' + err.message);
     }
   };
 
@@ -8690,6 +8754,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                     {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
                   </span>
                 </span>
+                {currentUserProfile?.roles?.includes('teacher') && (
+                  <button
+                    onClick={() => {
+                      if (onRoleSwitched) {
+                        onRoleSwitched('teacher');
+                      }
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '4px',
+                      color: '#ef4444',
+                      borderRadius: '50%',
+                      marginLeft: '6px',
+                      transition: 'background 0.2s, transform 0.2s',
+                    }}
+                    title="Zum Lehrer-Dashboard wechseln"
+                    className="hover-scale"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
               </span>
             </div>
 
@@ -10775,7 +10871,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             const query = employeeSearchQuery.toLowerCase().trim();
             
             const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
-            const matchesRole = employeeFilterRole === 'All' || emp.role === employeeFilterRole;
+            const matchesRole = employeeFilterRole === 'All' || 
+              (emp.roles && emp.roles.includes(employeeFilterRole)) || 
+              emp.role === employeeFilterRole;
             
             const isActive = emp.is_active ?? true;
             const matchesStatus = employeeStatusTab === 'all' ||
@@ -10785,8 +10883,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             return matchesSearch && matchesRole && matchesStatus;
           });
 
-          const adminCount = employees.filter(e => e.role === 'admin').length;
-          const secretaryCount = employees.filter(e => e.role === 'secretary').length;
+          const adminCount = employees.filter(e => e.role === 'admin' || (e.roles && e.roles.includes('admin'))).length;
+          const secretaryCount = employees.filter(e => e.role === 'secretary' || (e.roles && e.roles.includes('secretary'))).length;
+          const teacherCount = employees.filter(e => e.role === 'teacher' || (e.roles && e.roles.includes('teacher'))).length;
 
           return (
             <div className="campus-grid">
@@ -10875,7 +10974,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                       </div>
 
                       {employeeFilterRole && employeeFilterRole !== 'All' && (() => {
-                        const roleName = employeeFilterRole === 'admin' ? 'Admin' : 'Verwaltung';
+                        const roleName = employeeFilterRole === 'admin' ? 'Admin' : (employeeFilterRole === 'teacher' ? 'Lehrer' : 'Verwaltung');
                         const { avatarBg: instAvatarBg, avatarColor: instAvatarColor } = getAlphabeticalColor(roleName);
 
                         return (
@@ -11117,19 +11216,65 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             </div>
 
                             {/* Role Badge */}
-                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', justifyContent: 'center' }}>
-                              <span style={{
-                                padding: '5px 12px',
-                                borderRadius: '10px',
-                                background: emp.role === 'admin' ? '#e8f0fe' : '#e2f6ea',
-                                color: emp.role === 'admin' ? '#0b57d0' : '#137333',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                minWidth: '75px',
-                                textAlign: 'center'
-                              }}>
-                                {roleLabel}
-                              </span>
+                            <div style={{ flex: '1.4', minWidth: '160px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {/* Render primary roles: admin, secretary */}
+                              {(emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role])
+                                .filter((r: string) => r === 'admin' || r === 'secretary')
+                                .map((r: string) => {
+                                  const rLabel = r === 'admin' ? 'Admin' : 'Verwaltung';
+                                  const rBg = r === 'admin' ? '#e8f0fe' : '#e2f6ea';
+                                  const rColor = r === 'admin' ? '#0b57d0' : '#137333';
+                                  return (
+                                    <span key={r} style={{
+                                      padding: '5px 12px',
+                                      borderRadius: '10px',
+                                      background: rBg,
+                                      color: rColor,
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      minWidth: '75px',
+                                      textAlign: 'center'
+                                    }}>
+                                      {rLabel}
+                                    </span>
+                                  );
+                                })
+                              }
+
+                              {/* Render Lehrer Button next to it */}
+                              {(() => {
+                                const hasTeacher = (emp.roles && emp.roles.includes('teacher')) || emp.role === 'teacher';
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleTeacherRole(emp);
+                                    }}
+                                    style={{
+                                      padding: '4px 10px',
+                                      borderRadius: '10px',
+                                      background: hasTeacher ? '#fef3c7' : '#ffffff',
+                                      color: hasTeacher ? '#d97706' : '#a1a1aa',
+                                      border: hasTeacher ? '1.5px solid #d97706' : '1.5px dashed #cbd5e1',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      minWidth: '75px',
+                                      textAlign: 'center',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px',
+                                      transition: 'all 0.2s ease',
+                                      boxSizing: 'border-box'
+                                    }}
+                                    title={hasTeacher ? "Lehrer-Rolle entfernen" : "Lehrer-Rolle hinzufügen"}
+                                  >
+                                    {hasTeacher ? 'Lehrer' : '+ Lehrer'}
+                                  </button>
+                                );
+                              })()}
                             </div>
 
                             {/* Status Badge */}
@@ -11532,6 +11677,87 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                             whiteSpace: 'nowrap'
                           }}>
                             {adminCount} Admin
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Teacher/Lehrer Role Drop Row */}
+                    {(() => {
+                      const isActive = employeeFilterRole === 'teacher';
+                      const isHovered = dragHoveredEmployeeRole === 'teacher';
+                      return (
+                        <div
+                          onClick={() => setEmployeeFilterRole('teacher')}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragHoveredEmployeeRole('teacher');
+                          }}
+                          onDragLeave={() => setDragHoveredEmployeeRole(null)}
+                          onDrop={(e) => {
+                            const empId = e.dataTransfer.getData("employeeId");
+                            if (empId) {
+                              handleUpdateEmployeeRole(empId, 'teacher');
+                            }
+                            setDragHoveredEmployeeRole(null);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '16px',
+                            border: isHovered 
+                              ? '2px dashed #0b57d0' 
+                              : isActive 
+                                ? '1.5px solid #0b57d0' 
+                                : '1.5px solid #cbd5e1',
+                            background: isHovered 
+                              ? '#e8f0fe' 
+                              : isActive 
+                                ? '#e8f0fe' 
+                                : '#ffffff',
+                            cursor: 'pointer',
+                            transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: isActive ? '0 4px 12px rgba(11,87,208,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: '#fef3c7',
+                              color: '#d97706',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <GraduationCap size={18} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                Lehrer
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
+                                Musiklehrer & Coaches
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '10px',
+                            background: isActive ? '#d2e3fc' : '#f1f5f9',
+                            color: isActive ? '#1a73e8' : '#64748b',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            fontFamily: 'Urbanist',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {teacherCount} Lehrer
                           </span>
                         </div>
                       );

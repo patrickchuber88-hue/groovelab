@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
@@ -5629,6 +5629,19 @@ function App() {
     return <MasterAdminDashboard onLogout={handleLogout} />;
   }
 
+  const handleSwitchActiveRole = async (newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', user.id);
+      if (error) throw error;
+      setUser({ ...user, role: newRole });
+    } catch (err: any) {
+      alert('Fehler beim Rollenwechsel: ' + err.message);
+    }
+  };
+
   // 2.5b SECRETARY DASHBOARD BYPASS
   if (user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') {
     return (
@@ -5637,6 +5650,7 @@ function App() {
           schoolId={user.school_id} 
           userId={user.id} 
           onLogout={handleLogout} 
+          onRoleSwitched={handleSwitchActiveRole}
         />
       </ErrorBoundary>
     );
@@ -7072,6 +7086,37 @@ function App() {
                                   : `${user.first_name} ${user.last_name}`}
                               </span>
                             </span>
+                            {(user.roles && (user.roles.includes('admin') || user.roles.includes('secretary'))) && (
+                              <button
+                                onClick={() => {
+                                  const targetRole = user.roles.includes('admin') ? 'admin' : 'secretary';
+                                  handleSwitchActiveRole(targetRole);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '4px',
+                                  color: '#3b82f6',
+                                  borderRadius: '50%',
+                                  marginLeft: '6px',
+                                  transition: 'background 0.2s, transform 0.2s',
+                                }}
+                                title="Zur Verwaltung wechseln"
+                                className="hover-scale"
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                            )}
                           </span>
                         </div>
                       );
@@ -7321,126 +7366,110 @@ function App() {
           <ErrorBoundary>
             {activePlatform === 'campus' && (user.role === 'teacher' || user.role === 'admin') ? (
               /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
-              <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
-                {/* Hero Header Card with Premium Glassmorphism & Overlapping Elements */}
+              <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
+                {/* Hero Header Card — Briefing-style: image left panel, content right */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
+                  background: 'rgba(255, 255, 255, 0.72)',
                   backdropFilter: 'blur(24px) saturate(1.8)',
                   WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                  border: '1px solid rgba(255, 255, 255, 0.5)',
+                  border: '1px solid rgba(52, 168, 83, 0.2)',
                   borderRadius: '32px',
-                  boxShadow: '0 12px 40px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                   display: 'flex',
-                  overflow: 'visible',
+                  alignItems: 'stretch',
+                  boxShadow: '0 8px 32px rgba(52, 168, 83, 0.08)',
+                  overflow: 'hidden',
+                  minHeight: '160px',
+                  boxSizing: 'border-box' as const,
                   position: 'relative',
-                  minHeight: '240px',
-                  alignItems: 'center',
-                  padding: '32px 48px',
-                  gap: '32px',
-                  flexWrap: 'wrap'
                 }}>
-                  {/* Floating Shielded Avatar Frame */}
+
+
+                  {/* LEFT: Instrument image — full height, flush edges */}
                   <div style={{
-                    width: '128px',
-                    height: '128px',
-                    borderRadius: '50%',
-                    border: '5px solid #ffffff',
-                    boxShadow: '0 12px 32px rgba(15, 23, 42, 0.12)',
-                    background: '#ffffff',
+                    width: '200px',
                     flexShrink: 0,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     position: 'relative',
-                    zIndex: 2,
-                    transform: 'translateY(-10px)'
+                    overflow: 'hidden',
+                    borderRight: '1px solid rgba(52, 168, 83, 0.15)',
                   }}>
-                    <img 
-                      src={getInstrumentAvatarUrl(user.instrument)} 
-                      alt="" 
-                      style={{ width: '95%', height: '95%', objectFit: 'contain' }} 
+                    <img
+                      src={getInstrumentAvatarUrl(user.instrument)}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
                     />
                   </div>
 
-                  {/* Profile Identity Details */}
-                  <div style={{ flex: 1, minWidth: '280px' }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  {/* RIGHT: Identity content */}
+                  <div style={{
+                    flex: 1,
+                    padding: '28px 36px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    minWidth: 0,
+                  }}>
+                    {/* Badges row */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
                       <span style={{
-                        background: 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)',
-                        color: 'white', 
-                        padding: '4px 14px', 
+                        background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                        color: 'white',
+                        padding: '4px 14px',
                         borderRadius: '10px',
-                        fontSize: '0.7rem', 
-                        fontWeight: 900, 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.08em',
-                        boxShadow: '0 4px 10px rgba(0, 122, 255, 0.2)'
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                        textTransform: 'uppercase' as const,
+                        letterSpacing: '0.1em',
+                        boxShadow: '0 4px 10px rgba(52,168,83,0.25)',
                       }}>
                         Campus Lehrkraft
                       </span>
-                      <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 750 }}>
+                      <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
                         🏢 {user.schools?.name || 'Groovelab Campus'}
                       </span>
-                      <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
+                      <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 500 }}>
                         • Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}
                       </span>
                     </div>
 
-                    <h1 style={{ fontSize: '2.8rem', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
+                    {/* Name */}
+                    <h1 style={{
+                      fontSize: '2.6rem',
+                      fontWeight: 950,
+                      color: '#0f172a',
+                      margin: '0 0 14px 0',
+                      letterSpacing: '-0.03em',
+                      fontFamily: "'Urbanist', sans-serif",
+                      lineHeight: 1.1,
+                    }}>
                       {user.first_name} {user.last_name}
                     </h1>
 
-                    {/* Instruments List */}
+                    {/* Instrument pills */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {(user.instrument || '').split(',').map((inst: string) => inst.trim()).filter(Boolean).map((inst: string) => (
                         <div key={inst} style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          background: 'rgba(0, 122, 255, 0.05)',
-                          border: '1px solid rgba(0, 122, 255, 0.12)',
-                          color: '#007aff',
-                          padding: '4px 12px',
+                          background: 'rgba(52, 168, 83, 0.07)',
+                          border: '1px solid rgba(52, 168, 83, 0.18)',
+                          color: '#1e7e34',
+                          padding: '5px 14px',
                           borderRadius: '12px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
                         }}>
-                          <span>🎸</span>
+                          <span>🎵</span>
                           <span>{inst}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Profile Edit Action Button */}
-                  <button 
-                    onClick={() => {
-                      setEditingProfile({ ...user });
-                      setShowEditProfile(true);
-                    }} 
-                    style={{ 
-                      background: '#ffffff', 
-                      border: '1px solid rgba(0,0,0,0.06)', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                      color: '#0f172a', 
-                      fontSize: '0.85rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      padding: '12px 20px',
-                      borderRadius: '16px',
-                      transition: 'all 0.2s',
-                      marginLeft: 'auto'
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
-                  >
-                    <span>Profil bearbeiten</span>
-                    <Pencil size={15} />
-                  </button>
                 </div>
 
                 {/* Professional Teaching Metrics Grid (4 columns) */}
@@ -7500,8 +7529,8 @@ function App() {
                   </div>
                 </div>
 
-                {/* Split layout: Biography & Teaching Days Calendar Overview */}
-                <div style={{ display: 'grid', gridTemplateColumns: width < 900 ? '1fr' : '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+                {/* Teaching Days Calendar Overview */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px', alignItems: 'start' }}>
                   
                   {/* Day Availability Calendar Planner */}
                   <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)' }}>
@@ -7511,14 +7540,52 @@ function App() {
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {(() => {
-                        const boardsToDisplay = activePlatform === 'campus' 
-                          ? (user.campus_räume || []) 
-                          : (user.groovelab_räume || []);
-                        return boardsToDisplay.length > 0 ? (
-                          (boardsToDisplay as any[]).map((board) => {
-                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                        const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                        
+                        const timeToMinutes = (timeStr: string) => {
+                          const [h, m] = timeStr.split(':').map(Number);
+                          return h * 60 + m;
+                        };
+                        const minutesToTime = (mins: number) => {
+                          const h = Math.floor(mins / 60);
+                          const m = mins % 60;
+                          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                        };
+
+                        const schedulesByDay = (campusTeacherStats?.schedules || []).reduce((acc: Record<number, any[]>, curr: any) => {
+                          if (curr.day_of_week !== undefined && curr.day_of_week !== null) {
+                            if (!acc[curr.day_of_week]) {
+                              acc[curr.day_of_week] = [];
+                            }
+                            acc[curr.day_of_week].push(curr);
+                          }
+                          return acc;
+                        }, {});
+
+                        const activeDays = Object.keys(schedulesByDay)
+                          .map(Number)
+                          .sort((a, b) => a - b);
+
+                        return activeDays.length > 0 ? (
+                          activeDays.map((dayOfWeek) => {
+                            const daySchedules = schedulesByDay[dayOfWeek] || [];
+                            let minStart = Infinity;
+                            let maxEnd = -Infinity;
+                            
+                            daySchedules.forEach(s => {
+                              if (s.time_slot) {
+                                const startMins = timeToMinutes(s.time_slot);
+                                const endMins = startMins + (s.duration || 30);
+                                if (startMins < minStart) minStart = startMins;
+                                if (endMins > maxEnd) maxEnd = endMins;
+                              }
+                            });
+
+                            const startStr = minStart !== Infinity ? minutesToTime(minStart) : '--:--';
+                            const endStr = maxEnd !== -Infinity ? minutesToTime(maxEnd) : '--:--';
+
                             return (
-                              <div key={board.id} style={{ 
+                              <div key={dayOfWeek} style={{ 
                                 display: 'flex', 
                                 alignItems: 'center', 
                                 justifyContent: 'space-between', 
@@ -7533,44 +7600,10 @@ function App() {
                                   </div>
                                   <div>
                                     <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
-                                      {DAYS_DE[board.dayOfWeek]}s
+                                      {DAYS_DE[dayOfWeek]}s
                                     </div>
                                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-                                      {(() => {
-                                      const timeToMinutes = (timeStr: string) => {
-                                        const [h, m] = timeStr.split(':').map(Number);
-                                        return h * 60 + m;
-                                      };
-                                      const minutesToTime = (mins: number) => {
-                                        const h = Math.floor(mins / 60);
-                                        const m = mins % 60;
-                                        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                                      };
-                                      
-                                      const daySchedules = (campusTeacherStats?.schedules || []).filter(s => s.day_of_week === board.dayOfWeek);
-                                      let startStr = board.startAnchor || '14:00';
-                                      let endStr = '';
-
-                                      if (daySchedules.length > 0) {
-                                        let minStart = Infinity;
-                                        let maxEnd = -Infinity;
-                                        daySchedules.forEach(s => {
-                                          if (s.time_slot) {
-                                            const startMins = timeToMinutes(s.time_slot);
-                                            const endMins = startMins + (s.duration || 30);
-                                            if (startMins < minStart) minStart = startMins;
-                                            if (endMins > maxEnd) maxEnd = endMins;
-                                          }
-                                        });
-                                        if (minStart !== Infinity) startStr = minutesToTime(minStart);
-                                        if (maxEnd !== -Infinity) endStr = minutesToTime(maxEnd);
-                                      } else {
-                                        const startMins = timeToMinutes(startStr);
-                                        endStr = minutesToTime(startMins + 180);
-                                      }
-
-                                      return <>Geplanter Unterricht: {startStr} bis {endStr} Uhr</>;
-                                    })()}
+                                      Geplanter Unterricht: {startStr} bis {endStr} Uhr
                                     </div>
                                   </div>
                                 </div>
@@ -7591,34 +7624,7 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Professional Biography / Werdegang */}
-                  <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', fontFamily: "'Urbanist', sans-serif" }}>
-                        Werdegang
-                      </h3>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 550, color: '#475569', lineHeight: 1.6, background: '#f8fafc', padding: '16px 20px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                        {user.bio || 'Trage deinen Werdegang ein, um Schülern und Kollegen mehr über dich zu erzählen.'}
-                      </div>
-                    </div>
 
-                    <div>
-                      <h4 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                        Zusatz-Qualifikationen
-                      </h4>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {user.expertise ? (
-                          user.expertise.split(',').map((e: string) => e.trim()).filter(Boolean).map((exp: string) => (
-                            <span key={exp} style={{ background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
-                              {exp}
-                            </span>
-                          ))
-                        ) : (
-                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Expertise eingetragen</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Mobile / Profile Page Legal Footer */}
@@ -7775,12 +7781,7 @@ function App() {
                     </div>
                   )}
 
-                  <button onClick={() => {
-                    setEditingProfile({ ...user });
-                    setShowEditProfile(true);
-                  }} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', color: '#f59e0b', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: 0 }}>
-                    Profil bearbeiten <Pencil size={18} />
-                  </button>
+
                 </div>
               </div>
               {user.role === 'student' && (
