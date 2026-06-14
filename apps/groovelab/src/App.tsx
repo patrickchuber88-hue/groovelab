@@ -6853,7 +6853,7 @@ function App() {
             boxSizing: 'border-box'
           }}>
             {/* Campus Tab */}
-            {school?.has_campus_subscription && user?.is_campus_active && (
+            {school && (school.has_campus_subscription || !school.is_billing_booked) && user?.is_campus_active && (
               <div 
                 onClick={() => {
                   setActivePlatform('campus');
@@ -6891,7 +6891,7 @@ function App() {
             )}
 
             {/* GrooveLab Tab */}
-            {school?.has_groovelab_subscription && user?.is_groovelab_active && (
+            {school && (school.has_groovelab_subscription || !school.is_billing_booked) && user?.is_groovelab_active && (
               <div 
                 onClick={() => {
                   setActivePlatform('groovelab');
