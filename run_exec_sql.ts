@@ -2,15 +2,17 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config({ path: 'apps/groovelab/.env.local' });
 
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
-  process.env.VITE_SUPABASE_ANON_KEY!
+  SERVICE_KEY
 );
 
 import fs from 'fs';
 
 async function run() {
-  const sql = fs.readFileSync('supabase/migrations/164_add_student_billing_payment_method.sql', 'utf-8');
+  const sql = fs.readFileSync('supabase/migrations/165_add_student_billing_activation_tracking.sql', 'utf-8');
   console.log("Trying exec_sql...");
   const { data, error } = await supabase.rpc('exec_sql', { query: sql });
   if (error) {
