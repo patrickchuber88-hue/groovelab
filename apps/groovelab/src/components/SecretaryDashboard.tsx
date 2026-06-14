@@ -1060,6 +1060,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     };
     fetchOperatorBillingSettings();
   }, []);
+
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
     const saved = localStorage.getItem('groovelab_active_workspace');
@@ -1649,6 +1650,68 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
+
+  // Auto-scroll when dragging schedule blocks near top/bottom edges of the screen
+  useEffect(() => {
+    if (!draggedPlanId) return;
+
+    let scrollInterval: any = null;
+
+    const handleGlobalDragOver = (e: DragEvent) => {
+      const threshold = 180; // Distance in pixels from viewport edge to trigger scrolling
+      const speed = 15;     // Scroll speed multiplier
+      
+      const clientY = e.clientY;
+      const viewHeight = window.innerHeight;
+      
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+      }
+      
+      let scrollAmount = 0;
+      if (clientY < threshold) {
+        // Dragging near top of viewport -> scroll up
+        scrollAmount = -((threshold - clientY) / threshold) * speed;
+      } else if (clientY > viewHeight - threshold) {
+        // Dragging near bottom of viewport -> scroll down
+        scrollAmount = ((clientY - (viewHeight - threshold)) / threshold) * speed;
+      }
+      
+      if (scrollAmount !== 0) {
+        scrollInterval = setInterval(() => {
+          window.scrollBy(0, scrollAmount);
+          
+          // Also try scrolling any specific scrollable container inside the dashboard layout
+          const dashboardBody = document.querySelector('.google-dashboard-body') || 
+                                document.querySelector('.campus-grid') || 
+                                document.documentElement;
+          if (dashboardBody && dashboardBody !== document.documentElement) {
+            dashboardBody.scrollBy(0, scrollAmount);
+          }
+        }, 16);
+      }
+    };
+
+    const handleGlobalDragEnd = () => {
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
+      setDraggedPlanId(null);
+      setDraggedPlanDay(null);
+    };
+
+    window.addEventListener('dragover', handleGlobalDragOver);
+    window.addEventListener('dragend', handleGlobalDragEnd);
+    
+    return () => {
+      window.removeEventListener('dragover', handleGlobalDragOver);
+      window.removeEventListener('dragend', handleGlobalDragEnd);
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
+    };
+  }, [draggedPlanId]);
   const [hoveredUnassignedDayNum, setHoveredUnassignedDayNum] = useState<number | null>(null);
   const [clickedUnassignedDayNum, setClickedUnassignedDayNum] = useState<number | null>(null);
   const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
