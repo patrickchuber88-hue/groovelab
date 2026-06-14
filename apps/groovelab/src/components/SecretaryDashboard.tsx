@@ -4151,9 +4151,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       if (error) throw error;
       
       const filtered = (data || []).filter((log: any) => {
-        const hasTrialOld = log.old_data && ('is_trial' in log.old_data || 'is_campus_active' in log.old_data);
-        const hasTrialNew = log.new_data && ('is_trial' in log.new_data || 'is_campus_active' in log.new_data);
-        return hasTrialOld || hasTrialNew || log.action === 'INSERT';
+        if (!log.new_data) return false;
+        const isTrialStart = log.new_data.is_trial === true && (!log.old_data || log.old_data.is_trial !== true);
+        const isPermanentActivation = log.new_data.is_campus_active === true && log.new_data.is_trial === false && log.old_data?.is_trial === true;
+        
+        // Only show student self-initiated trial starts, and staff-initiated permanent activations
+        const isStudentTrialStart = isTrialStart && (!log.changed_by || log.changed_by === log.record_id);
+        const isStaffActivation = isPermanentActivation && log.changed_by && log.changed_by !== log.record_id;
+        
+        return isStudentTrialStart || isStaffActivation;
       });
       
       setTrialLogs(filtered);
