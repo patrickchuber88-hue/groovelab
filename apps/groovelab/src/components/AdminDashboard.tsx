@@ -4611,7 +4611,7 @@ export function AdminDashboard({
   };
 
   const renderStudentsTab = () => {
-    const brandColor = '#16a34a';
+    const brandColor = activePlatform === 'campus' ? '#16a34a' : '#eab308';
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -4657,7 +4657,7 @@ export function AdminDashboard({
                     cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? '#22c55e' : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? brandColor : 'transparent' }} />
                   Aktive Schüler
                 </button>
                 <button
@@ -4665,13 +4665,13 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
                     background: listType === 'archive' ? 'white' : 'transparent',
-                    color: listType === 'archive' ? '#16a34a' : '#64748b',
+                    color: listType === 'archive' ? brandColor : '#64748b',
                     fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
                     cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? '#16a34a' : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? brandColor : 'transparent' }} />
                   Archiv
                 </button>
               </div>
