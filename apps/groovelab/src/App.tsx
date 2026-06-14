@@ -3866,6 +3866,16 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    let schoolId = user?.school_id;
+    if (!schoolId && user?.schools) {
+      schoolId = Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id;
+    }
+    if (schoolId && loggedInUserId) {
+      fetchPlanningData(schoolId, loggedInUserId);
+    }
+  }, [activeStudentTab, loggedInUserId, user]);
+
   const toggleSlot = async (day: string, time: string) => {
     if (!loggedInUserId) {
       console.error('[Planning] Kein loggedInUserId gefunden.');
