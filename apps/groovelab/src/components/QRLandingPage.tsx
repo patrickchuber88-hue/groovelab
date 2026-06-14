@@ -339,6 +339,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Token temporär setzen, damit der supabase custom-fetch-wrapper ihn als Header mitschickt
         sessionStorage.setItem('groovelab_qr_token', token);
 
+        // Auto-pairing from query parameters if requested from a logged-in PWA session
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('auto_pair') === 'true') {
+          localStorage.setItem(`${DEVICE_KEY_PREFIX}${token}`, 'paired');
+        }
+
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')

@@ -1552,7 +1552,20 @@ function App() {
   // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
   const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
   if (qrPathMatch) {
-    return <QRLandingPage token={qrPathMatch[1]} />;
+    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
+    const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+
+    if (isStandalone && currentUserId) {
+      // User is logged in via PWA standalone app.
+      // Redirect the QR link to the external browser (Safari/Chrome) and auto-pair it
+      const externalUrl = `${window.location.origin}/qr/${qrPathMatch[1]}?auto_pair=true`;
+      window.open(externalUrl, '_blank');
+      
+      // Clean up the URL in the PWA so it returns to the dashboard
+      window.history.replaceState({}, '', '/');
+    } else {
+      return <QRLandingPage token={qrPathMatch[1]} />;
+    }
   }
 
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
