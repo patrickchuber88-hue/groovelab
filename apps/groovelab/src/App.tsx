@@ -127,7 +127,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
   const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
   
   useEffect(() => {
-    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein') && user.teacher_id) {
+    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein' || user.instrument === 'ohne Zuweisung') && user.teacher_id) {
       supabase
         .from('users')
         .select('instrument')

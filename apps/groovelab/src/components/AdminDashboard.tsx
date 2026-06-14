@@ -840,7 +840,7 @@ export function AdminDashboard({
     }
   };
 
-  const handleAssignStudentToSong = async (studentId: string, instrument: string = 'Allgemein') => {
+  const handleAssignStudentToSong = async (studentId: string, instrument: string = 'ohne Zuweisung') => {
     if (!selectedSongForDetail) return;
     try {
       if (assignedSongSkills.some(s => s.user_id === studentId)) {
@@ -14761,7 +14761,7 @@ export function AdminDashboard({
                                 </span>
                                 <button
                                   onClick={() => {
-                                    handleAssignStudentToSong(s.id, 'Allgemein');
+                                    handleAssignStudentToSong(s.id, 'ohne Zuweisung');
                                     setAssignStudentSearch('');
                                   }}
                                   style={{

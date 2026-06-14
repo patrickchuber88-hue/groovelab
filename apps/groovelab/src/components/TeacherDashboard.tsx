@@ -2454,23 +2454,30 @@ export function TeacherDashboard({
         if (regularRoomId) {
           if (b.roomId === regularRoomId) {
             // Revert the occurrence back to its original date/time
-            if (occ.original_date && occ.original_start_time) {
-              const { error: updErr } = await supabase
-                .from('schedule_occurrences')
-                .update({
-                  date: occ.original_date,
-                  start_time: occ.original_start_time,
-                  status: 'scheduled'
-                })
-                .eq('id', occ.id);
-              if (updErr) throw updErr;
-            } else {
-              const { error: delErr } = await supabase
-                .from('schedule_occurrences')
-                .delete()
-                .eq('id', occ.id);
-              if (delErr) throw delErr;
+            
+            // Delete room booking matching rescheduled coordinates to avoid orphans
+            const { error: roomBookingDelErr } = await supabase
+              .from('room_bookings')
+              .delete()
+              .eq('booked_by', userId)
+              .eq('date', b.date)
+              .eq('start_time', b.startTime.length === 5 ? `${b.startTime}:00` : b.startTime);
+            if (roomBookingDelErr) {
+              console.warn('Error clearing associated room booking by coordinates:', roomBookingDelErr);
             }
+
+            // Update the occurrence to mark it rescheduled-back, resetting student_acknowledged: false
+            const { error: updErr } = await supabase
+              .from('schedule_occurrences')
+              .update({
+                date: occ.original_date || occ.date,
+                start_time: occ.original_start_time || occ.start_time,
+                status: 'scheduled',
+                student_acknowledged: false,
+                original_date: occ.original_date || occ.date
+              })
+              .eq('id', occ.id);
+            if (updErr) throw updErr;
             
             // Delete the room booking completely
             const { error: delErr } = await supabase
@@ -2971,6 +2978,7 @@ export function TeacherDashboard({
               status,
               schedule_id,
               student_id,
+              student_acknowledged,
               schedules (
                 duration,
                 rooms (id, name)
@@ -3002,6 +3010,8 @@ export function TeacherDashboard({
               roomId: slot.rooms?.id || null,
               room: slot.rooms?.name || 'Hauptraum',
               instrument: student?.instrument || 'Klavier',
+              student_acknowledged: true,
+              original_date: null,
               student: student ? {
                 id: student.id,
                 name: `${student.first_name} ${student.last_name}`,
@@ -3038,6 +3048,8 @@ export function TeacherDashboard({
                   roomId: occ.schedules?.rooms?.id || null,
                   room: occ.schedules?.rooms?.name || 'Hauptraum',
                   instrument: student?.instrument || 'Klavier',
+                  student_acknowledged: occ.student_acknowledged,
+                  original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
                     name: `${student.first_name} ${student.last_name}`,
@@ -6605,6 +6617,8 @@ export function TeacherDashboard({
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                             const isRescheduledPending = slot.status === 'rescheduled_pending' || slot.status === 'pending' || slot.status === 'pending_reschedule';
                             const isRescheduledConfirmed = slot.status === 'rescheduled_confirmed';
+                            const isResetPending = slot.status === 'scheduled' && slot.original_date && slot.student_acknowledged === false;
+                            const isResetAcknowledged = slot.status === 'scheduled' && slot.original_date && slot.student_acknowledged === true;
                             const isBirthday = slot.student && isStudentBirthdayToday(slot.student);
  
                             let slotBg = '#ffffff';
@@ -6789,6 +6803,76 @@ export function TeacherDashboard({
                                   borderRadius: '50%',
                                   border: '3px solid #fbbc05', // Matches border accent color
                                   background: isFinished ? '#fbbc05' : '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isResetPending) {
+                              slotBg = 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)';
+                              slotBorder = '1.5px dashed #fbbc05';
+                              slotBorderLeft = '5px solid #fbbc05';
+                              titleColor = '#1e293b';
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #fbbc05',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#fbbc05'
+                                  }} />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #fbbc05',
+                                  background: isFinished ? '#fbbc05' : '#ffffff',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (isResetAcknowledged) {
+                              slotBg = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
+                              slotBorder = '1.5px solid #22c55e';
+                              slotBorderLeft = '5px solid #22c55e';
+                              titleColor = '#14532d';
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #22c55e',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#22c55e'
+                                  }} />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #22c55e',
+                                  background: '#22c55e',
                                   boxSizing: 'border-box'
                                 }} />
                               );

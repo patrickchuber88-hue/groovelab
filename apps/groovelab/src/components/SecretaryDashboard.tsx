@@ -687,6 +687,12 @@ interface SecretaryDashboardProps {
 
 const getAlphabeticalColor = (name: string) => {
   const trimmed = (name || '').trim();
+  if (trimmed.toLowerCase() === 'ohne zuweisung') {
+    return {
+      avatarBg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+      avatarColor: '#475569'
+    };
+  }
   const firstChar = trimmed.charAt(0).toUpperCase();
   const charCode = firstChar.charCodeAt(0) || 65;
   const clampedCode = Math.max(65, Math.min(90, charCode));
@@ -698,6 +704,12 @@ const getAlphabeticalColor = (name: string) => {
 
 const getAlphabeticalUniColor = (name: string) => {
   const trimmed = (name || '').trim();
+  if (trimmed.toLowerCase() === 'ohne zuweisung') {
+    return {
+      avatarBg: '#f1f5f9',
+      avatarColor: '#475569'
+    };
+  }
   const firstChar = trimmed.charAt(0).toUpperCase();
   const charCode = firstChar.charCodeAt(0) || 65;
   const clampedCode = Math.max(65, Math.min(90, charCode));
@@ -2506,12 +2518,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
 
       // Fetch subjects
-      const { data: subjectsData } = await supabase
+      let { data: subjectsData } = await supabase
         .from('subjects')
         .select('*')
         .eq('school_id', schoolId)
         .order('name');
-      setSubjects(subjectsData || []);
+      
+      const list = subjectsData || [];
+      const hasOhneZuweisung = list.some(s => s.name.toLowerCase() === 'ohne zuweisung');
+      if (!hasOhneZuweisung && schoolId) {
+        try {
+          const { data: newSub, error: insertErr } = await supabase
+            .from('subjects')
+            .insert({
+              school_id: schoolId,
+              name: 'ohne Zuweisung',
+              category: 'Allgemein'
+            })
+            .select('*')
+            .single();
+          if (!insertErr && newSub) {
+            list.push(newSub);
+          }
+        } catch (e) {
+          console.error("Error auto-creating subject:", e);
+        }
+      }
+
+      const sortedSubjects = list.sort((a, b) => {
+        if (a.name.toLowerCase() === 'ohne zuweisung') return -1;
+        if (b.name.toLowerCase() === 'ohne zuweisung') return 1;
+        return a.name.localeCompare(b.name, 'de');
+      });
+      setSubjects(sortedSubjects);
 
       // Fetch cooperations
       const { data: cooperationsData } = await supabase
@@ -3069,7 +3108,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
         const firstName = parts[0]?.trim();
         const lastName = parts[1]?.trim();
         const email = parts[2]?.trim();
-        const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'Allgemein');
+        const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'ohne Zuweisung');
         const maxStudents = parseInt(parts[4]?.trim()) || 10;
         const pin = generateStarterPin('teacher', false, false);
         const qrToken = generateSecureQrToken();
@@ -3487,7 +3526,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
       }
 
       let namePart = '';
-      let instrument = 'Allgemein';
+      let instrument = 'ohne Zuweisung';
       let email = '';
       let teacherNamePart = '';
 
@@ -3697,6 +3736,48 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
                 rows={5}
                 style={{ padding: '8px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'monospace', outline: 'none' }}
               />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Standard-Fächer schnell hinzufügen:</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {['ohne Zuweisung', 'Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'].map(inst => (
+                    <button
+                      key={inst}
+                      type="button"
+                      onClick={() => {
+                        const lines = subjectCsvText.split('\n').map(l => l.trim()).filter(Boolean);
+                        if (!lines.some(l => l.toLowerCase() === inst.toLowerCase())) {
+                          setSubjectCsvText(prev => prev.trim() ? prev.trim() + '\n' + inst : inst);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '100px',
+                        padding: '4px 12px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: '#475569',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        fontFamily: 'Urbanist'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f1f5f9';
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                      }}
+                    >
+                      ➕ {inst}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button
                 onClick={handleImportSubjects}
                 style={{ background: '#475569', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 16px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', alignSelf: 'flex-start' }}
@@ -3804,22 +3885,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
                     {/* Delete Action */}
                     <div style={{ flex: '0.5', minWidth: '60px', display: 'flex', justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => handleDeleteSubject(s.id, s.name)}
-                        style={{
-                          padding: '6px',
-                          borderRadius: '10px',
-                          border: 'none',
-                          background: 'transparent',
-                          cursor: 'pointer',
-                          color: '#ef4444',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {s.name.toLowerCase() !== 'ohne zuweisung' && (
+                        <button
+                          onClick={() => handleDeleteSubject(s.id, s.name)}
+                          style={{
+                            padding: '6px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

@@ -1863,7 +1863,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       backgroundColor: "rgb(10, 54, 28)",
       labelColor: "rgb(167, 243, 208)",
       studentName: `${verifiedStudentDetails?.first_name} ${verifiedStudentDetails?.last_name}`,
-      instrument: verifiedStudentDetails?.instrument || "Allgemein",
+      instrument: verifiedStudentDetails?.instrument || "ohne Zuweisung",
       qrToken: verifiedStudentDetails?.qr_token || verifiedStudentId
     }, null, 2);
 
@@ -3517,6 +3517,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 {/* Fallback in case loading is not complete or empty */}
                 {availableInstruments.length === 0 && (
                   <>
+                    <option value="ohne Zuweisung">ohne Zuweisung</option>
                     <option value="Klavier">Klavier</option>
                     <option value="E-Gitarre">E-Gitarre</option>
                     <option value="Akustikgitarre">Akustikgitarre</option>
@@ -3524,7 +3525,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     <option value="Bass">Bass</option>
                     <option value="Gesang">Gesang</option>
                     <option value="Keyboard">Keyboard</option>
-                    <option value="Allgemein">Allgemein</option>
                   </>
                 )}
               </select>

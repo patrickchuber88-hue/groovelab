@@ -1530,27 +1530,33 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
       const isDynamic = allSchoolSchedules.find(s => s.id === bookingId)?.is_dynamic_reschedule;
 
       if (isDynamic) {
-        // Reset the occurrence back to its original time/date
         const { data: occ } = await supabase
           .from('schedule_occurrences')
-          .select('original_date, original_start_time')
+          .select('original_date, original_start_time, date, start_time')
           .eq('id', bookingId)
-          .single();
+          .maybeSingle();
 
-        if (occ && occ.original_date && occ.original_start_time) {
+        if (occ) {
+          // Delete room booking matching rescheduled coordinates to avoid orphans
+          const { error: roomBookingDelErr } = await supabase
+            .from('room_bookings')
+            .delete()
+            .eq('booked_by', userId)
+            .eq('date', occ.date)
+            .eq('start_time', occ.start_time.length === 5 ? `${occ.start_time}:00` : occ.start_time);
+          if (roomBookingDelErr) {
+            console.warn('Error clearing associated room booking by coordinates:', roomBookingDelErr);
+          }
+
           const { error } = await supabase
             .from('schedule_occurrences')
             .update({
-              date: occ.original_date,
-              start_time: occ.original_start_time,
-              status: 'scheduled'
+              date: occ.original_date || occ.date,
+              start_time: occ.original_start_time || occ.start_time,
+              status: 'scheduled',
+              student_acknowledged: false,
+              original_date: occ.original_date || occ.date
             })
-            .eq('id', bookingId);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('schedule_occurrences')
-            .delete()
             .eq('id', bookingId);
           if (error) throw error;
         }
