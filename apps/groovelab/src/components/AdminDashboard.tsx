@@ -2106,7 +2106,8 @@ export function AdminDashboard({
             const creatorName = db.profiles ? `${db.profiles.first_name} ${db.profiles.last_name}` : 'Lehrer';
             
             const teacherName = isStaff ? 'Schule' : creatorName;
-            const purpose = isStaff ? creatorName : (db.title || 'Unterricht');
+            const dbTitle = db.title || 'Unterricht';
+            const purpose = isStaff && (dbTitle === 'Unterricht' || dbTitle.startsWith('Unterricht:')) ? creatorName : dbTitle;
 
             return {
               id: db.id,
@@ -6277,7 +6278,12 @@ export function AdminDashboard({
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
       const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
       
-      const finalPurpose = isStaff ? creatorName : defaultPurpose;
+      let finalPurpose = defaultPurpose;
+      if (isStaff) {
+        if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
+          finalPurpose = creatorName;
+        }
+      }
       const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (isRecurring) {
@@ -6347,7 +6353,12 @@ export function AdminDashboard({
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
       const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
       
-      const finalPurpose = isStaff ? creatorName : defaultPurpose;
+      let finalPurpose = defaultPurpose;
+      if (isStaff) {
+        if (defaultPurpose === 'Unterricht' || defaultPurpose.startsWith('Unterricht:') || defaultPurpose === 'Eigennutzung') {
+          finalPurpose = creatorName;
+        }
+      }
       const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (selectedBooking.isSchedule) {
@@ -7867,7 +7878,7 @@ export function AdminDashboard({
                             {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
                           </span>
                           <div style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
-                            {b.roomName}
+                            {b.teacherName === 'Schule' ? `Schule • ${b.roomName}` : b.roomName}
                           </div>
                           {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
                             <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
