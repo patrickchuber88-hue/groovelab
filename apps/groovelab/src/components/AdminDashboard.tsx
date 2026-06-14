@@ -5174,8 +5174,10 @@ export function AdminDashboard({
     );
   };
 
-  const renderTeachersTab = () => (
-    <div style={{ marginTop: '0px' }}>
+  const renderTeachersTab = () => {
+    const brandColor = activePlatform === 'campus' ? (admin?.schools?.brand_color || '#16a34a') : '#eab308';
+    return (
+      <div style={{ marginTop: '0px' }}>
       <div 
         className="glass-panel" 
         style={{ 
@@ -5418,7 +5420,8 @@ export function AdminDashboard({
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderCampusRoomsTab = () => {
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
