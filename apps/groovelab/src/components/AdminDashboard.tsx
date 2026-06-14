@@ -204,6 +204,7 @@ interface AdminDashboardProps {
   onSessionChange?: (session: any) => void;
   locationMode?: 'lab' | 'home';
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
+  hideHeader?: boolean;
 }
 
 export function AdminDashboard({ 
@@ -216,7 +217,8 @@ export function AdminDashboard({
   session,
   onSessionChange,
   locationMode,
-  onLocationModeChange
+  onLocationModeChange,
+  hideHeader = false
 }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -12477,9 +12479,9 @@ export function AdminDashboard({
   return (
     <div style={{ 
       flex: 1, 
-      padding: activePlatform === 'campus' 
+      padding: hideHeader ? '0px' : (activePlatform === 'campus' 
         ? (activeTab === 'live' ? '0px 10px 10px 10px' : '24px 10px 10px 10px') 
-        : '14px 10px 10px 10px', 
+        : '14px 10px 10px 10px'), 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',
@@ -12488,7 +12490,7 @@ export function AdminDashboard({
       width: '100%',
       overflowX: 'hidden'
     }}>
-      {activeTab !== 'live' && activeTab !== 'schedule' && (admin as any)?.schools?.limits_enabled && (
+      {!hideHeader && activeTab !== 'live' && activeTab !== 'schedule' && (admin as any)?.schools?.limits_enabled && (
         <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
           {/* Quota Progress Indicators */}
           <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>

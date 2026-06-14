@@ -10,6 +10,7 @@ import {
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
+import { AdminDashboard } from './AdminDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
@@ -11439,12 +11440,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* Subtab: Campus Räume */}
               {campusSubTab === 'rooms' && (
-                <div style={{ flex: 1, minWidth: 0, height: '80vh', overflowY: 'auto' }}>
-                  <CampusTeacherDashboard
+                <div style={{ flex: 1, minWidth: 0, height: '85vh', overflowY: 'auto' }}>
+                  <AdminDashboard
                     userId={userId || ''}
-                    onLogout={onLogout}
-                    hideSidebar={true}
-                    initialBoard="rooms"
+                    onLogout={onLogout || (() => {})}
+                    forceTab="rooms"
+                    activePlatform="campus"
+                    hideHeader={true}
                   />
                 </div>
               )}
