@@ -4153,7 +4153,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       const filtered = (data || []).filter((log: any) => {
         if (!log.new_data) return false;
         const isTrialStart = log.new_data.is_trial === true && (!log.old_data || log.old_data.is_trial !== true);
-        const isPermanentActivation = log.new_data.is_campus_active === true && log.new_data.is_trial === false && log.old_data?.is_trial === true;
+        const isPermanentActivation = log.old_data?.is_trial === true && log.new_data.is_trial === false && log.new_data.is_campus_active !== false;
         
         // Only show student self-initiated trial starts, and staff-initiated permanent activations
         const isStudentTrialStart = isTrialStart && (!log.changed_by || log.changed_by === log.record_id);
@@ -8766,8 +8766,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         actionIcon = '⏳';
                         actionColor = '#fffbeb';
                         actionBorder = '#fde68a';
-                      } else if (newT === false && oldT === true && newC === true) {
-                        detailMsg = 'Probezeit erfolgreich beendet und Account dauerhaft freigeschaltet.';
+                      } else if (oldT === true && newT === false && newC !== false) {
+                        detailMsg = 'Probezeit beendet und Account dauerhaft freigeschaltet.';
                         actionIcon = '✅';
                         actionColor = '#ecfdf5';
                         actionBorder = '#a7f3d0';
