@@ -68,6 +68,8 @@ interface ProfileData {
   app_usage_mode: string;
   joker_used_at?: string | null;
   created_at?: string;
+  is_trial?: boolean;
+  trial_ends_at?: string | null;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -383,7 +385,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url')
+          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at')
           .eq('qr_token', token)
           .single();
 
@@ -442,7 +444,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           is_groovelab_active: userData.is_groovelab_active ?? false,
           app_usage_mode: userData.app_usage_mode ?? 'student_only',
           joker_used_at: userData.joker_used_at,
-          created_at: userData.created_at
+          created_at: userData.created_at,
+          is_trial: userData.is_trial ?? false,
+          trial_ends_at: userData.trial_ends_at
         });
 
         if (isInactive) {
@@ -717,7 +721,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         return {
           ...prev,
           is_campus_active: true,
-          is_groovelab_active: schoolData?.has_groovelab_subscription ? true : prev.is_groovelab_active
+          is_groovelab_active: schoolData?.has_groovelab_subscription ? true : prev.is_groovelab_active,
+          is_trial: updatedUser?.is_trial ?? true,
+          trial_ends_at: updatedUser?.trial_ends_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         };
       });
 
@@ -1416,7 +1422,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#2563eb', background: '#dbeafe', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
               Heute Unterricht
             </span>
           </div>
@@ -2545,9 +2551,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Header Banner */}
           {!timerRunning && (
             <div style={{
-              background: isLessonDay 
-                ? 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)' 
-                : 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
+              background: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
               padding: '24px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -2584,6 +2588,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           {/* Thin separator */}
           {!timerRunning && <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }}></div>}
+
+          {/* Trial countdown bar */}
+          {!timerRunning && profile.is_trial && profile.trial_ends_at && (() => {
+            const daysLeft = Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            return (
+              <div style={{
+                background: '#fffbeb',
+                borderBottom: '1px solid #fde68a',
+                padding: '10px 20px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#b45309',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}>
+                <span>⏳</span>
+                <span>Deine Probezeit läuft noch {daysLeft} Tag(e) (bis {new Date(profile.trial_ends_at).toLocaleDateString('de-DE')})</span>
+              </div>
+            );
+          })()}
 
           {/* Main Content Area */}
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
