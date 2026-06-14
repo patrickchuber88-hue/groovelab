@@ -13178,7 +13178,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           {cellPlans.map(plan => {
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
                                             
-                                            // Dynamic instrument-based pastel coloring for consistency with Raumplan (Live)
+                                            // Dynamic instrument-based pastel coloring replaced with uniform green
                                             let themeBg = 'rgba(220, 252, 231, 0.45)'; // default green
                                             let themeBorder = '1px solid #e2e8f0';
                                             let themeBorderLeft = '4px solid #10b981';
@@ -13186,27 +13186,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             let timeText = '#059669';
 
                                             if (hasOverlap) {
-                                              themeBg = 'rgba(254, 226, 226, 0.45)';
-                                              themeBorder = '2px dashed #ef4444';
-                                              themeBorderLeft = '4px solid #ef4444';
-                                              themeText = '#991b1b';
-                                              timeText = '#ef4444';
-                                            } else if (plan.instrument?.toLowerCase().includes('schlagzeug') || plan.instrument?.toLowerCase().includes('drums')) {
-                                              themeBg = 'rgba(219, 234, 254, 0.45)'; // light blue
-                                              themeBorderLeft = '4px solid #3b82f6';
-                                              themeText = '#1e3a8a';
-                                              timeText = '#3b82f6';
-                                            } else if (plan.instrument?.toLowerCase().includes('piano') || plan.instrument?.toLowerCase().includes('klavier') || plan.instrument?.toLowerCase().includes('keys')) {
-                                              themeBg = 'rgba(243, 232, 255, 0.45)'; // light purple
-                                              themeBorderLeft = '4px solid #a855f7';
-                                              themeText = '#581c87';
-                                              timeText = '#a855f7';
-                                            } else if (plan.id.startsWith('adhoc_')) {
-                                              themeBg = 'rgba(254, 243, 199, 0.45)'; // light yellow
-                                              themeBorder = '1px solid #fde68a';
-                                              themeBorderLeft = '4px solid #f59e0b';
-                                              themeText = '#78350f';
-                                              timeText = '#d97706';
+                                              themeBorder = '2px dashed #10b981';
                                             }
 
                                             return (
