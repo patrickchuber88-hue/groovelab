@@ -1360,6 +1360,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // Students and Link States
   const [students, setStudents] = useState<any[]>([]);
+  const [showTrialLogModal, setShowTrialLogModal] = useState(false);
+  const [trialLogs, setTrialLogs] = useState<any[]>([]);
+  const [trialLogsLoading, setTrialLogsLoading] = useState(false);
   const [selectedCampusStudentId, setSelectedCampusStudentId] = useState<string>('');
   const [selectedGroovelabStudentId, setSelectedGroovelabStudentId] = useState<string>('');
   const [linkingInProgress, setLinkingInProgress] = useState<boolean>(false);
@@ -4133,6 +4136,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     const totalPrice = parseFloat((monthsCount * pricePerMonth).toFixed(2));
     
     return { monthsCount, totalPrice };
+  };
+
+  const fetchTrialLogs = async () => {
+    setTrialLogsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('table_name', 'users')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      const filtered = (data || []).filter((log: any) => {
+        const hasTrialOld = log.old_data && ('is_trial' in log.old_data || 'is_campus_active' in log.old_data);
+        const hasTrialNew = log.new_data && ('is_trial' in log.new_data || 'is_campus_active' in log.new_data);
+        return hasTrialOld || hasTrialNew || log.action === 'INSERT';
+      });
+      
+      setTrialLogs(filtered);
+    } catch (err) {
+      console.error('Error fetching trial logs:', err);
+    } finally {
+      setTrialLogsLoading(false);
+    }
   };
 
   const generateMailtoLink = (student: any) => {
@@ -8636,6 +8665,168 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         </div>
       )}
 
+      {/* TRIAL LOGBOOK MODAL */}
+      {showTrialLogModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.3)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '640px',
+            maxHeight: '80vh',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1.5px solid #cbd5e1'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '24px', borderBottom: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ClipboardList size={22} color="#10b981" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Probezeit- & Freischaltungs-Logbuch</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTrialLogModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '1rem',
+                  fontWeight: 900,
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {trialLogsLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                  <div className="google-spinner" />
+                </div>
+              ) : trialLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 600 }}>
+                  Keine Logbucheinträge vorhanden.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {trialLogs.map((log: any) => {
+                    const studentName = userMap[log.record_id] || `Schüler (ID: ${log.record_id.substring(0, 8)})`;
+                    const dateStr = new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    
+                    // Parse log changes to render a descriptive message
+                    let detailMsg = '';
+                    let actionIcon = '📝';
+                    let actionColor = '#f8fafc';
+                    let actionBorder = '#e2e8f0';
+
+                    if (log.action === 'INSERT') {
+                      detailMsg = 'Nutzerprofil wurde neu angelegt.';
+                      actionIcon = '👤';
+                      actionColor = '#eff6ff';
+                      actionBorder = '#bfdbfe';
+                    } else if (log.action === 'UPDATE' && log.new_data) {
+                      const oldT = log.old_data?.is_trial;
+                      const newT = log.new_data?.is_trial;
+                      const oldC = log.old_data?.is_campus_active;
+                      const newC = log.new_data?.is_campus_active;
+
+                      if (newT === true && oldT !== true) {
+                        detailMsg = `Probezeit (7 Tage) wurde gestartet (gültig bis ${log.new_data.trial_ends_at ? new Date(log.new_data.trial_ends_at).toLocaleDateString('de-DE') : ''}).`;
+                        actionIcon = '⏳';
+                        actionColor = '#fffbeb';
+                        actionBorder = '#fde68a';
+                      } else if (newT === false && oldT === true && newC === true) {
+                        detailMsg = 'Probezeit erfolgreich beendet und Account dauerhaft freigeschaltet.';
+                        actionIcon = '✅';
+                        actionColor = '#ecfdf5';
+                        actionBorder = '#a7f3d0';
+                      } else if (newC === false && oldC === true) {
+                        detailMsg = 'Campus-Zugang wurde deaktiviert.';
+                        actionIcon = '🚫';
+                        actionColor = '#fef2f2';
+                        actionBorder = '#fca5a5';
+                      } else if (newC === true && oldC !== true) {
+                        detailMsg = 'Campus-Zugang wurde aktiviert.';
+                        actionIcon = '⚡';
+                        actionColor = '#ecfdf5';
+                        actionBorder = '#a7f3d0';
+                      } else {
+                        detailMsg = 'Profil-Informationen wurden aktualisiert.';
+                      }
+                    }
+
+                    // Who performed the action?
+                    const changerName = log.changed_by ? (userMap[log.changed_by] || `Mitarbeiter (${log.changed_by.substring(0, 8)})`) : 'Schüler (Selbst-Aktivierung)';
+
+                    return (
+                      <div key={log.id} style={{ display: 'flex', gap: '14px', padding: '16px', borderRadius: '16px', background: actionColor, border: `1px solid ${actionBorder}` }}>
+                        <span style={{ fontSize: '1.4rem', marginTop: '2px' }}>{actionIcon}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1f2937' }}>
+                            {studentName}
+                          </span>
+                          <span style={{ fontSize: '0.82rem', color: '#4b5563', fontWeight: 600 }}>
+                            {detailMsg}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: '#6b7280', fontWeight: 600, marginTop: '2px' }}>
+                            📅 {dateStr} • Durchgeführt von: <strong>{changerName}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            {/* Modal Footer */}
+            <div style={{ padding: '18px 24px', borderTop: '1.5px solid #cbd5e1', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+              <button
+                type="button"
+                onClick={() => setShowTrialLogModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  background: '#64748b',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR */}
       <div 
         className="glass-sidebar"
@@ -12305,8 +12496,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     const trialStudents = students.filter(s => s.is_trial && s.trial_ends_at && new Date(s.trial_ends_at).getTime() > Date.now());
                     return (
                       <div className="google-card" style={{ padding: '24px' }}>
-                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetchTrialLogs();
+                              setShowTrialLogModal(true);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '6px',
+                              borderRadius: '8px',
+                              transition: 'all 0.2s',
+                            }}
+                            title="Aktivierungs-Logbuch öffnen"
+                          >
+                            <ClipboardList size={20} />
+                          </button>
                         </h4>
                         <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
                           Die folgenden Schüler befinden sich in der 7-tägigen Probezeit. Klicke auf das Briefumschlag-Icon, um die E-Mail-Vorlage für die Eltern zu öffnen. Nach Erhalt der Bestätigung kannst du den Account dauerhaft freischalten.
