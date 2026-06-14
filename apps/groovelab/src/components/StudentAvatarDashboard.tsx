@@ -4696,25 +4696,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
 
             {/* Fokus-Timer Box */}
-            <div style={{
-              background: sessionActive 
-                ? (isExtraTime ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#000000') 
-                : 'rgba(255, 255, 255, 0.75)',
+            <div style={sessionActive ? {
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9998,
+              background: '#000000',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxSizing: 'border-box',
+              padding: '24px'
+            } : {
+              background: 'rgba(255, 255, 255, 0.75)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
-              border: sessionActive ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
               borderRadius: '32px',
               padding: '36px 30px',
-              boxShadow: sessionActive ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
               display: 'flex',
               flexDirection: 'column',
               gap: '28px',
               alignItems: 'center',
               position: 'relative',
               overflow: 'hidden',
-              color: sessionActive ? '#ffffff' : 'inherit',
+              color: 'inherit',
               transition: 'all 0.5s ease'
             }}>
+              {/* Inner wrapper to keep size consistent and centered on black screen */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '28px',
+                alignItems: 'center',
+                width: '100%',
+                maxWidth: sessionActive ? '380px' : 'none'
+              }}>
               {/* Header */}
               <div style={{ 
                 display: 'flex', 
@@ -5457,6 +5476,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
               )}
+              </div>
             </div>
 
           </div>

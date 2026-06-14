@@ -1758,48 +1758,64 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const isLessonDay = isTodayLessonScheduled && !isCanceled;
 
     return (
-      <div style={styles.fullScreen}>
-        <div style={{ ...styles.card, maxWidth: '380px', gap: '0', padding: 0, overflow: 'hidden' }}>
+      <div style={{
+        ...styles.fullScreen,
+        background: timerRunning ? '#000000' : '#f2f2f7',
+        transition: 'background 0.5s ease'
+      }}>
+        <div style={{ 
+          ...styles.card, 
+          maxWidth: '380px', 
+          gap: '0', 
+          padding: 0, 
+          overflow: 'hidden',
+          background: timerRunning ? '#000000' : 'white',
+          border: timerRunning ? 'none' : '1px solid #e5e5ea',
+          boxShadow: timerRunning ? 'none' : '0 10px 40px rgba(0,0,0,0.04)',
+          transition: 'all 0.5s ease'
+        }}>
           {/* Header Banner */}
-          <div style={{
-            background: isLessonDay 
-              ? 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)' 
-              : 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
-            padding: '24px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'relative'
-          }}>
-            <div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
-                Groovelab Campus
-              </span>
-              <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-                {profile.first_name} {profile.last_name}
-              </h1>
-            </div>
+          {!timerRunning && (
             <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.2)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
+              background: isLessonDay 
+                ? 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)' 
+                : 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
+              padding: '24px 20px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '1rem',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
+              justifyContent: 'space-between',
+              position: 'relative'
             }}>
-              {profile.first_name?.[0]}{profile.last_name?.[0]}
+              <div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
+                  Groovelab Campus
+                </span>
+                <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                  {profile.first_name} {profile.last_name}
+                </h1>
+              </div>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '1rem',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                {profile.first_name?.[0]}{profile.last_name?.[0]}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Thin separator */}
-          <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }}></div>
+          {!timerRunning && <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }}></div>}
 
           {/* Main Content Area */}
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
