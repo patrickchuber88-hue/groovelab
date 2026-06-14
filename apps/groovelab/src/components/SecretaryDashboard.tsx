@@ -1581,6 +1581,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [coaches, setCoaches] = useState<GrooveLabCoach[]>([]);
   const [campusTeachers, setCampusTeachers] = useState<any[]>([]);
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
+  const allTeachersRef = useRef<any[]>([]);
+  const studentsRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    allTeachersRef.current = allTeachers;
+  }, [allTeachers]);
+
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
   const [dismissedInvoiceAlert, setDismissedInvoiceAlert] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('dismissedInvoiceAlert') === 'true';
   });
@@ -1782,9 +1792,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
         debouncedFetchDashboardData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload: any) => {
         debouncedFetchDashboardData();
         debouncedFetchCrisisNotifications();
+
+        if (payload.new && payload.new.school_id === schoolId) {
+          const uId = payload.new.id;
+          const newCampus = !!(payload.new.is_campus_active || payload.new.isCampusActive);
+          const newGroove = !!(payload.new.is_groovelab_active || payload.new.isGroovelabActive);
+
+          const localTeacher = allTeachersRef.current.find(t => t.id === uId);
+          if (localTeacher) {
+            const oldCampus = !!(localTeacher.isCampusActive || localTeacher.is_campus_active);
+            const oldGroove = !!(localTeacher.isGroovelabActive || localTeacher.is_groovelab_active);
+            if (oldCampus !== newCampus || oldGroove !== newGroove) {
+              window.location.reload();
+            }
+          } else {
+            const localStudent = studentsRef.current.find(s => s.id === uId);
+            if (localStudent) {
+              const oldCampus = !!(localStudent.isCampusActive || localStudent.is_campus_active);
+              const oldGroove = !!(localStudent.isGroovelabActive || localStudent.is_groovelab_active);
+              if (oldCampus !== newCampus || oldGroove !== newGroove) {
+                window.location.reload();
+              }
+            }
+          }
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_bookings' }, (payload: any) => {
         fetchPendingBookings();
