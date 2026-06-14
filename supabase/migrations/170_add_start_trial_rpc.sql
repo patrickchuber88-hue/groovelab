@@ -13,7 +13,7 @@ BEGIN
   -- Find student by qr_token or teacher_qr_token
   SELECT * INTO v_user
   FROM public.users
-  WHERE qr_token = p_qr_token OR teacher_qr_token = p_qr_token
+  WHERE qr_token::text = p_qr_token OR teacher_qr_token = p_qr_token
   LIMIT 1;
 
   IF NOT FOUND THEN
