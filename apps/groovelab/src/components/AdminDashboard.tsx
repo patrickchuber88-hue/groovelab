@@ -7665,6 +7665,45 @@ export function AdminDashboard({
                                         </button>
                                       )}
 
+                                      {/* Close Button for Preview Slots */}
+                                      {b.isPreview && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowPreviewField(false);
+                                          }}
+                                          style={{
+                                            position: 'absolute',
+                                            top: '4px',
+                                            right: '4px',
+                                            width: '16px',
+                                            height: '16px',
+                                            borderRadius: '6px',
+                                            background: 'rgba(2, 132, 199, 0.12)',
+                                            color: '#0284c7',
+                                            border: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            zIndex: 25,
+                                            padding: 0,
+                                            transition: 'all 0.2s'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#0284c7';
+                                            e.currentTarget.style.color = '#ffffff';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(2, 132, 199, 0.12)';
+                                            e.currentTarget.style.color = '#0284c7';
+                                          }}
+                                          title="Vorschau schließen"
+                                        >
+                                          <X size={10} strokeWidth={3} />
+                                        </button>
+                                      )}
+
                                       {/* Resize Handles */}
                                       {isOwnBooking && !isSchedule && !b.isPreview && (
                                         <>
