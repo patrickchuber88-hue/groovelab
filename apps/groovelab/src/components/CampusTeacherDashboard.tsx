@@ -26,11 +26,13 @@ import {
 interface CampusTeacherDashboardProps {
   userId: string;
   onLogout?: () => void;
+  hideSidebar?: boolean;
+  initialBoard?: 'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms';
 }
 
-export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashboardProps) {
+export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, initialBoard = 'compass' }: CampusTeacherDashboardProps) {
   // Navigation State
-  const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>('compass');
+  const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>(initialBoard);
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
@@ -1598,9 +1600,10 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
   const timeSlots = ['13:00', '13:45', '14:30', '15:15', '16:00', '16:45', '17:30', '18:15', '19:00'];
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden">
+    <div className={`flex ${hideSidebar ? 'h-full min-h-[650px] w-full' : 'h-screen'} bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden`}>
       {/* Sidebar Navigation */}
-      <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0">
+      {!hideSidebar && (
+        <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0">
         <div>
           {/* Logo & Role Header */}
           <div className="p-6 border-b border-slate-800 flex items-center justify-between">
@@ -1715,6 +1718,7 @@ export function CampusTeacherDashboard({ userId, onLogout }: CampusTeacherDashbo
           </button>
         </div>
       </aside>
+      )}
 
       {/* Main Board Viewport */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto">

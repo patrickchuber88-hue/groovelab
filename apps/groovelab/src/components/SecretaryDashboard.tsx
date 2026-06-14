@@ -13,6 +13,7 @@ import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
+import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
@@ -1066,7 +1067,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status'>('briefing');
+  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status' | 'rooms'>('briefing');
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
@@ -7718,6 +7719,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
             { id: 'cooperations', label: 'Kooperationen', icon: Users },
+            { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'events', label: 'Termine', icon: Calendar },
             { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
             { id: 'status', label: 'Status & API', icon: Sliders }
@@ -10811,10 +10813,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
         {/* TAB 2: CAMPUS */}
         {activeTab === 'campus' && (
-          <div className="campus-grid" style={campusSubTab === 'events' ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
+          <div className="campus-grid" style={(campusSubTab === 'events' || campusSubTab === 'rooms') ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events') ? '100%' : 'auto', minWidth: 0 }}>
+            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '100%' : 'auto', minWidth: 0 }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
@@ -11434,6 +11436,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
 
               {/* Subtab: Kooperationen */}
               {campusSubTab === 'cooperations' && renderCooperationsBoard()}
+
+              {/* Subtab: Campus Räume */}
+              {campusSubTab === 'rooms' && (
+                <div style={{ flex: 1, minWidth: 0, height: '80vh', overflowY: 'auto' }}>
+                  <CampusTeacherDashboard
+                    userId={userId || ''}
+                    onLogout={onLogout}
+                    hideSidebar={true}
+                    initialBoard="rooms"
+                  />
+                </div>
+              )}
 
               {/* Subtab: Termine Board */}
               {campusSubTab === 'events' && (
@@ -12320,7 +12334,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout }: SecretaryDash
             </div>
 
             {/* Right Sidebar Pane */}
-            {campusSubTab !== 'events' && (
+            {campusSubTab !== 'events' && campusSubTab !== 'rooms' && (
               <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
               
               {/* Briefing/Startseite Sidebar */}
