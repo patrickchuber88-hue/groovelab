@@ -384,8 +384,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(4, 120, 87, 0.2)',
-              border: '1.5px solid rgba(251, 191, 36, 0.25)',
+              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
+              border: '1.5px solid rgba(52, 168, 83, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -402,7 +402,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
             <div style={{
               position: 'absolute',
               top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(251, 191, 36, 0.03) 100%)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
               pointerEvents: 'none'
             }} />
 
@@ -431,8 +431,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                    height: '92px', 
                    borderRadius: '22px', 
                    objectFit: 'cover',
-                   border: '3px solid #fbbf24',
-                   boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
+                   border: '3px solid #22c55e',
+                   boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
                    flexShrink: 0,
                    marginTop: '2px'
                  }} 
@@ -457,7 +457,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
              </div>
 
             {/* Dashed divider line */}
-            <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+            <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
             {/* QR Code Scan area */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -469,7 +469,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                border: '1.5px solid rgba(251, 191, 36, 0.3)'
+                border: '1.5px solid rgba(52, 168, 83, 0.3)'
               }}>
                 <QRCode value={`https://campus-groovelab.de/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
               </div>

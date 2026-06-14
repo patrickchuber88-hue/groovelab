@@ -11927,7 +11927,7 @@ export function AdminDashboard({
         const { toJpeg } = await import('html-to-image');
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
-          backgroundColor: selectedQRUser.role === 'student' ? '#422006' : '#ffffff',
+          backgroundColor: selectedQRUser.role === 'student' ? '#064e3b' : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
         });
@@ -11955,12 +11955,12 @@ export function AdminDashboard({
           <div 
             ref={qrCardRef}
             style={selectedQRUser.role === 'student' ? {
-              background: 'linear-gradient(135deg, #713f12 0%, #422006 100%)', 
+              background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: '0 25px 50px -12px rgba(66, 32, 6, 0.5), 0 0 30px rgba(234, 179, 8, 0.2)',
-              border: '1.5px solid rgba(234, 179, 8, 0.3)',
+              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
+              border: '1.5px solid rgba(52, 168, 83, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -11988,7 +11988,7 @@ export function AdminDashboard({
                 <div style={{
                   position: 'absolute',
                   top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(251, 191, 36, 0.03) 100%)',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
                   pointerEvents: 'none'
                 }} />
 
@@ -11996,7 +11996,7 @@ export function AdminDashboard({
                  <span style={{ 
                    fontSize: '0.68rem', 
                    fontWeight: 900, 
-                   color: '#eab308', 
+                   color: '#fbbf24', 
                    textTransform: 'uppercase', 
                    letterSpacing: '0.2em',
                    zIndex: 1,
@@ -12018,8 +12018,8 @@ export function AdminDashboard({
                        height: '92px', 
                        borderRadius: '22px', 
                        objectFit: 'cover',
-                       border: '3px solid #fbbf24',
-                       boxShadow: '0 8px 24px rgba(251, 191, 36, 0.25)',
+                       border: '3px solid #22c55e',
+                       boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
                        flexShrink: 0,
                        marginTop: '2px'
                      }} 
@@ -12044,7 +12044,7 @@ export function AdminDashboard({
                  </div>
 
                 {/* Dashed divider line */}
-                <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(234, 179, 8, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+                <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
                 {/* QR Code Scan area */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -12056,7 +12056,7 @@ export function AdminDashboard({
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: '1.5px solid rgba(234, 179, 8, 0.3)'
+                    border: '1.5px solid rgba(52, 168, 83, 0.3)'
                   }}>
                     <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
                   </div>
@@ -12139,7 +12139,7 @@ export function AdminDashboard({
                 {/* Bottom Brand Stripe */}
                 <div style={{ 
                   height: '12px', 
-                  background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? '#eab308' : '#34a853'}, #1e293b, ${selectedQRUser.role === 'student' ? '#eab308' : '#34a853'})` 
+                  background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? '#34a853' : '#34a853'}, #1e293b, ${selectedQRUser.role === 'student' ? '#34a853' : '#34a853'})` 
                 }}></div>
               </>
             )}
@@ -12149,7 +12149,7 @@ export function AdminDashboard({
             onClick={saveAsImage} 
             style={{ 
               width: '100%', 
-              background: selectedQRUser.role === 'student' ? '#ca8a04' : '#34a853', 
+              background: selectedQRUser.role === 'student' ? '#137333' : '#34a853', 
               color: 'white', 
               border: 'none', 
               padding: '20px', 
@@ -12162,7 +12162,7 @@ export function AdminDashboard({
               justifyContent: 'center', 
               gap: '10px', 
               marginTop: '24px', 
-              boxShadow: `0 15px 35px ${selectedQRUser.role === 'student' ? '#ca8a04' : '#34a853'}50`, 
+              boxShadow: `0 15px 35px ${selectedQRUser.role === 'student' ? '#137333' : '#34a853'}50`, 
               transition: 'all 0.2s' 
             }} 
           >
