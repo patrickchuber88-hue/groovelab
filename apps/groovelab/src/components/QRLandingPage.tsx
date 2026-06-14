@@ -102,7 +102,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
   const [isGraceActive, setIsGraceActive] = useState(false);
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
-  const [isDesktopFallback, setIsDesktopFallback] = useState(false);
+  const [isDesktopFallback, setIsDesktopFallback] = useState(true);
   const [isExtraTime, setIsExtraTime] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -193,7 +193,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
         ? (isOrientedFlat && !isMoving && !document.hidden && document.hasFocus())
-        : (!document.hidden && document.hasFocus());
+        : (isMobile ? !document.hidden : (!document.hidden && document.hasFocus()));
 
       // Update states
       setIsPhoneFlat(isNowFlat);

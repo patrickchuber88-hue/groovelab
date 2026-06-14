@@ -2186,7 +2186,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
   const [isGraceActive, setIsGraceActive] = useState(false);
-  const [isDesktopFallback, setIsDesktopFallback] = useState(false);
+  const [isDesktopFallback, setIsDesktopFallback] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationDetails, setCelebrationDetails] = useState<{
     xpGained: number;
@@ -2991,7 +2991,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
         ? (isOrientedFlat && !isMoving && !document.hidden && document.hasFocus())
-        : (!document.hidden && document.hasFocus());
+        : (isMobile ? !document.hidden : (!document.hidden && document.hasFocus()));
 
       // Update local states
       setIsPhoneFlat(isNowFlat);
