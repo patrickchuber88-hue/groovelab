@@ -1953,7 +1953,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isGroovelabScreen = isGroovelabKiosk;
       const isBypass = !isGroovelabScreen;
 
-      if (!isBypass) {
+      // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
+      if (isGroovelabKiosk) {
         isWithinAnyRoom = false;
         let currentPos = userPos;
         if (!currentPos && navigator.geolocation) {
@@ -2199,7 +2200,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isGroovelabScreen = isGroovelabKiosk;
       const isBypass = !isGroovelabScreen;
 
-      if (!isBypass) {
+      // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
+      if (isGroovelabKiosk) {
         isWithinAnyRoom = false;
         console.log('[Login] Geofence check active. Fetching current location...');
         
