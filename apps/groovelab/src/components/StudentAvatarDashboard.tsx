@@ -3011,42 +3011,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           return nextVal;
         });
       } else {
-        // Start Grace Period countdown for BOTH normal practice time and extra time
-        setIsGraceActive(true);
-        
-        setGraceSecondsLeft(prevGrace => {
-          if (prevGrace <= 1) {
-            // Grace period expired!
-            if (!isExtraTimeRef.current) {
-              // Reset to 0 and end session if in normal practice time
-              setSecondsElapsed(0);
-              setIsExtraTime(false);
-              setIsGraceActive(false);
-              setSessionActive(false);
-              playBeep(330, 600); // Fail tone
-              if (navigator.vibrate) {
-                navigator.vibrate([400, 100, 400]);
-              }
-            } else {
-              // Just pause/end the session (do not reset to 0) if in extra time
+        if (!isExtraTimeRef.current) {
+          // During the focus minutes: HARD RESET TO 0 IMMEDIATELY on interruption (no grace period)
+          setSecondsElapsed(0);
+          setIsExtraTime(false);
+          setIsGraceActive(false);
+          setSessionActive(false);
+          playBeep(330, 600); // Fail tone
+          if (navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          }
+        } else {
+          // Once the focus minutes are reached: START FRIENDLY COUNTDOWN
+          setIsGraceActive(true);
+          
+          setGraceSecondsLeft(prevGrace => {
+            if (prevGrace <= 1) {
+              // Grace period expired! Just pause the session. Do NOT reset to 0.
               setSessionActive(false);
               setIsGraceActive(false);
               playBeep(440, 300); // Friendly end tone
+              return 10;
             }
-            return 10;
-          }
-          
-          // Still in grace period, play warning tone once per interruption
-          if (!graceWarningPlayed) {
-            playBeep(660, 200); // Warning tone
-            if (navigator.vibrate) {
-              navigator.vibrate([100, 50, 100]);
+            
+            // Still in grace period, play warning tone once per interruption
+            if (!graceWarningPlayed) {
+              playBeep(660, 200); // Warning tone
+              if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
+              }
+              graceWarningPlayed = true;
             }
-            graceWarningPlayed = true;
-          }
-          
-          return prevGrace - 1;
-        });
+            
+            return prevGrace - 1;
+          });
+        }
       }
     }, 1000);
 
