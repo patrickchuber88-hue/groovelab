@@ -2090,7 +2090,8 @@ export function AdminDashboard({
             booked_by,
             profiles:users!booked_by (
               first_name,
-              last_name
+              last_name,
+              role
             )
           `)
           .eq('school_id', adminData.school_id)
@@ -2101,14 +2102,19 @@ export function AdminDashboard({
           const mapped = dbBookingsData.map((db: any) => {
             const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
             const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
-            const teacherName = db.profiles ? `${db.profiles.first_name} ${db.profiles.last_name}` : 'Lehrer';
+            const isStaff = db.profiles?.role?.toLowerCase() === 'secretary' || db.profiles?.role?.toLowerCase() === 'admin';
+            const creatorName = db.profiles ? `${db.profiles.first_name} ${db.profiles.last_name}` : 'Lehrer';
+            
+            const teacherName = isStaff ? 'Schule' : creatorName;
+            const purpose = isStaff ? creatorName : (db.title || 'Unterricht');
+
             return {
               id: db.id,
               roomId: db.room_id,
               date: db.date,
               startTime: startTimeStr,
               endTime: endTimeStr,
-              purpose: db.title || 'Unterricht',
+              purpose: purpose,
               teacherId: db.booked_by,
               teacherName: teacherName,
               isDbBooking: true
@@ -6264,9 +6270,15 @@ export function AdminDashboard({
 
     const handleAddBooking = (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
+      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+      const creatorName = admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer';
+
       const studentObj = students.find(s => s.id === bookingStudentId);
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
-      const finalPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
+      const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
+      
+      const finalPurpose = isStaff ? creatorName : defaultPurpose;
+      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (isRecurring) {
         // Build the recurring schedule
@@ -6289,7 +6301,7 @@ export function AdminDashboard({
           duration: durationMin,
           purpose: finalPurpose,
           teacher_id: userId,
-          teacher: admin ? { first_name: admin.first_name, last_name: admin.last_name } : { first_name: 'Lehrer', last_name: '' },
+          teacher: { first_name: finalTeacherName, last_name: '' },
           status: 'approved',
           start_date: bookingDate,
           interval_weeks: recurringInterval
@@ -6306,7 +6318,7 @@ export function AdminDashboard({
           endTime: bookingEndTime,
           purpose: finalPurpose,
           teacherId: userId,
-          teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+          teacherName: finalTeacherName
         };
 
         setCampusBookings(prev => [...prev, newBooking]);
@@ -6328,9 +6340,15 @@ export function AdminDashboard({
     const handleUpdateBooking = () => {
       if (!selectedBooking) return;
 
+      const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+      const creatorName = admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer';
+
       const studentObj = students.find(s => s.id === bookingStudentId);
       const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
-      const finalPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
+      const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
+      
+      const finalPurpose = isStaff ? creatorName : defaultPurpose;
+      const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
@@ -6344,7 +6362,7 @@ export function AdminDashboard({
           endTime: bookingEndTime,
           purpose: finalPurpose,
           teacherId: userId,
-          teacherName: admin ? `${admin.first_name} ${admin.last_name}` : 'Lehrer'
+          teacherName: finalTeacherName
         };
         setCampusBookings(prev => [...prev, override]);
       } else {
@@ -6355,7 +6373,8 @@ export function AdminDashboard({
               date: bookingDate,
               startTime: bookingStartTime,
               endTime: bookingEndTime,
-              purpose: finalPurpose
+              purpose: finalPurpose,
+              teacherName: finalTeacherName
             };
           }
           return b;
