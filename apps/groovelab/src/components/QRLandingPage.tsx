@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
@@ -28,7 +28,7 @@ interface QRLandingPageProps {
   token: string;
 }
 
-type PageState = 'loading' | 'pin_required' | 'profile' | 'error';
+type PageState = 'loading' | 'pin_required' | 'profile' | 'error' | 'inactive_landing';
 
 interface ProfileData {
   id: string;
@@ -49,6 +49,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Inaktive Aktivierungs-States
+  const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
+  const [parentEmail, setParentEmail] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'debit' | 'cash'>('debit');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [activationLoading, setActivationLoading] = useState(false);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [schoolData, setSchoolData] = useState<any>(null);
+  const [showParentAgb, setShowParentAgb] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   // PIN-Eingabe
   const [pinInput, setPinInput] = useState('');
@@ -347,7 +358,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at')
+          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url')
           .eq('qr_token', token)
           .single();
 
@@ -358,32 +369,38 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        if (!userData.is_campus_active && !userData.is_groovelab_active) {
-          sessionStorage.removeItem('groovelab_qr_token');
-          setErrorMsg('Dieses Profil wurde nach 3 PIN-Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Musikschule.');
-          setPageState('error');
-          return;
-        }
-
         let schoolName = 'Musikschule';
         let hasCampusSub = false;
         let hasGroovelabSub = false;
         let isTrial = false;
         if (userData.school_id) {
-          const { data: schoolData } = await supabase
+          const { data: schDetails } = await supabase
             .from('schools')
-            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial, opening_hours')
+            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial, opening_hours, student_billing_option, contract_start_date, street, zip_code, city, logo_url, primary_color')
             .eq('id', userData.school_id)
             .single();
-          if (schoolData) {
-            schoolName = schoolData.name;
-            hasCampusSub = schoolData.has_campus_subscription ?? false;
-            hasGroovelabSub = schoolData.has_groovelab_subscription ?? false;
-            isTrial = schoolData.is_trial ?? false;
-            setSchoolFokusLevels(schoolData.opening_hours?.fokus_levels || null);
+          if (schDetails) {
+            schoolName = schDetails.name;
+            hasCampusSub = schDetails.has_campus_subscription ?? false;
+            hasGroovelabSub = schDetails.has_groovelab_subscription ?? false;
+            isTrial = schDetails.is_trial ?? false;
+            setSchoolData(schDetails);
+            setSchoolFokusLevels(schDetails.opening_hours?.fokus_levels || null);
           }
-        }        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
+        }
+
+        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
           setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
+          setPageState('error');
+          return;
+        }
+
+        const isInactive = !userData.is_campus_active && !userData.is_groovelab_active;
+        const isLocked = isInactive && userData.is_pin_activated;
+
+        if (isLocked) {
+          sessionStorage.removeItem('groovelab_qr_token');
+          setErrorMsg('Dieses Profil wurde nach 3 PIN-Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Musikschule.');
           setPageState('error');
           return;
         }
@@ -392,16 +409,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           id: userData.id,
           first_name: userData.first_name,
           last_name: userData.last_name,
-          instrument: null,
-          photo_url: null,
+          instrument: userData.instrument || null,
+          photo_url: userData.photo_url || null,
           role: 'student',
           school_name: schoolName,
-          is_campus_active: userData.is_campus_active ?? true,
-          is_groovelab_active: userData.is_groovelab_active ?? true,
+          is_campus_active: userData.is_campus_active ?? false,
+          is_groovelab_active: userData.is_groovelab_active ?? false,
           app_usage_mode: userData.app_usage_mode ?? 'student_only',
           joker_used_at: userData.joker_used_at,
           created_at: userData.created_at
         });
+
+        if (isInactive) {
+          sessionStorage.setItem('groovelab_qr_token', token);
+          setPageState('inactive_landing');
+          return;
+        }
 
         // Prüfen ob Gerät bereits bekannt ist
         const alreadyPaired = isPairedForToken(token);
@@ -452,7 +475,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── Dashboard-Daten laden ──────────────────────────────────────────────────
   const fetchDashboardData = useCallback(async () => {
-    if (pageState !== 'profile' || !profile) return;
+    if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile) return;
     setLoadingDashboard(true);
     try {
       const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
@@ -467,15 +490,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         `)
         .eq('student_id', profile.id);
 
-      // 2. Heutige Termine/Overrides holen
+      // 2. Termine ab heute holen (um den nächsten Termin zu ermitteln)
       const { data: occData } = await supabase
         .from('schedule_occurrences')
         .select(`
           *,
-          teacher:teacher_id(first_name, last_name)
+          teacher:teacher_id(first_name, last_name),
+          schedule:schedule_id(room:room_id(name))
         `)
         .eq('student_id', profile.id)
-        .eq('date', todayStr);
+        .gte('date', todayStr)
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
 
       // 3. Statistiken holen
       const { data: statsData } = await supabase
@@ -553,6 +579,98 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
     };
   }, [pageState, profile?.id, fetchDashboardData]);
+
+  // Payment default selection when school data is fetched
+  useEffect(() => {
+    if (schoolData?.student_billing_option) {
+      if (schoolData.student_billing_option === 'debit') {
+        setPaymentMethod('debit');
+      } else if (schoolData.student_billing_option === 'cash') {
+        setPaymentMethod('cash');
+      }
+    }
+  }, [schoolData]);
+
+  const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
+    const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
+    const month = contractDateObj.getMonth() + 1; // 1-indexed
+
+    const monthsMap: Record<number, number> = {
+      9: 12,  // September
+      10: 11, // October
+      11: 10, // November
+      12: 9,  // December
+      1: 8,   // January
+      2: 7,   // February
+      3: 6,   // March
+      4: 5,   // April
+      5: 4,   // May
+      6: 3,   // June
+      7: 2,   // July
+      8: 1    // August
+    };
+
+    const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
+    const basePrice = 4.80;
+    return parseFloat(((monthsRemaining / 12) * basePrice).toFixed(2));
+  };
+
+  const handleActivateContract = async () => {
+    if (!profile) return;
+    setActivationLoading(true);
+    setActivationError(null);
+
+    try {
+      // 1. Save parent email using secure update_student_emails RPC
+      sessionStorage.setItem('groovelab_user_id', profile.id);
+      sessionStorage.setItem('groovelab_qr_token', token);
+
+      const { error: emailError } = await supabase.rpc('update_student_emails', {
+        student_id_param: profile.id,
+        input_student_email: '', // student email remains empty
+        input_parent_email: parentEmail
+      });
+
+      if (emailError) throw emailError;
+
+      // 2. Update is_campus_active and payment method
+      const updatePayload: any = {
+        is_campus_active: true,
+        student_billing_payment_method: paymentMethod
+      };
+
+      if (schoolData?.has_groovelab_subscription) {
+        updatePayload.is_groovelab_active = true;
+      }
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(updatePayload)
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Mark device paired
+      markPairedForToken(token);
+
+      // 4. Update profile local state
+      setProfile(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          is_campus_active: true,
+          is_groovelab_active: schoolData?.has_groovelab_subscription ? true : prev.is_groovelab_active
+        };
+      });
+
+      setActivationStep('success');
+    } catch (err: any) {
+      console.error('[QRLanding] Activation error:', err);
+      setActivationError(err.message || 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+    } finally {
+      setActivationLoading(false);
+    }
+  };
 
   // Synthetischer Audio-Erfolgston (HTML5 AudioContext)
   const playSuccessChime = () => {
@@ -1713,6 +1831,589 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <span>Campus GrooveLab · Dieses Gerät wird einmalig gespeichert</span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ── Render: Inactive Landing Page ──────────────────────────────────────────
+  if (pageState === 'inactive_landing' && profile) {
+    const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    
+    // Calculate virtual next lesson if occurrences is empty
+    const getVirtualNextLesson = () => {
+      if (schedules.length === 0) return null;
+      const sch = schedules[0];
+      const dayOfWeek = sch.day_of_week; // 1-7 (Mon-Sun)
+      const today = new Date();
+      const currentDay = today.getDay() || 7; // Monday = 1, ..., Sunday = 7
+      
+      let diff = dayOfWeek - currentDay;
+      if (diff <= 0) {
+        diff += 7; // next week
+      }
+      const nextDate = new Date();
+      nextDate.setDate(today.getDate() + diff);
+      return {
+        dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+        time: sch.time_slot
+      };
+    };
+
+    const nextLessonInfo = (() => {
+      if (occurrences.length > 0) {
+        const nextOcc = occurrences[0];
+        const d = new Date(nextOcc.date);
+        return {
+          dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+          time: nextOcc.start_time
+        };
+      }
+      return getVirtualNextLesson();
+    })();
+
+    const notesList = getHomeworkNotes();
+    const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
+
+    const price = schoolData ? getDynamicAnnualPriceLocal(schoolData.contract_start_date, false) : 0;
+    
+    // Check if school allows direct parent/student activation
+    const activationAllowed = schoolData && (
+      schoolData.student_billing_option === 'option1' ||
+      schoolData.student_billing_option === 'both' ||
+      schoolData.student_billing_option === 'debit' ||
+      schoolData.student_billing_option === 'cash' ||
+      !schoolData.student_billing_option
+    );
+
+    return (
+      <div style={{...styles.fullScreen, background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '24px 16px', gap: '20px'}}>
+        {/* Confetti canvas if success */}
+        {activationStep === 'success' && <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10001, width: '100vw', height: '100vh' }} />}
+
+        {/* Modal overlays for terms */}
+        {showParentAgb && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '28px 24px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              color: '#1e293b'
+            }}>
+              <button 
+                onClick={() => setShowParentAgb(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800 }}>Nutzungsbedingungen</h3>
+              <div style={{ fontSize: '13px', lineHeight: '1.6', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p><strong>Vertragspartner und Anbieter:</strong><br/>Simplified Work GbR, Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                <p><strong>§ 1 LEISTUNGSUMFANG & KOSTENFREIHEIT</strong><br/>Die Nutzung der App selbst ist für den Schüler bzw. die Eltern lizenzgebührenfrei. Die Bereitstellung erfolgt über das Internet im Wege eines Software-as-a-Service (SaaS)-Modells.</p>
+                <p><strong>§ 2 ABRECHNUNG ÜBER DIE MUSIKSCHULE</strong><br/>Soweit für die Aktivierung oder den Betrieb des Profils Gebühren fällig werden, werden diese direkt über die Kooperations-Musikschule nach den dort vereinbarten Abrechnungswegen (z.B. Barzahlung oder Einzug mit der monatlichen Unterrichtsgebühr) erhoben. Es entstehen durch diese Nutzungsbedingungen keine unmittelbaren Zahlungsansprüche des Anbieters gegen den Schüler oder die Eltern.</p>
+                <p><strong>§ 3 ZUGANGSSICHERHEIT & AUTOMATISCHE SPERRUNG</strong><br/>Gibt der Endnutzer dreimal hintereinander eine falsche PIN ein, wird das Benutzerkonto aus Sicherheitsgründen automatisch gesperrt. Eine Entsperrung ist dann nur über die Verwaltung der Musikschule möglich.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showPrivacy && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '28px 24px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              color: '#1e293b'
+            }}>
+              <button 
+                onClick={() => setShowPrivacy(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800 }}>Datenschutzerklärung</h3>
+              <div style={{ fontSize: '13px', lineHeight: '1.6', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p>Wir verarbeiten personenbezogene Daten unserer Nutzer stets unter Einhaltung der geltenden Datenschutzbestimmungen (DSGVO).</p>
+                <p><strong>1. Datenverarbeitung beim QR-Code Scan:</strong><br/>Beim Scannen des QR-Codes werden temporär verbindungsspezifische Daten erhoben, um die Zuordnung zum Schülerprofil zu ermöglichen.</p>
+                <p><strong>2. Geräteregistrierung (Device-Pairing):</strong><br/>Zur Vermeidung unbefugter Zugriffe wird ein eindeutiger Geräteschlüssel (UUID) im lokalen Speicher deines Browsers abgelegt und an unsere Datenbank übermittelt. Dies dient dem Schutz deiner personenbezogenen Lerndaten.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activationStep === 'landing' && (
+          <div style={{width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
+            {/* Header / Profile Card */}
+            <div style={{...styles.card, padding: '24px 20px', gap: '16px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: 'white', position: 'relative', overflow: 'hidden'}}>
+              <div style={{position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none'}} />
+              <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                <div style={{width: '56px', height: '56px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(255, 255, 255, 0.3)', flexShrink: 0}}>
+                  {profile.photo_url ? (
+                    <img src={profile.photo_url} alt="" style={{width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover'}} />
+                  ) : (
+                    <User size={28} color="#059669" />
+                  )}
+                </div>
+                <div style={{display: 'flex', flexDirection: 'column'}}>
+                  <h2 style={{margin: 0, fontSize: '1.25rem', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}>
+                    {profile.first_name} {profile.last_name}
+                  </h2>
+                  <span style={{fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600}}>
+                    {profile.instrument || 'Schüler'} · {profile.school_name}
+                  </span>
+                </div>
+              </div>
+              <div style={{display: 'inline-flex', alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em'}}>
+                Profil Inaktiv
+              </div>
+            </div>
+
+            {/* Main Info Box */}
+            <div style={{...styles.card, padding: '24px', gap: '20px'}}>
+              {/* Regular Appointment Section */}
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <Clock size={16} color="#10b981" /> Unterrichtstermin
+                </h3>
+                {schedules.length > 0 ? (
+                  schedules.map((sch, i) => (
+                    <div key={i} style={{fontSize: '0.95rem', color: '#1e293b', fontWeight: 700, lineHeight: 1.4}}>
+                      Jeden {dayNames[sch.day_of_week - 1]} um {sch.time_slot.substring(0, 5)} Uhr ({sch.duration} Min.)
+                      <div style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 550, marginTop: '2px'}}>
+                        {sch.room?.name && `Raum: ${sch.room.name}`}
+                        {sch.teacher?.first_name && ` · Lehrkraft: ${sch.teacher.first_name} ${sch.teacher.last_name}`}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic'}}>Kein regelmäßiger Termin eingetragen.</p>
+                )}
+              </div>
+
+              {/* Next Lesson Section */}
+              <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <Calendar size={16} color="#10b981" /> Nächster Unterrichtstermin
+                </h3>
+                {nextLessonInfo ? (
+                  <div style={{fontSize: '0.95rem', color: '#1e293b', fontWeight: 700}}>
+                    {nextLessonInfo.dateStr}
+                    <div style={{fontSize: '0.85rem', color: '#10b981', fontWeight: 700, marginTop: '2px'}}>
+                      Start um {nextLessonInfo.time.substring(0, 5)} Uhr
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic'}}>Kein anstehender Termin geplant.</p>
+                )}
+              </div>
+
+              {/* Homework Section */}
+              <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <BookOpen size={16} color="#10b981" /> Deine Hausaufgaben
+                </h3>
+                {activeHWs.length > 0 || notesList.length > 0 ? (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    {activeHWs.map((hw, i) => (
+                      <div key={i} style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#334155', fontWeight: 600}}>
+                        <Check size={16} color="#10b981" style={{marginTop: '2px', flexShrink: 0}} />
+                        <span>{hw.topic_name}</span>
+                      </div>
+                    ))}
+                    {notesList.map((note, i) => (
+                      <div key={`note-${i}`} style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#475569', fontWeight: 550, background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', borderLeft: '3px solid #10b981'}}>
+                        <span>{note}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{margin: 0, fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', fontWeight: 550}}>Keine aktuellen Hausaufgaben erfasst ✨</p>
+                )}
+              </div>
+            </div>
+
+            {/* Activation callout or Notice */}
+            {activationAllowed ? (
+              <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #a7f3d0', background: '#f0fdf4', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                  <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus aktivieren</h3>
+                  <p style={{margin: 0, fontSize: '0.85rem', color: '#047857', lineHeight: 1.5, fontWeight: 550}}>
+                    Schalte deinen Online-Campus mit Übe-Timer, interaktiven Hausaufgaben, Statistiken und Badges frei!
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActivationStep('email')}
+                  style={{
+                    width: '100%',
+                    padding: '16px 20px',
+                    borderRadius: '16px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Sparkles size={18} /> Jetzt freischalten
+                </button>
+              </div>
+            ) : (
+              <div style={{...styles.card, padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                <Lock size={20} color="#64748b" style={{margin: '0 auto'}} />
+                <span style={{fontSize: '0.875rem', color: '#475569', fontWeight: 650}}>Campus wird durch Schule verwaltet</span>
+                <span style={{fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4}}>
+                  Dein Campus-Profil wird in Kürze von deiner Musikschule freigeschaltet. Wende dich bei Fragen bitte an das Sekretariat.
+                </span>
+              </div>
+            )}
+
+            <div style={styles.brandFooter}>
+              <Music size={14} color="#10b981" />
+              <span>Campus GrooveLab</span>
+            </div>
+          </div>
+        )}
+
+        {activationStep === 'email' && (
+          <div style={{...styles.card, maxWidth: '400px', gap: '24px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+              <button 
+                onClick={() => setActivationStep('landing')}
+                style={{background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569'}}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 style={{margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a'}}>Campus Aktivierung</h2>
+                <span style={{fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase'}}>Schritt 1 von 2</span>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); setActivationStep('payment'); }} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+              <p style={{margin: 0, fontSize: '0.875rem', color: '#475569', lineHeight: 1.5, fontWeight: 550}}>
+                Gib bitte die <strong>E-Mail-Adresse deiner Eltern</strong> ein. Dorthin senden wir alle Vertragsunterlagen und Infos zum Campus.
+              </p>
+
+              <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                <label style={{fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase'}}>E-Mail-Adresse der Eltern *</label>
+                <div style={{position: 'relative'}}>
+                  <Mail size={18} color="#94a3b8" style={{position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)'}} />
+                  <input
+                    type="email"
+                    required
+                    value={parentEmail}
+                    onChange={(e) => setParentEmail(e.target.value)}
+                    placeholder="eltern@beispiel.de"
+                    style={{
+                      width: '100%',
+                      padding: '14px 14px 14px 44px',
+                      borderRadius: '14px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                  marginTop: '8px'
+                }}
+              >
+                Weiter
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activationStep === 'payment' && (
+          <div style={{...styles.card, maxWidth: '400px', gap: '24px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+              <button 
+                onClick={() => setActivationStep('email')}
+                style={{background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569'}}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 style={{margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a'}}>Gebühr & Rechtliches</h2>
+                <span style={{fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase'}}>Schritt 2 von 2</span>
+              </div>
+            </div>
+
+            <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#f0fdf4', padding: '16px', borderRadius: '16px', border: '1px solid #a7f3d0'}}>
+              Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
+              <div style={{ marginTop: '10px', fontWeight: 900, color: '#065f46', fontSize: '0.95rem' }}>
+                Betrag: {price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)
+              </div>
+              <span style={{ fontSize: '0.7rem', color: '#047857', display: 'block', marginTop: '6px', fontWeight: 550 }}>
+                * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
+              </span>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleActivateContract(); }} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+              {/* Payment Methods Selector */}
+              {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zahlungsmethode wählen *</label>
+                  
+                  {/* Option 1: Abbuchung */}
+                  <div 
+                    onClick={() => setPaymentMethod('debit')}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: paymentMethod === 'debit' ? '2.5px solid #10b981' : '1px solid #e2e8f0',
+                      background: paymentMethod === 'debit' ? '#f0fdf4' : 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '2px solid #cbd5e1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {paymentMethod === 'debit' && (
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                      <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Mit der nächsten Unterrichtsgebühr abbuchen</strong>
+                      <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
+                        Die Gebühr wird bequem über deine bestehende Bankverbindung der Musikschule eingezogen.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Barzahlung */}
+                  <div 
+                    onClick={() => setPaymentMethod('cash')}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: paymentMethod === 'cash' ? '2.5px solid #10b981' : '1px solid #e2e8f0',
+                      background: paymentMethod === 'cash' ? '#f0fdf4' : 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '2px solid #cbd5e1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {paymentMethod === 'cash' && (
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                      <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Geld in bar mitbringen</strong>
+                      <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
+                        Bitte bringe den Betrag passend mit in den nächsten Unterricht und gib ihn der Lehrkraft.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'left' }}>
+                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#1e293b', marginBottom: '4px' }}>
+                    {schoolData.student_billing_option === 'debit' ? '💳 Abbuchung vereinbart' : '💵 Barzahlung vereinbart'}
+                  </strong>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
+                    {schoolData.student_billing_option === 'debit' 
+                      ? 'Diese Gebühr wird automatisch mit deiner nächsten monatlichen Unterrichtsgebühr über die Musikschule abgebucht.'
+                      : 'Bitte bringe den Betrag passend bar zum nächsten Unterricht mit und gib ihn der Lehrkraft ab.'}
+                  </span>
+                </div>
+              )}
+
+              {/* Legal Confirmation Checkbox */}
+              <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '4px', textAlign: 'left' }}>
+                <input 
+                  type="checkbox" 
+                  required
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  style={{ accentColor: '#10b981', marginTop: '3px', cursor: 'pointer', flexShrink: 0 }}
+                />
+                <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
+                  Ich bestätige, dass ich volljährig bin bzw. als Erziehungsberechtigter des Schülers handle, stimme den{' '}
+                  <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} style={{ textDecoration: 'underline', color: '#10b981', cursor: 'pointer', fontWeight: 700 }}>AGB</span>{' '}
+                  sowie der{' '}
+                  <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ textDecoration: 'underline', color: '#10b981', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span>{' '}
+                  zu und willige in die zahlungspflichtige Aktivierung für das laufende Schuljahr über {
+                    paymentMethod === 'debit' ? 'Abbuchung' : 'Barzahlung'
+                  } ein.
+                </span>
+              </label>
+
+              {activationError && (
+                <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', fontSize: '0.8rem', color: '#dc2626', fontWeight: 700, textAlign: 'center' }}>
+                  {activationError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={activationLoading}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                  marginTop: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {activationLoading ? (
+                  <>
+                    <span style={styles.spinnerInline} /> Aktivierung läuft...
+                  </>
+                ) : (
+                  <>Zahlungspflichtig aktivieren</>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activationStep === 'success' && (
+          <div style={{...styles.card, maxWidth: '380px', textAlign: 'center', gap: '24px', padding: '36px 24px'}}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+              <CheckCircle size={36} color="#10b981" />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>Erfolgreich aktiviert!</h2>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, fontWeight: 550 }}>
+                Dein Campus-Profil wurde erfolgreich aktiviert. Du kannst den Campus ab sofort in vollem Umfang nutzen!
+              </p>
+            </div>
+            <button
+              onClick={() => setPageState('profile')}
+              style={{
+                width: '100%',
+                padding: '16px',
+                borderRadius: '16px',
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+              }}
+            >
+              Zum Campus Profil
+            </button>
+          </div>
+        )}
       </div>
     );
   }
