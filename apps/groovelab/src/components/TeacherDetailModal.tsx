@@ -38,11 +38,8 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
     return [];
   };
 
-  const bio = teacher.bio || "";
   const bands = teacher.bands || "";
   const expertise = teacher.expertise || "";
-  const listeningTo = teacher.listening || "";
-  const gear = teacher.gear || "";
   const instruments = parseArray(teacher.instrument);
 
   return (
@@ -91,15 +88,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Bio section */}
-            <section>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '12px', letterSpacing: '0.05em' }}>
-                <Music size={14} color={brandColor} /> Musikalischer Werdegang
-              </h4>
-              <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#475569', margin: 0, fontWeight: 500 }}>{bio || "Kein Werdegang hinterlegt."}</p>
-            </section>
-
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Expertise */}
             <section>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '12px', letterSpacing: '0.05em' }}>
@@ -114,14 +103,6 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
                 <Headphones size={14} color={brandColor} /> Bands & Projekte
               </h4>
               <p style={{ fontSize: '0.95rem', lineHeight: 1.5, color: '#475569', margin: 0, fontWeight: 600 }}>{bands || "Keine Bands oder Projekte eingetragen."}</p>
-            </section>
-
-            {/* Lieblingsbands */}
-            <section style={{ background: '#fffbeb', padding: '24px', borderRadius: '24px', border: '1px solid #fef3c7' }}>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#b45309', marginBottom: '8px' }}>
-                <Heart size={14} fill="#b45309" /> Lieblingsbands
-              </h4>
-              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#78350f', lineHeight: 1.4 }}>{listeningTo || "Keine Favoriten eingetragen."}</div>
             </section>
           </div>
         </div>
