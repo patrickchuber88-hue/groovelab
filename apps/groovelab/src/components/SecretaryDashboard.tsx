@@ -2072,7 +2072,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       first_name: 'Vorname',
       last_name: 'Nachname',
       email: 'E-Mail',
-      nickname: 'Spitzname',
       is_active: 'Konto-Status',
       is_campus_active: 'Campus-Zugang',
       is_groovelab_active: 'GrooveLab-Zugang',
