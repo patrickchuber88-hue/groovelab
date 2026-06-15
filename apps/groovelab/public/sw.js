@@ -146,35 +146,44 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Navigate mode (HTML documents) -> Network First with Cache fallback
+  // Navigate mode (HTML documents) -> Stale-While-Revalidate with SPA Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then(function(response) {
-          if (response && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then(function(cache) {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(function() {
-          return caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // Fallback: try to match root '/' if we navigated to a subpath that isn't cached
-            return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
-              if (rootResponse) {
-                return rootResponse;
-              }
-              return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
+        const fetchPromise = fetch(event.request)
+          .then(function(response) {
+            if (response && response.status === 200) {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(event.request, responseClone);
               });
+            }
+            return response;
+          })
+          .catch(function(err) {
+            console.warn('Navigation background fetch failed:', err);
+          });
+
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        // Fallback: match root '/' if the navigated subpath isn't cached (standard SPA routing)
+        return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
+          if (rootResponse) {
+            return rootResponse;
+          }
+          // If neither is cached, wait for the background fetch to complete
+          return fetchPromise.then(function(networkResponse) {
+            if (networkResponse) {
+              return networkResponse;
+            }
+            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
             });
           });
-        })
+        });
+      })
     );
     return;
   }

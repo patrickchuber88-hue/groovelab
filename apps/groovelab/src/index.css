@@ -69,6 +69,8 @@
 
 /* ── Base ── */
 html {
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -83,6 +85,13 @@ body {
   min-height: 100vh;
   letter-spacing: -0.01em;
   line-height: 1.5;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+}
+
+#root {
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
 }
 
 /* ── Typography (Urbanist & Inter) ── */
