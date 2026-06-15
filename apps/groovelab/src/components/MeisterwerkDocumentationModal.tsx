@@ -5085,54 +5085,62 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   </div>
                                 )}
 
-                                {homeworkNotesList.length > 0 && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                      Bemerkungen & Hinweise
-                                    </span>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                      {homeworkNotesList.map((note, idx) => (
-                                        <div key={idx} style={{
-                                          display: 'flex',
-                                          alignItems: 'flex-start',
-                                          justifyContent: 'space-between',
-                                          background: '#ffffff',
-                                          border: '1px solid rgba(251, 191, 36, 0.15)',
-                                          padding: '8px 12px',
-                                          borderRadius: '12px',
-                                          fontSize: '0.76rem',
-                                          fontWeight: 650,
-                                          color: '#1e293b',
-                                          lineHeight: '1.4',
-                                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                        }}>
-                                          <div style={{ flex: 1, paddingRight: '8px' }}>
-                                            {note}
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteNote(idx)}
-                                            style={{
-                                              border: 'none',
-                                              background: 'none',
-                                              color: '#ef4444',
-                                              cursor: 'pointer',
-                                              fontSize: '0.74rem',
-                                              fontWeight: 800,
+                                {(() => {
+                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("AUDIO:") && !note.startsWith("STICKER:"));
+                                  if (visibleNotes.length === 0) return null;
+
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        Bemerkungen & Hinweise
+                                      </span>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                        {homeworkNotesList.map((note, idx) => {
+                                          if (note.startsWith("AUDIO:") || note.startsWith("STICKER:")) return null;
+                                          return (
+                                            <div key={idx} style={{
                                               display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              padding: '2px',
-                                              alignSelf: 'flex-start'
-                                            }}
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                      ))}
+                                              alignItems: 'flex-start',
+                                              justifyContent: 'space-between',
+                                              background: '#ffffff',
+                                              border: '1px solid rgba(251, 191, 36, 0.15)',
+                                              padding: '8px 12px',
+                                              borderRadius: '12px',
+                                              fontSize: '0.76rem',
+                                              fontWeight: 650,
+                                              color: '#1e293b',
+                                              lineHeight: '1.4',
+                                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                            }}>
+                                              <div style={{ flex: 1, paddingRight: '8px' }}>
+                                                {note}
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteNote(idx)}
+                                                style={{
+                                                  border: 'none',
+                                                  background: 'none',
+                                                  color: '#ef4444',
+                                                  cursor: 'pointer',
+                                                  fontSize: '0.74rem',
+                                                  fontWeight: 800,
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  padding: '2px',
+                                                  alignSelf: 'flex-start'
+                                                }}
+                                              >
+                                                ✕
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                               </div>
                             );
                           })()}
@@ -5263,81 +5271,103 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             flexDirection: 'column',
                             gap: '12px'
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>📼</span> Play-Along Aufnahme (max. 60s)
-                              </span>
-                              {!isRecordingAudio ? (
-                                <button
-                                  type="button"
-                                  onClick={startRecordingAudio}
-                                  disabled={isUploadingAudio}
-                                  style={{
-                                    background: '#000',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  🔴 Aufnahme starten
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => stopRecordingAudio()}
-                                  style={{
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  ⏹️ Stopp ({audioDuration}s / 60s)
-                                </button>
-                              )}
-                            </div>
-
-                            {isUploadingAudio && (
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>⏳</span> Lade Audio-Feedback hoch...
-                              </div>
-                            )}
-
-                            {/* Render Cassette Players for recorded audios */}
                             {(() => {
+                              const currentWeek = getISOWeek();
                               const audios = homeworkNotesList
-                                .filter(note => note.startsWith("AUDIO:"))
-                                .map(note => {
-                                  const parts = note.substring(6).split('|');
+                                .map((note, originalIdx) => ({ note, originalIdx }))
+                                .filter(item => item.note.startsWith("AUDIO:"))
+                                .map(item => {
+                                  const parts = item.note.substring(6).split('|');
                                   return {
                                     url: parts[0],
                                     duration: parseInt(parts[1] || '0', 10),
-                                    date: parts[2]
+                                    date: parts[2],
+                                    originalIdx: item.originalIdx
                                   };
                                 });
-
-                              if (audios.length === 0) return null;
+                              const currentWeekAudios = audios.filter(aud => {
+                                if (!aud.date) return false;
+                                return getISOWeek(aud.date) === currentWeek;
+                              });
+                              const isLimitReached = currentWeekAudios.length >= 2;
 
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
-                                  {audios.map((aud, aIdx) => (
-                                    <RetroCassettePlayer key={aIdx} url={aud.url} duration={aud.duration} index={aIdx} />
-                                  ))}
-                                </div>
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>📼</span> Play-Along Aufnahme (max. 60s)
+                                    </span>
+                                    {!isRecordingAudio ? (
+                                      <button
+                                        type="button"
+                                        onClick={startRecordingAudio}
+                                        disabled={isUploadingAudio || isLimitReached}
+                                        style={{
+                                          background: isLimitReached ? '#94a3b8' : '#000',
+                                          color: '#fff',
+                                          border: 'none',
+                                          padding: '6px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        🔴 Aufnahme starten
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => stopRecordingAudio()}
+                                        style={{
+                                          background: '#ef4444',
+                                          color: '#fff',
+                                          border: 'none',
+                                          padding: '6px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        ⏹️ Stopp ({audioDuration}s / 60s)
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {isLimitReached && (
+                                    <div style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 800, marginTop: '2px' }}>
+                                      ⚠️ Maximale Anzahl an Aufnahmen (2) für diese Kalenderwoche erreicht. Lösche eine alte Aufnahme der aktuellen Woche, um eine neue zu machen.
+                                    </div>
+                                  )}
+
+                                  {isUploadingAudio && (
+                                    <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>⏳</span> Lade Audio-Feedback hoch...
+                                    </div>
+                                  )}
+
+                                  {/* Render Cassette Players for recorded audios */}
+                                  {audios.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                                      {audios.map((aud, aIdx) => (
+                                        <RetroCassettePlayer 
+                                          key={aIdx} 
+                                          url={aud.url} 
+                                          duration={aud.duration} 
+                                          index={aIdx} 
+                                          onDelete={() => handleDeleteNote(aud.originalIdx)}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
                               );
                             })()}
                           </div>
@@ -6216,7 +6246,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   );
 };
 
-const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number }> = ({ url, duration, index }) => {
+const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number; onDelete?: () => void }> = ({ url, duration, index, onDelete }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -6340,6 +6370,28 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
         >
           {isPlaying ? '⏸️ PAUSE' : '▶️ PLAY'}
         </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            style={{
+              background: '#ef4444',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            🗑️ LÖSCHEN
+          </button>
+        )}
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
