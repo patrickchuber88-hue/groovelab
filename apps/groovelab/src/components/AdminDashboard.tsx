@@ -5117,10 +5117,10 @@ export function AdminDashboard({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{ fontSize: '0.72rem', color: '#7d7d82', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
                         {s.is_trial ? (
-                          <div style={{ padding: '1px 5px', background: '#fef2f2', color: '#ef4444', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '1px 5px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             ⏳ PROBE
                           </div>
-                        ) : (s.status || 'active') === 'active' ? (
+                        ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
                           <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#137333', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             Aktiv
                           </div>
