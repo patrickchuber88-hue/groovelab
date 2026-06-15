@@ -96,7 +96,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
 
     try {
       // 1. Try to hit backend endpoint
-      const token = sessionStorage.getItem('groovelab_user_id'); // mock token for auth header or direct
+      const token = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id'); // mock token for auth header or direct
       const response = await fetch('/api/students/onboard', {
         method: 'POST',
         headers: {

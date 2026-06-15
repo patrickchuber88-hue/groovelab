@@ -6504,23 +6504,39 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
           {/* Center Play Button Overlay */}
           <div 
             style={{
-              width: '16px',
-              height: '16px',
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '24px',
+              height: '24px',
               borderRadius: '50%',
-              background: isPlaying ? '#ef4444' : '#10b981',
+              background: isPlaying 
+                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: '2px solid #ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-              zIndex: 10,
-              fontSize: '8px',
+              boxShadow: isPlaying 
+                ? '0 0 10px rgba(239, 68, 68, 0.6), 0 2px 6px rgba(0,0,0,0.4)' 
+                : '0 0 10px rgba(16, 185, 129, 0.4), 0 2px 6px rgba(0,0,0,0.4)',
+              zIndex: 20,
               color: 'white',
-              fontWeight: 'bold',
-              transition: 'transform 0.1s ease',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               pointerEvents: 'none' // Clicks bubble up to trigger togglePlay on parent
             }}
           >
-            {isPlaying ? '⏸' : '▶'}
+            {isPlaying ? (
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                <rect x="5" y="5" width="4" height="14" rx="1" />
+                <rect x="15" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ marginLeft: '1.5px' }}>
+                <path d="M7 4v16l13-8z" />
+              </svg>
+            )}
           </div>
 
           {/* Right Reel Hub */}

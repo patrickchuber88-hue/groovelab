@@ -138,7 +138,7 @@ export function BillingDashboard() {
       setLoading(true);
       setError(null);
 
-      const token = sessionStorage.getItem('groovelab_user_id');
+      const token = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
       const response = await fetch('/api/get-billing-metrics', {
         headers: {
           'Authorization': `Bearer ${token}`

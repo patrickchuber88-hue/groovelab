@@ -1571,7 +1571,18 @@ function App() {
     }
   }
 
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const uid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+    if (uid && !sessionStorage.getItem('groovelab_user_id')) {
+      sessionStorage.setItem('groovelab_user_id', uid);
+    }
+    const mode = sessionStorage.getItem('groovelab_location_mode') || localStorage.getItem('groovelab_location_mode');
+    if (mode && !sessionStorage.getItem('groovelab_location_mode')) {
+      sessionStorage.setItem('groovelab_location_mode', mode);
+    }
+    return uid;
+  });
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
