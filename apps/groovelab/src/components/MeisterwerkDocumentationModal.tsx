@@ -5320,121 +5320,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
-
-                        {/* Audio Play-Along Cassette Widget */}
-                        {isCampusActive && (
-                          <div style={{
-                            margin: '12px 0',
-                            padding: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px'
-                          }}>
-                            {(() => {
-                              const currentWeek = getISOWeek();
-                              const audios = homeworkNotesList
-                                .map((note, originalIdx) => ({ note, originalIdx }))
-                                .filter(item => item.note.startsWith("AUDIO:"))
-                                .map(item => {
-                                  const parts = item.note.substring(6).split('|');
-                                  return {
-                                    url: parts[0],
-                                    duration: parseInt(parts[1] || '0', 10),
-                                    date: parts[2],
-                                    originalIdx: item.originalIdx
-                                  };
-                                });
-                              const currentWeekAudios = audios.filter(aud => {
-                                if (!aud.date) return false;
-                                return getISOWeek(aud.date) === currentWeek;
-                              });
-                              const isLimitReached = currentWeekAudios.length >= 2;
-
-                              return (
-                                <>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span>📼</span> Play-Along Aufnahme (max. 60s)
-                                    </span>
-                                    {!isRecordingAudio ? (
-                                      <button
-                                        type="button"
-                                        onClick={startRecordingAudio}
-                                        disabled={isUploadingAudio || isLimitReached}
-                                        style={{
-                                          background: isLimitReached ? '#94a3b8' : '#000',
-                                          color: '#fff',
-                                          border: 'none',
-                                          padding: '6px 12px',
-                                          borderRadius: '12px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 800,
-                                          cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}
-                                      >
-                                        🔴 Aufnahme starten
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => stopRecordingAudio()}
-                                        style={{
-                                          background: '#ef4444',
-                                          color: '#fff',
-                                          border: 'none',
-                                          padding: '6px 12px',
-                                          borderRadius: '12px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 800,
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}
-                                      >
-                                        ⏹️ Stopp ({audioDuration}s / 60s)
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {isLimitReached && (
-                                    <div style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 800, marginTop: '2px' }}>
-                                      ⚠️ Maximale Anzahl an Aufnahmen (2) für diese Kalenderwoche erreicht. Lösche eine alte Aufnahme der aktuellen Woche, um eine neue zu machen.
-                                    </div>
-                                  )}
-
-                                  {isUploadingAudio && (
-                                    <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span>⏳</span> Lade Audio-Feedback hoch...
-                                    </div>
-                                  )}
-
-                                  {/* Render Cassette Players for recorded audios */}
-                                  {audios.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
-                                      {audios.map((aud, aIdx) => (
-                                        <RetroCassettePlayer 
-                                          key={aIdx} 
-                                          url={aud.url} 
-                                          duration={aud.duration} 
-                                          index={aIdx} 
-                                          onDelete={() => handleDeleteNote(aud.originalIdx)}
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        )}
-
                         {/* Schnellbaukasten Presets */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
@@ -5562,6 +5447,120 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </div>
                         </div>
                       </div>
+
+                        {/* Audio Play-Along Cassette Widget */}
+                        {isCampusActive && (
+                          <div style={{
+                            margin: '12px 0',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                          }}>
+                            {(() => {
+                              const currentWeek = getISOWeek();
+                              const audios = homeworkNotesList
+                                .map((note, originalIdx) => ({ note, originalIdx }))
+                                .filter(item => item.note.startsWith("AUDIO:"))
+                                .map(item => {
+                                  const parts = item.note.substring(6).split('|');
+                                  return {
+                                    url: parts[0],
+                                    duration: parseInt(parts[1] || '0', 10),
+                                    date: parts[2],
+                                    originalIdx: item.originalIdx
+                                  };
+                                });
+                              const currentWeekAudios = audios.filter(aud => {
+                                if (!aud.date) return false;
+                                return getISOWeek(aud.date) === currentWeek;
+                              });
+                              const isLimitReached = currentWeekAudios.length >= 2;
+
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>📼</span> Play-Along Aufnahme (max. 60s)
+                                    </span>
+                                    {!isRecordingAudio ? (
+                                      <button
+                                        type="button"
+                                        onClick={startRecordingAudio}
+                                        disabled={isUploadingAudio || isLimitReached}
+                                        style={{
+                                          background: isLimitReached ? '#94a3b8' : '#000',
+                                          color: '#fff',
+                                          border: 'none',
+                                          padding: '6px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        🔴 Aufnahme starten
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => stopRecordingAudio()}
+                                        style={{
+                                          background: '#ef4444',
+                                          color: '#fff',
+                                          border: 'none',
+                                          padding: '6px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        ⏹️ Stopp ({audioDuration}s / 60s)
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {isLimitReached && (
+                                    <div style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 800, marginTop: '2px' }}>
+                                      ⚠️ Maximale Anzahl an Aufnahmen (2) für diese Kalenderwoche erreicht. Lösche eine alte Aufnahme der aktuellen Woche, um eine neue zu machen.
+                                    </div>
+                                  )}
+
+                                  {isUploadingAudio && (
+                                    <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>⏳</span> Lade Audio-Feedback hoch...
+                                    </div>
+                                  )}
+
+                                  {/* Render Cassette Players for recorded audios */}
+                                  {audios.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                                      {audios.map((aud, aIdx) => (
+                                        <RetroCassettePlayer 
+                                          key={aIdx} 
+                                          url={aud.url} 
+                                          duration={aud.duration} 
+                                          index={aIdx} 
+                                          onDelete={() => handleDeleteNote(aud.originalIdx)}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
 
                       {/* Internal teacher notes */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
