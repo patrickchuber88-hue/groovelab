@@ -6280,11 +6280,60 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   );
 };
 
+const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      width="20" 
+      height="20" 
+      fill="none" 
+      stroke={color} 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      style={{
+        display: 'block',
+        flexShrink: 0
+      }}
+    >
+      {/* Cassette Shell */}
+      <rect x="2" y="4" width="20" height="16" rx="2" ry="2" strokeWidth="2.2" />
+      {/* Center Label Area */}
+      <rect x="6" y="8" width="12" height="7" rx="1" ry="1" strokeWidth="1.5" opacity="0.8" />
+      {/* Left Reel */}
+      <g 
+        style={{
+          transformOrigin: '9px 11.5px',
+          animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
+        }}
+      >
+        <circle cx="9" cy="11.5" r="1.8" strokeWidth="1.5" />
+        <line x1="9" y1="10" x2="9" y2="13" strokeWidth="1" />
+        <line x1="7.5" y1="11.5" x2="10.5" y2="11.5" strokeWidth="1" />
+      </g>
+      {/* Right Reel */}
+      <g 
+        style={{
+          transformOrigin: '15px 11.5px',
+          animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
+        }}
+      >
+        <circle cx="15" cy="11.5" r="1.8" strokeWidth="1.5" />
+        <line x1="15" y1="10" x2="15" y2="13" strokeWidth="1" />
+        <line x1="13.5" y1="11.5" x2="16.5" y2="11.5" strokeWidth="1" />
+      </g>
+      {/* Trapezoid bottom */}
+      <path d="M 8,19 L 9,16 L 15,16 L 16,19 Z" strokeWidth="1.5" fill="none" opacity="0.8" />
+    </svg>
+  );
+};
+
 const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const togglePlay = () => {
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -6305,36 +6354,49 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
     };
   }, []);
 
+  const themeColor = isPlaying ? '#d97706' : '#475569';
+
   return (
     <div 
       onClick={togglePlay}
       style={{ 
         display: 'inline-flex', 
         alignItems: 'center', 
-        gap: '6px',
+        gap: '8px',
         cursor: 'pointer',
         userSelect: 'none',
-        transition: 'opacity 0.2s'
+        transition: 'all 0.2s ease',
+        background: isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)',
+        border: `1px solid ${isPlaying ? 'rgba(217, 119, 6, 0.2)' : 'rgba(71, 85, 105, 0.1)'}`,
+        padding: '5px 12px',
+        borderRadius: '20px',
+        color: themeColor,
+        fontWeight: 700,
+        fontSize: '0.8rem'
       }}
-      onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-      onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.12)' : 'rgba(71, 85, 105, 0.06)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)';
+      }}
     >
+      <style>{`
+        @keyframes spin-clockwise {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       <audio ref={audioRef} src={url} />
-      <span style={{ 
-        fontSize: '1.05rem', 
-        display: 'flex', 
-        alignItems: 'center',
-        animation: isPlaying ? 'pulse 1.2s infinite alternate' : 'none'
-      }}>
-        {isPlaying ? '🔊' : '📼'}
-      </span>
-      <span style={{ 
-        fontSize: '0.8rem', 
-        fontWeight: 700, 
-        color: isPlaying ? '#d97706' : '#1e293b' 
-      }}>
-        {label}
-      </span>
+      <CassetteIcon isPlaying={isPlaying} color={themeColor} />
+      <span>{label}</span>
+      {isPlaying && (
+        <span style={{ fontSize: '0.75rem', color: '#ef4444', animation: 'pulse 0.8s infinite alternate', marginLeft: '4px' }}>
+          • PLAYING
+        </span>
+      )}
     </div>
   );
 };
