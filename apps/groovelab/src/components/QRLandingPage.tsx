@@ -3398,7 +3398,7 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
       height="20" 
       fill="none" 
       stroke={color} 
-      strokeWidth="2" 
+      strokeWidth="1.5" 
       strokeLinecap="round" 
       strokeLinejoin="round"
       style={{
@@ -3406,29 +3406,32 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
         flexShrink: 0
       }}
     >
-      <rect x="2" y="4" width="20" height="16" rx="2" ry="2" strokeWidth="2.2" />
-      <rect x="6" y="8" width="12" height="7" rx="1" ry="1" strokeWidth="1.5" opacity="0.8" />
-      <g 
-        style={{
-          transformOrigin: '9px 11.5px',
-          animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-        }}
-      >
-        <circle cx="9" cy="11.5" r="1.8" strokeWidth="1.5" />
-        <line x1="9" y1="10" x2="9" y2="13" strokeWidth="1" />
-        <line x1="7.5" y1="11.5" x2="10.5" y2="11.5" strokeWidth="1" />
+      {/* Outer Cassette Shell */}
+      <rect x="2" y="3" width="20" height="14" rx="2" strokeWidth="1.8" />
+      {/* Bottom Trapezoid (exposed tape run) */}
+      <path d="M6 17 L7.5 20.5 L16.5 20.5 L18 17" strokeWidth="1.5" />
+      {/* Center label sticker area */}
+      <rect x="4.5" y="5.5" width="15" height="9" rx="1" strokeWidth="1.2" opacity="0.85" />
+      {/* The clear plastic window in the middle */}
+      <rect x="7.5" y="7.5" width="9" height="5" rx="0.5" strokeWidth="1" opacity="0.8" />
+      {/* Left rotating reel */}
+      <g style={{ transformOrigin: '10px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
+        <circle cx="10" cy="10" r="1.8" strokeWidth="1.2" />
+        <path d="M10 8.2 L10 11.8 M8.2 10 L11.8 10" strokeWidth="1" />
       </g>
-      <g 
-        style={{
-          transformOrigin: '15px 11.5px',
-          animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-        }}
-      >
-        <circle cx="15" cy="11.5" r="1.8" strokeWidth="1.5" />
-        <line x1="15" y1="10" x2="15" y2="13" strokeWidth="1" />
-        <line x1="13.5" y1="11.5" x2="16.5" y2="11.5" strokeWidth="1" />
+      {/* Right rotating reel */}
+      <g style={{ transformOrigin: '14px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
+        <circle cx="14" cy="10" r="1.8" strokeWidth="1.2" />
+        <path d="M14 8.2 L14 11.8 M12.2 10 L15.8 10" strokeWidth="1" />
       </g>
-      <path d="M 8,19 L 9,16 L 15,16 L 16,19 Z" strokeWidth="1.5" fill="none" opacity="0.8" />
+      {/* Small details: screw holes in corners */}
+      <circle cx="3.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="20.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="3.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="20.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      {/* Tape rolls inside window */}
+      <circle cx="10" cy="10" r="3" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
+      <circle cx="14" cy="10" r="2.8" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
     </svg>
   );
 };

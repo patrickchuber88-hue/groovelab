@@ -7922,23 +7922,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   );
                                 })}
 
-                                {currentWeekNotes && currentWeekNotes.map((note: string, idx: number) => (
-                                  <div key={`curr-note-${idx}`} style={{ 
-                                    fontSize: '0.78rem', 
-                                    color: '#475569', 
-                                    fontWeight: 650, 
-                                    fontStyle: 'italic', 
-                                    borderLeft: '3px solid #10b981', 
-                                    paddingLeft: '8px', 
-                                    margin: '2px 4px',
-                                    lineHeight: 1.4,
-                                    background: '#f8fafc',
-                                    padding: '6px 8px',
-                                    borderRadius: '0 8px 8px 0'
-                                  }}>
-                                    📝 {note}
-                                  </div>
-                                ))}
+                                {currentWeekNotes && (() => {
+                                  let audioCount = 0;
+                                  const filteredNotes = currentWeekNotes.filter((note: string) => !note.startsWith("STICKER:"));
+                                  return filteredNotes.map((note: string, idx: number) => {
+                                    const isAudio = note.startsWith("AUDIO:");
+                                    if (isAudio) {
+                                      audioCount++;
+                                      const parts = note.substring(6).split('|');
+                                      return (
+                                        <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '6px 10px', borderRadius: '12px', borderLeft: '3px solid #10b981', margin: '2px 4px' }}>
+                                          <InlineAudioPlayer url={parts[0]} label={`Play-Along #${audioCount}`} />
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div key={`curr-note-${idx}`} style={{ 
+                                        fontSize: '0.78rem', 
+                                        color: '#475569', 
+                                        fontWeight: 650, 
+                                        fontStyle: 'italic', 
+                                        borderLeft: '3px solid #10b981', 
+                                        paddingLeft: '8px', 
+                                        margin: '2px 4px',
+                                        lineHeight: 1.4,
+                                        background: '#f8fafc',
+                                        padding: '6px 8px',
+                                        borderRadius: '0 8px 8px 0',
+                                        whiteSpace: 'pre-line'
+                                      }}>
+                                        📝 {note}
+                                      </div>
+                                    );
+                                  });
+                                })()}
                               </>
                             ) : (
                               <div style={{ 
@@ -7988,20 +8005,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     </div>
                                   );
                                 })}
-                                {prevWeekNotes && prevWeekNotes.map((note: string, idx: number) => (
-                                  <div key={`prev-note-${idx}`} style={{ 
-                                    fontSize: '0.72rem', 
-                                    color: '#64748b', 
-                                    fontWeight: 650, 
-                                    fontStyle: 'italic', 
-                                    borderLeft: '2px solid #cbd5e1', 
-                                    paddingLeft: '6px', 
-                                    margin: '2px 4px',
-                                    lineHeight: 1.3
-                                  }}>
-                                    {note}
-                                  </div>
-                                ))}
+                                {prevWeekNotes && (() => {
+                                  let audioCount = 0;
+                                  const filteredNotes = prevWeekNotes.filter((note: string) => !note.startsWith("STICKER:"));
+                                  return filteredNotes.map((note: string, idx: number) => {
+                                    const isAudio = note.startsWith("AUDIO:");
+                                    if (isAudio) {
+                                      audioCount++;
+                                      const parts = note.substring(6).split('|');
+                                      return (
+                                        <div key={`prev-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '6px 10px', borderRadius: '12px', borderLeft: '2px solid #cbd5e1', margin: '2px 4px', opacity: 0.85 }}>
+                                          <InlineAudioPlayer url={parts[0]} label={`Play-Along #${audioCount}`} />
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div key={`prev-note-${idx}`} style={{ 
+                                        fontSize: '0.72rem', 
+                                        color: '#64748b', 
+                                        fontWeight: 650, 
+                                        fontStyle: 'italic', 
+                                        borderLeft: '2px solid #cbd5e1', 
+                                        paddingLeft: '6px', 
+                                        margin: '2px 4px',
+                                        lineHeight: 1.3,
+                                        whiteSpace: 'pre-line'
+                                      }}>
+                                        {note}
+                                      </div>
+                                    );
+                                  });
+                                })()}
                               </>
                             ) : (
                               <div style={{ fontSize: '0.72rem', color: '#cbd5e1', fontStyle: 'italic' }}>
@@ -11250,3 +11284,123 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     </div>
   );
 }
+
+const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      width="20" 
+      height="20" 
+      fill="none" 
+      stroke={color} 
+      strokeWidth="1.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      style={{
+        display: 'block',
+        flexShrink: 0
+      }}
+    >
+      {/* Outer Cassette Shell */}
+      <rect x="2" y="3" width="20" height="14" rx="2" strokeWidth="1.8" />
+      {/* Bottom Trapezoid (exposed tape run) */}
+      <path d="M6 17 L7.5 20.5 L16.5 20.5 L18 17" strokeWidth="1.5" />
+      {/* Center label sticker area */}
+      <rect x="4.5" y="5.5" width="15" height="9" rx="1" strokeWidth="1.2" opacity="0.85" />
+      {/* The clear plastic window in the middle */}
+      <rect x="7.5" y="7.5" width="9" height="5" rx="0.5" strokeWidth="1" opacity="0.8" />
+      {/* Left rotating reel */}
+      <g style={{ transformOrigin: '10px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
+        <circle cx="10" cy="10" r="1.8" strokeWidth="1.2" />
+        <path d="M10 8.2 L10 11.8 M8.2 10 L11.8 10" strokeWidth="1" />
+      </g>
+      {/* Right rotating reel */}
+      <g style={{ transformOrigin: '14px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
+        <circle cx="14" cy="10" r="1.8" strokeWidth="1.2" />
+        <path d="M14 8.2 L14 11.8 M12.2 10 L15.8 10" strokeWidth="1" />
+      </g>
+      {/* Small details: screw holes in corners */}
+      <circle cx="3.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="20.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="3.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      <circle cx="20.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
+      {/* Tape rolls inside window */}
+      <circle cx="10" cy="10" r="3" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
+      <circle cx="14" cy="10" r="2.8" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
+    </svg>
+  );
+};
+
+const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  React.useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => setIsPlaying(false);
+    audio.addEventListener('ended', onEnded);
+    return () => {
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  const themeColor = isPlaying ? '#d97706' : '#475569';
+
+  return (
+    <div 
+      onClick={togglePlay}
+      style={{ 
+        display: 'inline-flex', 
+        alignItems: 'center', 
+        gap: '8px',
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'all 0.2s ease',
+        background: isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)',
+        border: `1px solid ${isPlaying ? 'rgba(217, 119, 6, 0.2)' : 'rgba(71, 85, 105, 0.1)'}`,
+        padding: '4px 10px',
+        borderRadius: '20px',
+        color: themeColor,
+        fontWeight: 700,
+        fontSize: '0.75rem',
+        lineHeight: 1
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.12)' : 'rgba(71, 85, 105, 0.06)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)';
+      }}
+    >
+      <style>{`
+        @keyframes spin-clockwise {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <audio ref={audioRef} src={url} />
+      <CassetteIcon isPlaying={isPlaying} color={themeColor} />
+      <span>{label}</span>
+      {isPlaying && (
+        <span style={{ fontSize: '0.7rem', color: '#ef4444', animation: 'pulse 0.8s infinite alternate', marginLeft: '4px' }}>
+          • PLAYING
+        </span>
+      )}
+    </div>
+  );
+};
