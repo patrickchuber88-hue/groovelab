@@ -3852,16 +3852,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       const parsed = JSON.parse(item.homework_notes);
                       if (Array.isArray(parsed)) {
                         parsed.forEach((n: string) => {
-                          if (n.trim() !== '' && !uniqueHomeworkNotes.includes(n.trim())) {
+                          if (n.trim() !== '' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(n.trim())) {
                             uniqueHomeworkNotes.push(n.trim());
                           }
                         });
-                      } else if (typeof parsed === 'string' && parsed.trim() !== '' && !uniqueHomeworkNotes.includes(parsed.trim())) {
+                      } else if (typeof parsed === 'string' && parsed.trim() !== '' && !parsed.startsWith('AUDIO:') && !parsed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(parsed.trim())) {
                         uniqueHomeworkNotes.push(parsed.trim());
                       }
                     } catch (e) {
-                      if (!uniqueHomeworkNotes.includes(item.homework_notes.trim())) {
-                        uniqueHomeworkNotes.push(item.homework_notes.trim());
+                      const trimmed = item.homework_notes.trim();
+                      if (!trimmed.startsWith('AUDIO:') && !trimmed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(trimmed)) {
+                        uniqueHomeworkNotes.push(trimmed);
                       }
                     }
                   }
@@ -5101,8 +5102,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 )}
 
                                 {(() => {
-                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("AUDIO:") && !note.startsWith("STICKER:"));
+                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("STICKER:"));
                                   if (visibleNotes.length === 0) return null;
+
+                                  let audioCount = 0;
 
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
@@ -5111,11 +5114,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       </span>
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                         {homeworkNotesList.map((note, idx) => {
-                                          if (note.startsWith("AUDIO:") || note.startsWith("STICKER:")) return null;
+                                          if (note.startsWith("STICKER:")) return null;
+                                          
+                                          const isAudio = note.startsWith("AUDIO:");
+                                          let contentNode;
+                                          if (isAudio) {
+                                            audioCount++;
+                                            const parts = note.substring(6).split('|');
+                                            contentNode = (
+                                              <InlineAudioPlayer 
+                                                url={parts[0]} 
+                                                label={`Play-Along #${audioCount}`}
+                                              />
+                                            );
+                                          } else {
+                                            contentNode = note;
+                                          }
+
                                           return (
                                             <div key={idx} style={{
                                               display: 'flex',
-                                              alignItems: 'flex-start',
+                                              alignItems: 'center',
                                               justifyContent: 'space-between',
                                               background: '#ffffff',
                                               border: '1px solid rgba(251, 191, 36, 0.15)',
@@ -5128,7 +5147,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                             }}>
                                               <div style={{ flex: 1, paddingRight: '8px' }}>
-                                                {note}
+                                                {contentNode}
                                               </div>
                                               <button
                                                 type="button"
@@ -5144,7 +5163,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   alignItems: 'center',
                                                   justifyContent: 'center',
                                                   padding: '2px',
-                                                  alignSelf: 'flex-start'
+                                                  alignSelf: 'center'
                                                 }}
                                               >
                                                 ✕
@@ -6257,6 +6276,65 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       })()}
       </div>
       </div>
+    </div>
+  );
+};
+
+const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => setIsPlaying(false);
+    audio.addEventListener('ended', onEnded);
+    return () => {
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  return (
+    <div 
+      onClick={togglePlay}
+      style={{ 
+        display: 'inline-flex', 
+        alignItems: 'center', 
+        gap: '6px',
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'opacity 0.2s'
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+      onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+    >
+      <audio ref={audioRef} src={url} />
+      <span style={{ 
+        fontSize: '1.05rem', 
+        display: 'flex', 
+        alignItems: 'center',
+        animation: isPlaying ? 'pulse 1.2s infinite alternate' : 'none'
+      }}>
+        {isPlaying ? '🔊' : '📼'}
+      </span>
+      <span style={{ 
+        fontSize: '0.8rem', 
+        fontWeight: 700, 
+        color: isPlaying ? '#d97706' : '#1e293b' 
+      }}>
+        {label}
+      </span>
     </div>
   );
 };
