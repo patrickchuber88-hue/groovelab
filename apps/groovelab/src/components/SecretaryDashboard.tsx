@@ -3655,7 +3655,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employeeFirstName || !employeeLastName || !employeeEmail) return;
+    if (!employeeFirstName || !employeeLastName) return;
 
     try {
       const selectedRole = (e.currentTarget as any).elements.employeeRoleSelect?.value || 'admin';
@@ -3669,8 +3669,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           role: selectedRole,
           first_name: employeeFirstName,
           last_name: employeeLastName,
-          nickname: employeeNickname || null,
-          email: employeeEmail,
+          nickname: null,
+          email: null,
           is_active: true,
           is_app_user: true,
           ausweis_nummer: pin,
@@ -12002,30 +12002,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 />
                               </div>
                             </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Spitzname</label>
-                              <input
-                                type="text"
-                                value={employeeNickname}
-                                onChange={(e) => setEmployeeNickname(e.target.value)}
-                                placeholder="z.B. Clärchen"
-                                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                              />
-                            </div>
                             
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse *</label>
-                              <input
-                                type="email"
-                                required
-                                value={employeeEmail}
-                                onChange={(e) => setEmployeeEmail(e.target.value)}
-                                placeholder="z.B. clara@musaek.de"
-                                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                              />
-                            </div>
-
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Rolle *</label>
                               <select
@@ -12051,7 +12028,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <button
                               type="submit"
                               className="google-btn-primary"
-                              style={{ background: '#0b57d0', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
+                              style={{ background: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                             >
                               Mitarbeiter anlegen
                             </button>
