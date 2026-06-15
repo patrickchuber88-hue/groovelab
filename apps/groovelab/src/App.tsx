@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
@@ -13099,6 +13099,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
+  const [isLooping, setIsLooping] = useState(false);
   const [showScrollPausedToast, setShowScrollPausedToast] = useState(false);
   const [extractedBpm, setExtractedBpm] = useState<number | null>(null);
   const [testAudioUrl, setTestAudioUrl] = useState<string>('');
@@ -13472,6 +13473,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
         <audio
           ref={audioRef}
           src={resolvedAudioUrl}
+          loop={isLooping}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}
@@ -13707,6 +13709,28 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
                   >
                     <ArrowDown size={12} />
                     <span>Auto-Scroll</span>
+                  </button>
+
+                  {/* Loop Switch */}
+                  <button
+                    onClick={() => setIsLooping(!isLooping)}
+                    style={{
+                      background: isLooping ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                      border: isLooping ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      color: isLooping ? '#60a5fa' : '#94a3b8',
+                      padding: '5px 10px',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <Repeat size={12} />
+                    <span>Loop</span>
                   </button>
 
                   {/* Speed Selector */}
