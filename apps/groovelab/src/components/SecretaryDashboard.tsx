@@ -2065,40 +2065,119 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     document.body.removeChild(link);
   };
 
+  const translateKey = (key: string): string => {
+    const keyMap: Record<string, string> = {
+      role: 'Hauptrolle',
+      roles: 'Rollen',
+      first_name: 'Vorname',
+      last_name: 'Nachname',
+      email: 'E-Mail',
+      nickname: 'Spitzname',
+      is_active: 'Konto-Status',
+      is_campus_active: 'Campus-Zugang',
+      is_groovelab_active: 'GrooveLab-Zugang',
+      is_trial: 'Probezeit-Status',
+      trial_ends_at: 'Probezeit-Ende',
+      activated_at: 'Aktivierungsdatum',
+      ausweis_nummer: 'Mitarbeiter-PIN',
+      is_app_user: 'App-Nutzung',
+      is_premium_user: 'Premium-Status'
+    };
+    return keyMap[key] || key;
+  };
+
+  const translateValue = (key: string, val: any): string => {
+    if (val === null || val === undefined || val === '') return 'nicht gesetzt';
+    if (typeof val === 'boolean') {
+      if (key.startsWith('is_') && key.endsWith('_active')) {
+        return val ? 'Freigeschaltet' : 'Gesperrt';
+      }
+      return val ? 'Aktiv' : 'Inaktiv';
+    }
+    if (Array.isArray(val)) {
+      if (val.length === 0) return 'keine';
+      return val.map(v => translateValue(key, v)).join(', ');
+    }
+    const valueMap: Record<string, string> = {
+      admin: 'Admin',
+      secretary: 'Verwaltung',
+      teacher: 'Lehrkraft',
+      student: 'Schüler'
+    };
+    if (typeof val === 'string' && valueMap[val]) {
+      return valueMap[val];
+    }
+    if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
+      try {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+      } catch (e) {}
+    }
+    return String(val);
+  };
+
   const renderDiffContent = (log: any) => {
+    const ignoredKeys = ['id', 'created_at', 'school_id', 'password', 'password_hash', 'personal_pin'];
+    
     if (log.action === 'INSERT') {
       if (!log.new_data) return '-';
-      return Object.entries(log.new_data).map(([key, val]) => (
-        <div key={key} style={{ fontSize: '0.72rem', color: '#374151' }}>
-          <strong>{key}</strong>: {JSON.stringify(val)}
-        </div>
-      ));
+      return Object.entries(log.new_data)
+        .filter(([key]) => !ignoredKeys.includes(key))
+        .map(([key, val]) => {
+          const label = translateKey(key);
+          const valStr = translateValue(key, val);
+          return (
+            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Inter' }}>
+              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
+              <span style={{ color: '#16a34a', backgroundColor: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+                {valStr}
+              </span>
+            </div>
+          );
+        });
     }
     if (log.action === 'DELETE') {
       if (!log.old_data) return '-';
-      return Object.entries(log.old_data).map(([key, val]) => (
-        <div key={key} style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-          <strong>{key}</strong>: {JSON.stringify(val)}
-        </div>
-      ));
+      return Object.entries(log.old_data)
+        .filter(([key]) => !ignoredKeys.includes(key))
+        .map(([key, val]) => {
+          const label = translateKey(key);
+          const valStr = translateValue(key, val);
+          return (
+            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Inter' }}>
+              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
+              <span style={{ textDecoration: 'line-through', color: '#dc2626', backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem' }}>
+                {valStr}
+              </span>
+            </div>
+          );
+        });
     }
     if (log.action === 'UPDATE') {
       if (!log.new_data || !log.old_data) return '-';
-      return Object.entries(log.new_data).map(([key, newVal]: [string, any]) => {
-        const oldVal = log.old_data[key];
-        return (
-          <div key={key} style={{ fontSize: '0.72rem', color: '#1f2937', marginBottom: '2px' }}>
-            <span style={{ fontWeight: 650, color: '#4b5563' }}>{key}</span>:{' '}
-            <span style={{ textDecoration: 'line-through', color: '#c5221f', backgroundColor: '#fce8e6', padding: '1px 3px', borderRadius: '4px' }}>
-              {oldVal !== undefined ? JSON.stringify(oldVal) : 'leer'}
-            </span>{' '}
-            ➔{' '}
-            <span style={{ color: '#137333', backgroundColor: '#e6f4ea', padding: '1px 3px', borderRadius: '4px', fontWeight: 600 }}>
-              {JSON.stringify(newVal)}
-            </span>
-          </div>
-        );
-      });
+      return Object.entries(log.new_data)
+        .filter(([key]) => !ignoredKeys.includes(key))
+        .map(([key, newVal]: [string, any]) => {
+          const oldVal = log.old_data[key];
+          const label = translateKey(key);
+          const oldValStr = translateValue(key, oldVal);
+          const newValStr = translateValue(key, newVal);
+          
+          return (
+            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Inter' }}>
+              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
+              <span style={{ textDecoration: 'line-through', color: '#dc2626', backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem' }}>
+                {oldValStr}
+              </span>
+              <span style={{ color: '#94a3b8' }}>➔</span>
+              <span style={{ color: '#16a34a', backgroundColor: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+                {newValStr}
+              </span>
+            </div>
+          );
+        });
     }
     return '-';
   };
@@ -21576,12 +21655,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </td>
                             <td style={{ padding: '14px 20px', fontSize: '0.75rem', color: '#1e293b', maxWidth: '450px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginBottom: '2px' }}>
-                                  {log.table_name === 'users' ? 'Betroffener Nutzer' : 'Datensatz'}:{' '}
-                                  <strong style={{ color: '#475569' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.9rem' }}>👤</span>
+                                  <span style={{ fontWeight: 550 }}>
+                                    {log.table_name === 'users' ? 'Betroffener Nutzer' : 'Tabelle'}:
+                                  </span>
+                                  <strong style={{ color: '#0f172a', fontWeight: 800 }}>
                                     {log.table_name === 'users' ? (userMap[log.record_id] || 'Unbekannt') : log.table_name}
-                                  </strong>{' '}
-                                  (#{log.record_id.substring(0, 8)})
+                                  </strong>
+                                  <span style={{ fontSize: '0.62rem', background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                                    ID: {log.record_id.substring(0, 8)}
+                                  </span>
                                 </div>
                                 {renderDiffContent(log)}
                               </div>
