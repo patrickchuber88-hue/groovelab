@@ -144,6 +144,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [teacherNotes, setTeacherNotes] = useState('');
   const [homeworkNotes, setHomeworkNotes] = useState('');
   const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>([]);
+  const [isNotesFocused, setIsNotesFocused] = useState(false);
+  const isNotesExpanded = isNotesFocused || !!homeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Song catalog integration
@@ -810,6 +812,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       await fetchProgress();
       notifyHomeworkChange();
+      setIsNotesFocused(false);
     } catch (e) {
       console.error('Error adding note:', e);
     }
@@ -4337,13 +4340,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       {/* Combined Hausaufgaben-Fahrplan Widget */}
                       <div style={{
                         background: '#fffbeb',
-                        border: '1px solid #fef08a',
+                        border: isNotesExpanded ? 'none' : '1px solid #fef08a',
                         borderRadius: '16px',
-                        padding: '14px 16px',
+                        padding: isNotesExpanded ? '0px' : '14px 16px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '12px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                        gap: isNotesExpanded ? '0px' : '12px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                        maxHeight: isNotesExpanded ? '0px' : '1200px',
+                        opacity: isNotesExpanded ? 0 : 1,
+                        overflow: 'hidden',
+                        marginTop: isNotesExpanded ? '-16px' : '0px',
+                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f4f4f5', paddingBottom: '8px' }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -4714,9 +4722,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                       {/* General homework text notes */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          📝 Zusätzliche Hausaufgaben-Bemerkungen
-                        </label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                            📝 Zusätzliche Hausaufgaben-Bemerkungen
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {homeworkNotes.trim() && (
+                              <button
+                                type="button"
+                                onClick={handleAddNote}
+                                disabled={saving}
+                                style={{
+                                  background: '#456355',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(69, 99, 85, 0.15)',
+                                  transition: 'all 0.15s'
+                                }}
+                                className="hover-scale save-note-btn"
+                              >
+                                {saving ? 'Speichert...' : 'Bemerkung speichern'}
+                              </button>
+                            )}
+                            {isNotesExpanded && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsNotesFocused(false);
+                                  if (document.activeElement instanceof HTMLElement) {
+                                    document.activeElement.blur();
+                                  }
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: '2px 6px'
+                                }}
+                              >
+                                Minimieren
+                              </button>
+                            )}
+                          </div>
+                        </div>
                         <textarea
                           placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
                           value={homeworkNotes}
@@ -4724,9 +4780,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             setHomeworkNotes(e.target.value);
                             setHasChanges(true);
                           }}
+                          onFocus={() => setIsNotesFocused(true)}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const activeEl = document.activeElement;
+                              if (activeEl && (
+                                activeEl.closest('.preset-btn') || 
+                                activeEl.closest('.save-note-btn')
+                              )) {
+                                return;
+                              }
+                              setIsNotesFocused(false);
+                            }, 200);
+                          }}
                           style={{
-                            width: '100%', height: '90px', padding: '12px 14px', borderRadius: '16px',
-                            border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                            width: '100%',
+                            height: isNotesExpanded ? '280px' : '90px',
+                            padding: '12px 14px',
+                            borderRadius: '16px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            outline: 'none',
+                            resize: 'none',
+                            background: 'white',
+                            transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
 
@@ -4752,7 +4830,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
                                 transition: 'all 0.15s'
                               }}
-                              className="hover-scale"
+                              className="hover-scale preset-btn"
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span>⏱️</span>
@@ -4775,7 +4853,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
                                 transition: 'all 0.15s'
                               }}
-                              className="hover-scale"
+                              className="hover-scale preset-btn"
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span>✨</span>
@@ -4798,7 +4876,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
                                 transition: 'all 0.15s'
                               }}
-                              className="hover-scale"
+                              className="hover-scale preset-btn"
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span>🥁</span>
@@ -4821,7 +4899,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
                                 transition: 'all 0.15s'
                               }}
-                              className="hover-scale"
+                              className="hover-scale preset-btn"
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span>🖖</span>
@@ -4855,30 +4933,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </button>
                             ))}
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={handleAddNote}
-                            disabled={saving}
-                            style={{
-                              background: '#456355',
-                              color: 'white',
-                              border: 'none',
-                              padding: '6px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.7rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 6px rgba(69, 99, 85, 0.15)',
-                              transition: 'all 0.15s'
-                            }}
-                            className="hover-scale"
-                          >
-                            <span>{saving ? 'Speichert...' : 'Bemerkung speichern'}</span>
-                          </button>
                         </div>
                       </div>
 
