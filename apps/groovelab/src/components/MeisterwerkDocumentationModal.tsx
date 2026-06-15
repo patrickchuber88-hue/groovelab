@@ -960,6 +960,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const handleDeleteNote = async (noteIndex: number) => {
     try {
+      const noteToDelete = homeworkNotesList[noteIndex];
+      if (noteToDelete && noteToDelete.startsWith("AUDIO:")) {
+        const parts = noteToDelete.substring(6).split('|');
+        const audioUrlString = parts[0];
+        if (audioUrlString && audioUrlString.startsWith("http")) {
+          const marker = '/storage/v1/object/public/groovelab-assets/';
+          const markerIndex = audioUrlString.indexOf(marker);
+          if (markerIndex !== -1) {
+            const filePath = audioUrlString.substring(markerIndex + marker.length);
+            console.log("Deleting audio file from storage:", filePath);
+            await supabase.storage.from('groovelab-assets').remove([filePath]);
+          }
+        }
+      }
+
       const updatedList = homeworkNotesList.filter((_, idx) => idx !== noteIndex);
       setHomeworkNotesList(updatedList);
       
