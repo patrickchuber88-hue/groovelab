@@ -5105,34 +5105,62 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("STICKER:"));
                                   if (visibleNotes.length === 0) return null;
 
-                                  let audioCount = 0;
+                                  const audioNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("AUDIO:"));
+                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:"));
 
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
                                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                         Bemerkungen & Hinweise
                                       </span>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                        {homeworkNotesList.map((note, idx) => {
-                                          if (note.startsWith("STICKER:")) return null;
-                                          
-                                          const isAudio = note.startsWith("AUDIO:");
-                                          let contentNode;
-                                          if (isAudio) {
-                                            audioCount++;
-                                            const parts = note.substring(6).split('|');
-                                            contentNode = (
-                                              <InlineAudioPlayer 
-                                                url={parts[0]} 
-                                                label={`Play-Along #${audioCount}`}
-                                              />
+                                      
+                                      {/* Audio Notes (Cassettes) side-by-side */}
+                                      {audioNotes.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px', marginBottom: textNotes.length > 0 ? '6px' : '2px' }}>
+                                          {audioNotes.map((item, index) => {
+                                            const parts = item.note.substring(6).split('|');
+                                            return (
+                                              <div key={item.idx} style={{ position: 'relative', display: 'inline-block' }}>
+                                                <InlineAudioPlayer 
+                                                  url={parts[0]} 
+                                                  label={`Play-Along #${index + 1}`}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleDeleteNote(item.idx)}
+                                                  style={{
+                                                    position: 'absolute',
+                                                    top: '-4px',
+                                                    right: '-4px',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    borderRadius: '50%',
+                                                    background: '#ef4444',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    fontSize: '9px',
+                                                    fontWeight: 900,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                                                    zIndex: 20
+                                                  }}
+                                                >
+                                                  ✕
+                                                </button>
+                                              </div>
                                             );
-                                          } else {
-                                            contentNode = note;
-                                          }
+                                          })}
+                                        </div>
+                                      )}
 
-                                          return (
-                                            <div key={idx} style={{
+                                      {/* Text Notes stacked vertically */}
+                                      {textNotes.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                          {textNotes.map((item) => (
+                                            <div key={item.idx} style={{
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
@@ -5147,11 +5175,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                             }}>
                                               <div style={{ flex: 1, paddingRight: '8px' }}>
-                                                {contentNode}
+                                                {item.note}
                                               </div>
                                               <button
                                                 type="button"
-                                                onClick={() => handleDeleteNote(idx)}
+                                                onClick={() => handleDeleteNote(item.idx)}
                                                 style={{
                                                   border: 'none',
                                                   background: 'none',
@@ -5169,9 +5197,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 ✕
                                               </button>
                                             </div>
-                                          );
-                                        })}
-                                      </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })()}
@@ -6357,15 +6385,15 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
       onClick={togglePlay}
       style={{ 
         position: 'relative',
-        width: '210px',
-        height: '110px',
+        width: '160px',
+        height: '95px',
         background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        border: '2.5px solid #334155',
-        borderRadius: '10px',
-        padding: '6px',
+        border: '2px solid #334155',
+        borderRadius: '8px',
+        padding: '4px',
         boxShadow: isPlaying 
-          ? '0 10px 25px rgba(217, 119, 6, 0.15), 0 0 12px rgba(217, 119, 6, 0.1)'
-          : '0 6px 16px rgba(0,0,0,0.12)',
+          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
+          : '0 4px 12px rgba(0,0,0,0.12)',
         cursor: 'pointer',
         userSelect: 'none',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -6377,39 +6405,39 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = isPlaying ? 'scale(1.04)' : 'translateY(-2px)';
         e.currentTarget.style.boxShadow = isPlaying
-          ? '0 12px 30px rgba(217, 119, 6, 0.25), 0 0 16px rgba(217, 119, 6, 0.15)'
-          : '0 8px 20px rgba(0,0,0,0.18)';
+          ? '0 10px 24px rgba(217, 119, 6, 0.25), 0 0 14px rgba(217, 119, 6, 0.15)'
+          : '0 6px 16px rgba(0,0,0,0.18)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = isPlaying ? 'scale(1.02)' : 'none';
         e.currentTarget.style.boxShadow = isPlaying
-          ? '0 10px 25px rgba(217, 119, 6, 0.15), 0 0 12px rgba(217, 119, 6, 0.1)'
-          : '0 6px 16px rgba(0,0,0,0.12)';
+          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
+          : '0 4px 12px rgba(0,0,0,0.12)';
       }}
     >
       <audio ref={audioRef} src={url} />
       
       {/* 4 Screws in corners */}
-      <div style={{ position: 'absolute', top: '5px', left: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
-      <div style={{ position: 'absolute', top: '5px', right: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
-      <div style={{ position: 'absolute', bottom: '5px', left: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
-      <div style={{ position: 'absolute', bottom: '5px', right: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
+      <div style={{ position: 'absolute', top: '4px', left: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
+      <div style={{ position: 'absolute', top: '4px', right: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
+      <div style={{ position: 'absolute', bottom: '4px', left: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
+      <div style={{ position: 'absolute', bottom: '4px', right: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
 
       {/* Cassette Top Notch/Details */}
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: '16px', marginTop: '2px' }}>
-        <div style={{ width: '12px', height: '3px', background: '#334155', borderRadius: '1px' }} />
-        <div style={{ width: '24px', height: '3px', background: '#334155', borderRadius: '1px' }} />
-        <div style={{ width: '12px', height: '3px', background: '#334155', borderRadius: '1px' }} />
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: '10px', marginTop: '1px' }}>
+        <div style={{ width: '8px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
+        <div style={{ width: '18px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
+        <div style={{ width: '8px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
       </div>
 
       {/* Sticker Label Area */}
       <div style={{
         flex: 1,
-        margin: '4px 6px',
+        margin: '3px 4px',
         background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-        border: '1.5px solid #cbd5e1',
-        borderRadius: '6px',
-        padding: '6px',
+        border: '1.2px solid #cbd5e1',
+        borderRadius: '5px',
+        padding: '4px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -6418,21 +6446,22 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
         overflow: 'hidden'
       }}>
         {/* Retro Accent Stripes */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(to right, #ef4444 33%, #3b82f6 33%, #3b82f6 66%, #10b981 66%)', opacity: 0.8 }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, #ef4444 33%, #3b82f6 33%, #3b82f6 66%, #10b981 66%)', opacity: 0.8 }} />
 
         {/* Tape Reel Window */}
         <div style={{
-          width: '90px',
-          height: '28px',
+          width: '74px',
+          height: '22px',
           background: '#0f172a',
-          border: '1.5px solid #475569',
-          borderRadius: '4px',
+          border: '1.2px solid #475569',
+          borderRadius: '3px',
           display: 'flex',
-          justifyContent: 'space-around',
+          justifyContent: 'space-between',
           alignItems: 'center',
           position: 'relative',
-          marginTop: '4px',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)'
+          marginTop: '2px',
+          padding: '0 6px',
+          boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.5)'
         }}>
           {/* Transparent window pane effect */}
           <div style={{
@@ -6444,57 +6473,80 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
 
           {/* Left Reel Hub */}
           <div style={{
-            width: '16px',
-            height: '16px',
+            width: '12px',
+            height: '12px',
             borderRadius: '50%',
-            border: '2px solid #64748b',
+            border: '1.5px solid #64748b',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             background: '#1e293b',
-            transform: 'rotate(0deg)',
+            position: 'relative',
             animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
           }}>
-            {/* Teeth of the hub */}
-            <div style={{ width: '2px', height: '12px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '12px', height: '2px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
+            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
           </div>
 
-          {/* Magnetic tape roll representation */}
+          {/* Magnetic tape roll representation (left) */}
           <div style={{
             position: 'absolute',
-            left: '14px',
-            width: isPlaying ? '18px' : '20px',
-            height: isPlaying ? '18px' : '20px',
+            left: '4px',
+            width: isPlaying ? '14px' : '16px',
+            height: isPlaying ? '14px' : '16px',
             borderRadius: '50%',
             border: '1px dashed #78350f',
             opacity: 0.35,
             transition: 'all 5s ease'
           }} />
 
+          {/* Center Play Button Overlay */}
+          <div 
+            style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              background: isPlaying ? '#ef4444' : '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+              zIndex: 10,
+              fontSize: '8px',
+              color: 'white',
+              fontWeight: 'bold',
+              transition: 'transform 0.1s ease',
+              pointerEvents: 'none' // Clicks bubble up to trigger togglePlay on parent
+            }}
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </div>
+
           {/* Right Reel Hub */}
           <div style={{
-            width: '16px',
-            height: '16px',
+            width: '12px',
+            height: '12px',
             borderRadius: '50%',
-            border: '2px solid #64748b',
+            border: '1.5px solid #64748b',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             background: '#1e293b',
-            transform: 'rotate(0deg)',
+            position: 'relative',
             animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
           }}>
-            <div style={{ width: '2px', height: '12px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '12px', height: '2px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
+            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
           </div>
+          
+          {/* Magnetic tape roll representation (right) */}
           <div style={{
             position: 'absolute',
-            right: '14px',
-            width: isPlaying ? '20px' : '18px',
-            height: isPlaying ? '20px' : '18px',
+            right: '4px',
+            width: isPlaying ? '16px' : '14px',
+            height: isPlaying ? '16px' : '14px',
             borderRadius: '50%',
             border: '1px dashed #78350f',
             opacity: 0.35,
@@ -6505,14 +6557,14 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
         {/* Text/Song Title Sticker Writing */}
         <div style={{
           fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '0.8rem',
+          fontSize: '0.7rem',
           fontWeight: 800,
           color: '#1e293b',
           textAlign: 'center',
-          marginTop: '6px',
+          marginTop: '3px',
           width: '100%',
           borderTop: '1px dashed #cbd5e1',
-          paddingTop: '3px',
+          paddingTop: '2px',
           letterSpacing: '-0.5px',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
@@ -6527,29 +6579,29 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '0 16px',
-        marginBottom: '2px'
+        padding: '0 10px',
+        marginBottom: '1px'
       }}>
         {/* Play Status Flashing Indicator LED */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
           <div style={{
-            width: '6px',
-            height: '6px',
+            width: '5px',
+            height: '5px',
             borderRadius: '50%',
             background: isPlaying ? '#ef4444' : '#475569',
-            boxShadow: isPlaying ? '0 0 8px #ef4444' : 'none',
+            boxShadow: isPlaying ? '0 0 6px #ef4444' : 'none',
             animation: isPlaying ? 'pulse 1s infinite alternate' : 'none'
           }} />
-          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
+          <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
             {isPlaying ? 'PLAY' : 'STOP'}
           </span>
         </div>
         
         {/* Exposed tape path shapes */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ width: '8px', height: '4px', background: '#334155', borderRadius: '1px' }} />
-          <div style={{ width: '12px', height: '4px', background: '#334155', borderRadius: '1px' }} />
-          <div style={{ width: '8px', height: '4px', background: '#334155', borderRadius: '1px' }} />
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ width: '6px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
+          <div style={{ width: '10px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
+          <div style={{ width: '6px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
         </div>
       </div>
     </div>
