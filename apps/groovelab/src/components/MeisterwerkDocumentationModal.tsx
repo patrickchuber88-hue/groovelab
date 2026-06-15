@@ -135,6 +135,36 @@ export const formatPageNumbers = (pages: number[]): string => {
   return `S. ${ranges.join(', ')} & ${last}`;
 };
 
+export const getCleanPageNotes = (notes: any): string => {
+  if (!notes) return '';
+  let text = '';
+  if (typeof notes === 'string') {
+    if (notes.startsWith('[') || notes.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(notes);
+        if (Array.isArray(parsed)) {
+          text = parsed.join('\n');
+        } else {
+          text = String(parsed);
+        }
+      } catch {
+        text = notes;
+      }
+    } else {
+      text = notes;
+    }
+  } else if (Array.isArray(notes)) {
+    text = notes.join('\n');
+  } else {
+    text = String(notes);
+  }
+  return text
+    .split('\n')
+    .filter((line: string) => !line.trim().startsWith('AUDIO:') && !line.trim().startsWith('STICKER:'))
+    .join('\n')
+    .trim();
+};
+
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
 

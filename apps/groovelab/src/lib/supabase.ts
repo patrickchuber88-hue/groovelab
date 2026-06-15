@@ -18,7 +18,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   const headers = new Headers(init?.headers);
   
   // Dynamically inject security session headers
-  const userId = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+  const userId = sessionStorage.getItem('groovelab_user_id');
   if (userId) {
     headers.set('x-user-id', userId);
   }

@@ -600,10 +600,11 @@ function MobileBriefingView({
                   {Object.entries(groupedLehrwerke).map(([title, info]) => {
                     const pageNums = info.pages.map(p => p.num);
                     const formattedPages = formatPageNumbers(pageNums);
-                    const combinedNotes = info.pages
+                    
+                    const textNotes = info.pages
                       .map(p => p.notes)
                       .filter(Boolean)
-                      .filter(n => n !== 'Inhalte in der Premium-Version freischalten')
+                      .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
                       .join('; ');
 
                     return (
@@ -614,7 +615,7 @@ function MobileBriefingView({
                             <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</div>
                             <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650, marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                               <strong>{formattedPages}</strong>
-                              {combinedNotes ? ` • ${combinedNotes}` : ''}
+                              {textNotes ? ` • ${textNotes}` : ''}
                             </div>
                           </div>
                         </div>
