@@ -5116,9 +5116,17 @@ export function AdminDashboard({
                       <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {s.last_name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{ fontSize: '0.72rem', color: '#7d7d82', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
-                        {s.is_trial && (
+                        {s.is_trial ? (
                           <div style={{ padding: '1px 5px', background: '#fef2f2', color: '#ef4444', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             ⏳ PROBE
+                          </div>
+                        ) : (s.status || 'active') === 'active' ? (
+                          <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#137333', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                            Aktiv
+                          </div>
+                        ) : (
+                          <div style={{ padding: '1px 5px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                            Inaktiv
                           </div>
                         )}
                       </div>
