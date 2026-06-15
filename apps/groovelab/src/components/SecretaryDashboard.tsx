@@ -2633,7 +2633,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
                 sick_until: u.sick_until,
-                preferred_room_ids: u.preferred_room_ids || []
+                preferred_room_ids: u.preferred_room_ids || [],
+                isPinActivated: u.is_pin_activated
               });
             }
             if (u.is_campus_active) {
@@ -2653,7 +2654,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
                 sick_until: u.sick_until,
-                preferred_room_ids: u.preferred_room_ids || []
+                preferred_room_ids: u.preferred_room_ids || [],
+                isPinActivated: u.is_pin_activated
               });
             }
           }
@@ -2704,7 +2706,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         instrument: u.instrument || '',
         isActive: u.is_active ?? true,
         isCampusActive: u.is_campus_active,
-        isGroovelabActive: u.is_groovelab_active
+        isGroovelabActive: u.is_groovelab_active,
+        isPinActivated: u.is_pin_activated
       })) || []);
       setBypassTeachers(bypassList);
       setEmployees(employeesList);
@@ -6182,20 +6185,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           )}
                         </div>
                         <div style={{ width: '65px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                          <span style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            color: (student.is_campus_active || student.is_groovelab_active) ? '#166534' : '#64748b',
-                            background: (student.is_campus_active || student.is_groovelab_active) ? '#dcfce7' : '#f1f5f9',
-                            padding: '4px 8px',
-                            borderRadius: '8px',
-                            border: `1px solid ${(student.is_campus_active || student.is_groovelab_active) ? '#bbf7d0' : '#cbd5e1'}`,
-                            width: '100%',
-                            textAlign: 'center',
-                            display: 'inline-block'
-                          }}>
-                            {(student.is_campus_active || student.is_groovelab_active) ? 'Aktiv' : 'Inaktiv'}
-                          </span>
+                          {(student.is_campus_active || student.is_groovelab_active) ? (
+                            <span title="Aktiv"><CheckCircle size={18} style={{ color: '#34a853' }} /></span>
+                          ) : (
+                            <span title="Inaktiv"><Clock size={18} style={{ color: '#86868b' }} /></span>
+                          )}
                         </div>
                         <span style={{
                           fontSize: '0.74rem',
@@ -12521,190 +12515,328 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
         {/* TAB 2: CAMPUS */}
         {activeTab === 'campus' && (
-          <div className="campus-grid" style={(campusSubTab === 'events' || campusSubTab === 'rooms') ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
+          <div className="campus-grid" style={(campusSubTab === 'briefing' || campusSubTab === 'events' || campusSubTab === 'rooms') ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
             
             {/* Left Content Pane (Main Board Content) */}
-            <div style={{ flex: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '100%' : 'auto', minWidth: 0 }}>
+            <div style={{ flex: (campusSubTab === 'briefing' || campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '1' : '1.6', display: 'flex', flexDirection: 'column', gap: '24px', width: (campusSubTab === 'briefing' || campusSubTab === 'onboarding' || campusSubTab === 'students' || campusSubTab === 'cooperations' || campusSubTab === 'events' || campusSubTab === 'rooms') ? '100%' : 'auto', minWidth: 0 }}>
               
               {/* Subtab: Startseite (Briefing) */}
               {campusSubTab === 'briefing' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="google-card" style={{ paddingLeft: '44px' }}>
-                    <div className="google-kpi-bar bg-google-green" style={{ background: '#34a853' }} />
-                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 850, color: '#137333' }}>
-                      🎓 Campus-Zentrale &amp; Startseite
-                    </h3>
-                    <p style={{ margin: '0 0 16px 0', fontSize: '0.88rem', color: '#5f6368', lineHeight: '1.5' }}>
+                  {/* Apple Style Header Card */}
+                  <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.5rem' }}>🎓</span>
+                      <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Campus-Zentrale
+                      </h3>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: '1.5', fontFamily: 'Inter' }}>
                       Willkommen in der Campus-Verwaltung. Hier koordinierst du die Lehrkräfte, das Onboarding neuer Kolleginnen und Kollegen sowie die Stundenplan-Freigaben für deine Musikschule.
                     </p>
-
-                    {(() => {
-                      const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
-                        if (!acc.some(existing => existing.id === t.id)) {
-                          acc.push(t);
-                        }
-                        return acc;
-                      }, []);
-                      const totalStudentsSum = allUniqueTeachers.reduce((sum, t) => sum + (t.studentCount || 0), 0);
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '16px' }}>
-                          <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamt Lehrkräfte</span>
-                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#1e3a8a', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{allUniqueTeachers.length}</strong>
-                          </div>
-                          <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1px solid #bbf7d0', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktive Campus-Lehrer</span>
-                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#14532d', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{campusTeachers.length}</strong>
-                          </div>
-                          <div style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', border: '1px solid #fde68a', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inaktive Profile (Bypass)</span>
-                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#713f12', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{bypassTeachers.length}</strong>
-                          </div>
-                          <div style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)', border: '1px solid #fca5a5', padding: '24px', borderRadius: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Belegungen</span>
-                            <strong style={{ display: 'block', fontSize: '2.2rem', color: '#991b1b', marginTop: '6px', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalStudentsSum}</strong>
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
 
-                  {/* Campus Announcements */}
-                  <div className="google-card" style={{ padding: '24px' }}>
-                    <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937' }}>📌 Wichtige Hinweise &amp; tägliche Aufgaben</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '1.25rem' }}>📢</span>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1f2937' }}>Stundenplan-Reviews:</strong>
-                        <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Es stehen aktuell {pendingSchedules.length} Stundenpläne zur Review bereit. Bitte prüfe die Belegung, um Konflikte zu vermeiden.</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '1.25rem' }}>🔑</span>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1f2937' }}>Lehrer-Bypass:</strong>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Es warten noch {bypassTeachers.length} Lehrkräfte auf ihre finale Aktivierung via Support-PIN.</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trial Activations Card */}
                   {(() => {
+                    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                      if (!acc.some(existing => existing.id === t.id)) {
+                        acc.push(t);
+                      }
+                      return acc;
+                    }, []);
+                    const activeStudents = students.filter(s => s.is_campus_active || s.is_groovelab_active).length;
+                    const pendingStudents = students.filter(s => !(s.is_campus_active || s.is_groovelab_active)).length;
                     const trialStudents = students.filter(s => s.is_trial && s.trial_ends_at && new Date(s.trial_ends_at).getTime() > Date.now());
+                    const activeSubjects = subjects.filter(s => s.name.toLowerCase() !== 'ohne zuweisung').length;
+
+                    const activeTeachersCount = allUniqueTeachers.filter(t => t.isPinActivated).length;
+                    const pendingTeachersCount = allUniqueTeachers.filter(t => !t.isPinActivated).length;
+
+                    const kpis = [
+                      enabledCampusSubjects && {
+                        id: 'subjects',
+                        label: 'Unterrichtsfächer',
+                        value: `${activeSubjects} Fächer`,
+                        details: 'Aktive Unterrichtsangebote',
+                        icon: BookOpen,
+                        iconBg: '#eff6ff',
+                        iconColor: '#1d4ed8',
+                      },
+                      {
+                        id: 'onboarding',
+                        label: 'Lehrkräfte',
+                        value: `${activeTeachersCount} Aktiv`,
+                        details: `${pendingTeachersCount} im Onboarding/Bypass`,
+                        icon: GraduationCap,
+                        iconBg: '#f0fdf4',
+                        iconColor: '#15803d',
+                      },
+                      {
+                        id: 'students',
+                        label: 'Schüler',
+                        value: `${activeStudents} Aktiv`,
+                        details: `${pendingStudents} ausstehend, ${trialStudents.length} Probezeit`,
+                        icon: Users,
+                        iconBg: '#fdf2f8',
+                        iconColor: '#db2777',
+                      },
+                      enabledCampusCooperations && {
+                        id: 'cooperations',
+                        label: 'Kooperationen',
+                        value: `${cooperations.length} Partner`,
+                        details: `${cooperations.filter(c => c.status === 'active').length} aktiv, ${cooperations.filter(c => c.status === 'pending').length} ausstehend`,
+                        icon: Users,
+                        iconBg: '#e0e7ff',
+                        iconColor: '#4f46e5',
+                      },
+                      enabledCampusRooms && {
+                        id: 'rooms',
+                        label: 'Räume',
+                        value: `${rooms.length} Räume`,
+                        details: 'Konfigurierte Unterrichtsräume',
+                        icon: DoorOpen,
+                        iconBg: '#f0fdfa',
+                        iconColor: '#0d9488',
+                      },
+                      enabledCampusEvents && {
+                        id: 'events',
+                        label: 'Termine & News',
+                        value: `${schoolEvents.length} Termine`,
+                        details: 'Schulweite Ankündigungen',
+                        icon: Calendar,
+                        iconBg: '#fff1f2',
+                        iconColor: '#e11d48',
+                      },
+                      enabledCampusSchedules && {
+                        id: 'schedules',
+                        label: 'Stundenpläne',
+                        value: `${pendingSchedules.length} Review`,
+                        details: pendingSchedules.length > 0 ? 'Dringende Freigaben ausstehend' : 'Alle Stundenpläne freigegeben',
+                        icon: Calendar,
+                        iconBg: pendingSchedules.length > 0 ? '#fef2f2' : '#f0fdf4',
+                        iconColor: pendingSchedules.length > 0 ? '#991b1b' : '#15803d',
+                        badge: pendingSchedules.length > 0 ? pendingSchedules.length : undefined,
+                      },
+                      {
+                        id: 'status',
+                        label: 'Einstellungen',
+                        value: 'Konfiguration',
+                        details: 'Module & System-Status',
+                        icon: Sliders,
+                        iconBg: '#f8fafc',
+                        iconColor: '#475569',
+                      }
+                    ].filter(Boolean) as any[];
+
                     return (
-                      <div className="google-card" style={{ padding: '24px' }}>
-                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              fetchTrialLogs();
-                              setShowTrialLogModal(true);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#64748b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '6px',
-                              borderRadius: '8px',
-                              transition: 'all 0.2s',
-                            }}
-                            title="Aktivierungs-Logbuch öffnen"
-                          >
-                            <ClipboardList size={20} />
-                          </button>
-                        </h4>
-                        <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-                          Die folgenden Schüler befinden sich in der 7-tägigen Probezeit. Klicke auf das Briefumschlag-Icon, um die E-Mail-Vorlage für die Eltern zu öffnen. Nach Erhalt der Bestätigung kannst du den Account dauerhaft freischalten.
-                        </p>
-                        
-                        {trialStudents.length === 0 ? (
-                          <div style={{ padding: '20px', borderRadius: '16px', background: '#f8fafc', border: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-                            Aktuell befinden sich keine Schüler in der 7-tägigen Probezeit.
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {trialStudents.map(student => {
-                              const daysLeft = Math.ceil((new Date(student.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                              return (
-                                <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <strong style={{ fontSize: '0.9rem', color: '#1f2937', fontWeight: 800 }}>
-                                      {student.first_name} {student.last_name}
-                                    </strong>
-                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                                      🎸 {student.instrument || 'Nicht festgelegt'}
-                                    </span>
-                                    <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 700 }}>
-                                      ⏳ Probezeit läuft noch {daysLeft} Tag(e) (bis {new Date(student.trial_ends_at).toLocaleDateString('de-DE')})
-                                    </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* KPI Cards Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                          {kpis.map(kpi => {
+                            const Icon = kpi.icon;
+                            const isScheduleWarning = kpi.id === 'schedules' && pendingSchedules.length > 0;
+                            return (
+                              <div
+                                key={kpi.id}
+                                onClick={() => setCampusSubTab(kpi.id)}
+                                className="google-card"
+                                style={{
+                                  padding: '20px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px',
+                                  border: isScheduleWarning ? '1px solid rgba(220, 38, 38, 0.2) !important' : '1px solid rgba(255, 255, 255, 0.5) !important',
+                                  background: isScheduleWarning ? 'linear-gradient(135deg, rgba(254, 242, 242, 0.8) 0%, rgba(254, 242, 242, 0.4) 100%) !important' : undefined
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '12px',
+                                    background: kpi.iconBg,
+                                    color: kpi.iconColor,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <Icon size={20} />
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <a 
-                                      href={generateMailtoLink(student)}
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '40px',
-                                        height: '40px',
-                                        borderRadius: '12px',
-                                        background: '#eff6ff',
-                                        color: '#1d4ed8',
-                                        border: '1px solid #bfdbfe',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                      }}
-                                      title="E-Mail an Eltern entwerfen"
-                                    >
-                                      <Mail size={18} />
-                                    </a>
-                                    <button
-                                      onClick={() => handleConfirmStudentTrial(student.id)}
-                                      style={{
-                                        padding: '10px 16px',
-                                        borderRadius: '12px',
-                                        background: '#10b981',
-                                        color: 'white',
-                                        border: 'none',
-                                        fontWeight: 800,
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.2)'
-                                      }}
-                                    >
-                                      Freischalten
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeactivateStudentTrial(student.id)}
-                                      style={{
-                                        padding: '10px 16px',
-                                        borderRadius: '12px',
-                                        background: '#fee2e2',
-                                        color: '#b91c1c',
-                                        border: '1px solid #fca5a5',
-                                        fontWeight: 800,
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      Inaktivieren
-                                    </button>
-                                  </div>
+                                  {kpi.badge !== undefined && (
+                                    <span style={{
+                                      background: '#dc2626',
+                                      color: '#ffffff',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 900,
+                                      padding: '2px 8px',
+                                      borderRadius: '100px'
+                                    }}>
+                                      {kpi.badge}
+                                    </span>
+                                  )}
                                 </div>
-                              );
-                            })}
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    {kpi.label}
+                                  </span>
+                                  <strong style={{ display: 'block', fontSize: '1.6rem', color: isScheduleWarning ? '#991b1b' : '#0f172a', marginTop: '4px', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                                    {kpi.value}
+                                  </strong>
+                                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginTop: '4px', fontWeight: 550, fontFamily: 'Inter', lineHeight: '1.3' }}>
+                                    {kpi.details}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Two-Column Bottom Area */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '24px', alignItems: 'start' }}>
+                          {/* Left Column: Notices */}
+                          <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>📌</span> Wichtige Hinweise &amp; Aufgaben
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                                <span style={{ fontSize: '1.25rem' }}>📢</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Stundenplan-Reviews:</strong>
+                                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
+                                    Es stehen aktuell {pendingSchedules.length} Stundenpläne zur Review bereit. Bitte prüfe die Belegung, um Konflikte zu vermeiden.
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                                <span style={{ fontSize: '1.25rem' }}>🔑</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Lehrer-Bypass:</strong>
+                                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
+                                    Es warten noch {bypassTeachers.length} Lehrkräfte auf ihre finale Aktivierung via Support-PIN.
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )}
+
+                          {/* Right Column: Trial Activations */}
+                          <div className="google-card" style={{ padding: '24px' }}>
+                            <h4 style={{ margin: '0 0 16px 0', fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  fetchTrialLogs();
+                                  setShowTrialLogModal(true);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '6px',
+                                  borderRadius: '8px',
+                                  transition: 'all 0.2s',
+                                }}
+                                title="Aktivierungs-Logbuch öffnen"
+                              >
+                                <ClipboardList size={18} />
+                              </button>
+                            </h4>
+                            <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550, lineHeight: '1.45', fontFamily: 'Inter' }}>
+                              Die folgenden Schüler befinden sich in der 7-tägigen Probezeit. Klicke auf das Briefumschlag-Icon, um die E-Mail-Vorlage für die Eltern zu öffnen. Nach Erhalt der Bestätigung kannst du den Account dauerhaft freischalten.
+                            </p>
+                            
+                            {trialStudents.length === 0 ? (
+                              <div style={{ padding: '20px', borderRadius: '16px', background: '#f8fafc', border: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, fontFamily: 'Inter' }}>
+                                Aktuell befinden sich keine Schüler in der 7-tägigen Probezeit.
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                                {trialStudents.map(student => {
+                                  const daysLeft = Math.ceil((new Date(student.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                                  return (
+                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>
+                                          {student.first_name} {student.last_name}
+                                        </strong>
+                                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, fontFamily: 'Inter' }}>
+                                          🎸 {student.instrument || 'Nicht festgelegt'}
+                                        </span>
+                                        <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 700, fontFamily: 'Inter' }}>
+                                          ⏳ Probezeit läuft noch {daysLeft} Tag(e) (bis {new Date(student.trial_ends_at).toLocaleDateString('de-DE')})
+                                        </span>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <a 
+                                          href={generateMailtoLink(student)}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '10px',
+                                            background: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            border: '1px solid #bfdbfe',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                          }}
+                                          title="E-Mail an Eltern entwerfen"
+                                        >
+                                          <Mail size={16} />
+                                        </a>
+                                        <button
+                                          onClick={() => handleConfirmStudentTrial(student.id)}
+                                          style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '10px',
+                                            background: '#10b981',
+                                            color: 'white',
+                                            border: 'none',
+                                            fontWeight: 800,
+                                            fontSize: '0.75rem',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)',
+                                            fontFamily: 'Urbanist'
+                                          }}
+                                        >
+                                          Freischalten
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeactivateStudentTrial(student.id)}
+                                          style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '10px',
+                                            background: '#fee2e2',
+                                            color: '#b91c1c',
+                                            border: '1px solid #fca5a5',
+                                            fontWeight: 800,
+                                            fontSize: '0.75rem',
+                                            cursor: 'pointer',
+                                            fontFamily: 'Urbanist'
+                                          }}
+                                        >
+                                          Inaktivieren
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
                     );
                   })()}
@@ -13134,6 +13266,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 >
                                   Groovelab
                                 </button>
+                              </div>
+
+                              {/* Aktivierungs-Status */}
+                              <div style={{ flex: '0.4', minWidth: '50px', display: 'flex', justifyContent: 'center' }}>
+                                {t.isPinActivated ? (
+                                  <span title="Aktiviert"><CheckCircle size={18} style={{ color: '#34a853' }} /></span>
+                                ) : (
+                                  <span title="Ausstehend"><Clock size={18} style={{ color: '#fbbc04' }} /></span>
+                                )}
                               </div>
 
                               {/* Pupil Count */}
@@ -14600,32 +14741,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             </div>
 
             {/* Right Sidebar Pane */}
-            {campusSubTab !== 'events' && campusSubTab !== 'rooms' && campusSubTab !== 'status' && (
+            {campusSubTab !== 'briefing' && campusSubTab !== 'events' && campusSubTab !== 'rooms' && campusSubTab !== 'status' && (
               <div style={{ width: '340px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
-              
-              {/* Briefing/Startseite Sidebar */}
-              {campusSubTab === 'briefing' && enabledCalendarWidget && (
-                <div className="google-card" style={{ padding: '20px' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#137333', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📅 Campus Kalender
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem', color: '#5f6368' }}>
-                    <div style={{ background: '#f6fbf7', border: '1px solid #e6f4ea', padding: '8px', borderRadius: '12px' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px', color: '#137333' }}>Heutiger Betrieb:</strong>
-                      <span>Normaler Stundenplanbetrieb. Keine Störungen gemeldet. Sync-Frequenz auf "Täglich" eingestellt.</span>
-                    </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                      <span>Datenbank-Sync:</span>
-                      <strong style={{ color: '#137333' }}>Aktiv (02:00 Uhr)</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>System-Status:</span>
-                      <strong style={{ color: '#137333' }}>Bereit</strong>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Onboarding Sidebar */}
               {campusSubTab === 'onboarding' && (() => {

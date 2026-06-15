@@ -1556,7 +1556,7 @@ function App() {
   const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
   if (qrPathMatch) {
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
-    const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+    const currentUserId = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null;
 
     if (isStandalone && currentUserId) {
       // User is logged in via PWA standalone app.
@@ -1571,7 +1571,7 @@ function App() {
     }
   }
 
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
@@ -2005,7 +2005,7 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_location_mode') || localStorage.getItem('groovelab_location_mode')) as 'lab' | 'home' : null) || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentMessages, setStudentMessages] = useState<any[]>([]);
@@ -2966,9 +2966,11 @@ function App() {
         if (sessionRes.data) {
           setLocationMode('lab');
           sessionStorage.setItem('groovelab_location_mode', 'lab');
+          localStorage.setItem('groovelab_location_mode', 'lab');
         } else {
           setLocationMode('home');
           sessionStorage.setItem('groovelab_location_mode', 'home');
+          localStorage.setItem('groovelab_location_mode', 'home');
         }
         
         // Fetch active student count in background (non-blocking)
@@ -3034,9 +3036,11 @@ function App() {
         if (sessionRes.data) {
           setLocationMode('lab');
           sessionStorage.setItem('groovelab_location_mode', 'lab');
+          localStorage.setItem('groovelab_location_mode', 'lab');
         } else {
           setLocationMode('home');
           sessionStorage.setItem('groovelab_location_mode', 'home');
+          localStorage.setItem('groovelab_location_mode', 'home');
         }
       }
 
@@ -3849,7 +3853,7 @@ function App() {
   };
 
   const fetchPlanningData = async (schoolId: string, userIdArg?: string) => {
-    const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id');
+    const currentUserId = userIdArg || loggedInUserId || sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
     console.log(`[Planning] Fetching for School: ${schoolId}, User: ${currentUserId}`);
     if (!currentUserId || !schoolId) {
       console.warn('[Planning] Missing userId or schoolId', { currentUserId, schoolId });
@@ -4168,7 +4172,7 @@ function App() {
   };
 
   const fetchCampusMessages = React.useCallback(async () => {
-    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    const uid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id') || (user?.id);
     if (!uid) return;
     setCampusMessagesLoading(true);
     try {
@@ -4191,7 +4195,7 @@ function App() {
   }, [user?.id]);
 
   const handleSendCampusMessage = async (recipientId: string, content: string) => {
-    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    const uid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id') || (user?.id);
     if (!uid) return;
     try {
       const { error } = await supabase.from('campus_direct_messages').insert({
@@ -4207,7 +4211,7 @@ function App() {
   };
 
   const handleMarkCampusMessagesAsRead = async (senderId: string) => {
-    const uid = sessionStorage.getItem('groovelab_user_id') || (user?.id);
+    const uid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id') || (user?.id);
     if (!uid) return;
     try {
       const { error } = await supabase
@@ -5327,6 +5331,8 @@ function App() {
     setLocationMode(mode);
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
+    localStorage.setItem('groovelab_user_id', userId);
+    localStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
     const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -7443,6 +7449,7 @@ function App() {
                   onLocationModeChange={(mode) => {
                     setLocationMode(mode);
                     sessionStorage.setItem('groovelab_location_mode', mode);
+                    localStorage.setItem('groovelab_location_mode', mode);
                   }}
                   onSwitchPlatform={(newPlatform) => {
                     setActivePlatform(newPlatform);
@@ -8765,6 +8772,7 @@ function App() {
               onLocationModeChange={(mode) => {
                 setLocationMode(mode);
                 sessionStorage.setItem('groovelab_location_mode', mode);
+                localStorage.setItem('groovelab_location_mode', mode);
               }}
             />
           </ErrorBoundary>

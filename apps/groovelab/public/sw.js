@@ -136,6 +136,11 @@ self.addEventListener('fetch', function(event) {
 
   const url = new URL(event.request.url);
 
+  // Only handle http and https requests to avoid crashing on chrome-extension://, ws://, etc.
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
   // Skip API/Supabase internal traffic
   if (url.pathname.includes('/rest/v1/') || url.pathname.includes('/functions/v1/')) {
     return;
@@ -146,19 +151,27 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       fetch(event.request)
         .then(function(response) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, responseClone);
-          });
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, responseClone);
+            });
+          }
           return response;
         })
         .catch(function() {
-          return caches.match(event.request).then(function(cachedResponse) {
+          return caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
             if (cachedResponse) {
               return cachedResponse;
             }
-            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            // Fallback: try to match root '/' if we navigated to a subpath that isn't cached
+            return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
+              if (rootResponse) {
+                return rootResponse;
+              }
+              return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              });
             });
           });
         })
@@ -168,7 +181,7 @@ self.addEventListener('fetch', function(event) {
 
   // Static assets (CSS, JS, Fonts, Images) -> Stale-While-Revalidate
   event.respondWith(
-    caches.match(event.request).then(function(cachedResponse) {
+    caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
       const fetchPromise = fetch(event.request).then(function(networkResponse) {
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
@@ -178,7 +191,11 @@ self.addEventListener('fetch', function(event) {
         }
         return networkResponse;
       }).catch(function(err) {
-        // Silent logging, as network is offline/slow
+        console.warn('Background fetch failed for:', event.request.url, err);
+        // Ensure we never return undefined if cachedResponse is missing
+        if (!cachedResponse) {
+          return new Response('Ressource offline nicht verfügbar.', { status: 503 });
+        }
       });
 
       return cachedResponse || fetchPromise;
