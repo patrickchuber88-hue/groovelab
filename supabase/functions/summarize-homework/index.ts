@@ -32,8 +32,11 @@ serve(async (req) => {
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
 
-    const promptText = `Du bist ein KI-Assistent für Musiklehrer. Formatiere das transkribierte gesprochene Wort eines Lehrers in eine professionelle, übersichtliche und motivierende Hausaufgaben-Stichpunktliste für das digitale Hausaufgabenheft des Schülers. Verwende passende Musik-Emojis und gliedere die Übeanweisungen sauber in kurze, lesbare Stichpunkte. 
-WICHTIG: Schreibe absolut keine Begrüßung, Einleitung, Erklärungen oder abschließende Worte (wie "Hier ist deine Hausaufgabe:"). Starte direkt mit den Stichpunkten.
+    const promptText = `Du bist ein KI-Assistent für Musiklehrer. Fasse das transkribierte gesprochene Wort eines Lehrers prägnant zusammen und erstelle daraus eine übersichtliche, motivierende Hausaufgaben-Stichpunktliste für das digitale Hausaufgabenheft des Schülers. 
+WICHTIG: 
+- Kürze lange Sätze und reduziere das Transkript auf die wesentlichen Übe-Anweisungen, Hausaufgaben und Ziele.
+- Nutze passende Emojis für Instrumente oder Aktionen.
+- Schreibe absolut keine Begrüßung, Einleitung, Erklärungen oder abschließende Worte. Starte direkt mit den Stichpunkten.
 
 Lehrer-Transkript:
 "${transcript}"`;

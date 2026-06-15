@@ -351,6 +351,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
   const recordingTimerRef = React.useRef<any>(null);
+  const accumulatedTranscriptRef = React.useRef<string>('');
   const [useNotebookLayout, setUseNotebookLayout] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('meisterwerk_notebook_layout');
@@ -360,6 +361,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   });
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+
+  const summarizeVoiceNotes = async (textStr: string) => {
+    if (!textStr || !textStr.trim()) return;
+    try {
+      setSaving(true);
+      const { data, error: invokeErr } = await supabase.functions.invoke('summarize-homework', {
+        body: { transcript: textStr }
+      });
+      if (invokeErr) throw invokeErr;
+      if (data?.summary) {
+        setHomeworkNotes(prev => prev ? `${prev}\n• ${data.summary}` : `• ${data.summary}`);
+        setHasChanges(true);
+      }
+    } catch (e) {
+      console.error("Error summarizing voice notes:", e);
+      setHomeworkNotes(prev => prev ? `${prev}\n• ${textStr}` : `• ${textStr}`);
+      setHasChanges(true);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Speech Recognition setup
   const toggleSpeechRecognition = () => {
@@ -376,33 +398,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     } else {
       setIsListening(true);
+      accumulatedTranscriptRef.current = '';
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = false;
       recognition.lang = 'de-DE';
 
-      recognition.onresult = async (event: any) => {
-        const currentResultIndex = event.resultIndex;
-        const result = event.results[currentResultIndex];
-        const textStr = result[0].transcript;
-        if (textStr && textStr.trim()) {
-          try {
-            setSaving(true);
-            const { data, error: invokeErr } = await supabase.functions.invoke('summarize-homework', {
-              body: { transcript: textStr }
-            });
-            if (invokeErr) throw invokeErr;
-            if (data?.summary) {
-              setHomeworkNotes(prev => prev ? `${prev}\n• ${data.summary}` : `• ${data.summary}`);
-              setHasChanges(true);
-            }
-          } catch (e) {
-            console.error("Error summarizing voice notes:", e);
-            setHomeworkNotes(prev => prev ? `${prev}\n• ${textStr}` : `• ${textStr}`);
-            setHasChanges(true);
-          } finally {
-            setSaving(false);
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' ';
           }
+        }
+        if (finalTranscript) {
+          accumulatedTranscriptRef.current += finalTranscript;
         }
       };
 
@@ -413,6 +423,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       recognition.onend = () => {
         setIsListening(false);
+        const textStr = accumulatedTranscriptRef.current.trim();
+        if (textStr) {
+          summarizeVoiceNotes(textStr);
+        }
       };
 
       (window as any).recognitionInstance = recognition;
@@ -2718,6 +2732,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       }
 
                                       triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                      selectTextbookPage(activeLehrwerkId!, num);
                                     }
                                   }}
                                   style={{
@@ -6273,6 +6288,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             }
 
                             triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                            selectTextbookPage(assigned.lehrwerkId, num);
                           }
                         }}
                         style={{
