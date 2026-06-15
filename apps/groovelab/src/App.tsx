@@ -6831,62 +6831,130 @@ function App() {
           )}
         </nav>
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid #f1f5f9', paddingTop: '16px', paddingBottom: '16px', paddingLeft: '8px', paddingRight: '8px' }}>
+        <div style={{ 
+          marginTop: 'auto', 
+          borderTop: '1px solid #f1f5f9', 
+          padding: '20px 12px 12px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          {/* Profile Card wrapper (clickable to open profile) */}
           <button 
+            type="button"
             onClick={() => setActiveStudentTab('profile')} 
-            className={`sidebar-item ${activeStudentTab === 'profile' ? `active ${activePlatform}` : ''}`}
             style={{ 
               width: '100%',
               display: 'flex', 
+              flexDirection: 'column',
               alignItems: 'center', 
-              gap: '12px', 
-              padding: '8px 12px', 
-              borderRadius: '16px', 
-              border: 'none', 
-              background: 'transparent',
+              gap: '10px', 
+              padding: '16px', 
+              borderRadius: '20px', 
+              border: activeStudentTab === 'profile' ? '2.5px solid #22c55e' : '1px solid #e2e8f0', 
+              background: activeStudentTab === 'profile' ? '#f0fdf4' : '#f8fafc',
               cursor: 'pointer',
-              marginBottom: '8px',
-              textAlign: 'left',
+              textAlign: 'center',
               transition: 'all 0.2s ease',
               boxSizing: 'border-box'
             }}
           >
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            {/* Larger Avatar */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ 
+                width: '72px', 
+                height: '72px', 
+                borderRadius: '20px', 
+                overflow: 'hidden', 
+                border: '3px solid white', 
+                boxShadow: '0 8px 20px rgba(0,0,0,0.08)' 
+              }}>
                 <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
               </div>
-              {session && <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></div>}
+              {session && (
+                <div style={{ 
+                  position: 'absolute', 
+                  bottom: -2, 
+                  right: -2, 
+                  width: '12px', 
+                  height: '12px', 
+                  background: '#22c55e', 
+                  borderRadius: '50%', 
+                  border: '2px solid white' 
+                }} />
+              )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.first_name}</div>
-              <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+
+            {/* Name & Role centered underneath */}
+            <div style={{ minWidth: 0, width: '100%' }}>
+              <div style={{ 
+                fontWeight: 900, 
+                fontSize: '0.95rem', 
+                color: '#0f172a', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis',
+                marginBottom: '2px'
+              }}>
+                {user.first_name}
+              </div>
+              <div style={{ 
+                fontSize: '0.68rem', 
+                fontWeight: 800, 
+                color: '#64748b', 
+                textTransform: 'uppercase', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis',
+                letterSpacing: '0.02em'
+              }}>
                 {activePlatform === 'campus'
                   ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Verwaltung' : 'Campus Schüler')
                   : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
               </div>
             </div>
-            <ChevronRight size={16} color="#94a3b8" style={{ marginLeft: 'auto', flexShrink: 0 }} />
           </button>
+
+          {/* Abmelden button */}
           <button 
+            type="button"
             onClick={() => handleLogout(true, true)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'transparent', color: '#ef4444', fontWeight: 800, cursor: 'pointer' }}
+            style={{ 
+              width: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: '8px', 
+              padding: '10px 14px', 
+              borderRadius: '14px', 
+              border: 'none', 
+              background: '#fef2f2', 
+              color: '#ef4444', 
+              fontWeight: 800, 
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
           >
-            <LogOut size={18} color="#ef4444" /> Abmelden
+            <LogOut size={16} color="#ef4444" /> Abmelden
           </button>
           
           {/* Legal Links under logout */}
           <div style={{ 
-            marginTop: '12px', 
-            paddingTop: '12px',
+            marginTop: '4px', 
+            paddingTop: '10px',
             borderTop: '1px solid #f1f5f9',
             display: 'flex', 
+            flexWrap: 'wrap',
             justifyContent: 'center',
-            gap: '12px', 
-            fontSize: '10px', 
+            gap: '8px 12px', 
+            fontSize: '9px', 
             fontWeight: 800, 
             color: '#94a3b8',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em'
+            letterSpacing: '0.05em',
+            width: '100%'
           }}>
             <span 
               onClick={() => setShowPrivacy(true)} 
