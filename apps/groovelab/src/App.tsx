@@ -1612,6 +1612,30 @@ function App() {
         .catch((err) => console.error('Service Worker registration failed on load:', err));
     }
 
+    // Intercept external links inside standalone PWA to prevent flickering and white screen in WebKit in-app browser
+    const handleAnchorClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor && anchor.href) {
+        try {
+          if (!anchor.href.startsWith('http://') && !anchor.href.startsWith('https://')) {
+            return; // Allow mailto:, tel:, etc. to bypass URL checking and use default OS handling
+          }
+          const url = new URL(anchor.href, window.location.origin);
+          const isExternal = url.origin !== window.location.origin;
+          const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+          if (isStandalone && isExternal) {
+            e.preventDefault();
+            window.open(anchor.href, '_blank');
+          }
+        } catch (err) {
+          // Ignore malformed URLs
+        }
+      }
+    };
+    document.addEventListener('click', handleAnchorClick);
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -1631,6 +1655,7 @@ function App() {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      document.removeEventListener('click', handleAnchorClick);
     };
   }, []);
 
