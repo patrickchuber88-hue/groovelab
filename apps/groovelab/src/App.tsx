@@ -6876,7 +6876,7 @@ function App() {
                 border: '3px solid white', 
                 boxShadow: '0 8px 20px rgba(0,0,0,0.08)' 
               }}>
-                <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
+                <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} onClick={() => setActiveStudentTab('profile')} />
               </div>
               {session && (
                 <div style={{ 
