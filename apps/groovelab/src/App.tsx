@@ -1585,6 +1585,15 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Reset install banner dismiss state when scanning QR code or following QR links
+    const isQR = window.location.pathname.includes('/qr/') || 
+                 window.location.search.includes('qr') || 
+                 window.location.search.includes('auto_pair') || 
+                 window.location.search.includes('token');
+    if (isQR) {
+      localStorage.removeItem('groovelab_install_prompt_dismissed');
+    }
+
     // Register service worker immediately to ensure PWA installability
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })

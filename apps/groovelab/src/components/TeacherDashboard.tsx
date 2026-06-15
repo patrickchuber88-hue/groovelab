@@ -918,7 +918,8 @@ export function TeacherDashboard({
         id: std.id,
         first_name: std.first_name || std.name?.split(' ')[0],
         last_name: std.last_name || std.name?.split(' ').slice(1).join(' '),
-        photo_url: std.photo_url || '/avatar_ghost.jpg'
+        photo_url: std.photo_url || '/avatar_ghost.jpg',
+        is_campus_active: std.is_campus_active
       });
     };
     return () => {
@@ -4871,17 +4872,22 @@ export function TeacherDashboard({
               id: std.id,
               first_name: std.first_name,
               last_name: std.last_name,
-              photo_url: std.photo_url || '/avatar_ghost.jpg'
+              photo_url: std.photo_url || '/avatar_ghost.jpg',
+              is_campus_active: std.is_campus_active
             });
             setSelectedStudentProfile(null);
           }}
         />
       )}
-      {docStudent && (
+       {docStudent && (
         <MeisterwerkDocumentationModal 
           student={docStudent} 
           onClose={() => setDocStudent(null)} 
           teacherId={userId}
+          onProfileClick={(student) => {
+            setDocStudent(null);
+            setSelectedStudentProfile(student);
+          }}
         />
       )}
 
@@ -5979,11 +5985,13 @@ export function TeacherDashboard({
                                     <div 
                                       style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
                                       onClick={() => {
+                                        const foundStud = allStudents.find(s => s.id === prep.studentId);
                                         setDocStudent({
                                           id: prep.studentId,
                                           first_name: prep.studentName.split(' ')[0],
                                           last_name: prep.studentName.split(' ').slice(1).join(' '),
-                                          photo_url: '/avatar_ghost.jpg'
+                                          photo_url: '/avatar_ghost.jpg',
+                                          is_campus_active: foundStud ? foundStud.is_campus_active : false
                                         });
                                       }}
                                     >
@@ -6187,7 +6195,6 @@ export function TeacherDashboard({
                                         )}
                                       </div>
                                     </div>
-
                                     {/* Premium Quick Actions */}
                                     <div style={{ 
                                       marginTop: '12px', 
@@ -6198,11 +6205,13 @@ export function TeacherDashboard({
                                     }}>
                                       <button
                                         onClick={() => {
+                                          const foundStud = allStudents.find(s => s.id === prep.studentId);
                                           setDocStudent({
                                             id: prep.studentId,
                                             first_name: prep.studentName.split(' ')[0],
                                             last_name: prep.studentName.split(' ').slice(1).join(' '),
-                                            photo_url: '/avatar_ghost.jpg'
+                                            photo_url: '/avatar_ghost.jpg',
+                                            is_campus_active: foundStud ? foundStud.is_campus_active : false
                                           });
                                         }}
                                         style={{
@@ -6949,11 +6958,13 @@ export function TeacherDashboard({
                                    onClick={() => {
                                      if (isCanceled || isRescheduledAway) return;
                                      if (slot.student) {
+                                       const foundStud = allStudents.find(s => s.id === slot.student.id);
                                        setDocStudent({
                                          id: slot.student.id,
                                          first_name: slot.student.name.split(' ')[0],
                                          last_name: slot.student.name.split(' ').slice(1).join(' '),
-                                         photo_url: slot.student.photo_url || '/avatar_ghost.jpg'
+                                         photo_url: slot.student.photo_url || '/avatar_ghost.jpg',
+                                         is_campus_active: foundStud ? foundStud.is_campus_active : slot.student.is_campus_active
                                        });
                                      }
                                      // Log the date of the clicked appointment (today's date)

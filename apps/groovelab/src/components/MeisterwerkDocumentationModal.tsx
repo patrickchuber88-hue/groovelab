@@ -3,6 +3,14 @@ import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, Ch
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 
+export const ALL_STICKERS = [
+  { id: 'puls-master', emoji: '⏱️', title: 'Puls-Master', desc: 'Für perfektes rhythmische Timing und konstanten Puls.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+  { id: 'fingersatz-champion', emoji: '🖖', title: 'Fingersatz-Champion', desc: 'Für exakte Fingersätze und saubere Technik.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+  { id: 'gefuehls-gigant', emoji: '🎭', title: 'Gefühls-Gigant', desc: 'Für lebendigen Ausdruck und tolle Dynamik.', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)' },
+  { id: 'uebe-monster', emoji: '👹', title: 'Übe-Monster', desc: 'Für fleißiges, ausdauerndes Üben zu Hause.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+  { id: 'jam-genie', emoji: '🎸', title: 'Jam-Genie', desc: 'Für eigene kreative Ideen und Improvisation.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
+];
+
 interface Student {
   id: string;
   first_name: string;
@@ -10,6 +18,7 @@ interface Student {
   photo_url?: string;
   school_id?: string;
   schoolId?: string;
+  is_campus_active?: boolean;
 }
 
 interface MeisterwerkDocumentationModalProps {
@@ -17,6 +26,7 @@ interface MeisterwerkDocumentationModalProps {
   onClose: () => void;
   teacherId?: string;
   initialLehrwerkId?: string;
+  onProfileClick?: (student: Student) => void;
 }
 
 interface ProgressItem {
@@ -125,7 +135,27 @@ export const formatPageNumbers = (pages: number[]): string => {
   return `S. ${ranges.join(', ')} & ${last}`;
 };
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick }) => {
+  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
+
+  useEffect(() => {
+    if (!student.id) return;
+    if (typeof student.is_campus_active === 'boolean') {
+      setIsCampusActive(student.is_campus_active);
+      return;
+    }
+    supabase
+      .from('users')
+      .select('is_campus_active')
+      .eq('id', student.id)
+      .single()
+      .then(({ data }) => {
+        if (data && typeof data.is_campus_active === 'boolean') {
+          setIsCampusActive(data.is_campus_active);
+        }
+      });
+  }, [student.id, student.is_campus_active]);
+
   const [studentInstrument, setStudentInstrument] = useState<string | null>(null);
   const [studentSchoolId, setStudentSchoolId] = useState<string | null>(null);
   const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
@@ -280,7 +310,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
-  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook'>('document');
+  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
+
+  // Speech Recognition & Audio play-along state
+  const [isListening, setIsListening] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
+  const recordingTimerRef = React.useRef<any>(null);
   const [useNotebookLayout, setUseNotebookLayout] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('meisterwerk_notebook_layout');
@@ -290,6 +330,245 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   });
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+
+  // Speech Recognition setup
+  const toggleSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Spracherkennung wird von Ihrem Browser leider nicht unterstützt (empfohlen: Google Chrome oder Safari).");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      if ((window as any).recognitionInstance) {
+        (window as any).recognitionInstance.stop();
+      }
+    } else {
+      setIsListening(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'de-DE';
+
+      recognition.onresult = async (event: any) => {
+        const currentResultIndex = event.resultIndex;
+        const result = event.results[currentResultIndex];
+        const textStr = result[0].transcript;
+        if (textStr && textStr.trim()) {
+          try {
+            setSaving(true);
+            const { data, error: invokeErr } = await supabase.functions.invoke('summarize-homework', {
+              body: { transcript: textStr }
+            });
+            if (invokeErr) throw invokeErr;
+            if (data?.summary) {
+              setHomeworkNotes(prev => prev ? `${prev}\n• ${data.summary}` : `• ${data.summary}`);
+              setHasChanges(true);
+            }
+          } catch (e) {
+            console.error("Error summarizing voice notes:", e);
+            setHomeworkNotes(prev => prev ? `${prev}\n• ${textStr}` : `• ${textStr}`);
+            setHasChanges(true);
+          } finally {
+            setSaving(false);
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech Recognition Error:", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      (window as any).recognitionInstance = recognition;
+      recognition.start();
+    }
+  };
+
+  // Audio Recorder logic
+  const startRecordingAudio = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'audio/mp3' });
+        setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        
+        setIsUploadingAudio(true);
+
+        const saveAudioMetadata = async (audioUrlString: string) => {
+          try {
+            const audioMetaStr = `AUDIO:${audioUrlString}|${audioDuration}|${new Date().toISOString()}`;
+            setHomeworkNotesList(prev => [...prev, audioMetaStr]);
+            
+            const currentWeek = getISOWeek();
+            const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
+            const currentWeekItems = progressItems.filter(item => 
+              item.updated_at && getISOWeek(item.updated_at) === currentWeek
+            );
+            
+            const updatedList = [...homeworkNotesList, audioMetaStr];
+            const combined = JSON.stringify(updatedList);
+            
+            if (currentHomeworkItem) {
+              await supabase
+                .from('progress_matrix')
+                .update({ homework_notes: combined, updated_at: new Date().toISOString() })
+                .eq('id', currentHomeworkItem.id);
+            } else if (currentWeekItems.length > 0) {
+              const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
+              await supabase
+                .from('progress_matrix')
+                .update({ homework_notes: combined, updated_at: new Date().toISOString() })
+                .in('id', itemIds);
+            } else {
+              const activeTId = await getCurrentTeacherId();
+              await supabase
+                .from('progress_matrix')
+                .insert({
+                  student_id: student.id,
+                  teacher_id: activeTId,
+                  topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
+                  status: 'IN_PROGRESS',
+                  is_current_homework: true,
+                  teacher_notes: '',
+                  homework_notes: combined,
+                  updated_at: new Date().toISOString()
+                });
+            }
+            await fetchProgress();
+            notifyHomeworkChange();
+          } catch (saveErr) {
+            console.error("Failed to save audio metadata:", saveErr);
+            alert("Fehler beim Speichern der Audio-Bemerkung im Protokoll.");
+          }
+        };
+
+        try {
+          const fileName = `${student.id}_feedback_${Date.now()}.mp3`;
+          const filePath = `avatars/audio_feedback_${fileName}`;
+          
+          const { error: uploadErr } = await supabase.storage
+            .from('groovelab-assets')
+            .upload(filePath, blob);
+            
+          if (uploadErr) throw uploadErr;
+          
+          const { data: publicUrlData } = supabase.storage
+            .from('groovelab-assets')
+            .getPublicUrl(filePath);
+            
+          const uploadedUrl = publicUrlData.publicUrl;
+          await saveAudioMetadata(uploadedUrl);
+        } catch (err: any) {
+          console.warn("Storage upload failed, falling back to local base64 data URL:", err);
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const dataUrl = reader.result as string;
+            await saveAudioMetadata(dataUrl);
+          };
+          reader.readAsDataURL(blob);
+        } finally {
+          setIsUploadingAudio(false);
+        }
+      };
+
+      setAudioDuration(0);
+      setIsRecordingAudio(true);
+      recorder.start();
+      setMediaRecorderInstance(recorder);
+      
+      let seconds = 0;
+      recordingTimerRef.current = setInterval(() => {
+        seconds += 1;
+        setAudioDuration(seconds);
+        if (seconds >= 60) {
+          stopRecordingAudio(recorder);
+        }
+      }, 1000);
+      
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      alert("Mikrofonzugriff verweigert oder nicht verfügbar.");
+    }
+  };
+
+  const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
+    const rec = activeRecorder || mediaRecorderInstance;
+    if (rec && rec.state !== 'inactive') {
+      rec.stop();
+      rec.stream.getTracks().forEach(track => track.stop());
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+    setIsRecordingAudio(false);
+  };
+
+  const awardSticker = async (stickerId: string, topicNameContext?: string) => {
+    try {
+      const targetTopic = topicNameContext || topicName || `Allgemein`;
+      const dateStr = new Date().toISOString();
+      const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
+      
+      setHomeworkNotesList(prev => [...prev, stickerMetaStr]);
+      
+      const currentWeek = getISOWeek();
+      const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
+      const currentWeekItems = progressItems.filter(item => 
+        item.updated_at && getISOWeek(item.updated_at) === currentWeek
+      );
+      
+      const updatedList = [...homeworkNotesList, stickerMetaStr];
+      const combined = JSON.stringify(updatedList);
+      
+      if (currentHomeworkItem) {
+        await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: combined, updated_at: new Date().toISOString() })
+          .eq('id', currentHomeworkItem.id);
+      } else if (currentWeekItems.length > 0) {
+        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
+        await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: combined, updated_at: new Date().toISOString() })
+          .in('id', itemIds);
+      } else {
+        const activeTId = await getCurrentTeacherId();
+        await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: '',
+            homework_notes: combined,
+            updated_at: new Date().toISOString()
+          });
+      }
+      
+      await fetchProgress();
+      notifyHomeworkChange();
+      alert(`Sticker "${ALL_STICKERS.find(s => s.id === stickerId)?.title}" erfolgreich vergeben! 🎉`);
+    } catch (e) {
+      console.error("Error awarding sticker:", e);
+    }
+  };
 
   const handleClose = () => {
     if (hasChanges) {
@@ -1041,14 +1320,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return progressItems.filter(item => item.topic_name.toLowerCase().trim() === topicName.toLowerCase().trim());
   }, [topicName, progressItems]);
 
-  // Find the most recent homework from the previous week/lessons
-  const lastHomework = useMemo(() => {
-    const currentWeek = getISOWeek();
-    return progressItems.find(item => {
-      if (!item.homework_notes || item.homework_notes.trim() === '') return false;
-      if (!item.updated_at) return true; // fallback
-      return getISOWeek(item.updated_at) !== currentWeek;
+  // Scan all database entries for awarded stickers
+  const collectedStickers = useMemo(() => {
+    const counts: Record<string, { count: number; details: { topic: string; date: string }[] }> = {};
+    ALL_STICKERS.forEach(s => {
+      counts[s.id] = { count: 0, details: [] };
     });
+
+    progressItems.forEach(item => {
+      if (item.homework_notes) {
+        try {
+          const notesArray = item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')
+            ? JSON.parse(item.homework_notes)
+            : [item.homework_notes];
+          
+          if (Array.isArray(notesArray)) {
+            notesArray.forEach((note: string) => {
+              if (note.startsWith("STICKER:")) {
+                const content = note.substring(8);
+                const parts = content.split('|');
+                const stickerId = parts[0];
+                const topic = parts[1] || 'Allgemein';
+                const date = parts[2] ? new Date(parts[2]).toLocaleDateString('de-DE') : 'Unbekannt';
+                
+                if (counts[stickerId]) {
+                  counts[stickerId].count += 1;
+                  counts[stickerId].details.push({ topic, date });
+                }
+              }
+            });
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    });
+
+    return counts;
   }, [progressItems]);
 
   const triggerDirectSave = async (
@@ -1791,15 +2099,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }}>
           {/* Left: Avatar + Student Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              overflow: 'hidden',
-              flexShrink: 0,
-              boxShadow: useNotebookLayout ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
-              border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.2)' : '1px solid rgba(0,0,0,0.06)'
-            }}>
+            <div 
+              onClick={() => onProfileClick && onProfileClick(student)}
+              title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                flexShrink: 0,
+                boxShadow: useNotebookLayout ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
+                border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.2)' : '1px solid rgba(0,0,0,0.06)',
+                cursor: onProfileClick ? 'pointer' : 'default',
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (onProfileClick) e.currentTarget.style.opacity = '0.8';
+              }}
+              onMouseLeave={(e) => {
+                if (onProfileClick) e.currentTarget.style.opacity = '1';
+              }}
+            >
               <img
                 src={getInstrumentAvatarUrl(studentInstrument)}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -1807,17 +2127,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-              <h2 style={{
-                margin: 0,
-                fontSize: '1rem',
-                fontWeight: 700,
-                color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
+              <h2 
+                onClick={() => onProfileClick && onProfileClick(student)}
+                title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
+                style={{
+                  margin: 0,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  cursor: onProfileClick ? 'pointer' : 'default',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (onProfileClick) e.currentTarget.style.opacity = '0.8';
+                }}
+                onMouseLeave={(e) => {
+                  if (onProfileClick) e.currentTarget.style.opacity = '1';
+                }}
+              >
                 {student.first_name} {student.last_name}
               </h2>
               <span style={{
@@ -3341,7 +3673,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
                 </div>{/* close inner scrollable div */}
 
-                {/* Meisterwerke Button - pinned at bottom, same line as Eintrag speichern */}
+                {/* Meisterwerke & Sticker-Album Buttons - pinned at bottom */}
                 <div style={{ padding: '12px 24px 24px 24px', display: 'flex', gap: '12px' }}>
                   <button
                     type="button"
@@ -3358,6 +3690,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <Award size={15} />
                     Deine Meisterwerke
                   </button>
+                  {isCampusActive && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalTab('stickeralbum')}
+                      style={{
+                        flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
+                        background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                        boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
+                        transition: 'all 0.15s ease',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Star size={15} fill="#fff" />
+                      Sticker-Album
+                    </button>
+                  )}
                 </div>
               </>
         )}
@@ -3855,6 +4204,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </button>
                     </div>
 
+                    {/* Sticker Awarding Row */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '12px 0' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
+                        🏆 Sticker verleihen für diese Seite:
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {ALL_STICKERS.map(st => (
+                          <button
+                            key={st.id}
+                            type="button"
+                            onClick={() => awardSticker(st.id, `${globalLehrwerke.find(b => b.id === activeLehrwerkId)?.title} - Seite ${activePageNumber}`)}
+                            style={{
+                              background: '#fff',
+                              border: `1.5px solid ${st.color}`,
+                              color: '#1e293b',
+                              borderRadius: '12px',
+                              padding: '6px 12px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                            }}
+                            className="hover-scale"
+                            title={st.desc}
+                          >
+                            <span>{st.emoji}</span>
+                            <span>{st.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Live Preview Box */}
                     <div style={{
                       marginTop: '12px',
@@ -4151,6 +4535,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
                           }}
                         />
+                      </div>
+
+                      {/* Sticker Awarding Row */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '12px 0' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
+                          🏆 Sticker verleihen für diesen Song:
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {ALL_STICKERS.map(st => (
+                            <button
+                              key={st.id}
+                              type="button"
+                              onClick={() => awardSticker(st.id, `${skill.songs?.artist} - ${skill.songs?.title}`)}
+                              style={{
+                                background: '#fff',
+                                border: `1.5px solid ${st.color}`,
+                                color: '#1e293b',
+                                borderRadius: '12px',
+                                padding: '6px 12px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                              }}
+                              className="hover-scale"
+                              title={st.desc}
+                            >
+                              <span>{st.emoji}</span>
+                              <span>{st.title}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
@@ -4723,25 +5142,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       {/* General homework text notes */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                            📝 Zusätzliche Hausaufgaben-Bemerkungen
-                          </label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {homeworkNotes.trim() && (
+                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                              📝 Zusätzliche Hausaufgaben-Bemerkungen
+                            </label>
+                            <button
+                              type="button"
+                              onClick={toggleSpeechRecognition}
+                              style={{
+                                background: isListening ? '#ef4444' : '#f1f5f9',
+                                color: isListening ? 'white' : '#475569',
+                                border: 'none',
+                                padding: '4px 8px',
+                                borderRadius: '12px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              title={isListening ? "Aufnahme stoppen..." : "Diktieren (Speech-to-AI)"}
+                            >
+                              <span>🎤</span>
+                              <span>{isListening ? "Stopp..." : "Diktieren"}</span>
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {isNotesExpanded && (
                               <button
                                 type="button"
                                 onClick={handleAddNote}
-                                disabled={saving}
+                                disabled={saving || !homeworkNotes.trim()}
                                 style={{
-                                  background: '#456355',
-                                  color: 'white',
+                                  background: homeworkNotes.trim() ? '#456355' : '#cbd5e1',
+                                  color: homeworkNotes.trim() ? 'white' : '#94a3b8',
                                   border: 'none',
                                   padding: '5px 10px',
                                   borderRadius: '8px',
                                   fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(69, 99, 85, 0.15)',
+                                  cursor: homeworkNotes.trim() ? 'pointer' : 'not-allowed',
+                                  boxShadow: homeworkNotes.trim() ? '0 2px 6px rgba(69, 99, 85, 0.15)' : 'none',
                                   transition: 'all 0.15s'
                                 }}
                                 className="hover-scale save-note-btn"
@@ -4807,6 +5250,98 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
+
+                        {/* Audio Play-Along Cassette Widget */}
+                        {isCampusActive && (
+                          <div style={{
+                            margin: '12px 0',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>📼</span> Play-Along Aufnahme (max. 60s)
+                              </span>
+                              {!isRecordingAudio ? (
+                                <button
+                                  type="button"
+                                  onClick={startRecordingAudio}
+                                  disabled={isUploadingAudio}
+                                  style={{
+                                    background: '#000',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  🔴 Aufnahme starten
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => stopRecordingAudio()}
+                                  style={{
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  ⏹️ Stopp ({audioDuration}s / 60s)
+                                </button>
+                              )}
+                            </div>
+
+                            {isUploadingAudio && (
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>⏳</span> Lade Audio-Feedback hoch...
+                              </div>
+                            )}
+
+                            {/* Render Cassette Players for recorded audios */}
+                            {(() => {
+                              const audios = homeworkNotesList
+                                .filter(note => note.startsWith("AUDIO:"))
+                                .map(note => {
+                                  const parts = note.substring(6).split('|');
+                                  return {
+                                    url: parts[0],
+                                    duration: parseInt(parts[1] || '0', 10),
+                                    date: parts[2]
+                                  };
+                                });
+
+                              if (audios.length === 0) return null;
+
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                                  {audios.map((aud, aIdx) => (
+                                    <RetroCassettePlayer key={aIdx} url={aud.url} duration={aud.duration} index={aIdx} />
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
 
                         {/* Schnellbaukasten Presets */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
@@ -4978,6 +5513,172 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             )}
           </div>
         </>
+      ) : activeModalTab === 'stickeralbum' && isCampusActive ? (
+        /* STICKER SAMMELALBUM VIEW */
+        <div style={{
+          flex: 1,
+          padding: useNotebookLayout ? '32px 32px 32px 60px' : '32px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          background: useNotebookLayout ? '#faf8f2' : '#f8fafc',
+          backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+          borderRadius: useNotebookLayout ? '0 0 20px 20px' : '0',
+          boxShadow: useNotebookLayout ? '0 10px 30px rgba(0,0,0,0.15)' : 'none',
+          position: 'relative'
+        }}>
+          {useNotebookLayout && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: '42px',
+              width: '2px',
+              background: '#fca5a5',
+              zIndex: 10
+            }} />
+          )}
+          
+          <button
+            type="button"
+            onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f1f5f9',
+              border: 'none',
+              color: '#475569',
+              padding: '8px 14px',
+              borderRadius: '20px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              width: 'fit-content',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <span>← Zurück zum Hub</span>
+          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '1.25rem' }}>🏆</span>
+            <span style={{
+              fontSize: '1rem',
+              fontWeight: 900,
+              color: '#0f172a',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+            }}>
+              Sticker Sammelalbum
+            </span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: '20px',
+            width: '100%'
+          }}>
+            {ALL_STICKERS.map(st => {
+              const info = collectedStickers[st.id] || { count: 0, details: [] };
+              const isCollected = info.count > 0;
+              return (
+                <div
+                  key={st.id}
+                  style={{
+                    background: isCollected ? 'white' : 'rgba(241, 245, 249, 0.6)',
+                    border: isCollected ? `2px solid ${st.color}` : '2px dashed #cbd5e1',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: '12px',
+                    opacity: isCollected ? 1 : 0.6,
+                    boxShadow: isCollected ? '0 10px 25px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {isCollected && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: st.color,
+                      color: 'white',
+                      fontWeight: 900,
+                      fontSize: '0.75rem',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                    }}>
+                      x{info.count}
+                    </div>
+                  )}
+
+                  {/* Icon / Badge Container */}
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: isCollected ? st.bg : '#e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    border: isCollected ? `2px solid ${st.color}` : '2px solid transparent',
+                    filter: isCollected ? 'none' : 'grayscale(100%)',
+                    boxShadow: isCollected ? `0 8px 20px ${st.bg}` : 'none',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {st.emoji}
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                      {st.title}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+                      {st.desc}
+                    </p>
+                  </div>
+
+                  {isCollected && (
+                    <div style={{
+                      width: '100%',
+                      borderTop: '1px solid #f1f5f9',
+                      paddingTop: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      alignItems: 'flex-start',
+                      maxHeight: '120px',
+                      overflowY: 'auto'
+                    }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
+                        Verlauf:
+                      </span>
+                      {info.details.map((dt, dIdx) => (
+                        <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#475569', fontWeight: 650 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>{dt.topic}</span>
+                          <span style={{ color: '#94a3b8' }}>{dt.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
         <div style={{
@@ -5515,3 +6216,138 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   );
 };
 
+const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number }> = ({ url, duration, index }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('ended', onEnded);
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
+      borderRadius: '16px',
+      padding: '16px',
+      width: '100%',
+      maxWidth: '340px',
+      border: '4px solid #0f0e0d',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      fontFamily: 'monospace',
+      color: '#fff',
+      alignSelf: 'center',
+      position: 'relative'
+    }}>
+      <audio ref={audioRef} src={url} />
+      
+      <div style={{
+        background: 'linear-gradient(to bottom, #dbeafe 0%, #eff6ff 100%)',
+        border: '2px solid #000',
+        borderRadius: '6px',
+        padding: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        position: 'relative'
+      }}>
+        <div style={{ height: '3px', background: '#ef4444', width: '100%' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#1e3a8a', fontWeight: 900 }}>
+          <span>A / PLAY-ALONG #{index + 1}</span>
+          <span>{Math.round(currentTime)}s / {duration}s</span>
+        </div>
+        
+        <div style={{
+          background: '#000',
+          borderRadius: '4px',
+          height: '28px',
+          margin: '4px 0',
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          padding: '0 20px'
+        }}>
+          <div 
+            className={isPlaying ? 'spinning' : ''} 
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#94a3b8',
+              border: '3px dashed #334155',
+              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
+            }} 
+          />
+          <div 
+            className={isPlaying ? 'spinning' : ''} 
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#94a3b8',
+              border: '3px dashed #334155',
+              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
+            }} 
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+        <button
+          type="button"
+          onClick={togglePlay}
+          style={{
+            background: '#d97706',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '6px 12px',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          {isPlaying ? '⏸️ PAUSE' : '▶️ PLAY'}
+        </button>
+      </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}} />
+    </div>
+  );
+};

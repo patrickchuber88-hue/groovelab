@@ -2103,7 +2103,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             id: student.id,
             first_name: student.first_name,
             last_name: student.last_name,
-            photo_url: student.photo_url || '/avatar_ghost.jpg'
+            photo_url: student.photo_url || '/avatar_ghost.jpg',
+            is_campus_active: student.is_campus_active
           }}
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}

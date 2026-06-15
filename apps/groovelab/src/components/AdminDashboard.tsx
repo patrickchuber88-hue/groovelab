@@ -15627,7 +15627,8 @@ export function AdminDashboard({
             id: selectedStudentForTageskompass.id,
             first_name: selectedStudentForTageskompass.first_name,
             last_name: selectedStudentForTageskompass.last_name,
-            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg'
+            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
+            is_campus_active: selectedStudentForTageskompass.is_campus_active
           }}
           onClose={() => {
             setShowTageskompassModal(false);
@@ -15636,6 +15637,12 @@ export function AdminDashboard({
           }}
           teacherId={userId}
           initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+          onProfileClick={(student) => {
+            setShowTageskompassModal(false);
+            setSelectedStudentForTageskompass(null);
+            setInitialLehrwerkIdForTageskompass(null);
+            setSelectedStudent(student);
+          }}
         />
       )}
 

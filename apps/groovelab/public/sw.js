@@ -146,44 +146,64 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Navigate mode (HTML documents) -> Stale-While-Revalidate with SPA Fallback
+  // Navigate mode (HTML documents) -> Network First with Cache Fallback
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
-        const fetchPromise = fetch(event.request)
+    const isReload = url.searchParams.has('reload_cb') || url.searchParams.has('reload_manual');
+
+    if (isReload) {
+      // Hard reload requested: bypass cache and go straight to network
+      event.respondWith(
+        fetch(event.request)
           .then(function(response) {
             if (response && response.status === 200) {
               const responseClone = response.clone();
               caches.open(CACHE_NAME).then(function(cache) {
-                cache.put(event.request, responseClone);
+                // Update the clean URL version in the cache (without query param)
+                const cleanRequest = new Request(event.request.url.split('?')[0]);
+                cache.put(cleanRequest, responseClone);
               });
             }
             return response;
           })
-          .catch(function(err) {
-            console.warn('Navigation background fetch failed:', err);
-          });
+          .catch(function() {
+            // Fallback to cache only if network fails
+            return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
+              return rootResponse || new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              });
+            });
+          })
+      );
+      return;
+    }
 
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // Fallback: match root '/' if the navigated subpath isn't cached (standard SPA routing)
-        return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
-          if (rootResponse) {
-            return rootResponse;
+    // Normal navigate mode -> Network First
+    event.respondWith(
+      fetch(event.request)
+        .then(function(response) {
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, responseClone);
+            });
           }
-          // If neither is cached, wait for the background fetch to complete
-          return fetchPromise.then(function(networkResponse) {
-            if (networkResponse) {
-              return networkResponse;
+          return response;
+        })
+        .catch(function() {
+          return caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
+            if (cachedResponse) {
+              return cachedResponse;
             }
-            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            return caches.match('/', { ignoreSearch: true }).then(function(rootResponse) {
+              if (rootResponse) {
+                return rootResponse;
+              }
+              return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              });
             });
           });
-        });
-      })
+        })
     );
     return;
   }
