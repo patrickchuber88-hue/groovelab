@@ -3982,21 +3982,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
                                   if (!assignedBook) return null;
                                   
-                                  const pagesWithNotes = info.pages.filter(p => {
+                                  const pagesWithNotes = info.pages.filter((p: number) => {
                                     const pState = assignedBook.pageStates?.[p];
-                                    if (pState?.homeworkNotes && pState.homeworkNotes.trim() !== '') return true;
-                                    if (pState?.homework_notes && pState.homework_notes.trim() !== '') return true;
+                                    if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
                                     
                                     const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
-                                    if (dbItem?.homework_notes && dbItem.homework_notes.trim() !== '') {
-                                      try {
-                                        const parsed = JSON.parse(dbItem.homework_notes);
-                                        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].trim() !== '') return true;
-                                        if (typeof parsed === 'string' && parsed.trim() !== '') return true;
-                                      } catch {
-                                        return true;
-                                      }
-                                    }
+                                    if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
                                     return false;
                                   });
                                   
@@ -4015,19 +4006,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       marginLeft: '22px',
                                       boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                     }}>
-                                      {pagesWithNotes.map(p => {
+                                      {pagesWithNotes.map((p: number) => {
                                         const pState = assignedBook.pageStates?.[p];
-                                        let noteText = pState?.homeworkNotes || pState?.homework_notes || '';
+                                        let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
                                         
                                         if (!noteText) {
                                           const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
                                           if (dbItem?.homework_notes) {
-                                            try {
-                                              const parsed = JSON.parse(dbItem.homework_notes);
-                                              noteText = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
-                                            } catch {
-                                              noteText = dbItem.homework_notes;
-                                            }
+                                            noteText = getCleanPageNotes(dbItem.homework_notes);
                                           }
                                         }
                                         
@@ -5000,21 +4986,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
                                       if (!assignedBook) return null;
                                       
-                                      const pagesWithNotes = item.pages.filter(p => {
+                                      const pagesWithNotes = item.pages.filter((p: number) => {
                                         const pState = assignedBook.pageStates?.[p];
-                                        if (pState?.homeworkNotes && pState.homeworkNotes.trim() !== '') return true;
-                                        if (pState?.homework_notes && pState.homework_notes.trim() !== '') return true;
+                                        if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
                                         
                                         const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
-                                        if (dbItem?.homework_notes && dbItem.homework_notes.trim() !== '') {
-                                          try {
-                                            const parsed = JSON.parse(dbItem.homework_notes);
-                                            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].trim() !== '') return true;
-                                            if (typeof parsed === 'string' && parsed.trim() !== '') return true;
-                                          } catch {
-                                            return true;
-                                          }
-                                        }
+                                        if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
                                         return false;
                                       });
                                       
@@ -5032,19 +5009,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           marginTop: '6px',
                                           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                         }}>
-                                          {pagesWithNotes.map(p => {
+                                          {pagesWithNotes.map((p: number) => {
                                             const pState = assignedBook.pageStates?.[p];
-                                            let noteText = pState?.homeworkNotes || pState?.homework_notes || '';
+                                            let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
                                             
                                             if (!noteText) {
                                               const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
                                               if (dbItem?.homework_notes) {
-                                                try {
-                                                  const parsed = JSON.parse(dbItem.homework_notes);
-                                                  noteText = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
-                                                } catch {
-                                                  noteText = dbItem.homework_notes;
-                                                }
+                                                noteText = getCleanPageNotes(dbItem.homework_notes);
                                               }
                                             }
                                             
