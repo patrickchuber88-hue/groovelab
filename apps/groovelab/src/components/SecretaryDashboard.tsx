@@ -3784,30 +3784,53 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
-  const handleToggleTeacherRole = async (emp: any) => {
+  const handleToggleRole = async (emp: any, roleToToggle: 'admin' | 'secretary' | 'teacher') => {
     try {
       const currentRoles = Array.isArray(emp.roles) ? emp.roles : [emp.role];
-      let newRoles: string[];
+      const hasAdmin = currentRoles.includes('admin');
+      const hasSecretary = currentRoles.includes('secretary') || (!hasAdmin && emp.role === 'secretary');
+      const hasTeacher = currentRoles.includes('teacher') || emp.role === 'teacher';
+      
+      let newRoles: string[] = [];
       let primaryRole = emp.role;
       const updateFields: any = {};
-      
-      if (currentRoles.includes('teacher')) {
-        newRoles = currentRoles.filter((r: string) => r !== 'teacher');
-        if (primaryRole === 'teacher') {
-          primaryRole = newRoles.find((r: string) => r === 'admin' || r === 'secretary') || 'secretary';
+
+      if (roleToToggle === 'admin') {
+        if (hasAdmin) {
+          newRoles = ['secretary'];
+          primaryRole = 'secretary';
+        } else {
+          newRoles = ['admin'];
+          primaryRole = 'admin';
         }
-        updateFields.is_campus_active = false;
-        updateFields.is_groovelab_active = false;
-      } else {
-        newRoles = [...currentRoles, 'teacher'];
-        updateFields.is_campus_active = true;
-        updateFields.is_groovelab_active = true;
+        if (hasTeacher) {
+          newRoles.push('teacher');
+        }
+      } else if (roleToToggle === 'secretary') {
+        if (hasSecretary) {
+          newRoles = ['admin'];
+          primaryRole = 'admin';
+        } else {
+          newRoles = ['secretary'];
+          primaryRole = 'secretary';
+        }
+        if (hasTeacher) {
+          newRoles.push('teacher');
+        }
+      } else if (roleToToggle === 'teacher') {
+        const baseRole = hasAdmin ? 'admin' : 'secretary';
+        newRoles = [baseRole];
+        primaryRole = baseRole;
+        if (hasTeacher) {
+          updateFields.is_campus_active = false;
+          updateFields.is_groovelab_active = false;
+        } else {
+          newRoles.push('teacher');
+          updateFields.is_campus_active = true;
+          updateFields.is_groovelab_active = true;
+        }
       }
-      
-      if (newRoles.length === 0) {
-        newRoles = [primaryRole];
-      }
-      
+
       const { error } = await supabase
         .from('users')
         .update({ 
@@ -3820,7 +3843,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       if (error) throw error;
       fetchDashboardData();
     } catch (err: any) {
-      alert('Fehler beim Aktualisieren der Lehrer-Rolle: ' + err.message);
+      alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
     }
   };
 
@@ -11723,7 +11746,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             }}
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '260px 180px 100px 120px 150px',
+                              gridTemplateColumns: '240px 270px 80px 120px 120px',
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               padding: '12px 20px',
@@ -11766,65 +11789,94 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                             </div>
 
-                            {/* Role Badge */}
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              {/* Render primary roles: admin, secretary */}
-                              {(emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role])
-                                .filter((r: string) => r === 'admin' || r === 'secretary')
-                                .map((r: string) => {
-                                  const rLabel = r === 'admin' ? 'Admin' : 'Verwaltung';
-                                  const rBg = r === 'admin' ? '#e8f0fe' : '#e2f6ea';
-                                  const rColor = r === 'admin' ? '#0b57d0' : '#137333';
-                                  return (
-                                    <span key={r} style={{
-                                      padding: '5px 12px',
-                                      borderRadius: '10px',
-                                      background: rBg,
-                                      color: rColor,
-                                      fontSize: '0.74rem',
-                                      fontWeight: 700,
-                                      minWidth: '75px',
-                                      textAlign: 'center',
-                                      boxSizing: 'border-box'
-                                    }}>
-                                      {rLabel}
-                                    </span>
-                                  );
-                                })
-                              }
-
-                              {/* Render Lehrer Button next to it */}
+                            {/* Role Buttons (Admin, Verwaltung, Lehrer) */}
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                               {(() => {
-                                const hasTeacher = (emp.roles && emp.roles.includes('teacher')) || emp.role === 'teacher';
+                                const currentRoles = Array.isArray(emp.roles) ? emp.roles : [emp.role];
+                                const hasAdmin = currentRoles.includes('admin');
+                                const hasSecretary = currentRoles.includes('secretary') || (!hasAdmin && emp.role === 'secretary');
+                                const hasTeacher = currentRoles.includes('teacher') || emp.role === 'teacher';
+
                                 return (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleTeacherRole(emp);
-                                    }}
-                                    style={{
-                                      padding: '4px 10px',
-                                      borderRadius: '10px',
-                                      background: hasTeacher ? '#fef3c7' : '#ffffff',
-                                      color: hasTeacher ? '#d97706' : '#a1a1aa',
-                                      border: hasTeacher ? '1.5px solid #d97706' : '1.5px dashed #cbd5e1',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 700,
-                                      minWidth: '75px',
-                                      textAlign: 'center',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.2s ease',
-                                      boxSizing: 'border-box'
-                                    }}
-                                    title={hasTeacher ? "Lehrer-Rolle entfernen" : "Lehrer-Rolle hinzufügen"}
-                                  >
-                                    {hasTeacher ? 'Lehrer' : '+ Lehrer'}
-                                  </button>
+                                  <>
+                                    {/* Admin Button */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleRole(emp, 'admin');
+                                      }}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        background: hasAdmin ? '#e8f0fe' : '#ffffff',
+                                        color: hasAdmin ? '#0b57d0' : '#a1a1aa',
+                                        border: hasAdmin ? '1.5px solid #0b57d0' : '1.5px dashed #cbd5e1',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                        minWidth: '75px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        boxSizing: 'border-box'
+                                      }}
+                                      title={hasAdmin ? "Admin-Rolle entfernen (wechselt zu Verwaltung)" : "Admin-Rolle aktivieren"}
+                                    >
+                                      {hasAdmin ? 'Admin' : '+ Admin'}
+                                    </button>
+
+                                    {/* Verwaltung Button */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleRole(emp, 'secretary');
+                                      }}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        background: hasSecretary ? '#e2f6ea' : '#ffffff',
+                                        color: hasSecretary ? '#137333' : '#a1a1aa',
+                                        border: hasSecretary ? '1.5px solid #137333' : '1.5px dashed #cbd5e1',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                        minWidth: '85px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        boxSizing: 'border-box'
+                                      }}
+                                      title={hasSecretary ? "Verwaltungs-Rolle entfernen (wechselt zu Admin)" : "Verwaltungs-Rolle aktivieren"}
+                                    >
+                                      {hasSecretary ? 'Verwaltung' : '+ Verwaltung'}
+                                    </button>
+
+                                    {/* Lehrer Button */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleRole(emp, 'teacher');
+                                      }}
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '10px',
+                                        background: hasTeacher ? '#fef3c7' : '#ffffff',
+                                        color: hasTeacher ? '#d97706' : '#a1a1aa',
+                                        border: hasTeacher ? '1.5px solid #d97706' : '1.5px dashed #cbd5e1',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                        minWidth: '75px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        boxSizing: 'border-box'
+                                      }}
+                                      title={hasTeacher ? "Lehrer-Rolle entfernen" : "Lehrer-Rolle hinzufügen"}
+                                    >
+                                      {hasTeacher ? 'Lehrer' : '+ Lehrer'}
+                                    </button>
+                                  </>
                                 );
                               })()}
                             </div>
