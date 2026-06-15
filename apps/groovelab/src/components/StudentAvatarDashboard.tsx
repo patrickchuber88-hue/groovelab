@@ -641,15 +641,32 @@ function MobileBriefingView({
                     </div>
                   )}
 
-                  {notesList.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
-                      {notesList.map((note: string, nIdx: number) => (
-                        <div key={nIdx} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.3', whiteSpace: 'pre-line' }}>
-                          {note}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {notesList.length > 0 && (() => {
+                    let audioCount = 0;
+                    const filteredNotes = notesList.filter((note: string) => !note.startsWith("STICKER:"));
+                    if (filteredNotes.length === 0) return null;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                        {filteredNotes.map((note: string, nIdx: number) => {
+                          const isAudio = note.startsWith("AUDIO:");
+                          if (isAudio) {
+                            audioCount++;
+                            const parts = note.substring(6).split('|');
+                            return (
+                              <div key={nIdx} style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+                                <InlineAudioPlayer url={parts[0]} label={`Play-Along #${audioCount}`} />
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={nIdx} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.3', whiteSpace: 'pre-line' }}>
+                              {note}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );
@@ -11357,50 +11374,206 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
     };
   }, []);
 
-  const themeColor = isPlaying ? '#d97706' : '#475569';
-
   return (
     <div 
       onClick={togglePlay}
       style={{ 
-        display: 'inline-flex', 
-        alignItems: 'center', 
-        gap: '8px',
+        position: 'relative',
+        width: '210px',
+        height: '110px',
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        border: '2.5px solid #334155',
+        borderRadius: '10px',
+        padding: '6px',
+        boxShadow: isPlaying 
+          ? '0 10px 25px rgba(217, 119, 6, 0.15), 0 0 12px rgba(217, 119, 6, 0.1)'
+          : '0 6px 16px rgba(0,0,0,0.12)',
         cursor: 'pointer',
         userSelect: 'none',
-        transition: 'all 0.2s ease',
-        background: isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)',
-        border: `1px solid ${isPlaying ? 'rgba(217, 119, 6, 0.2)' : 'rgba(71, 85, 105, 0.1)'}`,
-        padding: '4px 10px',
-        borderRadius: '20px',
-        color: themeColor,
-        fontWeight: 700,
-        fontSize: '0.75rem',
-        lineHeight: 1
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        transform: isPlaying ? 'scale(1.02)' : 'none',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.12)' : 'rgba(71, 85, 105, 0.06)';
+        e.currentTarget.style.transform = isPlaying ? 'scale(1.04)' : 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = isPlaying
+          ? '0 12px 30px rgba(217, 119, 6, 0.25), 0 0 16px rgba(217, 119, 6, 0.15)'
+          : '0 8px 20px rgba(0,0,0,0.18)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.background = isPlaying ? 'rgba(217, 119, 6, 0.08)' : 'rgba(71, 85, 105, 0.03)';
+        e.currentTarget.style.transform = isPlaying ? 'scale(1.02)' : 'none';
+        e.currentTarget.style.boxShadow = isPlaying
+          ? '0 10px 25px rgba(217, 119, 6, 0.15), 0 0 12px rgba(217, 119, 6, 0.1)'
+          : '0 6px 16px rgba(0,0,0,0.12)';
       }}
     >
-      <style>{`
-        @keyframes spin-clockwise {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
       <audio ref={audioRef} src={url} />
-      <CassetteIcon isPlaying={isPlaying} color={themeColor} />
-      <span>{label}</span>
-      {isPlaying && (
-        <span style={{ fontSize: '0.7rem', color: '#ef4444', animation: 'pulse 0.8s infinite alternate', marginLeft: '4px' }}>
-          • PLAYING
-        </span>
-      )}
+      
+      {/* 4 Screws in corners */}
+      <div style={{ position: 'absolute', top: '5px', left: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
+      <div style={{ position: 'absolute', top: '5px', right: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
+      <div style={{ position: 'absolute', bottom: '5px', left: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
+      <div style={{ position: 'absolute', bottom: '5px', right: '5px', width: '4px', height: '4px', borderRadius: '50%', background: '#64748b', border: '0.5px solid #475569' }} />
+
+      {/* Cassette Top Notch/Details */}
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: '16px', marginTop: '2px' }}>
+        <div style={{ width: '12px', height: '3px', background: '#334155', borderRadius: '1px' }} />
+        <div style={{ width: '24px', height: '3px', background: '#334155', borderRadius: '1px' }} />
+        <div style={{ width: '12px', height: '3px', background: '#334155', borderRadius: '1px' }} />
+      </div>
+
+      {/* Sticker Label Area */}
+      <div style={{
+        flex: 1,
+        margin: '4px 6px',
+        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+        border: '1.5px solid #cbd5e1',
+        borderRadius: '6px',
+        padding: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Retro Accent Stripes */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(to right, #ef4444 33%, #3b82f6 33%, #3b82f6 66%, #10b981 66%)', opacity: 0.8 }} />
+
+        {/* Tape Reel Window */}
+        <div style={{
+          width: '90px',
+          height: '28px',
+          background: '#0f172a',
+          border: '1.5px solid #475569',
+          borderRadius: '4px',
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          position: 'relative',
+          marginTop: '4px',
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)'
+        }}>
+          {/* Transparent window pane effect */}
+          <div style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 50%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* Left Reel Hub */}
+          <div style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: '2px solid #64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#1e293b',
+            transform: 'rotate(0deg)',
+            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
+          }}>
+            {/* Teeth of the hub */}
+            <div style={{ width: '2px', height: '12px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '12px', height: '2px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
+          </div>
+
+          {/* Magnetic tape roll representation */}
+          <div style={{
+            position: 'absolute',
+            left: '14px',
+            width: isPlaying ? '18px' : '20px',
+            height: isPlaying ? '18px' : '20px',
+            borderRadius: '50%',
+            border: '1px dashed #78350f',
+            opacity: 0.35,
+            transition: 'all 5s ease'
+          }} />
+
+          {/* Right Reel Hub */}
+          <div style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: '2px solid #64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#1e293b',
+            transform: 'rotate(0deg)',
+            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
+          }}>
+            <div style={{ width: '2px', height: '12px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '12px', height: '2px', background: '#e2e8f0', position: 'absolute' }} />
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
+          </div>
+          <div style={{
+            position: 'absolute',
+            right: '14px',
+            width: isPlaying ? '20px' : '18px',
+            height: isPlaying ? '20px' : '18px',
+            borderRadius: '50%',
+            border: '1px dashed #78350f',
+            opacity: 0.35,
+            transition: 'all 5s ease'
+          }} />
+        </div>
+
+        {/* Text/Song Title Sticker Writing */}
+        <div style={{
+          fontFamily: '"Courier New", Courier, monospace',
+          fontSize: '0.8rem',
+          fontWeight: 800,
+          color: '#1e293b',
+          textAlign: 'center',
+          marginTop: '6px',
+          width: '100%',
+          borderTop: '1px dashed #cbd5e1',
+          paddingTop: '3px',
+          letterSpacing: '-0.5px',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden'
+        }}>
+          {label}
+        </div>
+      </div>
+
+      {/* Cassette Bottom Run / Exposed Tape details */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '0 16px',
+        marginBottom: '2px'
+      }}>
+        {/* Play Status Flashing Indicator LED */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: isPlaying ? '#ef4444' : '#475569',
+            boxShadow: isPlaying ? '0 0 8px #ef4444' : 'none',
+            animation: isPlaying ? 'pulse 1s infinite alternate' : 'none'
+          }} />
+          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
+            {isPlaying ? 'PLAY' : 'STOP'}
+          </span>
+        </div>
+        
+        {/* Exposed tape path shapes */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ width: '8px', height: '4px', background: '#334155', borderRadius: '1px' }} />
+          <div style={{ width: '12px', height: '4px', background: '#334155', borderRadius: '1px' }} />
+          <div style={{ width: '8px', height: '4px', background: '#334155', borderRadius: '1px' }} />
+        </div>
+      </div>
     </div>
   );
 };
