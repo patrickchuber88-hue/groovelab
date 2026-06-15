@@ -203,8 +203,30 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   }, []);
 
   useEffect(() => {
-    setLocalQrToken(student.qr_token || '');
-  }, [student.qr_token]);
+    const fetchQrToken = async () => {
+      if (!student.qr_token && student.id) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('qr_token')
+            .eq('id', student.id)
+            .single();
+          if (data && data.qr_token) {
+            setLocalQrToken(data.qr_token);
+            student.qr_token = data.qr_token;
+          } else {
+            setLocalQrToken('');
+          }
+        } catch (err) {
+          console.error('Error fetching qr_token in StudentDetailModal:', err);
+          setLocalQrToken('');
+        }
+      } else {
+        setLocalQrToken(student.qr_token || '');
+      }
+    };
+    fetchQrToken();
+  }, [student.id, student.qr_token]);
 
   const handleRegenerateQrToken = async () => {
     if (!window.confirm('Möchtest du diesen QR-Code wirklich sperren und neu generieren? Der alte Code verliert sofort seine Gültigkeit.')) {
@@ -1963,7 +1985,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     justifyContent: 'center',
                     border: '1.5px solid rgba(52, 168, 83, 0.3)'
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${student.qr_token || student.id || ''}`} size={135} />
+                    <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
                   </div>
                 </div>
               </div>
@@ -2043,7 +2065,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${student.qr_token || student.id || ''}`} size={135} />
+                    <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
                   </div>
 
                   <p style={{ 
