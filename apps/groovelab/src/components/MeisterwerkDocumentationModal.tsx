@@ -6511,16 +6511,12 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
               width: '24px',
               height: '24px',
               borderRadius: '50%',
-              background: isPlaying 
-                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
               border: '2px solid #ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: isPlaying 
-                ? '0 0 10px rgba(239, 68, 68, 0.6), 0 2px 6px rgba(0,0,0,0.4)' 
-                : '0 0 10px rgba(16, 185, 129, 0.4), 0 2px 6px rgba(0,0,0,0.4)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
               zIndex: 20,
               color: 'white',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
