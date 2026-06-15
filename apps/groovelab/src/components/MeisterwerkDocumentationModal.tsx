@@ -5480,7 +5480,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 if (!aud.date) return false;
                                 return getISOWeek(aud.date) === currentWeek;
                               });
-                              const isLimitReached = currentWeekAudios.length >= 2;
+                              const isLimitReached = currentWeekAudios.length >= 1;
 
                               return (
                                 <>
@@ -5534,7 +5534,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                                   {isLimitReached && (
                                     <div style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 800, marginTop: '2px' }}>
-                                      ⚠️ Maximale Anzahl an Aufnahmen (2) für diese Kalenderwoche erreicht. Lösche eine alte Aufnahme der aktuellen Woche, um eine neue zu machen.
+                                      ⚠️ Maximale Anzahl an Aufnahmen (1) für diese Kalenderwoche erreicht. Lösche die alte Aufnahme der aktuellen Woche, um eine neue zu machen.
                                     </div>
                                   )}
 
