@@ -11722,21 +11722,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               e.dataTransfer.setData("employeeId", emp.id);
                             }}
                             style={{
-                              display: 'flex',
+                              display: 'grid',
+                              gridTemplateColumns: '260px 180px 100px 120px 150px',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              padding: '10px 16px',
+                              padding: '12px 20px',
                               borderRadius: '16px',
                               border: '1px solid #f1f5f9',
                               background: '#ffffff',
                               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
                               transition: 'all 0.25s ease',
-                              minWidth: '850px'
+                              minWidth: '850px',
+                              gap: '12px',
+                              boxSizing: 'border-box'
                             }}
                             className="hover-scale"
                           >
                             {/* Avatar & Name Info */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.6', minWidth: '180px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
                               <div style={{
                                 width: '42px',
                                 height: '42px',
@@ -11763,30 +11766,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                             </div>
 
-                            {/* Nickname/Spitzname Badge */}
-                            <div style={{ flex: '1', minWidth: '100px' }}>
-                              {emp.nickname ? (
-                                <span style={{
-                                  display: 'inline-block',
-                                  padding: '6px 12px',
-                                  borderRadius: '10px',
-                                  background: '#f5f5f7',
-                                  color: '#0b57d0',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  textAlign: 'center',
-                                  width: '100%',
-                                  boxSizing: 'border-box'
-                                }}>
-                                  "{emp.nickname}"
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: '0.78rem', color: '#cbd5e1', display: 'block', textAlign: 'center' }}>-</span>
-                              )}
-                            </div>
-
                             {/* Role Badge */}
-                            <div style={{ flex: '1.4', minWidth: '160px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               {/* Render primary roles: admin, secretary */}
                               {(emp.roles && emp.roles.length > 0 ? emp.roles : [emp.role])
                                 .filter((r: string) => r === 'admin' || r === 'secretary')
@@ -11803,7 +11784,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       fontSize: '0.74rem',
                                       fontWeight: 700,
                                       minWidth: '75px',
-                                      textAlign: 'center'
+                                      textAlign: 'center',
+                                      boxSizing: 'border-box'
                                     }}>
                                       {rLabel}
                                     </span>
@@ -11848,7 +11830,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
 
                             {/* Status Badge */}
-                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
                               <span style={{
                                 padding: '5px 12px',
                                 borderRadius: '10px',
@@ -11864,7 +11846,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
 
                             {/* Monospace PIN */}
-                            <div style={{ flex: '1', minWidth: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontSize: '0.58rem', color: '#86868b', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                                 <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>
@@ -11889,7 +11871,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
 
                             {/* Action Buttons */}
-                            <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -11928,7 +11910,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               >
                                 Pass teilen
                               </button>
-                              {emp.id !== userId && (currentUserProfile?.role === 'admin' || emp.role !== 'admin') && (
+                              {emp.id !== userId && (currentUserProfile?.role === 'admin' || emp.role !== 'admin') ? (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -11942,11 +11924,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     cursor: 'pointer',
-                                    padding: '2px 6px'
+                                    padding: '2px 6px',
+                                    width: '28px',
+                                    height: '28px',
+                                    boxSizing: 'border-box'
                                   }}
                                 >
                                   <Trash2 size={16} />
                                 </button>
+                              ) : (
+                                <div style={{ width: '28px', height: '28px' }} />
                               )}
                             </div>
 
