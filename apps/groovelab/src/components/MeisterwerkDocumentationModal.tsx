@@ -438,6 +438,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Audio Recorder logic
   const startRecordingAudio = async () => {
+    let durationInSeconds = 0;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -448,7 +449,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       };
       
       recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/mp3' });
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
@@ -457,7 +458,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         const saveAudioMetadata = async (audioUrlString: string) => {
           try {
-            const audioMetaStr = `AUDIO:${audioUrlString}|${audioDuration}|${new Date().toISOString()}`;
+            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}`;
             setHomeworkNotesList(prev => [...prev, audioMetaStr]);
             
             const updatedList = [...homeworkNotesList, audioMetaStr];
@@ -504,11 +505,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       recorder.start();
       setMediaRecorderInstance(recorder);
       
-      let seconds = 0;
       recordingTimerRef.current = setInterval(() => {
-        seconds += 1;
-        setAudioDuration(seconds);
-        if (seconds >= 60) {
+        durationInSeconds += 1;
+        setAudioDuration(durationInSeconds);
+        if (durationInSeconds >= 60) {
           stopRecordingAudio(recorder);
         }
       }, 1000);

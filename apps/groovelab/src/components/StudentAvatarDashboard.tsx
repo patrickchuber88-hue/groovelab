@@ -11739,6 +11739,40 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
             transition: 'all 5s ease'
           }} />
 
+          {/* Center Play Button Overlay */}
+          <div 
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+              border: '2px solid #ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+              zIndex: 20,
+              color: 'white',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: 'none'
+            }}
+          >
+            {isPlaying ? (
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                <rect x="5" y="5" width="4" height="14" rx="1" />
+                <rect x="15" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ marginLeft: '1.5px' }}>
+                <path d="M7 4v16l13-8z" />
+              </svg>
+            )}
+          </div>
+
           {/* Right Reel Hub */}
           <div style={{
             width: '16px',
