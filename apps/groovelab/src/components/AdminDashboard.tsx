@@ -17258,12 +17258,44 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
             {isPlaying ? 'PLAY' : 'STOP'}
           </span>
         </div>
+
+        {/* Small Stop Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+              setIsPlaying(false);
+            }
+          }}
+          style={{
+            background: '#ef4444',
+            border: 'none',
+            borderRadius: '3px',
+            width: '18px',
+            height: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            padding: 0,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            transition: 'transform 0.1s ease',
+            zIndex: 10
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          title="Stop"
+        >
+          <div style={{ width: '7px', height: '7px', background: 'white', borderRadius: '1px' }} />
+        </button>
         
         {/* Exposed tape path shapes */}
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <div style={{ width: '6px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-          <div style={{ width: '10px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-          <div style={{ width: '6px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
+          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
         </div>
       </div>
     </div>
