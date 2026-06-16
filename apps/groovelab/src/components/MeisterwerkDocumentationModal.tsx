@@ -2812,6 +2812,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   key={num}
                                   type="button"
                                   onClick={() => {
+                                    if (activeBrush !== 'NONE') {
+                                      let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                      let targetHomework = false;
+
+                                      if (activeBrush === 'LOCKED') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'HOMEWORK') {
+                                        targetStatus = 'IN_PROGRESS';
+                                        targetHomework = true;
+                                      } else if (activeBrush === 'MASTERED') {
+                                        targetStatus = 'MASTERED';
+                                        targetHomework = false;
+                                      } else if (activeBrush === 'THEORY') {
+                                        targetStatus = 'THEORY_DONE';
+                                        targetHomework = false;
+                                      }
+
+                                      triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                      selectTextbookPage(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                      return;
+                                    }
+
                                     const now = Date.now();
                                     if (lastClickRef.current && lastClickRef.current.pageNum === num && (now - lastClickRef.current.timestamp) < 250) {
                                       if (clickTimeoutRef.current) {
@@ -2828,29 +2851,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       clickTimeoutRef.current = setTimeout(() => {
                                         clickTimeoutRef.current = null;
                                         lastClickRef.current = null;
-                                        if (activeBrush === 'NONE') {
-                                          selectTextbookPage(activeLehrwerkId!, num);
-                                        } else {
-                                          let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                          let targetHomework = false;
-
-                                          if (activeBrush === 'LOCKED') {
-                                            targetStatus = 'IN_PROGRESS';
-                                            targetHomework = false;
-                                          } else if (activeBrush === 'HOMEWORK') {
-                                            targetStatus = 'IN_PROGRESS';
-                                            targetHomework = true;
-                                          } else if (activeBrush === 'MASTERED') {
-                                            targetStatus = 'MASTERED';
-                                            targetHomework = false;
-                                          } else if (activeBrush === 'THEORY') {
-                                            targetStatus = 'THEORY_DONE';
-                                            targetHomework = false;
-                                          }
-
-                                          triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                          selectTextbookPage(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                        }
+                                        selectTextbookPage(activeLehrwerkId!, num);
                                       }, 250);
                                     }
                                   }}
@@ -6379,6 +6380,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <button
                         key={num}
                         onClick={() => {
+                          if (activeBrush !== 'NONE') {
+                            let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                            let targetHomework = false;
+
+                            if (activeBrush === 'LOCKED') {
+                              targetStatus = 'IN_PROGRESS';
+                              targetHomework = false;
+                            } else if (activeBrush === 'HOMEWORK') {
+                              targetStatus = 'IN_PROGRESS';
+                              targetHomework = true;
+                            } else if (activeBrush === 'MASTERED') {
+                              targetStatus = 'MASTERED';
+                              targetHomework = false;
+                            } else if (activeBrush === 'THEORY') {
+                              targetStatus = 'THEORY_DONE';
+                              targetHomework = false;
+                            }
+
+                            triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                            selectTextbookPage(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                            return;
+                          }
+
                           const now = Date.now();
                           if (lastClickRef.current && lastClickRef.current.pageNum === num && (now - lastClickRef.current.timestamp) < 250) {
                             if (clickTimeoutRef.current) {
@@ -6396,30 +6420,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             clickTimeoutRef.current = setTimeout(() => {
                               clickTimeoutRef.current = null;
                               lastClickRef.current = null;
-                              if (activeBrush === 'NONE') {
-                                selectTextbookPage(assigned.lehrwerkId, num);
-                                setShowAllPagesGrid(false);
-                              } else {
-                                let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                let targetHomework = false;
-
-                                if (activeBrush === 'LOCKED') {
-                                  targetStatus = 'IN_PROGRESS';
-                                  targetHomework = false;
-                                } else if (activeBrush === 'HOMEWORK') {
-                                  targetStatus = 'IN_PROGRESS';
-                                  targetHomework = true;
-                                } else if (activeBrush === 'MASTERED') {
-                                  targetStatus = 'MASTERED';
-                                  targetHomework = false;
-                                } else if (activeBrush === 'THEORY') {
-                                  targetStatus = 'THEORY_DONE';
-                                  targetHomework = false;
-                                }
-
-                                triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
-                                selectTextbookPage(assigned.lehrwerkId, num, targetStatus, targetHomework);
-                              }
+                              selectTextbookPage(assigned.lehrwerkId, num);
+                              setShowAllPagesGrid(false);
                             }, 250);
                           }
                         }}
