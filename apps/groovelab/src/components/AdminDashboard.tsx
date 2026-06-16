@@ -9299,170 +9299,172 @@ export function AdminDashboard({
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
-                          {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', ...(activePlatform === 'campus' ? ['Vocals'] : [])].map(inst => {
-                            const count = newSong.instrumentation?.[inst] || 0;
-                            const isSelected = count > 0;
-                            return (
-                              <div
-                                key={inst}
-                                onClick={(e) => {
-                                  if ((e.target as HTMLElement).closest('button')) return;
-                                  const currentInst = { ...newSong.instrumentation };
-                                  currentInst[inst] = isSelected ? 0 : 1;
-                                  setNewSong({ ...newSong, instrumentation: currentInst });
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '16px 12px',
-                                  borderRadius: '20px',
-                                  border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
-                                  background: isSelected 
-                                    ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
-                                    : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                                  width: '120px',
-                                  height: '145px',
-                                  textAlign: 'center',
-                                  gap: '8px',
-                                  boxShadow: isSelected 
-                                    ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
-                                    : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
-                                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  cursor: 'pointer',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  boxSizing: 'border-box'
-                                }}
-                                onMouseOver={e => {
-                                  if (!isSelected) {
-                                    e.currentTarget.style.borderColor = '#cbd5e1';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                  } else {
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                  }
-                                }}
-                                onMouseOut={e => {
-                                  if (!isSelected) {
-                                    e.currentTarget.style.borderColor = '#e2e8f0';
-                                    e.currentTarget.style.transform = 'none';
-                                  } else {
-                                    e.currentTarget.style.transform = 'none';
-                                  }
-                                }}
-                              >
-                                <div style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: '14px',
-                                  background: isSelected ? 'white' : '#f1f5f9',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: isSelected ? '#a16207' : '#64748b',
-                                  boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
-                                  transition: 'all 0.2s ease',
-                                  transform: isSelected ? 'scale(1.05)' : 'none'
-                                }}>
-                                  {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
-                                </div>
-                                
-                                <span style={{ 
-                                  fontSize: '0.72rem', 
-                                  fontWeight: 800, 
-                                  color: isSelected ? '#a16207' : '#475569',
-                                  letterSpacing: '-0.01em'
-                                }}>
-                                  {inst}
-                                </span>
-                                
-                                <div style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: '8px', 
-                                  background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
-                                  padding: '4px 8px',
-                                  borderRadius: '12px',
-                                  border: '1px solid',
-                                  borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
-                                  backdropFilter: 'blur(4px)',
-                                  transition: 'all 0.2s ease'
-                                }}>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const currentInst = { ...newSong.instrumentation };
-                                      currentInst[inst] = Math.max(0, count - 1);
-                                      setNewSong({ ...newSong, instrumentation: currentInst });
-                                    }}
-                                    style={{
-                                      width: '22px',
-                                      height: '22px',
-                                      borderRadius: '8px',
-                                      border: 'none',
-                                      background: 'white',
-                                      color: '#475569',
-                                      fontSize: '0.85rem',
-                                      fontWeight: 900,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                      transition: 'all 0.2s ease',
-                                      padding: 0
-                                    }}
-                                  >
-                                    -
-                                  </button>
-                                  <span style={{ 
-                                    fontSize: '0.85rem', 
-                                    fontWeight: 900, 
-                                    color: isSelected ? '#a16207' : '#475569', 
-                                    minWidth: '14px',
-                                    textAlign: 'center'
+                      {activePlatform !== 'campus' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+                            {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano'].map(inst => {
+                              const count = newSong.instrumentation?.[inst] || 0;
+                              const isSelected = count > 0;
+                              return (
+                                <div
+                                  key={inst}
+                                  onClick={(e) => {
+                                    if ((e.target as HTMLElement).closest('button')) return;
+                                    const currentInst = { ...newSong.instrumentation };
+                                    currentInst[inst] = isSelected ? 0 : 1;
+                                    setNewSong({ ...newSong, instrumentation: currentInst });
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '16px 12px',
+                                    borderRadius: '20px',
+                                    border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                                    background: isSelected 
+                                      ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
+                                      : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                                    width: '120px',
+                                    height: '145px',
+                                    textAlign: 'center',
+                                    gap: '8px',
+                                    boxShadow: isSelected 
+                                      ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
+                                      : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
+                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    boxSizing: 'border-box'
+                                  }}
+                                  onMouseOver={e => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.borderColor = '#cbd5e1';
+                                      e.currentTarget.style.transform = 'translateY(-2px)';
+                                    } else {
+                                      e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }
+                                  }}
+                                  onMouseOut={e => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.borderColor = '#e2e8f0';
+                                      e.currentTarget.style.transform = 'none';
+                                    } else {
+                                      e.currentTarget.style.transform = 'none';
+                                    }
+                                  }}
+                                >
+                                  <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '14px',
+                                    background: isSelected ? 'white' : '#f1f5f9',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: isSelected ? '#a16207' : '#64748b',
+                                    boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
+                                    transition: 'all 0.2s ease',
+                                    transform: isSelected ? 'scale(1.05)' : 'none'
                                   }}>
-                                    {count}
+                                    {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+                                  </div>
+                                  
+                                  <span style={{ 
+                                    fontSize: '0.72rem', 
+                                    fontWeight: 800, 
+                                    color: isSelected ? '#a16207' : '#475569',
+                                    letterSpacing: '-0.01em'
+                                  }}>
+                                    {inst}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const currentInst = { ...newSong.instrumentation };
-                                      currentInst[inst] = count + 1;
-                                      setNewSong({ ...newSong, instrumentation: currentInst });
-                                    }}
-                                    style={{
-                                      width: '22px',
-                                      height: '22px',
-                                      borderRadius: '8px',
-                                      border: 'none',
-                                      background: 'white',
-                                      color: '#475569',
-                                      fontSize: '0.85rem',
-                                      fontWeight: 900,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                      transition: 'all 0.2s ease',
-                                      padding: 0
-                                    }}
-                                  >
-                                    +
-                                  </button>
+                                  
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px', 
+                                    background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
+                                    padding: '4px 8px',
+                                    borderRadius: '12px',
+                                    border: '1px solid',
+                                    borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
+                                    backdropFilter: 'blur(4px)',
+                                    transition: 'all 0.2s ease'
+                                  }}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const currentInst = { ...newSong.instrumentation };
+                                        currentInst[inst] = Math.max(0, count - 1);
+                                        setNewSong({ ...newSong, instrumentation: currentInst });
+                                      }}
+                                      style={{
+                                        width: '22px',
+                                        height: '22px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        background: 'white',
+                                        color: '#475569',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        transition: 'all 0.2s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      -
+                                    </button>
+                                    <span style={{ 
+                                      fontSize: '0.85rem', 
+                                      fontWeight: 900, 
+                                      color: isSelected ? '#a16207' : '#475569', 
+                                      minWidth: '14px',
+                                      textAlign: 'center'
+                                    }}>
+                                      {count}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const currentInst = { ...newSong.instrumentation };
+                                        currentInst[inst] = count + 1;
+                                        setNewSong({ ...newSong, instrumentation: currentInst });
+                                      }}
+                                      style={{
+                                        width: '22px',
+                                        height: '22px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        background: 'white',
+                                        color: '#475569',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        transition: 'all 0.2s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {activePlatform !== 'campus' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -9521,47 +9523,48 @@ export function AdminDashboard({
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
-                      {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano', ...(activePlatform === 'campus' ? ['Vocals'] : [])].map(inst => {
-                        const count = editingSong.instrumentation?.[inst] || 0;
-                        const isSelected = count > 0;
-                        return (
-                          <div
-                            key={inst}
-                            onClick={(e) => {
-                              if ((e.target as HTMLElement).closest('button')) return;
-                              const currentInst = { ...editingSong.instrumentation };
-                              currentInst[inst] = isSelected ? 0 : 1;
-                              setEditingSong({ ...editingSong, instrumentation: currentInst });
-                            }}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '16px 12px',
-                              borderRadius: '20px',
-                              border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
-                              background: isSelected 
-                                ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
-                                : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                              width: '120px',
-                              height: '145px',
-                              textAlign: 'center',
-                              gap: '8px',
-                              boxShadow: isSelected 
-                                ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
-                                : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
-                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseOver={e => {
-                              if (!isSelected) {
+                  {activePlatform !== 'campus' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+                        {['E-Gitarre', 'E-Bass', 'E-Drums', 'E-Piano'].map(inst => {
+                          const count = editingSong.instrumentation?.[inst] || 0;
+                          const isSelected = count > 0;
+                          return (
+                            <div
+                              key={inst}
+                              onClick={(e) => {
+                                if ((e.target as HTMLElement).closest('button')) return;
+                                const currentInst = { ...editingSong.instrumentation };
+                                currentInst[inst] = isSelected ? 0 : 1;
+                                setEditingSong({ ...editingSong, instrumentation: currentInst });
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '16px 12px',
+                                borderRadius: '20px',
+                                border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                                background: isSelected 
+                                  ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
+                                  : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                                width: '120px',
+                                height: '145px',
+                                textAlign: 'center',
+                                gap: '8px',
+                                boxShadow: isSelected 
+                                  ? '0 10px 20px -5px rgba(234, 179, 8, 0.18), 0 6px 6px -6px rgba(234, 179, 8, 0.12)' 
+                                  : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02)',
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseOver={e => {
+                                if (!isSelected) {
                                   e.currentTarget.style.borderColor = '#cbd5e1';
                                   e.currentTarget.style.transform = 'translateY(-2px)';
                                 } else {
@@ -9576,115 +9579,116 @@ export function AdminDashboard({
                                   e.currentTarget.style.transform = 'none';
                                 }
                               }}
-                          >
-                            <div style={{
-                              width: '48px',
-                              height: '48px',
-                              borderRadius: '14px',
-                              background: isSelected ? 'white' : '#f1f5f9',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: isSelected ? '#a16207' : '#64748b',
-                              boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
-                              transition: 'all 0.2s ease',
-                              transform: isSelected ? 'scale(1.05)' : 'none'
-                            }}>
-                              {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
-                            </div>
-                            
-                            <span style={{ 
-                              fontSize: '0.72rem', 
-                              fontWeight: 800, 
-                              color: isSelected ? '#a16207' : '#475569',
-                              letterSpacing: '-0.01em'
-                            }}>
-                              {inst}
-                            </span>
-                            
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '8px', 
-                              background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
-                              padding: '4px 8px',
-                              borderRadius: '12px',
-                              border: '1px solid',
-                              borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
-                              backdropFilter: 'blur(4px)',
-                              transition: 'all 0.2s ease'
-                            }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const currentInst = { ...editingSong.instrumentation };
-                                  currentInst[inst] = Math.max(0, count - 1);
-                                  setEditingSong({ ...editingSong, instrumentation: currentInst });
-                                }}
-                                style={{
-                                  width: '22px',
-                                  height: '22px',
-                                  borderRadius: '8px',
-                                  border: 'none',
-                                  background: 'white',
-                                  color: '#475569',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                  transition: 'all 0.2s ease',
-                                  padding: 0
-                                }}
-                              >
-                                -
-                              </button>
-                              <span style={{ 
-                                fontSize: '0.85rem', 
-                                fontWeight: 950, 
-                                color: isSelected ? '#a16207' : '#475569', 
-                                minWidth: '14px',
-                                textAlign: 'center'
+                            >
+                              <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '14px',
+                                background: isSelected ? 'white' : '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: isSelected ? '#a16207' : '#64748b',
+                                boxShadow: isSelected ? '0 4px 10px rgba(234, 179, 8, 0.15)' : 'inset 0 2px 4px rgba(0,0,0,0.01)',
+                                transition: 'all 0.2s ease',
+                                transform: isSelected ? 'scale(1.05)' : 'none'
                               }}>
-                                {count}
+                                {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+                              </div>
+                              
+                              <span style={{ 
+                                fontSize: '0.72rem', 
+                                fontWeight: 800, 
+                                color: isSelected ? '#a16207' : '#475569',
+                                letterSpacing: '-0.01em'
+                              }}>
+                                {inst}
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const currentInst = { ...editingSong.instrumentation };
-                                  currentInst[inst] = count + 1;
-                                  setEditingSong({ ...editingSong, instrumentation: currentInst });
-                                }}
-                                style={{
-                                  width: '22px',
-                                  height: '22px',
-                                  borderRadius: '8px',
-                                  border: 'none',
-                                  background: 'white',
-                                  color: '#475569',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                  transition: 'all 0.2s ease',
-                                  padding: 0
-                                }}
-                              >
-                                +
-                              </button>
+                              
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                background: isSelected ? 'rgba(255, 255, 255, 0.7)' : 'rgba(241, 245, 249, 0.7)',
+                                padding: '4px 8px',
+                                borderRadius: '12px',
+                                border: '1px solid',
+                                borderColor: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(226, 232, 240, 0.5)',
+                                backdropFilter: 'blur(4px)',
+                                transition: 'all 0.2s ease'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const currentInst = { ...editingSong.instrumentation };
+                                    currentInst[inst] = Math.max(0, count - 1);
+                                    setEditingSong({ ...editingSong, instrumentation: currentInst });
+                                  }}
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: 'white',
+                                    color: '#475569',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.2s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  -
+                                </button>
+                                <span style={{ 
+                                  fontSize: '0.85rem', 
+                                  fontWeight: 950, 
+                                  color: isSelected ? '#a16207' : '#475569', 
+                                  minWidth: '14px',
+                                  textAlign: 'center'
+                                }}>
+                                  {count}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const currentInst = { ...editingSong.instrumentation };
+                                    currentInst[inst] = count + 1;
+                                    setEditingSong({ ...editingSong, instrumentation: currentInst });
+                                  }}
+                                  style={{
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: 'white',
+                                    color: '#475569',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 900,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.2s ease',
+                                    padding: 0
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" style={{ flex: 2, background: brandColor, color: '#1e293b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
