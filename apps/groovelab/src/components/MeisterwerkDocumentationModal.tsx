@@ -628,6 +628,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return getISOWeekRaw(dateInput, lessonDay);
   };
 
+  const getItemWeek = (item: { topic_name: string; updated_at?: string }): string => {
+    if (item.topic_name.startsWith('Hausaufgabe KW ')) {
+      const parts = item.topic_name.split('Hausaufgabe KW ');
+      const kwNum = parts[1]?.trim();
+      if (kwNum) {
+        const year = item.updated_at ? new Date(item.updated_at).getFullYear() : new Date().getFullYear();
+        return `${year}-W${kwNum.padStart(2, '0')}`;
+      }
+    }
+    return item.updated_at ? getISOWeek(item.updated_at) : '';
+  };
+
+  const getWeeksBetween = (startWeek: string, endWeek: string): string[] => {
+    const parseWeekToMonday = (wk: string): Date => {
+      const [year, week] = wk.split('-W').map(Number);
+      const simple = new Date(year, 0, 4);
+      const day = simple.getDay() || 7;
+      const monday = new Date(simple.getTime() - (day - 1) * 24 * 3600000);
+      monday.setDate(monday.getDate() + (week - 1) * 7);
+      return monday;
+    };
+
+    try {
+      const startMon = parseWeekToMonday(startWeek);
+      const endMon = parseWeekToMonday(endWeek);
+      
+      const result: string[] = [];
+      const curr = new Date(startMon);
+      let iterations = 0;
+      while (curr <= endMon && iterations < 500) {
+        result.push(getISOWeek(curr));
+        curr.setDate(curr.getDate() + 7);
+        iterations++;
+      }
+      return Array.from(new Set(result)).sort().reverse();
+    } catch (e) {
+      console.error(e);
+      return [startWeek, endWeek];
+    }
+  };
+
   // Custom song creation form states
   const [showCreateSongModal, setShowCreateSongModal] = useState(false);
   const [newSongTitle, setNewSongTitle] = useState('');
@@ -2397,10 +2438,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
                   {(() => {
-                    const weeks = Array.from(new Set(progressItems
+                    const existingWeeks = progressItems
                       .filter(item => item.updated_at)
-                      .map(item => getISOWeek(item.updated_at))
-                    )).sort().reverse();
+                      .map(item => getItemWeek(item))
+                      .filter(Boolean);
+
+                    let weeks: string[] = [];
+                    if (existingWeeks.length > 0) {
+                      const sortedExisting = [...existingWeeks].sort();
+                      const earliestWeek = sortedExisting[0];
+                      const currentWeek = getISOWeek();
+                      const latestExisting = sortedExisting[sortedExisting.length - 1];
+                      const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
+                      weeks = getWeeksBetween(earliestWeek, endWeek);
+                    } else {
+                      weeks = [getISOWeek()];
+                    }
                     
                     if (weeks.length === 0) {
                       return (
@@ -2415,8 +2468,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       const weekNum = wk.split('-W')[1] || '';
                       
                       // Count how many items were checked or active in this week
-                      const weekItems = progressItems.filter(item => item.updated_at && getISOWeek(item.updated_at) === wk);
+                      const weekItems = progressItems.filter(item => item.updated_at && getItemWeek(item) === wk);
                       const homeworkItemsCount = weekItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ')).length;
+                      const isCompact = homeworkItemsCount === 0;
                       
                       return (
                         <div
@@ -2426,12 +2480,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             background: isSelected ? '#f1f5f9' : 'white',
                             border: isSelected ? '1.5px solid #456355' : '1px solid #cbd5e1',
                             borderRadius: '16px',
-                            padding: '16px',
+                            padding: isCompact ? '10px 16px' : '16px',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '4px',
+                            gap: isCompact ? '0px' : '4px',
                             boxShadow: isSelected ? '0 4px 12px rgba(69, 99, 85, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
                           }}
                           className="hover-scale"
@@ -2444,9 +2498,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               {homeworkItemsCount} Aufgaben
                             </span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                            Dokumentiert in Woche {weekNum}
-                          </span>
+                          {!isCompact && (
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                              Dokumentiert in Woche {weekNum}
+                            </span>
+                          )}
                         </div>
                       );
                     });
@@ -3865,13 +3921,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 const weekNum = selectedHistoryWeek.split('-W')[1] || '';
                 const weekItems = progressItems.filter(item => 
-                  item.updated_at && getISOWeek(item.updated_at) === selectedHistoryWeek
+                  item.updated_at && getItemWeek(item) === selectedHistoryWeek
                 );
 
                 // Group page numbers by book title
                 const groupedLehrwerke: Record<string, { pages: number[] }> = {};
                 const otherHWs: any[] = [];
-                const allActive = weekItems.filter(item => item.is_current_homework || item.status === 'THEORY_DONE');
+                const allActive = weekItems.filter(item => 
+                  (item.is_current_homework || item.status === 'THEORY_DONE') && 
+                  !item.topic_name.startsWith('Hausaufgabe KW ')
+                );
 
                 allActive.forEach(item => {
                   if (item.topic_name.includes(' - Seite ')) {
@@ -3887,6 +3946,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   } else {
                     otherHWs.push(item);
                   }
+                });
+
+                // Sort pages for each textbook in ascending order
+                Object.keys(groupedLehrwerke).forEach(title => {
+                  groupedLehrwerke[title].pages.sort((a, b) => a - b);
                 });
 
                 // Extract unique non-empty homework notes
@@ -4732,10 +4796,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       onClick={() => {
                         setActiveSubView('history');
                         // Pre-select the most recent week if available
-                        const weeks = Array.from(new Set(progressItems
+                        const existingWeeks = progressItems
                           .filter(item => item.updated_at)
-                          .map(item => getISOWeek(item.updated_at))
-                        )).sort().reverse();
+                          .map(item => getItemWeek(item))
+                          .filter(Boolean);
+                        let weeks: string[] = [];
+                        if (existingWeeks.length > 0) {
+                          const sortedExisting = [...existingWeeks].sort();
+                          const earliestWeek = sortedExisting[0];
+                          const currentWeek = getISOWeek();
+                          const latestExisting = sortedExisting[sortedExisting.length - 1];
+                          const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
+                          weeks = getWeeksBetween(earliestWeek, endWeek);
+                        } else {
+                          weeks = [getISOWeek()];
+                        }
                         if (weeks.length > 0) {
                           setSelectedHistoryWeek(weeks[0]);
                         }

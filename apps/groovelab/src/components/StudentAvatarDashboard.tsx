@@ -247,6 +247,18 @@ const getISOWeek = (dateInput?: string | Date): string => {
   return getISOWeekRaw(dateInput, 1);
 };
 
+const getItemWeek = (item: { topic_name: string; updated_at?: string }): string => {
+  if (item.topic_name.startsWith('Hausaufgabe KW ')) {
+    const parts = item.topic_name.split('Hausaufgabe KW ');
+    const kwNum = parts[1]?.trim();
+    if (kwNum) {
+      const year = item.updated_at ? new Date(item.updated_at).getFullYear() : new Date().getFullYear();
+      return `${year}-W${kwNum.padStart(2, '0')}`;
+    }
+  }
+  return item.updated_at ? getISOWeek(item.updated_at) : '';
+};
+
 const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
   const trimmed = (title || '').trim();
   const list = customLehrwerkeList || [];
@@ -485,38 +497,58 @@ function MobileBriefingView({
         {/* Widget 1: Hausaufgaben */}
         <div style={{ background: '#ffffff', borderRadius: '0px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
           {(() => {
-            const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
-            const currentWeek = getISOWeek();
+
+
+            const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
+            const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek();
+
+            const activeHWs = progressItems.filter(item => 
+              item.is_current_homework && 
+              !item.topic_name.startsWith('Hausaufgabe KW ') &&
+              getItemWeek(item) === latestWeek
+            );
             const activeTheories = progressItems.filter(item => 
               item.status === 'THEORY_DONE' && 
               item.updated_at && 
-              getISOWeek(item.updated_at) === currentWeek &&
+              getItemWeek(item) === latestWeek &&
               !item.topic_name.startsWith('Hausaufgabe KW ')
             );
             const allActive = [...activeHWs, ...activeTheories];
 
             const getHomeworkNotes = (): string[] => {
-              for (const item of progressItems) {
+              const notes: string[] = [];
+              const weekItems = progressItems.filter(item => getItemWeek(item) === latestWeek);
+              for (const item of weekItems) {
                 if (item.homework_notes && item.homework_notes.trim()) {
                   try {
                     const raw = item.homework_notes;
                     if (raw.startsWith('[') && raw.endsWith(']')) {
                       const parsed = JSON.parse(raw);
-                      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                      if (Array.isArray(parsed)) {
+                        parsed.forEach((n: string) => {
+                          if (n && n.trim() && !notes.includes(n.trim())) {
+                            notes.push(n.trim());
+                          }
+                        });
+                      }
                     } else {
                       const lines = raw
                         .split('\n')
                         .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
                         .map((l: string) => l.trim())
                         .filter(Boolean);
-                      if (lines.length > 0) return lines;
+                      lines.forEach((l: string) => {
+                        if (l && !notes.includes(l)) {
+                          notes.push(l);
+                        }
+                      });
                     }
                   } catch (e) {
                     console.error(e);
                   }
                 }
               }
-              return [];
+              return notes;
             };
             const notesList = getHomeworkNotes();
             const totalItemsCount = allActive.length + notesList.length;
@@ -1898,14 +1930,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const fetchCrisisNotifications = async () => {
     if (!studentId) return;
     try {
+      const { data: studentSchedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('day_of_week, time_slot')
+        .eq('student_id', studentId);
+
       const { data, error } = await supabase
         .from('crisis_notifications')
         .select('*, teacher:users!crisis_notifications_teacher_id_fkey(first_name, last_name)')
         .eq('student_id', studentId)
         .eq('status', 'UNREAD')
         .order('slot_start_datetime', { ascending: true });
+
       if (!error && data) {
-        setUnreadCrisisNotifs(data);
+        if (studentSchedules && studentSchedules.length > 0) {
+          const filtered = data.filter(n => {
+            const dt = new Date(n.slot_start_datetime);
+            const dayOfWeek = dt.getDay() || 7;
+            const hours = String(dt.getHours()).padStart(2, '0');
+            const minutes = String(dt.getMinutes()).padStart(2, '0');
+            const timeSlot = `${hours}:${minutes}`;
+            
+            return studentSchedules.some(sch => 
+              sch.day_of_week === dayOfWeek && 
+              sch.time_slot === timeSlot
+            );
+          });
+          setUnreadCrisisNotifs(filtered);
+        } else {
+          setUnreadCrisisNotifs([]);
+        }
       }
     } catch (err) {
       console.error('Error fetching crisis notifications:', err);
@@ -7726,20 +7780,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 {/* Spalte 1: Hausaufgaben (Orientieren & Planen) */}
                 {(() => {
-                  const currentWeekStr = getISOWeekRaw(new Date(), 1);
-                  const prevWeekDate = new Date();
-                  prevWeekDate.setDate(prevWeekDate.getDate() - 7);
-                  const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
+                  const getPrevWeek = (wkStr: string): string => {
+                    const [year, week] = wkStr.split('-W').map(Number);
+                    const simple = new Date(year, 0, 4);
+                    const day = simple.getDay() || 7;
+                    const monday = new Date(simple.getTime() - (day - 1) * 24 * 3600000);
+                    monday.setDate(monday.getDate() + (week - 1) * 7 - 7);
+                    return getISOWeekRaw(monday, 1);
+                  };
+
+                  const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
+                  const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+                  const prevWeekStr = getPrevWeek(currentWeekStr);
 
                   const parseHomeworkNotes = (rawNotes: string): string[] => {
                     if (!rawNotes || rawNotes.trim() === '') return [];
                     try {
+                      let parsed: string[] = [];
                       if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
-                        return JSON.parse(rawNotes);
+                        parsed = JSON.parse(rawNotes);
+                      } else {
+                        parsed = rawNotes.split('\n\n').filter(Boolean);
                       }
-                      return rawNotes.split('\n\n').filter(Boolean);
+                      const unique: string[] = [];
+                      parsed.forEach(n => {
+                        if (n && n.trim() && !unique.includes(n.trim())) {
+                          unique.push(n.trim());
+                        }
+                      });
+                      return unique;
                     } catch (e) {
-                      return [rawNotes];
+                      return [rawNotes.trim()];
                     }
                   };
 
@@ -7747,14 +7818,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     !item.topic_name.startsWith('Hausaufgabe KW ') && 
                     item.status !== 'MASTERED' && 
                     item.status !== 'THEORY_DONE' &&
-                    (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+                    getItemWeek(item) === currentWeekStr
                   );
 
                   const currentWeekNotesItem = progressItems.find(item => 
                     item.topic_name.startsWith('Hausaufgabe KW ') && 
-                    (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+                    getItemWeek(item) === currentWeekStr
                   ) || progressItems.find(item => 
-                    item.is_current_homework && 
+                    getItemWeek(item) === currentWeekStr && 
                     item.homework_notes && 
                     item.homework_notes.trim() !== ''
                   );
@@ -7765,14 +7836,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     !item.topic_name.startsWith('Hausaufgabe KW ') && 
                     item.status !== 'MASTERED' && 
                     item.status !== 'THEORY_DONE' && 
-                    item.updated_at && 
-                    getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                    getItemWeek(item) === prevWeekStr
                   );
 
                   const prevWeekNotesItem = progressItems.find(item => 
                     item.topic_name.startsWith('Hausaufgabe KW ') && 
-                    item.updated_at && 
-                    getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+                    getItemWeek(item) === prevWeekStr
                   );
 
                   const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];

@@ -1262,28 +1262,92 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   // ── Helper: Homework parsing & rendering ──────────────────────────────────
-  const getHomeworkNotes = (): string[] => {
-    for (const item of progressItems) {
+  const getISOWeek = (dateInput?: string | Date, lessonDay: number = 1): string => {
+    let date: Date;
+    if (!dateInput) {
+      date = new Date();
+    } else if (dateInput instanceof Date) {
+      date = dateInput;
+    } else {
+      const match = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // 0-indexed
+        const day = parseInt(match[3], 10);
+        date = new Date(year, month, day);
+      } else {
+        date = new Date(dateInput);
+      }
+    }
+    
+    if (isNaN(date.getTime())) {
+      date = new Date();
+    }
+
+    const currentDay = date.getDay();
+    let diff = currentDay - lessonDay;
+    if (diff < 0) {
+      diff += 7;
+    }
+    
+    const lessonStart = new Date(date);
+    lessonStart.setDate(date.getDate() - diff);
+
+    const d = new Date(Date.UTC(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+  };
+
+  const getItemWeek = (item: { topic_name: string; updated_at?: string }): string => {
+    if (item.topic_name.startsWith('Hausaufgabe KW ')) {
+      const parts = item.topic_name.split('Hausaufgabe KW ');
+      const kwNum = parts[1]?.trim();
+      if (kwNum) {
+        const year = item.updated_at ? new Date(item.updated_at).getFullYear() : new Date().getFullYear();
+        return `${year}-W${kwNum.padStart(2, '0')}`;
+      }
+    }
+    const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
+    return item.updated_at ? getISOWeek(item.updated_at, lessonDay) : '';
+  };
+
+  const getHomeworkNotes = (targetWeek: string): string[] => {
+    const notes: string[] = [];
+    const weekItems = progressItems.filter(item => getItemWeek(item) === targetWeek);
+    for (const item of weekItems) {
       if (item.homework_notes && item.homework_notes.trim()) {
         try {
           const raw = item.homework_notes;
           if (raw.startsWith('[') && raw.endsWith(']')) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed)) {
+              parsed.forEach((n: string) => {
+                if (n && n.trim() && !notes.includes(n.trim())) {
+                  notes.push(n.trim());
+                }
+              });
+            }
           } else {
             const lines = raw
               .split('\n')
               .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
               .map((l: string) => l.trim())
               .filter(Boolean);
-            if (lines.length > 0) return lines;
+            lines.forEach((l: string) => {
+              if (l && !notes.includes(l)) {
+                notes.push(l);
+              }
+            });
           }
         } catch (e) {
           console.error(e);
         }
       }
     }
-    return [];
+    return notes;
   };
 
   const formatPageNumbers = (pages: number[]): string => {
@@ -1318,8 +1382,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const renderHomeworkWidget = () => {
-    const notesList = getHomeworkNotes();
-    const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
+    const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
+    const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
+    const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek(undefined, lessonDay);
+    const notesList = getHomeworkNotes(latestWeek);
+    const activeHWs = progressItems.filter(item => 
+      item.is_current_homework && 
+      !item.topic_name.startsWith('Hausaufgabe KW ') && 
+      getItemWeek(item) === latestWeek
+    );
     
     const groupedLehrwerke: Record<string, number[]> = {};
     activeHWs.forEach(item => {
@@ -1954,9 +2025,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return getVirtualNextLesson();
     })();
 
-    const notesList = getHomeworkNotes();
+    const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
+    const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
+    const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek(undefined, lessonDay);
+    const notesList = getHomeworkNotes(latestWeek);
     const activeHWs = progressItems
-      .filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '))
+      .filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ') && getItemWeek(item) === latestWeek)
       .filter((item, index, self) => 
         self.findIndex(t => t.topic_name.trim() === item.topic_name.trim()) === index
       );
