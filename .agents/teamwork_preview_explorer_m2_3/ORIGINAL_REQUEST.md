@@ -1,0 +1,3 @@
+## 2026-06-16T18:02:06Z
+
+You are teamwork_preview_explorer_m2_3. Your working directory is `/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_explorer_m2_3/`. Read `task.md` in your directory, `PROJECT.md` and `ORIGINAL_REQUEST.md` at the project root, and analyze the database schema requirements for M2: Database Migration. Provide your findings, designed tables, triggers, and RLS policies in `handoff.md` in your directory. Send a message to your parent when done.

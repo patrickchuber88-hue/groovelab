@@ -150,6 +150,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [userQrToken, setUserQrToken] = useState<string>('');
   const [generatingToken, setGeneratingToken] = useState<boolean>(false);
 
+  // Column 3: Infos der Verwaltung (campus_announcements)
+  const [schoolAnnouncements, setSchoolAnnouncements] = useState<any[]>([]);
+  const [showAnnForm, setShowAnnForm] = useState(false);
+  const [annTitle, setAnnTitle] = useState('');
+  const [annMessage, setAnnMessage] = useState('');
+  const [annTarget, setAnnTarget] = useState<'all' | 'teachers' | 'students'>('all');
+  const [submittingAnn, setSubmittingAnn] = useState(false);
+
   // Fetch or generate QR token for secure iCal URL
   useEffect(() => {
     const fetchOrCreateToken = async () => {
@@ -191,6 +199,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     fetchCustomEvents();
     fetchSchoolCalendarSettings();
     fetchSchoolRooms();
+    fetchAnnouncements();
     if (role === 'student') {
       fetchStudentEnsembles();
     }
@@ -901,6 +910,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setSchoolRooms(data || []);
     } catch (err) {
       console.warn('Could not load school rooms:', err);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const { data } = await supabase
+        .from('campus_announcements')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setSchoolAnnouncements(data || []);
+    } catch (err) {
+      console.warn('Could not load campus announcements:', err);
     }
   };
 
@@ -2070,7 +2093,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         )}
       </div>
 
-      {/* COLUMN 3: SIDEBAR - CREATE OWN EVENTS */}
+      {/* COLUMN 3: INFOS DER VERWALTUNG */}
       <div style={{
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
@@ -2083,748 +2106,268 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         height: 'calc(100vh - 120px)',
         overflowY: 'auto'
       }}>
-        {/* Title */}
-        {role === 'student' ? (
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CalendarDays size={20} color={brandColor} /> Meine Termine
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Info size={20} color={brandColor} /> Infos der Verwaltung
             </h3>
-            <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
-              Termine, denen du zugeteilt bist
+            <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+              Mitteilungen &amp; Ankündigungen der Schulleitung
             </p>
           </div>
-        ) : (
-          <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Plus size={20} color={brandColor} /> Eigene Termine
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
-              Erstelle Vorspiele, Konzerte oder Proben
-            </p>
-          </div>
-        )}
-
-        {/* Form or Assigned List */}
-        {role === 'student' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {customEvents.filter(ev => isAssignedToEvent(ev)).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 16px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.78rem', fontWeight: 600 }}>
-                Keine Termine, denen du zugeteilt bist.
-              </div>
-            ) : (
-              customEvents.filter(ev => isAssignedToEvent(ev)).map(ev => {
-                const dateObj = new Date(ev.event_date);
-                const dateStr = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' });
-                
-                let catColor = '#64748b';
-                let catBg = '#f1f5f9';
-                if (ev.category === 'Konzert') {
-                  catColor = '#a855f7';
-                  catBg = '#f3e8ff';
-                } else if (ev.category === 'Probe') {
-                  catColor = '#f59e0b';
-                  catBg = '#fef3c7';
-                } else if (ev.category === 'Sonstiges') {
-                  catColor = '#3b82f6';
-                  catBg = '#eff6ff';
-                }
-
-                return (
-                  <div
-                    key={ev.id}
-                    onClick={() => handleSelectEvent(ev)}
-                    style={{
-                      padding: '14px',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(0, 0, 0, 0.06)',
-                      borderLeft: `4px solid ${catColor}`,
-                      background: '#ffffff',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.01)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale-subtle"
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 650, color: catColor, background: `${catColor}14`, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                        {ev.category}
-                      </span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6e6e73' }}>
-                        {dateStr}
-                      </span>
-                    </div>
-                    <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1d1d1f', margin: '0 0 6px 0', lineHeight: 1.3 }}>
-                      {ev.title}
-                    </h4>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={12} />
-                        <span>{ev.start_time.substring(0, 5)}{ev.end_time ? ` - ${ev.end_time.substring(0, 5)}` : ''}</span>
-                      </div>
-                      {ev.location_type === 'intern' && ev.room && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Building2 size={12} />
-                          <span>{ev.room.name}</span>
-                        </div>
-                      )}
-                      {ev.location_type === 'extern' && ev.location_extern && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={12} />
-                          <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {ev.location_extern}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : (
-          <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Title */}
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Titel des Termins *
-            </label>
-            <input
-              type="text"
-              value={formTitle}
-              onChange={e => setFormTitle(e.target.value)}
-              placeholder="z.B. Klassenvorspiel Patrick"
-              required
+          {(role === 'admin' || role === 'secretary') && (
+            <button
+              onClick={() => setShowAnnForm(f => !f)}
               style={{
-                width: '100%',
-                padding: '10px 12px',
+                background: showAnnForm ? '#f1f5f9' : brandColor,
+                color: showAnnForm ? '#475569' : '#ffffff',
+                border: 'none',
                 borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                fontSize: '0.85rem',
-                fontWeight: 650,
-                outline: 'none',
-                boxSizing: 'border-box'
+                padding: '7px 14px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                flexShrink: 0,
+                transition: 'all 0.2s'
               }}
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Datum *
-            </label>
-            <input
-              type="date"
-              value={formDate}
-              onChange={e => setFormDate(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                fontSize: '0.85rem',
-                fontWeight: 650,
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Start and End Times */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                Startzeit *
-              </label>
-              <input
-                type="time"
-                value={formStartTime}
-                onChange={e => setFormStartTime(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '0.85rem',
-                  fontWeight: 650,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                Endzeit
-              </label>
-              <input
-                type="time"
-                value={formEndTime}
-                onChange={e => setFormEndTime(e.target.value)}
-                required={formLocationType === 'intern'}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '0.85rem',
-                  fontWeight: 650,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Ort — Location */}
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Ort
-            </label>
-
-            {/* Toggle: Intern / Extern */}
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', gap: '4px', border: '1px solid #e2e8f0', marginBottom: formLocationType !== 'none' ? '10px' : '0' }}>
-              {([
-                { id: 'none', label: '—' },
-                { id: 'intern', label: '🏫 Intern (Raum)' },
-                { id: 'extern', label: '📍 Extern' }
-              ] as const).map(opt => {
-                const isSel = formLocationType === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      setFormLocationType(opt.id);
-                      setFormRoomId('');
-                      setFormLocationExtern('');
-                      if (opt.id === 'intern' && formDate && formStartTime && formEndTime) {
-                        fetchAvailableRooms(formDate, formStartTime, formEndTime);
-                      }
-                    }}
-                    style={{
-                      flex: opt.id === 'none' ? 0.5 : 1,
-                      border: 'none',
-                      background: isSel ? '#ffffff' : 'transparent',
-                      color: isSel ? '#0f172a' : '#64748b',
-                      padding: '7px 8px',
-                      borderRadius: '8px',
-                      fontWeight: 800,
-                      fontSize: '0.7rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      boxShadow: isSel ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Intern: Room picker */}
-            {formLocationType === 'intern' && (
-              <div>
-                {!formDate || !formStartTime || !formEndTime ? (
-                  <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1.5px dashed #e2e8f0', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, textAlign: 'center' }}>
-                    Bitte erst Datum, Startzeit &amp; Endzeit wählen
-                  </div>
-                ) : checkingRooms ? (
-                  <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, textAlign: 'center' }}>
-                    Verfügbarkeit wird geprüft...
-                  </div>
-                ) : availableRooms.length === 0 ? (
-                  <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #fee2e2', background: '#fef2f2', fontSize: '0.78rem', color: '#ef4444', fontWeight: 700, textAlign: 'center' }}>
-                    Keine Räume frei zu dieser Zeit
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {availableRooms.map(room => {
-                      const isSelected = formRoomId === room.id;
-                      return (
-                        <button
-                          key={room.id}
-                          type="button"
-                          onClick={() => setFormRoomId(isSelected ? '' : room.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '10px 14px',
-                            borderRadius: '10px',
-                            border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
-                            background: isSelected ? `${brandColor}10` : '#ffffff',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            transition: 'all 0.15s'
-                          }}
-                        >
-                          <Building2 size={15} color={isSelected ? brandColor : '#94a3b8'} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isSelected ? brandColor : '#0f172a' }}>{room.name}</div>
-                            {room.floor && <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>{room.floor}</div>}
-                          </div>
-                          {isSelected && <Check size={14} color={brandColor} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Extern: Free text */}
-            {formLocationType === 'extern' && (
-              <input
-                type="text"
-                value={formLocationExtern}
-                onChange={e => setFormLocationExtern(e.target.value)}
-                placeholder="z.B. Stadthalle, Konzertsaal Mitte..."
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '0.85rem',
-                  fontWeight: 650,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            )}
-          </div>          {/* Category Switch */}
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Kategorie *
-            </label>
-            <div style={{
-              display: 'flex',
-              background: '#f1f5f9',
-              padding: '4px',
-              borderRadius: '12px',
-              gap: '4px',
-              border: '1px solid #e2e8f0'
-            }}>
-              {[
-                { id: 'Konzert', label: 'Konzert' },
-                { id: 'Probe', label: 'Probe' },
-                { id: 'Sonstiges', label: 'Sonstiges' }
-              ].map(cat => {
-                const isSelected = formCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setFormCategory(cat.id)}
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      background: isSelected ? '#ffffff' : 'transparent',
-                      color: isSelected ? '#0f172a' : '#64748b',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontWeight: 800,
-                      fontSize: '0.72rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.04)' : 'none',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Smart Chip-Tag Input: Schüler / Ensembles & Bands */}
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Schüler / Ensembles & Bands
-            </label>
-
-            <div
-              ref={participantSearchRef}
-              style={{ position: 'relative' }}
-              onClick={() => { (participantSearchRef.current?.querySelector('input') as HTMLInputElement)?.focus(); }}
             >
-              <style dangerouslySetInnerHTML={{__html: `
-                .no-autofill-icon::-webkit-contacts-auto-fill-button,
-                .no-autofill-icon::-webkit-credentials-auto-fill-button {
-                  visibility: hidden !important;
-                  display: none !important;
-                  pointer-events: none !important;
-                  height: 0 !important;
-                  width: 0 !important;
-                  margin: 0 !important;
+              {showAnnForm ? '✕ Schließen' : '＋ Neu'}
+            </button>
+          )}
+        </div>
+
+        {/* Create Form – only for admin/secretary */}
+        {(role === 'admin' || role === 'secretary') && showAnnForm && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!annTitle.trim() || !annMessage.trim()) return;
+              setSubmittingAnn(true);
+              try {
+                const { error } = await supabase
+                  .from('campus_announcements')
+                  .insert({
+                    school_id: schoolId,
+                    user_id: userId,
+                    title: annTitle.trim(),
+                    message: annMessage.trim(),
+                    target_type: annTarget
+                  });
+                if (!error) {
+                  setAnnTitle('');
+                  setAnnMessage('');
+                  setAnnTarget('all');
+                  setShowAnnForm(false);
+                  fetchAnnouncements();
                 }
-              `}} />
-
-              {/* Chip + Input container — looks like one unified field */}
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: '6px',
-                padding: selectedParticipants.length > 0 ? '7px 36px 7px 8px' : '0 36px 0 0',
-                borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                background: '#ffffff',
-                cursor: 'text',
-                minHeight: '42px',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.15s, box-shadow 0.15s',
-              }}
-              onFocusCapture={e => {
-                const el = e.currentTarget;
-                el.style.borderColor = '#94a3b8';
-                el.style.boxShadow = '0 0 0 3px rgba(148,163,184,0.12)';
-              }}
-              onBlurCapture={e => {
-                const el = e.currentTarget;
-                // only blur if focus left the whole container
-                if (!el.contains(e.relatedTarget as Node)) {
-                  el.style.borderColor = '#cbd5e1';
-                  el.style.boxShadow = 'none';
-                }
-              }}
-              >
-                {/* Chips */}
-                {selectedParticipants.map((p, idx) => (
-                  <span key={p.id} style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 7px 3px 8px',
-                    borderRadius: '20px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    lineHeight: 1.4,
-                    background: p.type === 'student' ? '#eff6ff' : p.type === 'ensemble' ? '#f3e8ff' : '#fef3c7',
-                    color: p.type === 'student' ? '#1e40af' : p.type === 'ensemble' ? '#7c3aed' : '#92400e',
-                    border: `1px solid ${p.type === 'student' ? '#bfdbfe' : p.type === 'ensemble' ? '#ddd6fe' : '#fde68a'}`,
-                    userSelect: 'none',
-                    flexShrink: 0
-                  }}>
-                    <span style={{ fontSize: '0.6rem' }}>
-                      {p.type === 'student' ? '👤' : p.type === 'ensemble' ? '🎼' : '🎸'}
-                    </span>
-                    {p.name}
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onMouseDown={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setSelectedParticipants(prev => prev.filter(x => x.id !== p.id));
-                      }}
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        padding: '0', display: 'flex', alignItems: 'center',
-                        color: 'inherit', opacity: 0.55, lineHeight: 1,
-                        marginLeft: '1px'
-                      }}
-                    >
-                      <X size={10} strokeWidth={2.5} />
-                    </button>
-                  </span>
-                ))}
-
-                {/* Inline text input */}
-                <input
-                  type="search"
-                  className="no-autofill-icon"
-                  value={participantQuery}
-                  onChange={e => setParticipantQuery(e.target.value)}
-                  autoComplete="new-password"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={selectedParticipants.length === 0 ? 'Name eingeben...' : ''}
-
-
-                  style={{
-                    border: 'none',
-                    outline: 'none',
-                    background: 'transparent',
-                    fontSize: '0.82rem',
-                    fontWeight: 650,
-                    color: '#0f172a',
-                    minWidth: '120px',
-                    flex: 1,
-                    padding: selectedParticipants.length > 0 ? '3px 0' : '10px 0 10px 12px',
-                    lineHeight: 1.5
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      // Select first non-already-selected result
-                      const first = participantResults.find(r => !selectedParticipants.some(s => s.id === r.id));
-                      if (first) {
-                        setSelectedParticipants(prev => [...prev, first]);
-                        setParticipantQuery('');
-                        setParticipantSearchOpen(false);
-                      }
-                    } else if (e.key === 'Backspace' && participantQuery === '' && selectedParticipants.length > 0) {
-                      // Remove last chip
-                      setSelectedParticipants(prev => prev.slice(0, -1));
-                    } else if (e.key === 'Escape') {
-                      setParticipantSearchOpen(false);
-                      setParticipantQuery('');
-                    }
-                  }}
-                  onFocus={() => { if (participantResults.length > 0) setParticipantSearchOpen(true); }}
-                />
-              </div>
-
-              {/* Search icon / spinner — absolute right of box */}
-              <div style={{
-                position: 'absolute', right: '10px', top: '50%',
-                transform: 'translateY(-50%)', pointerEvents: 'none',
-                color: '#94a3b8', display: 'flex', alignItems: 'center'
-              }}>
-                {participantLoading
-                  ? <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '-0.05em', color: '#94a3b8' }}>···</span>
-                  : <Users size={14} />}
-              </div>
-
-              {/* Live dropdown */}
-              {participantSearchOpen && participantResults.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 5px)', left: 0, right: 0,
-                  background: '#ffffff', border: '1.5px solid #e2e8f0',
-                  borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.10)',
-                  zIndex: 300, overflow: 'hidden', maxHeight: '230px', overflowY: 'auto'
-                }}>
-                  {(['student', 'ensemble', 'band'] as const).map(type => {
-                    const grouped = participantResults.filter(r => r.type === type);
-                    if (grouped.length === 0) return null;
-                    const groupLabel = type === 'student' ? '👤 Schüler' : type === 'ensemble' ? '🎼 Ensembles' : '🎸 Bands';
-                    return (
-                      <div key={type}>
-                        <div style={{
-                          padding: '5px 12px 3px',
-                          fontSize: '0.58rem', fontWeight: 900,
-                          color: '#b0bec5', textTransform: 'uppercase', letterSpacing: '0.07em',
-                          background: '#f8fafc', borderBottom: '1px solid #f0f4f8'
-                        }}>{groupLabel}</div>
-                        {grouped.map((item, i) => {
-                          const alreadySelected = selectedParticipants.some(s => s.id === item.id);
-                          // highlight first available item
-                          const isFirst = !alreadySelected && grouped.findIndex(g => !selectedParticipants.some(s => s.id === g.id)) === i;
-                          return (
-                            <div
-                              key={item.id}
-                              onMouseDown={e => {
-                                e.preventDefault();
-                                if (!alreadySelected) {
-                                  setSelectedParticipants(prev => [...prev, item]);
-                                  setParticipantQuery('');
-                                  setParticipantSearchOpen(false);
-                                }
-                              }}
-                              style={{
-                                padding: '9px 14px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                cursor: alreadySelected ? 'default' : 'pointer',
-                                background: isFirst ? '#f0f7ff' : alreadySelected ? '#f8fafc' : '#ffffff',
-                                opacity: alreadySelected ? 0.5 : 1,
-                                transition: 'background 0.1s',
-                                borderBottom: '1px solid #f8fafc'
-                              }}
-                              onMouseEnter={e => { if (!alreadySelected) e.currentTarget.style.background = '#e8f4ff'; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = isFirst ? '#f0f7ff' : alreadySelected ? '#f8fafc' : '#ffffff'; }}
-                            >
-                              <div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{item.name}</div>
-                                {item.detail && <div style={{ fontSize: '0.67rem', color: '#94a3b8', fontWeight: 600, marginTop: '1px' }}>{item.detail}</div>}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                {isFirst && !alreadySelected && (
-                                  <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#94a3b8', background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.02em' }}>↵</span>
-                                )}
-                                {alreadySelected && <Check size={13} color="#22c55e" />}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* No results */}
-              {participantSearchOpen && participantResults.length === 0 && !participantLoading && participantQuery.trim().length > 0 && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 5px)', left: 0, right: 0,
-                  background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '12px',
-                  padding: '12px 14px', fontSize: '0.78rem', color: '#94a3b8',
-                  fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.06)', zIndex: 300
-                }}>
-                  Keine Ergebnisse für „{participantQuery}“
-                </div>
-              )}
-            </div>
-          </div>
-
-
-
-          <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              Beschreibung
-            </label>
-            <textarea
-              value={formDescription}
-              onChange={e => setFormDescription(e.target.value)}
-              placeholder="Zusätzliche Infos wie Raum, Ort oder Programm..."
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                fontSize: '0.85rem',
-                fontWeight: 650,
-                outline: 'none',
-                resize: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-            {(role === 'admin' || role === 'secretary') ? (
-              <>
-                {/* Visibility */}
-                <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                    Wer darf diesen Termin sehen?
-                  </label>
-                  <select
-                    value={formVisibility}
-                    onChange={e => setFormVisibility(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '10px',
-                      border: '1.5px solid #cbd5e1',
-                      fontSize: '0.85rem',
-                      fontWeight: 650,
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      background: '#ffffff'
-                    }}
-                  >
-                    <option value="all">Alle (Schüler & Lehrer)</option>
-                    <option value="teachers">Nur Lehrer</option>
-                    <option value="students">Nur Schüler</option>
-                  </select>
-                </div>
-
-                {/* Color Dot Picker */}
-                <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                    Terminfarbe
-                  </label>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    {[
-                      { hex: '', label: 'Standard', bg: '#f1f5f9', border: '#cbd5e1' },
-                      { hex: '#a855f7', label: 'Lila', bg: '#a855f7', border: '#a855f7' },
-                      { hex: '#f59e0b', label: 'Gelb', bg: '#f59e0b', border: '#f59e0b' },
-                      { hex: '#3b82f6', label: 'Blau', bg: '#3b82f6', border: '#3b82f6' },
-                      { hex: '#ef4444', label: 'Rot', bg: '#ef4444', border: '#ef4444' },
-                      { hex: '#10b981', label: 'Grün', bg: '#10b981', border: '#10b981' }
-                    ].map(col => {
-                      const isSelected = formColor === col.hex;
-                      return (
-                        <button
-                          key={col.hex}
-                          type="button"
-                          onClick={() => setFormColor(col.hex)}
-                          title={col.label}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            background: col.bg,
-                            border: isSelected ? '3px solid #0f172a' : `1.5px solid ${col.border}`,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: isSelected ? '0 0 0 2px #ffffff, 0 4px 10px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.04)',
-                            transition: 'all 0.15s',
-                            padding: 0
-                          }}
-                        >
-                          {col.hex === '' && (
-                            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b' }}>A</span>
-                          )}
-                          {isSelected && col.hex !== '' && (
-                            <Check size={12} color="#ffffff" strokeWidth={3} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-                <input
-                  type="checkbox"
-                  id="isPublicEvent"
-                  checked={formIsPublic}
-                  onChange={e => {
-                    const val = e.target.checked;
-                    setFormIsPublic(val);
-                    setFormVisibility(val ? 'all' : 'teachers');
-                  }}
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    accentColor: brandColor,
-                    cursor: 'pointer'
-                  }}
-                />
-                <label htmlFor="isPublicEvent" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer', userSelect: 'none' }}>
-                  Schulweit veröffentlichen (Sichtbar für Schüler)
-                </label>
-              </div>
-            )}
-
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={submittingForm}
+              } catch (err) {
+                console.error(err);
+              } finally {
+                setSubmittingAnn(false);
+              }
+            }}
             style={{
-              width: '100%',
-              background: brandColor,
-              color: '#ffffff',
-              border: 'none',
-              padding: '12px',
-              borderRadius: '12px',
-              fontWeight: 800,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              boxShadow: `0 4px 14px rgba(0, 0, 0, 0.05)`,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'opacity 0.2s',
-              opacity: submittingForm ? 0.7 : 1
+              flexDirection: 'column',
+              gap: '10px'
             }}
           >
-            {submittingForm ? 'Speichert...' : '+ Termin anlegen'}
-          </button>
-        </form>
+            <input
+              placeholder="Titel..."
+              value={annTitle}
+              onChange={e => setAnnTitle(e.target.value)}
+              required
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                fontFamily: 'inherit',
+                width: '100%',
+                boxSizing: 'border-box' as const
+              }}
+            />
+            <textarea
+              placeholder="Mitteilung schreiben..."
+              value={annMessage}
+              onChange={e => setAnnMessage(e.target.value)}
+              required
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                minHeight: '80px',
+                resize: 'vertical' as const,
+                fontFamily: 'inherit',
+                width: '100%',
+                boxSizing: 'border-box' as const
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <select
+                value={annTarget}
+                onChange={e => setAnnTarget(e.target.value as any)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.74rem',
+                  background: '#ffffff',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="all">Sichtbar für alle</option>
+                <option value="teachers">Nur Lehrkräfte</option>
+                <option value="students">Nur Schüler</option>
+              </select>
+              <button
+                type="submit"
+                disabled={submittingAnn}
+                style={{
+                  background: brandColor,
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '8px 18px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  opacity: submittingAnn ? 0.7 : 1,
+                  transition: 'opacity 0.2s'
+                }}
+              >
+                {submittingAnn ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          </form>
         )}
-      </div>
 
+        {/* Announcements list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {schoolAnnouncements.length === 0 ? (
+            <div style={{
+              background: '#f8fafc',
+              border: '1.5px dashed #e2e8f0',
+              borderRadius: '16px',
+              padding: '32px 16px',
+              textAlign: 'center' as const
+            }}>
+              <div style={{ fontSize: '1.6rem', marginBottom: '8px' }}>📋</div>
+              <strong style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                Keine Mitteilungen
+              </strong>
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 500 }}>
+                {(role === 'admin' || role === 'secretary')
+                  ? 'Erstelle eine neue Mitteilung über den "＋ Neu"-Button.'
+                  : 'Die Verwaltung hat noch keine Mitteilungen veröffentlicht.'}
+              </span>
+            </div>
+          ) : (
+            schoolAnnouncements.map((ann: any, idx: number) => {
+              const dateObj = new Date(ann.created_at);
+              const dateStr = `${dateObj.getDate()}.${dateObj.getMonth() + 1}.${dateObj.getFullYear()}`;
+
+              let targetLabel = 'ALLE';
+              let targetBg = '#f1f5f9';
+              let targetColor = '#475569';
+              if (ann.target_type === 'teachers') {
+                targetLabel = 'LEHRKRÄFTE';
+                targetBg = '#fef3c7';
+                targetColor = '#b45309';
+              } else if (ann.target_type === 'students') {
+                targetLabel = 'SCHÜLER';
+                targetBg = '#e0f2fe';
+                targetColor = '#0369a1';
+              }
+
+              return (
+                <div
+                  key={ann.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column' as const,
+                    gap: '8px',
+                    paddingBottom: idx < schoolAnnouncements.length - 1 ? '16px' : '0',
+                    borderBottom: idx < schoolAnnouncements.length - 1 ? '1px solid #f1f5f9' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      background: targetBg,
+                      color: targetColor,
+                      padding: '3px 9px',
+                      borderRadius: '9999px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.02em'
+                    }}>
+                      {targetLabel}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                        {dateStr}
+                      </span>
+                      {(role === 'admin' || role === 'secretary') && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm('Diese Mitteilung wirklich löschen?')) return;
+                            try {
+                              await supabase.from('campus_announcements').delete().eq('id', ann.id);
+                              fetchAnnouncements();
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            opacity: 0.35,
+                            transition: 'opacity 0.2s'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}
+                          title="Löschen"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <strong style={{
+                    fontSize: '0.94rem',
+                    color: '#1a253c',
+                    fontWeight: 800,
+                    lineHeight: 1.3
+                  }}>
+                    {ann.title}
+                  </strong>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '0.82rem',
+                    color: '#475569',
+                    lineHeight: 1.5,
+                    fontWeight: 500
+                  }}>
+                    {ann.message}
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
       {/* ── Event Detail Modal ── */}
       {selectedEvent && (() => {
         const ev = selectedEvent;
