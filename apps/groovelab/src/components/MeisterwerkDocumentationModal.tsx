@@ -819,6 +819,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Pre-populate homeworkNotes with the current week's active homework notes if found
       const currentWeek = getISOWeek();
       const currentWeekHomework = (data || []).find(item => 
+        item.topic_name.startsWith('Hausaufgabe KW ') &&
+        item.homework_notes && 
+        item.homework_notes.trim() !== '' && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) === currentWeek
+      ) || (data || []).find(item => 
         item.homework_notes && 
         item.homework_notes.trim() !== '' && 
         item.updated_at && 
