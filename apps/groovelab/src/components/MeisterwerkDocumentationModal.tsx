@@ -4,11 +4,29 @@ import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 
 export const ALL_STICKERS = [
-  { id: 'puls-master', emoji: '⏱️', title: 'Puls-Master', desc: 'Für perfektes rhythmische Timing und konstanten Puls.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-  { id: 'fingersatz-champion', emoji: '🖖', title: 'Fingersatz-Champion', desc: 'Für exakte Fingersätze und saubere Technik.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-  { id: 'gefuehls-gigant', emoji: '🎭', title: 'Gefühls-Gigant', desc: 'Für lebendigen Ausdruck und tolle Dynamik.', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)' },
-  { id: 'uebe-monster', emoji: '👹', title: 'Übe-Monster', desc: 'Für fleißiges, ausdauerndes Üben zu Hause.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-  { id: 'jam-genie', emoji: '🎸', title: 'Jam-Genie', desc: 'Für eigene kreative Ideen und Improvisation.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
+  // Meilensteine / Üben
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 250 Minuten fleißiges Üben.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', auto: true },
+  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 1000 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
+  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 3000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
+
+  // XP
+  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '500 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
+  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1500 XP auf dem Profil gesammelt.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true },
+  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 3000 XP auf dem Profil gesammelt.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true },
+
+  // Streaks
+  { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true },
+  { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true },
+  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 14 Tagen gehalten!', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true },
+
+  // Songs
+  { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
+  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 5 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
+  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', auto: true },
+
+  // Manuell
+  { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
+  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false }
 ];
 
 interface Student {
@@ -338,6 +356,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const [isSongSearchFocused, setIsSongSearchFocused] = useState(false);
+  const [studentXP, setStudentXP] = useState<number>(0);
+  const [studentStreak, setStudentStreak] = useState<number>(0);
+  const [studentPracticeMinutes, setStudentPracticeMinutes] = useState<number>(0);
 
   // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
@@ -440,7 +461,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const startRecordingAudio = async () => {
     let durationInSeconds = 0;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
       const recorder = new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
       
@@ -907,6 +934,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               loadLehrwerke(data.school_id);
             }
           }
+
+          // Fetch avatars (streak_flame, xp)
+          const { data: avatarData, error: avatarError } = await supabase
+            .from('avatars')
+            .select('xp, streak_flame')
+            .eq('user_id', student.id)
+            .maybeSingle();
+
+          if (!avatarError && avatarData) {
+            setStudentXP(avatarData.xp || 0);
+            setStudentStreak(avatarData.streak_flame || 0);
+          }
+
+          // Fetch fokus_logs and sum up all minutes
+          const { data: focusData, error: focusError } = await supabase
+            .from('fokus_logs')
+            .select('seconds_spent')
+            .eq('student_id', student.id);
+
+          if (!focusError && focusData) {
+            const totalSeconds = focusData.reduce((sum, item) => sum + (item.seconds_spent || 0), 0);
+            setStudentPracticeMinutes(Math.floor(totalSeconds / 60));
+          }
         } catch (e) {
           console.error('Error loading student profile in modal:', e);
         }
@@ -914,6 +964,62 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       fetchProfile();
     }
   }, [student.id]);
+
+  const awardStickerSilent = async (stickerId: string, topicNameContext: string) => {
+    try {
+      const targetTopic = topicNameContext || `System-Meilenstein`;
+      const dateStr = new Date().toISOString();
+      const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
+      
+      const currentWeek = getISOWeek();
+      const dummyWeeklyItem = progressItems.find(item => 
+        item.topic_name.startsWith('Hausaufgabe KW ') && 
+        getItemWeek(item) === currentWeek
+      );
+
+      let currentNotes: string[] = [];
+      if (dummyWeeklyItem && dummyWeeklyItem.homework_notes) {
+        try {
+          currentNotes = dummyWeeklyItem.homework_notes.startsWith('[') && dummyWeeklyItem.homework_notes.endsWith(']')
+            ? JSON.parse(dummyWeeklyItem.homework_notes)
+            : [dummyWeeklyItem.homework_notes];
+        } catch (e) {
+          currentNotes = [dummyWeeklyItem.homework_notes];
+        }
+      }
+      
+      const updatedList = [...currentNotes, stickerMetaStr];
+      const allNotesJson = JSON.stringify(updatedList);
+
+      if (dummyWeeklyItem) {
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
+          .eq('id', dummyWeeklyItem.id);
+        if (error) throw error;
+      } else {
+        const activeTId = await getCurrentTeacherId();
+        const { error } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: '',
+            homework_notes: allNotesJson,
+            updated_at: new Date().toISOString()
+          });
+        if (error) throw error;
+      }
+
+      await fetchProgress();
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error("Error silently awarding sticker:", e);
+    }
+  };
 
   useEffect(() => {
     if (initialLehrwerkId && globalLehrwerke.length > 0) {
@@ -1530,6 +1636,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     return counts;
   }, [progressItems]);
+
+  useEffect(() => {
+    if (!student.id || loading || progressItems.length === 0) return;
+
+    const runAutoStickerCheck = async () => {
+      const collectedIds = new Set(Object.keys(collectedStickers).filter(id => collectedStickers[id].count > 0));
+      const completedSongsCount = activeSongSkills.filter(s => s.progress === 100 || s.status === 'MASTERED').length;
+
+      const autoAwards = [
+        { id: 'fleiss-pionier', value: 250, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-meister', value: 1000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-legende', value: 3000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+
+        { id: 'xp-sammler', value: 500, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-champion', value: 1500, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-meister', value: 3000, current: studentXP, context: `${studentXP} XP erreicht` },
+
+        { id: 'dranbleiber', value: 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'wochen-held', value: 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'streak-koenig', value: 14, current: studentStreak, context: `${studentStreak} Tage Streak` },
+
+        { id: 'erster-erfolg', value: 1, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
+        { id: 'song-sammler', value: 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
+        { id: 'repertoire-riese', value: 10, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
+      ];
+
+      for (const award of autoAwards) {
+        if (!collectedIds.has(award.id) && award.current >= award.value) {
+          console.log(`Auto-awarding sticker: ${award.id}`);
+          await awardStickerSilent(award.id, award.context);
+        }
+      }
+    };
+
+    runAutoStickerCheck();
+  }, [student.id, progressItems, activeSongSkills, studentPracticeMinutes, studentXP, studentStreak, loading, collectedStickers]);
 
   const triggerDirectSave = async (
     lehrwerkId: string, 
@@ -3293,6 +3435,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </button>
                         </div>
                       )}
+
+                      {/* Claim Mastery Sticker Button */}
+                      {(() => {
+                        const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
+                        const songTitle = skill?.songs?.title || '';
+                        const songMasterInfo = collectedStickers['song-master'];
+                        const isSongMasterStickerAwarded = songTitle && songMasterInfo?.details.some(
+                          d => d.topic.toLowerCase().trim() === songTitle.toLowerCase().trim()
+                        );
+                        
+                        if ((songProgressPercent === 100 || status === 'MASTERED') && songTitle && !isSongMasterStickerAwarded) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => awardSticker('song-master', songTitle)}
+                              style={{
+                                marginTop: '12px',
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '10px 16px',
+                                borderRadius: '20px',
+                                fontWeight: 'bold',
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span>🏆 Neuen Sticker erhalten</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 );
@@ -5833,6 +6016,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     overflow: 'hidden'
                   }}
                 >
+                  {st.id !== 'song-master' && !st.auto && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
+                        if (context !== null) {
+                          awardSticker(st.id, context || undefined);
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: st.color,
+                        color: 'white',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                        zIndex: 10,
+                        fontWeight: 'bold',
+                        fontSize: '1rem'
+                      }}
+                      title="Sticker manuell vergeben"
+                      className="hover-scale"
+                    >
+                      +
+                    </button>
+                  )}
+
                   {isCollected && (
                     <div style={{
                       position: 'absolute',
