@@ -4381,40 +4381,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </button>
                     </div>
 
-                    {/* Sticker Awarding Row */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '12px 0' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
-                        🏆 Sticker verleihen für diese Seite:
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {ALL_STICKERS.map(st => (
-                          <button
-                            key={st.id}
-                            type="button"
-                            onClick={() => awardSticker(st.id, `${globalLehrwerke.find(b => b.id === activeLehrwerkId)?.title} - Seite ${activePageNumber}`)}
-                            style={{
-                              background: '#fff',
-                              border: `1.5px solid ${st.color}`,
-                              color: '#1e293b',
-                              borderRadius: '12px',
-                              padding: '6px 12px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                            }}
-                            className="hover-scale"
-                            title={st.desc}
-                          >
-                            <span>{st.emoji}</span>
-                            <span>{st.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+
 
                     {/* Live Preview Box */}
                     <div style={{
@@ -4714,40 +4681,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         />
                       </div>
 
-                      {/* Sticker Awarding Row */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '12px 0' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
-                          🏆 Sticker verleihen für diesen Song:
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {ALL_STICKERS.map(st => (
-                            <button
-                              key={st.id}
-                              type="button"
-                              onClick={() => awardSticker(st.id, `${skill.songs?.artist} - ${skill.songs?.title}`)}
-                              style={{
-                                background: '#fff',
-                                border: `1.5px solid ${st.color}`,
-                                color: '#1e293b',
-                                borderRadius: '12px',
-                                padding: '6px 12px',
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                              }}
-                              className="hover-scale"
-                              title={st.desc}
-                            >
-                              <span>{st.emoji}</span>
-                              <span>{st.title}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                         <button
