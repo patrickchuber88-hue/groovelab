@@ -1591,7 +1591,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
       setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
-      loadLehrwerke();
 
       setTopicName(`${book.title} - Seite ${pageNum}`);
       setStatus(targetStatus);
@@ -1803,7 +1802,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
         setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
-        loadLehrwerke();
       } catch (err) {
         console.error('Error saving textbook local progress:', err);
       }
