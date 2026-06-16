@@ -326,6 +326,9 @@ interface MobileBriefingViewProps {
   songStats: { assignedCount: number; masteredCount: number };
   occurrencesWithMessages: string[];
   setShowRulesModal: (show: boolean) => void;
+  lehrwerke: any[];
+  localProgress: any[];
+  studentId: string;
 }
 
 function MobileBriefingView({
@@ -347,7 +350,10 @@ function MobileBriefingView({
   campusFeedAnnouncements,
   songStats,
   occurrencesWithMessages,
-  setShowRulesModal
+  setShowRulesModal,
+  lehrwerke,
+  localProgress,
+  studentId
 }: MobileBriefingViewProps) {
   const campusSettings = studentUser?.schools?.opening_hours?.campus_settings || {};
   const flamesActive = campusSettings.flames_active !== false;
@@ -502,17 +508,45 @@ function MobileBriefingView({
             const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
             const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek();
 
-            const activeHWs = progressItems.filter(item => 
-              item.is_current_homework && 
-              !item.topic_name.startsWith('Hausaufgabe KW ') &&
-              getItemWeek(item) === latestWeek
-            );
-            const activeTheories = progressItems.filter(item => 
-              item.status === 'THEORY_DONE' && 
-              item.updated_at && 
-              getItemWeek(item) === latestWeek &&
-              !item.topic_name.startsWith('Hausaufgabe KW ')
-            );
+            const activeHWs = progressItems.filter(item => {
+              if (item.topic_name.includes(' - Seite ')) {
+                // Must be from the current week!
+                if (!item.updated_at || getISOWeek(item.updated_at) !== latestWeek) {
+                  return false;
+                }
+                const parts = item.topic_name.split(' - Seite ');
+                const bookTitle = parts[0].trim();
+                const pageNum = parseInt(parts[1], 10);
+                const book = lehrwerke.find(g => g.title === bookTitle);
+                if (book) {
+                  const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+                  const pageState = assignment?.pageStates?.[pageNum];
+                  return pageState?.status === 'homework';
+                }
+              }
+              return item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ');
+            });
+            const activeTheories = progressItems.filter(item => {
+              if (item.topic_name.includes(' - Seite ')) {
+                // Must be from the current week!
+                if (!item.updated_at || getISOWeek(item.updated_at) !== latestWeek) {
+                  return false;
+                }
+                const parts = item.topic_name.split(' - Seite ');
+                const bookTitle = parts[0].trim();
+                const pageNum = parseInt(parts[1], 10);
+                const book = lehrwerke.find(g => g.title === bookTitle);
+                if (book) {
+                  const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+                  const pageState = assignment?.pageStates?.[pageNum];
+                  return pageState?.status === 'purple';
+                }
+              }
+              return item.status === 'THEORY_DONE' && 
+                item.updated_at && 
+                getItemWeek(item) === latestWeek &&
+                !item.topic_name.startsWith('Hausaufgabe KW ');
+            });
             const allActive = [...activeHWs, ...activeTheories];
 
             const getHomeworkNotes = (): string[] => {
@@ -2969,6 +3003,93 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
     };
   }, [studentId]);
+
+  // Synchronize progressItems from DB into student_lehrwerke_progress in localStorage
+  useEffect(() => {
+    if (lehrwerke.length === 0 || progressItems.length === 0 || !studentId) return;
+
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      let parsed = stored ? JSON.parse(stored) : [];
+      let hasChanges = false;
+
+      lehrwerke.forEach(book => {
+        const bookTitleLower = book.title.toLowerCase();
+        
+        // Find all progress items for this book
+        const bookProgressItems = progressItems.filter(item => {
+          const topicLower = (item.topic_name || '').toLowerCase();
+          return topicLower.startsWith(bookTitleLower + ' - seite ');
+        });
+
+        if (bookProgressItems.length === 0) return;
+
+        // Ensure the book is assigned locally if there are progress items for it in the DB
+        let assignmentIndex = parsed.findIndex((item: any) => item.studentId === studentId && item.lehrwerkId === book.id);
+        if (assignmentIndex === -1) {
+          const newAssignment = {
+            studentId: studentId,
+            lehrwerkId: book.id,
+            assignedAt: new Date().toISOString(),
+            pageStates: {}
+          };
+          parsed.push(newAssignment);
+          assignmentIndex = parsed.length - 1;
+          hasChanges = true;
+        }
+        const assignment = parsed[assignmentIndex];
+        const pageStates = { ...assignment.pageStates };
+        const pageSeen = new Set<number>();
+
+        bookProgressItems.forEach(item => {
+          const parts = item.topic_name.split(' - Seite ');
+          const pageNumStr = parts[1];
+          const pageNum = parseInt(pageNumStr, 10);
+          if (isNaN(pageNum)) return;
+
+          // Only process the latest entry for each page number (newest wins since progressItems is sorted updated_at DESC)
+          if (pageSeen.has(pageNum)) return;
+          pageSeen.add(pageNum);
+
+          // Map database status/homework back to local status
+          let localStatus: 'locked' | 'homework' | 'mastered' | 'purple' = 'locked';
+          if (item.status === 'MASTERED') {
+            localStatus = 'mastered';
+          } else if (item.status === 'THEORY_DONE') {
+            localStatus = 'purple';
+          } else if (item.is_current_homework) {
+            localStatus = 'homework';
+          }
+
+          const existingState = pageStates[pageNum];
+          const dbItemTime = item.updated_at ? new Date(item.updated_at).getTime() : 0;
+          const localItemTime = existingState?.updatedAt ? new Date(existingState.updatedAt).getTime() : 0;
+
+          if (dbItemTime > localItemTime) {
+            if (!existingState || existingState.status !== localStatus) {
+              pageStates[pageNum] = {
+                ...(existingState || {}),
+                status: localStatus,
+                updatedAt: item.updated_at || new Date().toISOString(),
+                notes: item.teacher_notes || existingState?.notes || '',
+                homework_notes: item.homework_notes || existingState?.homework_notes || ''
+              };
+              hasChanges = true;
+            }
+          }
+        });
+
+        assignment.pageStates = pageStates;
+      });
+
+      if (hasChanges) {
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(parsed));
+        setLocalProgress(parsed);
+      }
+    } catch (err) {
+      console.error('Error synchronizing textbook progress from DB:', err);
+    }
+  }, [lehrwerke, progressItems, studentId]);
 
   useEffect(() => {
     if (!studentUser?.school_id) return;
@@ -7443,6 +7564,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             songStats={songStats}
             occurrencesWithMessages={occurrencesWithMessages}
             setShowRulesModal={setShowRulesModal}
+            lehrwerke={lehrwerke}
+            localProgress={localProgress}
+            studentId={studentId}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -7814,23 +7938,46 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }
                   };
 
-                  const currentWeekItems = progressItems.filter(item => 
-                    !item.topic_name.startsWith('Hausaufgabe KW ') && 
-                    item.status !== 'MASTERED' && 
-                    item.status !== 'THEORY_DONE' &&
-                    getItemWeek(item) === currentWeekStr
-                  );
+                  const currentWeekItems = progressItems.filter(item => {
+                    if (item.topic_name.startsWith('Hausaufgabe KW ')) return false;
+                    if (item.status === 'MASTERED' || item.status === 'THEORY_DONE') return false;
+                    
+                    if (item.topic_name.includes(' - Seite ')) {
+                      // Must be from the current week!
+                      if (!item.updated_at || getISOWeekRaw(item.updated_at, 1) !== currentWeekStr) {
+                        return false;
+                      }
+                      const parts = item.topic_name.split(' - Seite ');
+                      const bookTitle = parts[0].trim();
+                      const pageNum = parseInt(parts[1], 10);
+                      const book = lehrwerke.find(g => g.title === bookTitle);
+                      if (book) {
+                        const assignment = localProgress.find((p: any) => p.studentId === studentId && p.lehrwerkId === book.id);
+                        const pageState = assignment?.pageStates?.[pageNum];
+                        return pageState?.status === 'homework';
+                      }
+                    }
+                    return item.is_current_homework;
+                  });
 
-                  const currentWeekNotesItem = progressItems.find(item => 
-                    item.topic_name.startsWith('Hausaufgabe KW ') && 
-                    getItemWeek(item) === currentWeekStr
-                  ) || progressItems.find(item => 
-                    getItemWeek(item) === currentWeekStr && 
-                    item.homework_notes && 
-                    item.homework_notes.trim() !== ''
-                  );
+                  const getNotesForWeek = (weekStr: string): string[] => {
+                    const notes: string[] = [];
+                    const weekItems = progressItems.filter(item => getItemWeek(item) === weekStr);
+                    for (const item of weekItems) {
+                      if (item.homework_notes && item.homework_notes.trim()) {
+                        const parsed = parseHomeworkNotes(item.homework_notes);
+                        parsed.forEach(n => {
+                          if (n && n.trim() && !notes.includes(n.trim())) {
+                            notes.push(n.trim());
+                          }
+                        });
+                      }
+                    }
+                    return notes;
+                  };
 
-                  const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
+                  const currentWeekNotes = getNotesForWeek(currentWeekStr);
+                  const prevWeekNotes = getNotesForWeek(prevWeekStr);
 
                   const prevWeekItems = progressItems.filter(item => 
                     !item.topic_name.startsWith('Hausaufgabe KW ') && 
@@ -7839,20 +7986,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     getItemWeek(item) === prevWeekStr
                   );
 
-                  const prevWeekNotesItem = progressItems.find(item => 
-                    item.topic_name.startsWith('Hausaufgabe KW ') && 
-                    getItemWeek(item) === prevWeekStr
-                  );
-
-                  const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
-
                   const currentWeekNum = currentWeekStr.split('-W')[1] || '';
                   const prevWeekNum = prevWeekStr.split('-W')[1] || '';
 
                   const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                   const groupAndFormatItems = (rawItems: any[]) => {
-                    const groupedLehrwerke: Record<string, { pages: number[]; statuses: string[] }> = {};
+                    const groupedLehrwerke: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
                     const otherItems: any[] = [];
 
                     (rawItems || []).forEach(item => {
@@ -7863,15 +8003,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         const pageNum = parseInt(parts[1], 10);
                         
                         if (!groupedLehrwerke[bookTitle]) {
-                          groupedLehrwerke[bookTitle] = { pages: [], statuses: [] };
+                          groupedLehrwerke[bookTitle] = { pages: [] };
                         }
-                        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
-                          groupedLehrwerke[bookTitle].pages.push(pageNum);
-                          groupedLehrwerke[bookTitle].statuses.push(item.status);
+                        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.some(p => p.num === pageNum)) {
+                          groupedLehrwerke[bookTitle].pages.push({
+                            num: pageNum,
+                            notes: item.teacher_notes || '',
+                            status: item.status
+                          });
                         }
                       } else {
                         otherItems.push(item);
                       }
+                    });
+
+                    // Sort pages
+                    Object.keys(groupedLehrwerke).forEach(title => {
+                      groupedLehrwerke[title].pages.sort((a, b) => a.num - b.num);
                     });
 
                     const formatPageNumbers = (pages: number[]): string => {
@@ -7906,10 +8054,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     };
 
                     const groupedItems = Object.entries(groupedLehrwerke).map(([bookTitle, info]) => {
-                      const formattedPages = formatPageNumbers(info.pages);
-                      const allDone = info.statuses.every(status => status === 'MASTERED' || status === 'THEORY_DONE');
+                      const pageNums = info.pages.map(p => p.num);
+                      const formattedPages = formatPageNumbers(pageNums);
+                      
+                      const textNotes = info.pages
+                        .map(p => p.notes)
+                        .filter(Boolean)
+                        .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
+                        .join('; ');
+
+                      const allDone = info.pages.every(p => p.status === 'MASTERED' || p.status === 'THEORY_DONE');
                       return {
-                        title: `${bookTitle}: ${formattedPages}`,
+                        title: bookTitle,
+                        subtitle: formattedPages,
+                        notes: textNotes,
                         status: allDone ? 'MASTERED' : 'IN_PROGRESS',
                         isBook: true
                       };
@@ -7919,6 +8077,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       ...groupedItems,
                       ...otherItems.map(item => ({
                         title: cleanTitle(item.title || item.topic_name || ''),
+                        subtitle: '',
+                        notes: item.teacher_notes || '',
                         status: item.status,
                         isBook: false
                       }))
@@ -7971,6 +8131,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
                                   const isBook = item.isBook;
                                   const isDone = item.status === 'MASTERED' || item.status === 'THEORY_DONE';
+                                  const textNotes = item.notes;
                                   
                                   return (
                                     <div key={`curr-item-${idx}`} style={{
@@ -7979,31 +8140,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       borderRadius: '12px',
                                       border: isDone ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(0, 0, 0, 0.04)',
                                       display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '8px'
+                                      flexDirection: 'column',
+                                      gap: '4px'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                        {isBook ? <BookOpen size={12} color={isDone ? '#10b981' : '#4f46e5'} /> : <Music size={12} color={isDone ? '#10b981' : '#4f46e5'} />}
-                                        <span style={{ 
-                                          fontWeight: 800, 
-                                          color: isDone ? '#94a3b8' : '#1e293b', 
-                                          fontSize: '0.78rem', 
-                                          textDecoration: isDone ? 'line-through' : 'none',
-                                          whiteSpace: 'nowrap', 
-                                          textOverflow: 'ellipsis', 
-                                          overflow: 'hidden' 
-                                        }}>
-                                          {item.title}
-                                        </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                          {isBook ? <BookOpen size={12} color={isDone ? '#10b981' : '#4f46e5'} /> : <Music size={12} color={isDone ? '#10b981' : '#4f46e5'} />}
+                                          <span style={{ 
+                                            fontWeight: 800, 
+                                            color: isDone ? '#94a3b8' : '#1e293b', 
+                                            fontSize: '0.78rem', 
+                                            textDecoration: isDone ? 'line-through' : 'none',
+                                            whiteSpace: 'nowrap', 
+                                            textOverflow: 'ellipsis', 
+                                            overflow: 'hidden' 
+                                          }}>
+                                            {item.title} {item.subtitle ? `(${item.subtitle})` : ''}
+                                          </span>
+                                        </div>
+                                        
+                                        {isDone ? (
+                                          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                                            <Check size={12} strokeWidth={3} />
+                                          </span>
+                                        ) : (
+                                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+                                        )}
                                       </div>
-                                      
-                                      {isDone ? (
-                                        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                                          <Check size={12} strokeWidth={3} />
-                                        </span>
-                                      ) : (
-                                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+                                      {textNotes && (
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, marginLeft: '20px' }}>
+                                          Bemerkung: {textNotes}
+                                        </div>
                                       )}
                                     </div>
                                   );
@@ -8073,22 +8240,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
                                   const isBook = item.isBook;
                                   const isDone = item.status === 'MASTERED' || item.status === 'THEORY_DONE';
+                                  const textNotes = item.notes;
                                   
                                   return (
                                     <div key={`prev-item-${idx}`} style={{
                                       display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      fontSize: '0.75rem',
-                                      gap: '8px'
+                                      flexDirection: 'column',
+                                      gap: '2px',
+                                      fontSize: '0.75rem'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                        {isBook ? <BookOpen size={11} color="#94a3b8" /> : <Music size={11} color="#94a3b8" />}
-                                        <span style={{ fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                          {item.title}
-                                        </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                          {isBook ? <BookOpen size={11} color="#94a3b8" /> : <Music size={11} color="#94a3b8" />}
+                                          <span style={{ fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.title} {item.subtitle ? `(${item.subtitle})` : ''}
+                                          </span>
+                                        </div>
+                                        {isDone && <Check size={10} color="#10b981" strokeWidth={3} />}
                                       </div>
-                                      {isDone && <Check size={10} color="#10b981" strokeWidth={3} />}
+                                      {textNotes && (
+                                        <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: '17px' }}>
+                                          Bemerkung: {textNotes}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

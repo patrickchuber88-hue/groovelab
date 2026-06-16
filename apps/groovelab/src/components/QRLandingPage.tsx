@@ -553,11 +553,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         .eq('student_id', profile.id)
         .order('updated_at', { ascending: false });
 
+      // Deduplicate matrixItems by topic_name (latest wins)
+      const uniqueMatrixItemsMap = new Map<string, any>();
+      (matrixItems || []).forEach((item: any) => {
+        const name = (item.topic_name || '').trim().toLowerCase();
+        if (name && !uniqueMatrixItemsMap.has(name)) {
+          uniqueMatrixItemsMap.set(name, item);
+        }
+      });
+      const deduplicatedMatrixItems = Array.from(uniqueMatrixItemsMap.values());
+
       setSchedules(schData || []);
       setOccurrences(occData || []);
       setStats(statsData || null);
       setAvatar(avatarData || null);
-      setProgressItems(matrixItems || []);
+      setProgressItems(deduplicatedMatrixItems);
 
       if (statsData && statsData.last_practice_date === todayStr) {
         setPracticeLoggedToday(true);
@@ -1388,11 +1398,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const notesList = getHomeworkNotes(latestWeek);
     const activeHWs = progressItems.filter(item => 
       item.is_current_homework && 
-      !item.topic_name.startsWith('Hausaufgabe KW ') && 
-      getItemWeek(item) === latestWeek
+      !item.topic_name.startsWith('Hausaufgabe KW ')
     );
     
-    const groupedLehrwerke: Record<string, number[]> = {};
+    const groupedLehrwerke: Record<string, { num: number; notes: string }[]> = {};
+    const otherHWs: any[] = [];
+
     activeHWs.forEach(item => {
       if (item.topic_name.includes(' - Seite ')) {
         const parts = item.topic_name.split(' - Seite ');
@@ -1401,15 +1412,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (!groupedLehrwerke[bookTitle]) {
           groupedLehrwerke[bookTitle] = [];
         }
-        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].includes(pageNum)) {
-          groupedLehrwerke[bookTitle].push(pageNum);
+        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].some(p => p.num === pageNum)) {
+          groupedLehrwerke[bookTitle].push({ num: pageNum, notes: item.teacher_notes || '' });
         }
+      } else {
+        otherHWs.push(item);
       }
     });
 
     const activeBooks = Object.entries(groupedLehrwerke);
 
-    if (activeBooks.length === 0 && notesList.length === 0) {
+    if (activeBooks.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
       return (
         <div style={{
           background: '#f8fafc',
@@ -1425,6 +1438,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </div>
       );
     }
+
+    const hasAnyHWItems = activeBooks.length > 0 || otherHWs.length > 0;
 
     return (
       <div style={{
@@ -1445,14 +1460,44 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {activeBooks.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activeBooks.map(([bookTitle, pages]) => (
-              <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {activeBooks.map(([bookTitle, pages]) => {
+              const formattedPages = formatPageNumbers(pages.map(p => p.num));
+              const textNotes = pages
+                .map(p => p.notes)
+                .filter(Boolean)
+                .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
+                .join('; ');
+              return (
+                <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                    📖 {bookTitle}
+                  </span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#6366f1', marginLeft: '22px' }}>
+                    {formattedPages}
+                  </span>
+                  {textNotes && (
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
+                      Bemerkung: {textNotes}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {otherHWs.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: activeBooks.length > 0 ? '1px solid #f1f5f9' : 'none', paddingTop: activeBooks.length > 0 ? '12px' : 0 }}>
+            {otherHWs.map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                  📖 {bookTitle}
+                  🎵 {item.topic_name}
                 </span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#6366f1', marginLeft: '22px' }}>
-                  {formatPageNumbers(pages)}
-                </span>
+                {item.teacher_notes && (
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
+                    Bemerkung: {item.teacher_notes}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -1468,8 +1513,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
-              borderTop: activeBooks.length > 0 ? '1px solid #f1f5f9' : 'none',
-              paddingTop: activeBooks.length > 0 ? '12px' : 0
+              borderTop: hasAnyHWItems ? '1px solid #f1f5f9' : 'none',
+              paddingTop: hasAnyHWItems ? '12px' : 0
             }}>
               {filteredNotes.map((note, idx) => {
                 const isAudio = note.startsWith("AUDIO:");
@@ -2030,7 +2075,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek(undefined, lessonDay);
     const notesList = getHomeworkNotes(latestWeek);
     const activeHWs = progressItems
-      .filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ') && getItemWeek(item) === latestWeek)
+      .filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '))
       .filter((item, index, self) => 
         self.findIndex(t => t.topic_name.trim() === item.topic_name.trim()) === index
       );
@@ -2232,12 +2277,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </h3>
                 {activeHWs.length > 0 || notesList.length > 0 ? (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                    {activeHWs.map((hw, i) => (
-                      <div key={i} style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#334155', fontWeight: 600}}>
-                        <Check size={16} color="#10b981" style={{marginTop: '2px', flexShrink: 0}} />
-                        <span>{hw.topic_name}</span>
-                      </div>
-                    ))}
+                    {activeHWs.map((hw, i) => {
+                      const textNotes = hw.teacher_notes || hw.notes || '';
+                      return (
+                        <div key={i} style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
+                          <div style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#334155', fontWeight: 600}}>
+                            <Check size={16} color="#10b981" style={{marginTop: '2px', flexShrink: 0}} />
+                            <span>{hw.topic_name}</span>
+                          </div>
+                          {textNotes && (
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginLeft: '24px' }}>
+                              Bemerkung: {textNotes}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                     {(() => {
                       let audioCount = 0;
                       return notesList.map((note, i) => {

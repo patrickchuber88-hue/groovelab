@@ -207,6 +207,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isNotesFocused, setIsNotesFocused] = useState(false);
   const isNotesExpanded = isNotesFocused || !!homeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const lastClickRef = React.useRef<{ pageNum: number; timestamp: number } | null>(null);
+  const clickTimeoutRef = React.useRef<any>(null);
 
   // Song catalog integration
   const [activeInputTab, setActiveInputTab] = useState<'free' | 'catalog' | 'lehrwerk_page' | 'active_song'>('free');
@@ -458,41 +460,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const audioMetaStr = `AUDIO:${audioUrlString}|${audioDuration}|${new Date().toISOString()}`;
             setHomeworkNotesList(prev => [...prev, audioMetaStr]);
             
-            const currentWeek = getISOWeek();
-            const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
-            const currentWeekItems = progressItems.filter(item => 
-              item.updated_at && getISOWeek(item.updated_at) === currentWeek
-            );
-            
             const updatedList = [...homeworkNotesList, audioMetaStr];
-            const combined = JSON.stringify(updatedList);
-            
-            if (currentHomeworkItem) {
-              await supabase
-                .from('progress_matrix')
-                .update({ homework_notes: combined, updated_at: new Date().toISOString() })
-                .eq('id', currentHomeworkItem.id);
-            } else if (currentWeekItems.length > 0) {
-              const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-              await supabase
-                .from('progress_matrix')
-                .update({ homework_notes: combined, updated_at: new Date().toISOString() })
-                .in('id', itemIds);
-            } else {
-              const activeTId = await getCurrentTeacherId();
-              await supabase
-                .from('progress_matrix')
-                .insert({
-                  student_id: student.id,
-                  teacher_id: activeTId,
-                  topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
-                  status: 'IN_PROGRESS',
-                  is_current_homework: true,
-                  teacher_notes: '',
-                  homework_notes: combined,
-                  updated_at: new Date().toISOString()
-                });
-            }
+            await syncHomeworkNotes(updatedList);
             await fetchProgress();
             notifyHomeworkChange();
           } catch (saveErr) {
@@ -570,41 +539,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       
       setHomeworkNotesList(prev => [...prev, stickerMetaStr]);
       
-      const currentWeek = getISOWeek();
-      const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
-      const currentWeekItems = progressItems.filter(item => 
-        item.updated_at && getISOWeek(item.updated_at) === currentWeek
-      );
-      
       const updatedList = [...homeworkNotesList, stickerMetaStr];
-      const combined = JSON.stringify(updatedList);
-      
-      if (currentHomeworkItem) {
-        await supabase
-          .from('progress_matrix')
-          .update({ homework_notes: combined, updated_at: new Date().toISOString() })
-          .eq('id', currentHomeworkItem.id);
-      } else if (currentWeekItems.length > 0) {
-        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-        await supabase
-          .from('progress_matrix')
-          .update({ homework_notes: combined, updated_at: new Date().toISOString() })
-          .in('id', itemIds);
-      } else {
-        const activeTId = await getCurrentTeacherId();
-        await supabase
-          .from('progress_matrix')
-          .insert({
-            student_id: student.id,
-            teacher_id: activeTId,
-            topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
-            status: 'IN_PROGRESS',
-            is_current_homework: true,
-            teacher_notes: '',
-            homework_notes: combined,
-            updated_at: new Date().toISOString()
-          });
-      }
+      await syncHomeworkNotes(updatedList);
       
       await fetchProgress();
       notifyHomeworkChange();
@@ -696,6 +632,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return 'd3b07384-d113-4ec2-a5d6-6d2c12345678';
   };
 
+  const syncHomeworkNotes = async (notesList: string[]) => {
+    const currentWeek = getISOWeek();
+    const allNotesJson = JSON.stringify(notesList);
+    const cleanNotesJson = JSON.stringify(notesList.filter(n => !n.startsWith('AUDIO:')));
+
+    const dummyWeeklyItem = progressItems.find(item => 
+      item.topic_name.startsWith('Hausaufgabe KW ') && 
+      getItemWeek(item) === currentWeek
+    );
+
+    if (dummyWeeklyItem) {
+      const { error } = await supabase
+        .from('progress_matrix')
+        .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
+        .eq('id', dummyWeeklyItem.id);
+      if (error) throw error;
+    } else {
+      const activeTId = await getCurrentTeacherId();
+      const { error } = await supabase
+        .from('progress_matrix')
+        .insert({
+          student_id: student.id,
+          teacher_id: activeTId,
+          topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
+          status: 'IN_PROGRESS',
+          is_current_homework: true,
+          teacher_notes: '',
+          homework_notes: allNotesJson,
+          updated_at: new Date().toISOString()
+        });
+      if (error) throw error;
+    }
+
+    const currentWeekItems = progressItems.filter(item => 
+      getItemWeek(item) === currentWeek && 
+      !item.topic_name.startsWith('Hausaufgabe KW ')
+    );
+
+    if (currentWeekItems.length > 0) {
+      const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
+      const { error } = await supabase
+        .from('progress_matrix')
+        .update({ homework_notes: cleanNotesJson, updated_at: new Date().toISOString() })
+        .in('id', itemIds);
+      if (error) throw error;
+    }
+  };
+
 
 
   // Fetch student's school's songs catalog
@@ -756,6 +740,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       loadLessonDay();
     }
   }, [student.id]);
+
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load Lehrwerke data from Supabase
   const loadLehrwerke = async (resolvedSchoolId?: string) => {
@@ -928,6 +920,95 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [initialLehrwerkId, globalLehrwerke, assignedLehrwerke]);
 
+  // Synchronize progressItems from DB into student_lehrwerke_progress in localStorage
+  useEffect(() => {
+    if (globalLehrwerke.length === 0 || progressItems.length === 0) return;
+
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      let parsed = stored ? JSON.parse(stored) : [];
+      let hasChanges = false;
+
+      globalLehrwerke.forEach(book => {
+        const bookTitleLower = book.title.toLowerCase();
+        
+        // Find all progress items for this book
+        const bookProgressItems = progressItems.filter(item => {
+          const topicLower = (item.topic_name || '').toLowerCase();
+          return topicLower.startsWith(bookTitleLower + ' - seite ');
+        });
+
+        if (bookProgressItems.length === 0) return;
+
+        // Ensure the book is assigned locally if there are progress items for it in the DB
+        let assignmentIndex = parsed.findIndex((item: any) => item.studentId === student.id && item.lehrwerkId === book.id);
+        if (assignmentIndex === -1) {
+          const newAssignment = {
+            studentId: student.id,
+            lehrwerkId: book.id,
+            assignedAt: new Date().toISOString(),
+            pageStates: {}
+          };
+          parsed.push(newAssignment);
+          assignmentIndex = parsed.length - 1;
+          hasChanges = true;
+        }
+
+        const assignment = parsed[assignmentIndex];
+        const pageStates = { ...assignment.pageStates };
+        const pageSeen = new Set<number>();
+
+        bookProgressItems.forEach(item => {
+          const parts = item.topic_name.split(' - Seite ');
+          const pageNumStr = parts[1];
+          const pageNum = parseInt(pageNumStr, 10);
+          if (isNaN(pageNum)) return;
+
+          // Only process the latest entry for each page number (newest wins since progressItems is sorted updated_at DESC)
+          if (pageSeen.has(pageNum)) return;
+          pageSeen.add(pageNum);
+
+          // Map database status/homework back to local status
+          let localStatus: 'locked' | 'homework' | 'mastered' | 'purple' = 'locked';
+          if (item.status === 'MASTERED') {
+            localStatus = 'mastered';
+          } else if (item.status === 'THEORY_DONE') {
+            localStatus = 'purple';
+          } else if (item.is_current_homework) {
+            localStatus = 'homework';
+          }
+
+          const existingState = pageStates[pageNum];
+          const dbItemTime = item.updated_at ? new Date(item.updated_at).getTime() : 0;
+          const localItemTime = existingState?.updatedAt ? new Date(existingState.updatedAt).getTime() : 0;
+
+          if (dbItemTime > localItemTime) {
+            if (!existingState || existingState.status !== localStatus) {
+              pageStates[pageNum] = {
+                ...(existingState || {}),
+                status: localStatus,
+                updatedAt: item.updated_at || new Date().toISOString(),
+                notes: item.teacher_notes || existingState?.notes || '',
+                homework_notes: item.homework_notes || existingState?.homework_notes || ''
+              };
+              hasChanges = true;
+            }
+          }
+        });
+
+        assignment.pageStates = pageStates;
+      });
+
+      if (hasChanges) {
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(parsed));
+        const filtered = parsed.filter((item: any) => item.studentId === student.id);
+        setAssignedLehrwerke(filtered);
+      }
+    } catch (err) {
+      console.error('Error synchronizing textbook progress from DB:', err);
+    }
+  }, [globalLehrwerke, progressItems, student.id]);
+
   // Dynamically auto-expand the homework textarea height as more content gets entered
   useEffect(() => {
     if (homeworkTextareaRef.current) {
@@ -1063,22 +1144,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const updatedList = homeworkNotesList.filter((_, idx) => idx !== noteIndex);
       setHomeworkNotesList(updatedList);
       
-      const combinedHomeworkNotes = JSON.stringify(updatedList);
-      const currentWeek = getISOWeek();
-      const currentWeekItems = progressItems.filter(item => 
-        item.updated_at && getISOWeek(item.updated_at) === currentWeek
-      );
-      
-      if (currentWeekItems.length > 0) {
-        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-        if (itemIds.length > 0) {
-          const { error } = await supabase
-            .from('progress_matrix')
-            .update({ homework_notes: combinedHomeworkNotes })
-            .in('id', itemIds);
-          if (error) throw error;
-        }
-      }
+      await syncHomeworkNotes(updatedList);
       
       await fetchProgress();
       notifyHomeworkChange();
@@ -1143,51 +1209,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setHomeworkNotesList(updatedList);
       setHomeworkNotes('');
 
-      const currentWeek = getISOWeek();
-      const combinedHomeworkNotes = JSON.stringify(updatedList);
-
-      // Try to find an active homework row or current week items to update
-      const currentHomeworkItem = progressItems.find(item => item.is_current_homework);
-      const currentWeekItems = progressItems.filter(item => 
-        item.updated_at && getISOWeek(item.updated_at) === currentWeek
-      );
-
-      if (currentHomeworkItem) {
-        const { error } = await supabase
-          .from('progress_matrix')
-          .update({ 
-            homework_notes: combinedHomeworkNotes,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentHomeworkItem.id);
-        if (error) throw error;
-      } else if (currentWeekItems.length > 0) {
-        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-        const { error } = await supabase
-          .from('progress_matrix')
-          .update({ 
-            homework_notes: combinedHomeworkNotes,
-            updated_at: new Date().toISOString()
-          })
-          .in('id', itemIds);
-        if (error) throw error;
-      } else {
-        const activeTId = await getCurrentTeacherId();
-        const row = {
-          student_id: student.id,
-          teacher_id: activeTId,
-          topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
-          status: 'IN_PROGRESS',
-          is_current_homework: true,
-          teacher_notes: '',
-          homework_notes: combinedHomeworkNotes,
-          updated_at: new Date().toISOString()
-        };
-        const { error } = await supabase
-          .from('progress_matrix')
-          .insert(row);
-        if (error) throw error;
-      }
+      await syncHomeworkNotes(updatedList);
 
       await fetchProgress();
       notifyHomeworkChange();
@@ -1303,9 +1325,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const selectTextbookPage = (lehrwerkId: string, pageNum: number) => {
+  const handlePageDoubleClick = (lehrwerkId: string, pageNum: number) => {
+    const stored = localStorage.getItem('student_lehrwerke_progress');
+    const parsed = stored ? JSON.parse(stored) : [];
+    const assignedBook = parsed.find((a: any) => a.studentId === student.id && a.lehrwerkId === lehrwerkId);
+    const pageState = assignedBook?.pageStates?.[pageNum] || { status: 'locked' };
+    const currentStatus = pageState.status || 'locked';
+
+    console.log('handlePageDoubleClick called:', { lehrwerkId, pageNum, currentStatus });
+    let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+    let targetHomework = false;
+
+    if (currentStatus === 'homework') {
+      targetStatus = 'MASTERED';
+      targetHomework = false;
+    } else if (currentStatus === 'mastered') {
+      targetStatus = 'IN_PROGRESS';
+      targetHomework = false;
+    } else {
+      targetStatus = 'IN_PROGRESS';
+      targetHomework = true;
+    }
+
+    console.log('handlePageDoubleClick saving:', { targetStatus, targetHomework });
+    triggerDirectSave(lehrwerkId, pageNum, targetStatus, targetHomework);
+    selectTextbookPage(lehrwerkId, pageNum, targetStatus, targetHomework);
+  };
+
+  const selectTextbookPage = (
+    lehrwerkId: string, 
+    pageNum: number, 
+    overrideStatus?: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED',
+    overrideHomework?: boolean
+  ) => {
+    console.log('selectTextbookPage called:', { lehrwerkId, pageNum, overrideStatus, overrideHomework });
     const book = globalLehrwerke.find(b => b.id === lehrwerkId);
-    if (!book) return;
+    if (!book) {
+      console.log('selectTextbookPage book not found:', lehrwerkId);
+      return;
+    }
 
     setActiveLehrwerkId(lehrwerkId);
     setActivePageNumber(pageNum);
@@ -1316,8 +1374,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const calculatedGroup = Math.floor((pageNum - 1) / 49);
     setPageGroupIndex(calculatedGroup);
     
-    const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === lehrwerkId);
+    const stored = localStorage.getItem('student_lehrwerke_progress');
+    const parsed = stored ? JSON.parse(stored) : [];
+    const assignedBook = parsed.find((a: any) => a.studentId === student.id && a.lehrwerkId === lehrwerkId);
     const pageState = assignedBook?.pageStates?.[pageNum] || { status: 'locked', notes: '', homework_notes: '' };
+    console.log('selectTextbookPage pageState loaded:', pageState);
     
     // Look up existing database notes in progressItems
     const topicNameStr = `${book.title} - Seite ${pageNum}`;
@@ -1340,19 +1401,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setHomeworkNotes(loadedNote);
 
     // Map textbook page statuses to Supabase/form states
-    const bookPageStatus = pageState.status || 'locked';
-    if (bookPageStatus === 'mastered') {
-      setStatus('MASTERED');
-      setIsCurrentHomework(false);
-    } else if (bookPageStatus === 'purple') {
-      setStatus('THEORY_DONE');
-      setIsCurrentHomework(false);
-    } else if (bookPageStatus === 'homework') {
-      setStatus('IN_PROGRESS');
-      setIsCurrentHomework(true);
+    if (overrideStatus !== undefined) {
+      setStatus(overrideStatus);
+      setIsCurrentHomework(!!overrideHomework);
     } else {
-      setStatus('IN_PROGRESS');
-      setIsCurrentHomework(false);
+      const bookPageStatus = pageState.status || 'locked';
+      if (bookPageStatus === 'mastered') {
+        setStatus('MASTERED');
+        setIsCurrentHomework(false);
+      } else if (bookPageStatus === 'purple') {
+        setStatus('THEORY_DONE');
+        setIsCurrentHomework(false);
+      } else if (bookPageStatus === 'homework') {
+        setStatus('IN_PROGRESS');
+        setIsCurrentHomework(true);
+      } else {
+        setStatus('IN_PROGRESS');
+        setIsCurrentHomework(false);
+      }
     }
   };
 
@@ -1515,7 +1581,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               [pageNum]: {
                 ...(item.pageStates?.[pageNum] || {}),
                 status: pageStatus,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date(Date.now() + 10000).toISOString()
               }
             }
           };
@@ -1727,7 +1793,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   status: pageStatus,
                   notes: teacherNotes.trim(),
                   homeworkNotes: homeworkNotes.trim(),
-                  updatedAt: new Date().toISOString()
+                  updatedAt: new Date(Date.now() + 10000).toISOString()
                 }
               }
             };
@@ -1819,22 +1885,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       if (response.ok) {
-        if (!isLehrwerkPage && !isSong) {
-          // Sync homework notes to all other progress items of the current week for this student
-          const currentWeek = getISOWeek();
-          const currentWeekItems = progressItems.filter(item => 
-            item.updated_at && getISOWeek(item.updated_at) === currentWeek
-          );
-          if (currentWeekItems.length > 0) {
-            const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-            if (itemIds.length > 0) {
-              await supabase
-                .from('progress_matrix')
-                .update({ homework_notes: combinedHomeworkNotes })
-                .in('id', itemIds);
-            }
-          }
-        }
+        const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
+        await syncHomeworkNotes(parsedNotes);
 
         if (targetHomework && !isCurrentHomework) {
           setIsCurrentHomework(true);
@@ -1861,6 +1913,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const activeTId = await getCurrentTeacherId();
       const currentWeek = getISOWeek();
 
+      const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
+      const rowHomeworkNotes = finalTopicName.startsWith('Hausaufgabe KW ')
+        ? combinedHomeworkNotes
+        : JSON.stringify(parsedNotes.filter((n: string) => !n.startsWith('AUDIO:')));
+
       const row = {
         student_id: student.id,
         teacher_id: activeTId,
@@ -1868,7 +1925,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         status,
         is_current_homework: finalIsCurrentHomework,
         teacher_notes: teacherNotes.trim(),
-        homework_notes: combinedHomeworkNotes,
+        homework_notes: rowHomeworkNotes,
         updated_at: new Date().toISOString()
       };
 
@@ -1903,19 +1960,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (dbError) throw dbError;
 
-      // Sync homework notes to all other progress items of the current week for this student
-      const currentWeekItems = progressItems.filter(item => 
-        item.updated_at && getISOWeek(item.updated_at) === currentWeek
-      );
-      if (currentWeekItems.length > 0) {
-        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-        if (itemIds.length > 0) {
-          await supabase
-            .from('progress_matrix')
-            .update({ homework_notes: combinedHomeworkNotes })
-            .in('id', itemIds);
-        }
-      }
+      await syncHomeworkNotes(parsedNotes);
 
       await fetchProgress();
       notifyHomeworkChange();
@@ -2755,7 +2800,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 textColor = 'hsl(255, 75%, 32%)';
                               }
 
-                              let solidActiveBg = 'hsl(355, 75%, 84%)';
+                        let solidActiveBg = 'hsl(355, 75%, 84%)';
                               if (status === 'homework') solidActiveBg = 'hsl(47, 85%, 84%)';
                               else if (status === 'mastered') solidActiveBg = 'hsl(130, 65%, 82%)';
                               else if (status === 'purple') solidActiveBg = 'hsl(255, 75%, 84%)';
@@ -2767,28 +2812,46 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   key={num}
                                   type="button"
                                   onClick={() => {
-                                    if (activeBrush === 'NONE') {
-                                      selectTextbookPage(activeLehrwerkId!, num);
-                                    } else {
-                                      let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                      let targetHomework = false;
-
-                                      if (activeBrush === 'LOCKED') {
-                                        targetStatus = 'IN_PROGRESS';
-                                        targetHomework = false;
-                                      } else if (activeBrush === 'HOMEWORK') {
-                                        targetStatus = 'IN_PROGRESS';
-                                        targetHomework = true;
-                                      } else if (activeBrush === 'MASTERED') {
-                                        targetStatus = 'MASTERED';
-                                        targetHomework = false;
-                                      } else if (activeBrush === 'THEORY') {
-                                        targetStatus = 'THEORY_DONE';
-                                        targetHomework = false;
+                                    const now = Date.now();
+                                    if (lastClickRef.current && lastClickRef.current.pageNum === num && (now - lastClickRef.current.timestamp) < 250) {
+                                      if (clickTimeoutRef.current) {
+                                        clearTimeout(clickTimeoutRef.current);
+                                        clickTimeoutRef.current = null;
                                       }
+                                      lastClickRef.current = null;
+                                      handlePageDoubleClick(activeLehrwerkId!, num);
+                                    } else {
+                                      lastClickRef.current = { pageNum: num, timestamp: now };
+                                      if (clickTimeoutRef.current) {
+                                        clearTimeout(clickTimeoutRef.current);
+                                      }
+                                      clickTimeoutRef.current = setTimeout(() => {
+                                        clickTimeoutRef.current = null;
+                                        lastClickRef.current = null;
+                                        if (activeBrush === 'NONE') {
+                                          selectTextbookPage(activeLehrwerkId!, num);
+                                        } else {
+                                          let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                          let targetHomework = false;
 
-                                      triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                      selectTextbookPage(activeLehrwerkId!, num);
+                                          if (activeBrush === 'LOCKED') {
+                                            targetStatus = 'IN_PROGRESS';
+                                            targetHomework = false;
+                                          } else if (activeBrush === 'HOMEWORK') {
+                                            targetStatus = 'IN_PROGRESS';
+                                            targetHomework = true;
+                                          } else if (activeBrush === 'MASTERED') {
+                                            targetStatus = 'MASTERED';
+                                            targetHomework = false;
+                                          } else if (activeBrush === 'THEORY') {
+                                            targetStatus = 'THEORY_DONE';
+                                            targetHomework = false;
+                                          }
+
+                                          triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                          selectTextbookPage(activeLehrwerkId!, num, targetStatus, targetHomework);
+                                        }
+                                      }, 250);
                                     }
                                   }}
                                   style={{
@@ -2948,6 +3011,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                  finger: 25,
                                  expression: 25
                                }));
+                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false);
                              } },
                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => {
                                setStatus('IN_PROGRESS');
@@ -2962,6 +3026,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                  finger: 25,
                                  expression: 25
                                }));
+                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true);
                              } },
                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (gemeistert - 100%)', getActive: () => status === 'MASTERED', action: () => {
                                setStatus('MASTERED');
@@ -2976,6 +3041,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                  finger: 100,
                                  expression: 100
                                }));
+                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false);
                              } }
                           ].map(b => {
                             const isActive = b.getActive();
@@ -4498,9 +4564,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                           {[
-                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); } },
-                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); } },
-                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setRhythmVal(100); setFingerVal(100); setExpressionVal(100); setHasChanges(true); } }
+                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false); } },
+                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setSongProgressPercent(25); setRhythmVal(25); setFingerVal(25); setExpressionVal(25); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true); } },
+                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setSongProgressPercent(100); setRhythmVal(100); setFingerVal(100); setExpressionVal(100); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false); } }
                            ].map(b => {
                             const isActive = b.getActive();
                             return (
@@ -4924,14 +4990,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {(() => {
-                            const activeHWs = progressItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW '));
+                            // Deduplicate progressItems by topic_name (latest wins)
+                            const uniqueItemsMap = new Map<string, any>();
+                            (progressItems || []).forEach(item => {
+                              const name = (item.topic_name || '').trim().toLowerCase();
+                              if (name && !uniqueItemsMap.has(name)) {
+                                uniqueItemsMap.set(name, item);
+                              }
+                            });
+                            const deduplicatedItems = Array.from(uniqueItemsMap.values());
+
                             const currentWeek = getISOWeek();
-                            const activeTheories = progressItems.filter(item => 
-                              item.status === 'THEORY_DONE' && 
-                              item.updated_at && 
-                              getISOWeek(item.updated_at) === currentWeek &&
-                              !item.topic_name.startsWith('Hausaufgabe KW ')
-                            );
+                            const activeHWs = deduplicatedItems.filter(item => {
+                              if (item.topic_name.includes(' - Seite ')) {
+                                const parts = item.topic_name.split(' - Seite ');
+                                const bookTitle = parts[0].trim();
+                                const pageNum = parseInt(parts[1], 10);
+                                const book = globalLehrwerke.find(g => g.title === bookTitle);
+                                if (book) {
+                                  const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                  const pageState = assignment?.pageStates?.[pageNum];
+                                  return pageState?.status === 'homework';
+                                }
+                              }
+                              return item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ');
+                            });
+                            const activeTheories = deduplicatedItems.filter(item => {
+                              if (item.topic_name.includes(' - Seite ')) {
+                                const parts = item.topic_name.split(' - Seite ');
+                                const bookTitle = parts[0].trim();
+                                const pageNum = parseInt(parts[1], 10);
+                                const book = globalLehrwerke.find(g => g.title === bookTitle);
+                                if (book) {
+                                  const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                  const pageState = assignment?.pageStates?.[pageNum];
+                                  return pageState?.status === 'purple';
+                                }
+                              }
+                              return item.status === 'THEORY_DONE' && 
+                                     item.updated_at && 
+                                     getISOWeek(item.updated_at) === currentWeek &&
+                                     !item.topic_name.startsWith('Hausaufgabe KW ');
+                            });
                             const hasActive = activeHWs.length > 0 || activeTheories.length > 0;
                             const hasNotes = homeworkNotesList.length > 0;
                             
@@ -5046,7 +5146,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                           }}>
                                             <span>📄 S. {p}</span>
-                                            {original?.id && !(original?.updated_at && getISOWeek(original.updated_at) !== getISOWeek()) && (
+                                            {original?.id && (
                                               <button
                                                 type="button"
                                                 onClick={() => handleRemoveHomeworkItem(original.id!, item.title, p)}
@@ -5166,7 +5266,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
                                         }}>
                                           <span>🎵 {item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}</span>
-                                          {!(item.updated_at && getISOWeek(item.updated_at) !== getISOWeek()) && (
+                                          {item.id && (
                                             <button
                                               type="button"
                                               onClick={() => handleRemoveHomeworkItem(item.id!)}
@@ -5358,6 +5458,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (homeworkNotes.trim()) {
+                                    setHomeworkNotes('');
+                                    setHasChanges(true);
+                                  }
                                   setIsNotesFocused(false);
                                   if (document.activeElement instanceof HTMLElement) {
                                     document.activeElement.blur();
@@ -5373,7 +5477,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   padding: '2px 6px'
                                 }}
                               >
-                                Minimieren
+                                {homeworkNotes.trim() ? 'Entfernen' : 'Minimieren'}
                               </button>
                             )}
                           </div>
@@ -6341,29 +6445,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <button
                         key={num}
                         onClick={() => {
-                          if (activeBrush === 'NONE') {
-                            selectTextbookPage(assigned.lehrwerkId, num);
+                          const now = Date.now();
+                          if (lastClickRef.current && lastClickRef.current.pageNum === num && (now - lastClickRef.current.timestamp) < 250) {
+                            if (clickTimeoutRef.current) {
+                              clearTimeout(clickTimeoutRef.current);
+                              clickTimeoutRef.current = null;
+                            }
+                            lastClickRef.current = null;
+                            handlePageDoubleClick(assigned.lehrwerkId, num);
                             setShowAllPagesGrid(false);
                           } else {
-                            let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                            let targetHomework = false;
-
-                            if (activeBrush === 'LOCKED') {
-                              targetStatus = 'IN_PROGRESS';
-                              targetHomework = false;
-                            } else if (activeBrush === 'HOMEWORK') {
-                              targetStatus = 'IN_PROGRESS';
-                              targetHomework = true;
-                            } else if (activeBrush === 'MASTERED') {
-                              targetStatus = 'MASTERED';
-                              targetHomework = false;
-                            } else if (activeBrush === 'THEORY') {
-                              targetStatus = 'THEORY_DONE';
-                              targetHomework = false;
+                            lastClickRef.current = { pageNum: num, timestamp: now };
+                            if (clickTimeoutRef.current) {
+                              clearTimeout(clickTimeoutRef.current);
                             }
+                            clickTimeoutRef.current = setTimeout(() => {
+                              clickTimeoutRef.current = null;
+                              lastClickRef.current = null;
+                              if (activeBrush === 'NONE') {
+                                selectTextbookPage(assigned.lehrwerkId, num);
+                                setShowAllPagesGrid(false);
+                              } else {
+                                let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
+                                let targetHomework = false;
 
-                            triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
-                            selectTextbookPage(assigned.lehrwerkId, num);
+                                if (activeBrush === 'LOCKED') {
+                                  targetStatus = 'IN_PROGRESS';
+                                  targetHomework = false;
+                                } else if (activeBrush === 'HOMEWORK') {
+                                  targetStatus = 'IN_PROGRESS';
+                                  targetHomework = true;
+                                } else if (activeBrush === 'MASTERED') {
+                                  targetStatus = 'MASTERED';
+                                  targetHomework = false;
+                                } else if (activeBrush === 'THEORY') {
+                                  targetStatus = 'THEORY_DONE';
+                                  targetHomework = false;
+                                }
+
+                                triggerDirectSave(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                                selectTextbookPage(assigned.lehrwerkId, num, targetStatus, targetHomework);
+                              }
+                            }, 250);
                           }
                         }}
                         style={{

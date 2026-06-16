@@ -2871,7 +2871,7 @@ export function TeacherDashboard({
           !item.topic_name.startsWith('Hausaufgabe KW ') && 
           item.status !== 'MASTERED' && 
           item.status !== 'THEORY_DONE' && 
-          (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+          item.is_current_homework
         );
 
         const currentWeekNotesItem = matrixItems.find(item => 
@@ -3165,7 +3165,7 @@ export function TeacherDashboard({
               !item.topic_name.startsWith('Hausaufgabe KW ') && 
               item.status !== 'MASTERED' && 
               item.status !== 'THEORY_DONE' && 
-              (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
+              item.is_current_homework
             );
 
             const currentWeekNotesItem = matrixItems.find(item => 
