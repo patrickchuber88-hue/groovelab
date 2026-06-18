@@ -1979,6 +1979,7 @@ export function TeacherDashboard({
       
       setResponseTextInput('');
       setRespondingToRequestId(null);
+      setAdminFeedbackTab('done');
       alert('Rückmeldung erfolgreich übermittelt! Vielen Dank.');
       setTicker(t => t + 1);
     } catch (err) {

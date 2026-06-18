@@ -92,6 +92,7 @@ interface ProgramPoint {
   is_pause: boolean;
   status: 'submitted' | 'approved' | 'rejected';
   additional_feedback_responses: Record<string, any>;
+  songs?: any[];
 }
 
 // In-Memory Mock Database
@@ -437,7 +438,8 @@ class MockDatabase {
             sort_order,
             is_pause: row.is_pause || false,
             status,
-            additional_feedback_responses: row.additional_feedback_responses || {}
+            additional_feedback_responses: row.additional_feedback_responses || {},
+            songs: row.songs || []
           };
           this.campus_event_program_points.push(newRow);
           insertedRows.push(JSON.parse(JSON.stringify(newRow)));

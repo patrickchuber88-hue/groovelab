@@ -2728,5 +2728,41 @@ export const testCases: TestCase[] = [
         }
       }
     }
+  },
+  {
+    id: 'T4_6',
+    name: 'T4: Multiple songs submission and export validation (Multiple Songs)',
+    tier: 4,
+    feature: 'F10',
+    description: 'Verify teacher can submit multiple songs and they are exported/retrieved correctly.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'teacher-1');
+      const ppId = uuid();
+      const songs = [
+        { title: 'Song 1', artist: 'Artist 1', composer: 'Composer 1', arranger: 'Arranger 1' },
+        { title: 'Song 2', artist: 'Artist 2', composer: 'Composer 2', arranger: 'Arranger 2' }
+      ];
+      await client.from('campus_event_program_points').insert({
+        id: ppId,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Multi Song Act',
+        duration: 15,
+        songs: songs,
+        title: songs[0].title,
+        artist: songs[0].artist
+      });
+
+      const { data, error } = await client.from('campus_event_program_points')
+        .select('*')
+        .eq('id', ppId);
+      if (error) throw new Error(error.message);
+      if (!data || !data[0].songs || data[0].songs.length !== 2) {
+        throw new Error('Multiple songs not stored correctly');
+      }
+      if (data[0].songs[1].title !== 'Song 2') {
+        throw new Error('Song array data mismatch');
+      }
+    }
   }
 ];

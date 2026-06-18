@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  ShieldAlert, CheckCircle, Users, Settings, Bell, ShieldCheck, FileText,
+  ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
@@ -9120,13 +9120,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           >
             <div style={{ position: 'relative' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                {currentUserProfile?.photo_url ? (
-                  <img src={currentUserProfile.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                ) : (
-                  <div style={{ width: '100%', height: '100%', background: '#e8f0fe', color: '#0b57d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-                    {currentUserProfile?.first_name?.[0] || 'S'}
-                  </div>
-                )}
+                <img src="/campus_login_hero.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} loading="lazy" />
               </div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>

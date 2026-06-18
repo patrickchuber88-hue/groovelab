@@ -223,6 +223,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [homeworkNotes, setHomeworkNotes] = useState('');
   const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>([]);
   const [isNotesFocused, setIsNotesFocused] = useState(false);
+  const [isPresetsCollapsed, setIsPresetsCollapsed] = useState<boolean>(true);
+  const [isStackHovered, setIsStackHovered] = useState<boolean>(false);
   const isNotesExpanded = isNotesFocused || !!homeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const lastClickRef = React.useRef<{ pageNum: number; timestamp: number } | null>(null);
@@ -5638,132 +5640,299 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
-                        {/* Schnellbaukasten Presets */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                            ⚡ Schnellbaukasten Presets (Aktiviert Hausaufgabe):
-                          </span>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                const bpmText = bpm ? `${bpm} BPM` : "X BPM";
-                                const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                              }}
-                              style={{
-                                background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale preset-btn"
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span>⏱️</span>
-                                <span style={{ fontWeight: 800 }}>Tempo halten</span>
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Metronom BPM</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                              }}
-                              style={{
-                                background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale preset-btn"
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span>✨</span>
-                                <span>Sauber spielen</span>
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Klarer Klang</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                              }}
-                              style={{
-                                background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale preset-btn"
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span>🥁</span>
-                                <span style={{ fontWeight: 800 }}>Rhythmus-Metronom</span>
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Timing & Takt</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                              }}
-                              style={{
-                                background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale preset-btn"
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span>🖖</span>
-                                <span style={{ fontWeight: 800 }}>Fingersatz üben</span>
-                              </div>
-                              <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Fingersatz einhalten</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Schnell-Textbausteine */}
-                        {/* Schnell-Textbausteine & Submit button side-by-side */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                            {textbausteine
-                              .filter((tb: any) => tb.active)
-                              .map((tpl, i) => (
+                        {isPresetsCollapsed ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                ⚡ Schnellbaukasten Presets:
+                              </span>
                               <button
-                                key={tpl.id || i}
                                 type="button"
-                                onClick={() => {
-                                  setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
-                                  setHasChanges(true);
-                                }}
+                                onClick={() => setIsPresetsCollapsed(false)}
                                 style={{
-                                  background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
-                                  padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
+                                  background: 'none', border: 'none', color: '#3b82f6', fontSize: '0.65rem', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: 0
                                 }}
                               >
-                                {tpl.label}
+                                <span>Ausklappen</span> <ChevronRight size={10} />
                               </button>
-                            ))}
+                            </div>
+
+                            <div
+                              onClick={() => setIsPresetsCollapsed(false)}
+                              onMouseEnter={() => setIsStackHovered(true)}
+                              onMouseLeave={() => setIsStackHovered(false)}
+                              style={{
+                                height: '90px',
+                                position: 'relative',
+                                background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
+                                border: '1.5px dashed #cbd5e1',
+                                borderRadius: '16px',
+                                cursor: 'pointer',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginTop: '4px',
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                boxShadow: isStackHovered ? '0 6px 16px rgba(0, 0, 0, 0.06)' : 'none',
+                                borderColor: isStackHovered ? '#94a3b8' : '#cbd5e1',
+                                transform: isStackHovered ? 'scale(1.01)' : 'scale(1)'
+                              }}
+                            >
+                              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                {(() => {
+                                  const stackItems = [
+                                    { type: 'card', label: '⏱️ Tempo halten', desc: 'Metronom BPM', color: '#1e293b', bg: '#f8fafc' },
+                                    { type: 'card', label: '✨ Sauber spielen', desc: 'Klarer Klang', color: '#1e293b', bg: '#f8fafc' },
+                                    { type: 'card', label: '🥁 Rhythmus-Metronom', desc: 'Timing & Takt', color: '#1e293b', bg: '#f8fafc' },
+                                    { type: 'card', label: '🖖 Fingersatz üben', desc: 'Fingersatz einhalten', color: '#1e293b', bg: '#f8fafc' },
+                                    ...textbausteine.filter((tb: any) => tb.active).map(tb => ({
+                                      type: 'chip', label: tb.label, desc: '', color: '#475569', bg: '#ffffff'
+                                    }))
+                                  ];
+
+                                  return stackItems.slice(0, 10).map((item, idx) => {
+                                    const baseRotation = ((idx * 17) % 24) - 12;
+                                    const hoverRotation = baseRotation * 0.45;
+                                    const rotation = isStackHovered ? hoverRotation : baseRotation;
+
+                                    const baseOffsetVal = 20;
+                                    const baseOffsetX = ((idx * 27) % (baseOffsetVal * 2)) - baseOffsetVal;
+                                    const baseOffsetY = ((idx * 13) % 14) - 7;
+
+                                    const offsetX = isStackHovered ? baseOffsetX * 2.8 : baseOffsetX;
+                                    const offsetY = isStackHovered ? baseOffsetY * 1.6 : baseOffsetY;
+                                    const zIndex = idx + 1;
+
+                                    if (item.type === 'card') {
+                                      return (
+                                        <div
+                                          key={idx}
+                                          style={{
+                                            position: 'absolute',
+                                            left: '50%',
+                                            top: '50%',
+                                            width: '125px',
+                                            height: '40px',
+                                            marginLeft: '-62px',
+                                            marginTop: '-20px',
+                                            background: item.bg,
+                                            color: item.color,
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '10px',
+                                            padding: '4px 8px',
+                                            fontSize: '0.62rem',
+                                            fontWeight: 700,
+                                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'center',
+                                            pointerEvents: 'none',
+                                            transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
+                                            transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                            zIndex: zIndex
+                                          }}
+                                        >
+                                          <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                                          <span style={{ fontSize: '0.52rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</span>
+                                        </div>
+                                      );
+                                    } else {
+                                      return (
+                                        <div
+                                          key={idx}
+                                          style={{
+                                            position: 'absolute',
+                                            left: '50%',
+                                            top: '50%',
+                                            height: '22px',
+                                            background: item.bg,
+                                            color: item.color,
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '9999px',
+                                            padding: '2px 8px',
+                                            fontSize: '0.58rem',
+                                            fontWeight: 700,
+                                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            pointerEvents: 'none',
+                                            transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
+                                            transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                            zIndex: zIndex,
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                        >
+                                          {item.label}
+                                        </div>
+                                      );
+                                    }
+                                  });
+                                })()}
+                                
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: '6px',
+                                  right: '8px',
+                                  fontSize: '0.58rem',
+                                  fontWeight: 800,
+                                  color: '#475569',
+                                  background: 'rgba(255, 255, 255, 0.9)',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  backdropFilter: 'blur(4px)',
+                                  zIndex: 50,
+                                  pointerEvents: 'none',
+                                  border: '1px solid #cbd5e1',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                }}>
+                                  ⚡ Stapel anklicken zum Öffnen
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <>
+                            {/* Schnellbaukasten Presets */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                  ⚡ Schnellbaukasten Presets (Aktiviert Hausaufgabe):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsPresetsCollapsed(true)}
+                                  style={{
+                                    background: 'none', border: 'none', color: '#64748b', fontSize: '0.62rem', fontWeight: 750, cursor: 'pointer', padding: 0
+                                  }}
+                                >
+                                  Stapel einklappen
+                                </button>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                                    const bpmText = bpm ? `${bpm} BPM` : "X BPM";
+                                    const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                    setIsCurrentHomework(true);
+                                    setHasChanges(true);
+                                  }}
+                                  style={{
+                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
+                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  className="hover-scale preset-btn"
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>⏱️</span>
+                                    <span style={{ fontWeight: 800 }}>Tempo halten</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Metronom BPM</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
+                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                    setIsCurrentHomework(true);
+                                    setHasChanges(true);
+                                  }}
+                                  style={{
+                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
+                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  className="hover-scale preset-btn"
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>✨</span>
+                                    <span>Sauber spielen</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Klarer Klang</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
+                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                    setIsCurrentHomework(true);
+                                    setHasChanges(true);
+                                  }}
+                                  style={{
+                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
+                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  className="hover-scale preset-btn"
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>🥁</span>
+                                    <span style={{ fontWeight: 800 }}>Rhythmus-Metronom</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Timing & Takt</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
+                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                    setIsCurrentHomework(true);
+                                    setHasChanges(true);
+                                  }}
+                                  style={{
+                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
+                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  className="hover-scale preset-btn"
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span>🖖</span>
+                                    <span style={{ fontWeight: 800 }}>Fingersatz üben</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Fingersatz einhalten</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Schnell-Textbausteine */}
+                            {/* Schnell-Textbausteine & Submit button side-by-side */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                {textbausteine
+                                  .filter((tb: any) => tb.active)
+                                  .map((tpl, i) => (
+                                  <button
+                                    key={tpl.id || i}
+                                    type="button"
+                                    onClick={() => {
+                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                      setHasChanges(true);
+                                    }}
+                                    style={{
+                                      background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
+                                      padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
+                                    }}
+                                  >
+                                    {tpl.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                         {/* Audio Play-Along Cassette Widget */}
