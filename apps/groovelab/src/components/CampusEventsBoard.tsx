@@ -97,6 +97,7 @@ interface CampusEvent {
   responsible_tech?: string;
   responsible_coordination?: string;
   planning_status?: 'planung' | 'bestaetigt' | 'laufend' | 'abgeschlossen';
+  is_planning_active?: boolean;
 }
 
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor }: CampusEventsBoardProps) {
@@ -108,6 +109,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Filter for Column 2 (School / Subscribed Events Timeline)
   const [eventFilter, setEventFilter] = useState<'all' | 'subscribed' | 'custom'>('all');
+  const [isDragOverPlanning, setIsDragOverPlanning] = useState(false);
 
   // Core Data States
   const [lessons, setLessons] = useState<LessonOccurrence[]>([]);
@@ -1007,7 +1009,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     if (cLower.includes('vorspiel') || cLower.includes('klassenvorspiel') || tLower.includes('vorspiel') || tLower.includes('klassenvorspiel') || tLower.includes('schülervorspiel') || tLower.includes('recital')) {
       return { color: '#3b82f6', bg: '#eff6ff' };
     }
-    if (cLower.includes('konzert') || cLower.includes('auftritt') || cLower.includes('fest') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig') || tLower.includes('fest') || tLower.includes('sommerfest') || tLower.includes('weihnachtsfeier') || tLower.includes('party')) {
+    if (cLower.includes('fest') || tLower.includes('fest') || tLower.includes('weihnachtsfeier') || tLower.includes('party') || tLower.includes('feier')) {
+      return { color: '#f97316', bg: '#ffedd5' }; // Orange
+    }
+    if (cLower.includes('konzert') || cLower.includes('auftritt') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig')) {
       return { color: '#a855f7', bg: '#f3e8ff' };
     }
     if (cLower.includes('probe') || cLower.includes('ensemble') || cLower.includes('bandprobe') || tLower.includes('probe') || tLower.includes('bandprobe') || tLower.includes('ensemble') || tLower.includes('rehearsal')) {
@@ -1029,6 +1034,101 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     setSelectedEvent({ ...ev, isMyEvent, catColor: colors.color, catBg: colors.bg });
     // Pre-fill visibility editor for admin/secretary
     setEditVisibility(ev.visibility || 'all');
+  };
+
+  const handleActivatePlanning = async (ev: any) => {
+    // Check if there is already an override/copy in customEvents
+    const existingOverride = !ev.is_subscribed ? ev : customEvents.find(c => 
+      normalizeTitle(c.title) === normalizeTitle(ev.title) && 
+      c.event_date === ev.event_date && 
+      normalizeTime(c.start_time) === normalizeTime(ev.start_time)
+    );
+
+    if (existingOverride) {
+      try {
+        const { data, error } = await supabase
+          .from('campus_events')
+          .update({ is_planning_active: true })
+          .eq('id', existingOverride.id)
+          .select('*, room:room_id(id, name)')
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCustomEvents(prev => prev.map(x => x.id === data.id ? data : x));
+          alert('Termin wurde für die Event-Planung aktiviert! 🎉');
+        }
+      } catch (err: any) {
+        alert('Aktivieren für Event-Planung fehlgeschlagen: ' + err.message);
+      }
+    } else {
+      // Subscribed event with no override copy yet - insert a new copy with is_planning_active = true
+      try {
+        const { data, error } = await supabase
+          .from('campus_events')
+          .insert({
+            school_id: schoolId,
+            title: ev.title,
+            description: ev.description || '',
+            event_date: ev.event_date,
+            start_time: ev.start_time + ':00',
+            category: ev.category || 'Schultermin',
+            created_by: userId,
+            visibility: ev.visibility || 'all',
+            is_public: (ev.visibility || 'all') === 'all',
+            is_planning_active: true
+          })
+          .select('*, room:room_id(id, name)')
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCustomEvents(prev => [...prev, data]);
+          alert('Termin wurde für die Event-Planung dupliziert und aktiviert! 🎉');
+        }
+      } catch (err: any) {
+        alert('Aktivieren für Event-Planung fehlgeschlagen: ' + err.message);
+      }
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, ev: any) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify(ev));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (role === 'admin' || role === 'secretary') {
+      setIsDragOverPlanning(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOverPlanning(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPlanning(false);
+    if (role !== 'admin' && role !== 'secretary') return;
+    try {
+      const dataStr = e.dataTransfer.getData('text/plain');
+      if (!dataStr) return;
+      const ev = JSON.parse(dataStr);
+      if (ev.is_planning_active) {
+        alert('Dieses Event ist bereits in der Event-Planung aktiv.');
+        return;
+      }
+      await handleActivatePlanning(ev);
+    } catch (err) {
+      console.error('Drag and drop error:', err);
+    }
   };
 
   // Save ONLY visibility for a campus_event (admin/secretary only)
@@ -1634,6 +1734,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         location_type: formLocationType,
         room_id: formLocationType === 'intern' && formRoomId ? formRoomId : null,
         location_extern: formLocationType === 'extern' && formLocationExtern.trim() ? formLocationExtern.trim() : null,
+        is_planning_active: true
       };
 
       const { data, error } = await supabase
@@ -2336,12 +2437,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <div
                   key={ev.id}
                   onClick={() => handleSelectEvent(ev)}
+                  draggable={role === 'admin' || role === 'secretary'}
+                  onDragStart={e => handleDragStart(e, ev)}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
                     padding: '16px',
                     borderRadius: '18px',
-                    cursor: 'pointer',
+                    cursor: (role === 'admin' || role === 'secretary') ? 'grab' : 'pointer',
                     background: '#ffffff',
                     border: '1px solid rgba(0, 0, 0, 0.06)',
                     borderLeft: `4px solid ${catColor}`,
@@ -2363,33 +2466,75 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       }}>
                         {ev.category}
                       </span>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 650,
+                        color: ev.visibility === 'teachers' ? '#d97706' : ev.visibility === 'students' ? '#2563eb' : '#64748b',
+                        background: ev.visibility === 'teachers' ? '#fef3c7' : ev.visibility === 'students' ? '#dbeafe' : '#f1f5f9',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        {ev.visibility === 'teachers' ? '🎓 Nur Lehrer' : ev.visibility === 'students' ? '🎵 Nur Schüler' : '👥 Alle'}
+                      </span>
                     </div>
 
-                    {!isSubscribed && isMyEvent && (
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id); }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '6px'
-                        }}
-                        title="Termin löschen"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {!isSubscribed && isMyEvent && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id); }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px'
+                          }}
+                          title="Termin löschen"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textAlign: 'left' }}>
-                      {ev.title}
-                    </h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                      <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1d1d1f', textAlign: 'left' }}>
+                        {ev.title}
+                      </h4>
+                      {!ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleActivatePlanning(ev); }}
+                          style={{
+                            background: `${brandColor}12`,
+                            border: `1.5px solid ${brandColor}30`,
+                            color: brandColor,
+                            padding: '3px 8px',
+                            borderRadius: '8px',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.background = `${brandColor}22`; }}
+                          onMouseOut={e => { e.currentTarget.style.background = `${brandColor}12`; }}
+                          title="Für Event-Planung aktivieren"
+                        >
+                          <CalendarPlus size={12} /> Planen
+                        </button>
+                      )}
+                    </div>
                     <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#515154', background: '#f5f5f7', padding: '4px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
                       {formatDateGerman(ev.event_date)}
                     </span>
@@ -2592,21 +2737,32 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const renderTeacherEventPlanningColumn = () => {
-    const activePlanningEvents = customEvents.filter(ev => !ev.is_subscribed);
+    const activePlanningEvents = customEvents.filter(ev => {
+      if (ev.is_subscribed) return false;
+      return ev.is_planning_active;
+    });
 
     return (
-      <div style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '24px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        height: 'calc(100vh - 120px)',
-        overflowY: 'auto'
-      }}>
+      <div 
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        style={{
+          background: '#ffffff',
+          border: isDragOverPlanning ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)',
+          borderRadius: '24px',
+          padding: '24px',
+          boxShadow: isDragOverPlanning ? `0 12px 40px ${brandColor}15` : '0 8px 32px rgba(0,0,0,0.02)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          height: 'calc(100vh - 120px)',
+          overflowY: 'auto',
+          transition: 'all 0.2s ease',
+          transform: isDragOverPlanning ? 'scale(1.01)' : 'none'
+        }}
+      >
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calendar size={18} color={brandColor} /> {role === 'secretary' ? 'Event-Übersicht' : 'Event-Planung (Lehrer)'}
@@ -3337,18 +3493,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         overflow: 'hidden'
       }}>
         {/* Event Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>PLANUNGS-MODUL</span>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>{activeEvent.title}</h3>
+        {!asOverlay && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>PLANUNGS-MODUL</span>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>{activeEvent.title}</h3>
+            </div>
+            <button
+              onClick={() => { setSelectedEvent(null); setSecretaryPlanningEvent(null); }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={15} color="#64748b" />
+            </button>
           </div>
-          <button
-            onClick={() => { setSelectedEvent(null); setSecretaryPlanningEvent(null); }}
-            style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <X size={15} color="#64748b" />
-          </button>
-        </div>
+        )}
 
         {/* Tab Buttons */}
         <div style={{ display: 'flex', background: '#f8fafc', padding: '4px', borderRadius: '12px', gap: '4px' }}>
@@ -3390,7 +3548,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               planung:       { label: 'In Planung',    color: '#b45309', bg: '#fef3c7' },
               bestaetigt:    { label: 'Bestätigt',     color: '#1d4ed8', bg: '#dbeafe' },
               laufend:       { label: 'Laufend',       color: '#15803d', bg: '#dcfce7' },
-              abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
+                      abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
             };
             const currentStatus = statusConfig[eventStatus] || statusConfig.planung;
             const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.82rem', boxSizing: 'border-box', background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' };
@@ -3399,8 +3557,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                {/* Top Row: Title badge */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '18px' }}>
+                {/* Status Row: Buttons on the left, current status indicator on the right */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+                  {/* Status Buttons */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {Object.entries(statusConfig).map(([id, cfg]) => {
+                      const isSelected = eventStatus === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setEventStatus(id as any)}
+                          style={{
+                            border: `1.5px solid ${isSelected ? cfg.color : '#e2e8f0'}`,
+                            background: isSelected ? cfg.bg : '#fafafa',
+                            color: isSelected ? cfg.color : '#94a3b8',
+                            padding: '5px 12px', borderRadius: '20px',
+                            fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Current Status Badge */}
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
                     padding: '5px 14px', borderRadius: '20px',
@@ -3415,36 +3598,36 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </span>
                 </div>
 
-                {/* Status Buttons Row */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                  {Object.entries(statusConfig).map(([id, cfg]) => {
-                    const isSelected = eventStatus === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setEventStatus(id as any)}
-                        style={{
-                          border: `1.5px solid ${isSelected ? cfg.color : '#e2e8f0'}`,
-                          background: isSelected ? cfg.bg : '#fafafa',
-                          color: isSelected ? cfg.color : '#94a3b8',
-                          padding: '5px 12px', borderRadius: '20px',
-                          fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        {cfg.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Datum (Read-only) */}
-                <div style={{ marginBottom: '20px', padding: '10px 14px', background: '#f8fafc', borderRadius: '10px', border: '1.5px solid #f1f5f9', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Datum</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
-                    {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-                  </span>
+                {/* Datum (Read-only Calendar Widget Style) */}
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                  borderRadius: '16px',
+                  border: '1px solid #dcfce7',
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'center'
+                }}>
+                  <div style={{
+                    background: '#10b981',
+                    color: '#ffffff',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
+                  }}>
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Datum & Tag</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                      {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* 2-Column Main Grid */}
@@ -3455,25 +3638,31 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     {/* Veranstaltungsort */}
                     <div>
                       <label style={labelStyle}>Veranstaltungsort</label>
-                      <input
-                        type="text"
-                        value={eventLocation}
-                        onChange={e => setEventLocation(e.target.value)}
-                        placeholder="z.B. Aula, Turnhalle, Stadtpark"
-                        style={inputStyle}
-                      />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Building2 size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px' }} />
+                        <input
+                          type="text"
+                          value={eventLocation}
+                          onChange={e => setEventLocation(e.target.value)}
+                          placeholder="z.B. Aula, Turnhalle, Stadtpark"
+                          style={{ ...inputStyle, paddingLeft: '32px' }}
+                        />
+                      </div>
                     </div>
 
                     {/* Adresse */}
                     <div>
                       <label style={labelStyle}>Adresse</label>
-                      <input
-                        type="text"
-                        value={eventLocationAddress}
-                        onChange={e => setEventLocationAddress(e.target.value)}
-                        placeholder="z.B. Musterstraße 12, 80333 München"
-                        style={inputStyle}
-                      />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <MapPin size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px' }} />
+                        <input
+                          type="text"
+                          value={eventLocationAddress}
+                          onChange={e => setEventLocationAddress(e.target.value)}
+                          placeholder="z.B. Musterstraße 12, 80333 München"
+                          style={{ ...inputStyle, paddingLeft: '32px' }}
+                        />
+                      </div>
                     </div>
 
                     {/* Beginn */}
@@ -3590,16 +3779,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                     {/* Budget */}
                     <div>
-                      <label style={labelStyle}>Budget (€)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={eventBudget}
-                        onChange={e => setEventBudget(e.target.value)}
-                        placeholder="z.B. 1500.00"
-                        style={inputStyle}
-                      />
+                      <label style={labelStyle}>Budget</label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: '12px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8' }}>€</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={eventBudget}
+                          onChange={e => setEventBudget(e.target.value)}
+                          placeholder="1.500,00"
+                          style={{ ...inputStyle, paddingLeft: '28px' }}
+                        />
+                      </div>
                     </div>
 
                     {/* Verantwortliche */}
@@ -4129,6 +4321,29 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <Check size={14} /> {savingVisibility ? 'Wird gespeichert...' : 'Sichtbarkeit speichern'}
                     </button>
                   </div>
+                )}
+
+                {/* Activate for Event Planning button — admin/secretary only */}
+                {!ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
+                  <button
+                    onClick={async () => {
+                      await handleActivatePlanning(ev);
+                      setSelectedEvent(null);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      background: '#ecfdf5', border: '1.5px solid #a7f3d0', color: '#059669',
+                      padding: '10px', borderRadius: '12px', cursor: 'pointer',
+                      fontWeight: 800, fontSize: '0.82rem',
+                      transition: 'all 0.15s',
+                      marginTop: '6px'
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.background = '#d1fae5'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = '#ecfdf5'; }}
+                  >
+                    <CalendarPlus size={14} />
+                    Für Event-Planung aktivieren
+                  </button>
                 )}
 
                 {/* Delete button — admin/secretary, non-subscribed, own events */}
