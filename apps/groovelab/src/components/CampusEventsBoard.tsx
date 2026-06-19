@@ -98,7 +98,23 @@ interface CampusEvent {
   responsible_coordination?: string;
   planning_status?: 'planung' | 'bestaetigt' | 'laufend' | 'abgeschlossen';
   is_planning_active?: boolean;
+  submission_deadline?: string;
 }
+
+const formatToLocalDatetime = (isoString: string | null | undefined): string => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+  
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const MM = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  
+  return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
+};
 
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor }: CampusEventsBoardProps) {
   // Tabs for Column 1 (My Lessons)
@@ -110,6 +126,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   // Filter for Column 2 (School / Subscribed Events Timeline)
   const [eventFilter, setEventFilter] = useState<'all' | 'subscribed' | 'custom'>('all');
   const [isDragOverPlanning, setIsDragOverPlanning] = useState(false);
+
+  // --- M5 Drag-and-Drop Board & Conflict Prevention ---
+  const [activeStage, setActiveStage] = useState<number>(1);
+  const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualEnsemble, setManualEnsemble] = useState('');
+  const [manualTeacherId, setManualTeacherId] = useState('');
+  const [manualInstrument, setManualInstrument] = useState('');
+  const [manualDuration, setManualDuration] = useState('');
+  const [eventDayLessons, setEventDayLessons] = useState<any[]>([]);
+  const [eventSubmissionDeadline, setEventSubmissionDeadline] = useState('');
 
   // Core Data States
   const [lessons, setLessons] = useState<LessonOccurrence[]>([]);
@@ -143,6 +170,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [participantSearchOpen, setParticipantSearchOpen] = useState(false);
   const [participantLoading, setParticipantLoading] = useState(false);
   const participantSearchRef = useRef<HTMLDivElement>(null);
+  const instrumentInputRef = useRef<HTMLInputElement>(null);
   const [myStudentIds, setMyStudentIds] = useState<string[]>([]);
   const [studentEnsembleIds, setStudentEnsembleIds] = useState<string[]>([]);
 
@@ -242,6 +270,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [newPpChairs, setNewPpChairs] = useState('0');
   const [newPpStands, setNewPpStands] = useState('0');
   const [newPpRemarks, setNewPpRemarks] = useState('');
+
+  // Tech Rider Builder states
+  const [techRiderItems, setTechRiderItems] = useState<any[]>([]);
+  const [builderType, setBuilderType] = useState('Gesang');
+  const [builderConnection, setBuilderConnection] = useState('Mikrofon');
+  const [builderCount, setBuilderCount] = useState(1);
+  const [builderSource, setBuilderSource] = useState('venue');
+  const [builderNotes, setBuilderNotes] = useState('');
   const [newPpSelectedStudentIds, setNewPpSelectedStudentIds] = useState<string[]>([]);
   const [submittingPp, setSubmittingPp] = useState(false);
   const [addedSongs, setAddedSongs] = useState<Song[]>([]);
@@ -266,6 +302,28 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const handleRemoveSong = (index: number) => {
     setAddedSongs(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddTechRiderItem = () => {
+    if (builderCount <= 0) {
+      alert('Die Anzahl muss mindestens 1 sein.');
+      return;
+    }
+    const newItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      type: builderType,
+      connection: builderConnection,
+      count: builderCount,
+      source: builderSource,
+      notes: builderNotes.trim()
+    };
+    setTechRiderItems(prev => [...prev, newItem]);
+    setBuilderNotes('');
+    setBuilderCount(1);
+  };
+
+  const handleRemoveTechRiderItem = (id: string) => {
+    setTechRiderItems(prev => prev.filter(item => item.id !== id));
   };
 
   // State to edit an existing program point for teacher
@@ -306,6 +364,296 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
+  // --- M5 Drag-and-Drop Board & Conflict Prevention ---
+  const fetchEventDayLessons = async (dateStr: string) => {
+    if (!dateStr) return;
+    try {
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('date', dateStr);
+      if (!error && data) {
+        setEventDayLessons(data);
+      }
+    } catch (err) {
+      console.error('Error fetching event day lessons:', err);
+    }
+  };
+
+  const parseTimeToMinutes = (timeStr?: string) => {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    return hours * 60 + minutes;
+  };
+
+  const formatMinutesToTime = (totalMinutes: number) => {
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  };
+
+  const getTeacherName = (teacherId?: string) => {
+    const teacher = allUsers.find(u => u.id === teacherId);
+    return teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : '—';
+  };
+
+  const calculateTimelineTimes = (points: any[], eventStartTimeStr?: string) => {
+    const startMin = parseTimeToMinutes(eventStartTimeStr || '14:00');
+    const stages: Record<number, any[]> = {};
+    points.forEach(pp => {
+      if (pp.is_scheduled || pp.is_pause) {
+        const stage = pp.stage_number || 1;
+        if (!stages[stage]) stages[stage] = [];
+        stages[stage].push(pp);
+      }
+    });
+
+    const timeMap: Record<string, { startMin: number; endMin: number; start: string; end: string }> = {};
+
+    Object.keys(stages).forEach(stageStr => {
+      const stageNum = parseInt(stageStr, 10);
+      const stagePoints = stages[stageNum].sort((a, b) => a.sort_order - b.sort_order);
+      let currentMin = startMin;
+      stagePoints.forEach(pp => {
+        const duration = pp.duration || 0;
+        timeMap[pp.id] = {
+          startMin: currentMin,
+          endMin: currentMin + duration,
+          start: formatMinutesToTime(currentMin),
+          end: formatMinutesToTime(currentMin + duration)
+        };
+        currentMin += duration;
+      });
+    });
+
+    return timeMap;
+  };
+
+  const getConflictsMap = (points: any[], lessonsList: any[], activeEventStartTime: string) => {
+    const timeMap = calculateTimelineTimes(points, activeEventStartTime);
+    const conflicts: Record<string, string> = {};
+
+    points.forEach(pp => {
+      if ((!pp.is_scheduled && !pp.is_pause) || pp.is_pause || !pp.teacher_id) return;
+      const ppTime = timeMap[pp.id];
+      if (!ppTime) return;
+
+      for (const lesson of lessonsList) {
+        if (
+          lesson.teacher_id === pp.teacher_id && 
+          !lesson.status?.startsWith('cancel') && 
+          lesson.status !== 'teacher_sick'
+        ) {
+          const lessonStart = parseTimeToMinutes(lesson.start_time);
+          const lessonEnd = lessonStart + (lesson.duration || 0);
+          if (ppTime.startMin < lessonEnd && ppTime.endMin > lessonStart) {
+            conflicts[pp.id] = `Kollision mit Unterricht (${lesson.start_time} - ${formatMinutesToTime(lessonEnd)})`;
+            return;
+          }
+        }
+      }
+
+      for (const otherPp of points) {
+        if (
+          otherPp.id !== pp.id &&
+          (otherPp.is_scheduled || otherPp.is_pause) &&
+          !otherPp.is_pause &&
+          otherPp.teacher_id === pp.teacher_id &&
+          otherPp.stage_number !== pp.stage_number
+        ) {
+          const otherTime = timeMap[otherPp.id];
+          if (otherTime) {
+            if (ppTime.startMin < otherTime.endMin && ppTime.endMin > otherTime.startMin) {
+              conflicts[pp.id] = `Kollision mit Beitrag auf Bühne ${otherPp.stage_number} (${otherTime.start} - ${otherTime.end})`;
+              return;
+            }
+          }
+        }
+      }
+    });
+
+    return conflicts;
+  };
+
+  const handleDropOnUnscheduledPool = async (e: React.DragEvent) => {
+    e.preventDefault();
+    const ppId = e.dataTransfer.getData('ppId');
+    if (!ppId) return;
+
+    const pp = programPoints.find(p => p.id === ppId);
+    if (!pp) return;
+
+    if (pp.is_pause) {
+      const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
+      if (!error) {
+        setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
+      }
+    } else {
+      if (!pp.is_scheduled) return;
+      const { error } = await supabase
+        .from('campus_event_program_points')
+        .update({ is_scheduled: false, sort_order: 0 })
+        .eq('id', pp.id);
+      if (!error) {
+        setProgramPoints(prev => prev.map(p => p.id === pp.id ? { ...p, is_scheduled: false, sort_order: 0 } : p));
+      }
+    }
+  };
+
+  const handleDropOnTimeline = async (e: React.DragEvent, targetPpId?: string) => {
+    e.preventDefault();
+    const ppId = e.dataTransfer.getData('ppId');
+    if (!ppId) return;
+
+    const draggedPp = programPoints.find(p => p.id === ppId);
+    if (!draggedPp) return;
+
+    if (draggedPp.is_scheduled && draggedPp.stage_number === activeStage && !targetPpId) {
+      return;
+    }
+
+    let updatedList = [...programPoints];
+    if (!draggedPp.is_scheduled || draggedPp.stage_number !== activeStage) {
+      updatedList = updatedList.map(p => p.id === ppId ? { ...p, is_scheduled: true, stage_number: activeStage } : p);
+    }
+
+    const otherPoints = updatedList.filter(p => p.id !== ppId);
+    const stageScheduled = otherPoints.filter(p => (p.is_scheduled || p.is_pause) && p.stage_number === activeStage)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    let newStageScheduled: any[] = [];
+    const draggedItem = updatedList.find(p => p.id === ppId);
+    if (targetPpId) {
+      const targetIdx = stageScheduled.findIndex(p => p.id === targetPpId);
+      if (targetIdx !== -1) {
+        newStageScheduled = [
+          ...stageScheduled.slice(0, targetIdx),
+          draggedItem,
+          ...stageScheduled.slice(targetIdx)
+        ];
+      } else {
+        newStageScheduled = [...stageScheduled, draggedItem];
+      }
+    } else {
+      newStageScheduled = [...stageScheduled, draggedItem];
+    }
+
+    newStageScheduled.forEach((p, index) => {
+      p.sort_order = index;
+    });
+
+    const finalPoints = updatedList.map(p => {
+      const stageItem = newStageScheduled.find(sp => sp.id === p.id);
+      return stageItem ? stageItem : p;
+    });
+
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+    const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
+
+    if (Object.keys(conflicts).length > 0) {
+      alert('Aktion blockiert: ' + Object.values(conflicts)[0]);
+      return;
+    }
+
+    const pointsToUpdate = finalPoints.filter(p => {
+      const original = programPoints.find(orig => orig.id === p.id);
+      return (
+        original.is_scheduled !== p.is_scheduled ||
+        original.stage_number !== p.stage_number ||
+        original.sort_order !== p.sort_order
+      );
+    });
+
+    for (const pp of pointsToUpdate) {
+      const { error } = await supabase
+        .from('campus_event_program_points')
+        .update({
+          is_scheduled: pp.is_scheduled,
+          stage_number: pp.stage_number,
+          sort_order: pp.sort_order
+        })
+        .eq('id', pp.id);
+      if (error) {
+        console.error('Error updating program point placement:', error);
+        alert('Fehler beim Speichern in der Datenbank.');
+        return;
+      }
+    }
+
+    setProgramPoints(finalPoints);
+  };
+
+  const handleEditDuration = async (ppId: string, newDuration: number) => {
+    if (isNaN(newDuration) || newDuration <= 0) return;
+
+    const finalPoints = programPoints.map(p => p.id === ppId ? { ...p, duration: newDuration } : p);
+
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+    const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
+
+    if (Object.keys(conflicts).length > 0) {
+      alert('Dauer-Änderung blockiert: ' + Object.values(conflicts)[0]);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('campus_event_program_points')
+      .update({ duration: newDuration })
+      .eq('id', ppId);
+
+    if (error) {
+      console.error('Error updating duration:', error);
+      alert('Fehler beim Aktualisieren der Dauer.');
+    } else {
+      setProgramPoints(finalPoints);
+    }
+  };
+
+  const handleAddManualEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+
+    if (!manualTitle || !manualDuration) {
+      alert('Bitte Titel und Dauer ausfüllen.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('campus_event_program_points')
+      .insert({
+        event_id: activeEv.id,
+        school_id: activeEv.school_id || schoolId,
+        name: manualTitle,
+        title: manualTitle,
+        ensemble_band: manualEnsemble || null,
+        teacher_id: manualTeacherId || null,
+        instrument: manualInstrument || null,
+        duration: parseInt(manualDuration, 10),
+        status: 'approved',
+        is_scheduled: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting manual entry:', error);
+      alert('Fehler beim Speichern: ' + error.message);
+    } else {
+      setProgramPoints(prev => [...prev, data]);
+      setManualTitle('');
+      setManualEnsemble('');
+      setManualTeacherId('');
+      setManualInstrument('');
+      setManualDuration('');
+      setIsManualEntryModalOpen(false);
+    }
+  };
+
   useEffect(() => {
     const fetchUsers = async () => {
       if (!schoolId) return;
@@ -334,6 +682,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const activeEventForPanel = secretaryPlanningEvent || selectedEvent;
     if (activeEventForPanel && !activeEventForPanel.is_subscribed) {
       fetchProgramPoints(activeEventForPanel.id);
+      fetchEventDayLessons(activeEventForPanel.event_date);
+      setActiveStage(1);
       setStageCount(Math.min(10, Math.max(1, activeEventForPanel.stage_count || 1)));
       setTotalDuration(activeEventForPanel.total_duration ? String(activeEventForPanel.total_duration) : '');
       setProgramDuration(activeEventForPanel.program_duration ? String(activeEventForPanel.program_duration) : '');
@@ -349,6 +699,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setEventMainResponsible(activeEventForPanel.responsible_program || '');
       setEventTechResponsible(activeEventForPanel.responsible_tech || '');
       setEventCoordResponsible(activeEventForPanel.responsible_coordination || '');
+      setEventSubmissionDeadline(formatToLocalDatetime(activeEventForPanel.submission_deadline));
     } else if (teacherSubmissionEvent) {
       fetchProgramPoints(teacherSubmissionEvent.id);
     } else {
@@ -387,7 +738,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           budget: budgetVal,
           responsible_program: eventMainResponsible,
           responsible_tech: eventTechResponsible,
-          responsible_coordination: eventCoordResponsible
+          responsible_coordination: eventCoordResponsible,
+          submission_deadline: eventSubmissionDeadline ? new Date(eventSubmissionDeadline).toISOString() : null
         })
         .eq('id', activeEv.id)
         .select()
@@ -557,7 +909,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           composer: firstSong ? firstSong.composer : null,
           arranger: firstSong ? firstSong.arranger : null,
           publisher: newPpPublisher.trim() || null,
-          tech_requirements: newPpTechRequirements.trim() || null,
+          tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
           chairs_needed: chairs,
           music_stands_needed: stands,
           remarks: newPpRemarks.trim() || null,
@@ -583,6 +935,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setNewPpArranger('');
       setNewPpPublisher('');
       setNewPpTechRequirements('');
+      setTechRiderItems([]);
+      setBuilderNotes('');
       setNewPpChairs('0');
       setNewPpStands('0');
       setNewPpRemarks('');
@@ -634,7 +988,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           composer: firstSong ? firstSong.composer : null,
           arranger: firstSong ? firstSong.arranger : null,
           publisher: newPpPublisher.trim() || null,
-          tech_requirements: newPpTechRequirements.trim() || null,
+          tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
           chairs_needed: chairs,
           music_stands_needed: stands,
           remarks: newPpRemarks.trim() || null,
@@ -660,6 +1014,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setNewPpArranger('');
       setNewPpPublisher('');
       setNewPpTechRequirements('');
+      setTechRiderItems([]);
+      setBuilderNotes('');
       setNewPpChairs('0');
       setNewPpStands('0');
       setNewPpRemarks('');
@@ -2990,6 +3346,235 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {/* Equipment & Tech details */}
         <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '8px' }}>
           <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', margin: '0 0 12px 0' }}>Bühnen-Bedarf & Technik</h4>
+          
+          {/* Technical Rider - Now on TOP */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '8px' }}>
+              Technical Rider / Bühnen-Inputs
+            </label>
+
+            {/* List of currently added items */}
+            {techRiderItems.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                {techRiderItems.map((item) => {
+                  let emoji = '🎵';
+                  if (item.type.toLowerCase().includes('gesang')) emoji = '🎤';
+                  else if (item.type.toLowerCase().includes('gitarre')) emoji = '🎸';
+                  else if (item.type.toLowerCase().includes('bass')) emoji = '🎸';
+                  else if (item.type.toLowerCase().includes('piano') || item.type.toLowerCase().includes('keyboard')) emoji = '🎹';
+                  else if (item.type.toLowerCase().includes('schlagzeug') || item.type.toLowerCase().includes('drum')) emoji = '🥁';
+                  else if (item.type.toLowerCase().includes('di-box') || item.type.toLowerCase().includes('di box')) emoji = '🔌';
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
+                        <div>
+                          <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>
+                            {item.count}x {item.type}
+                          </strong>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>
+                            Anschluss: {item.connection} | Bereitstellung: {item.source === 'venue' ? 'Gestellt von Schule' : 'Selbst mitgebracht'}
+                            {item.notes ? ` (${item.notes})` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTechRiderItem(item.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          padding: '4px'
+                        }}
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Input row for adding new item */}
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                padding: '14px',
+                borderRadius: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}
+            >
+              {/* Badges for Quick Selection */}
+              <div>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                  Schnellauswahl:
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    { label: '🎤 Gesang', value: 'Gesang', conn: 'Mikrofon', src: 'venue' },
+                    { label: '🎸 E-Gitarre', value: 'E-Gitarre', conn: 'Mikrofon', src: 'own' },
+                    { label: '🎸 A-Gitarre', value: 'A-Gitarre', conn: 'DI-Box', src: 'own' },
+                    { label: '🎸 E-Bass', value: 'E-Bass', conn: 'DI-Box', src: 'own' },
+                    { label: '🎹 Keyboard', value: 'E-Piano / Keyboard', conn: 'Line-In', src: 'venue' },
+                    { label: '🥁 Drums', value: 'Schlagzeug / E-Drum', conn: 'Mikrofon', src: 'venue' },
+                    { label: '🔌 DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' },
+                    { label: '🎺 Blasinstrument', value: 'Blasinstrument', conn: 'Mikrofon', src: 'own' }
+                  ].map(badge => (
+                    <button
+                      key={badge.value}
+                      type="button"
+                      onClick={() => {
+                        if (badge.value === 'Blasinstrument') {
+                          setBuilderType('');
+                        } else {
+                          setBuilderType(badge.value);
+                        }
+                        setBuilderConnection(badge.conn);
+                        setBuilderSource(badge.src);
+                        // Focus the input field immediately
+                        setTimeout(() => {
+                          instrumentInputRef.current?.focus();
+                        }, 50);
+                      }}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: builderType === badge.value ? `${brandColor}10` : '#ffffff',
+                        borderColor: builderType === badge.value ? brandColor : '#cbd5e1',
+                        color: builderType === badge.value ? brandColor : '#334155',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {badge.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grid 1: Input name & connection & count */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 0.7fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Instrument / Input</label>
+                  <input
+                    ref={instrumentInputRef}
+                    type="text"
+                    list="default-instruments"
+                    value={builderType}
+                    placeholder="z.B. Gesang, Percussion"
+                    onChange={(e) => setBuilderType(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                  />
+                  <datalist id="default-instruments">
+                    <option value="Gesang" />
+                    <option value="E-Gitarre" />
+                    <option value="A-Gitarre" />
+                    <option value="E-Bass" />
+                    <option value="E-Piano / Keyboard" />
+                    <option value="Schlagzeug / E-Drum" />
+                    <option value="DI-Box" />
+                    <option value="Verstärker (Amp)" />
+                    <option value="Line-In" />
+                    <option value="Blasinstrument" />
+                  </datalist>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anschluss</label>
+                  <select
+                    value={builderConnection}
+                    onChange={(e) => setBuilderConnection(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
+                  >
+                    <option value="Mikrofon">Mikrofon</option>
+                    <option value="DI-Box">DI-Box</option>
+                    <option value="Line-In">Line-In</option>
+                    <option value="Verstärker (Amp)">Verstärker (Amp)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anzahl</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={builderCount}
+                    onChange={(e) => setBuilderCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Grid 2: Source & notes & add button */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.4fr auto', gap: '8px', alignItems: 'end' }}>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Bereitgestellt durch</label>
+                  <select
+                    value={builderSource}
+                    onChange={(e) => setBuilderSource(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
+                  >
+                    <option value="venue">Gestellt von Schule</option>
+                    <option value="own">Selbst mitgebracht</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Details / Notiz</label>
+                  <input
+                    type="text"
+                    value={builderNotes}
+                    placeholder="z.B. Phantomspeisung"
+                    onChange={(e) => setBuilderNotes(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddTechRiderItem}
+                  style={{
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 900,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    height: '35px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Chairs & Music Stands - Now below Technical Rider */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
             <div>
               <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Anzahl Stühle</label>
@@ -2998,7 +3583,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 min="0"
                 value={newPpChairs}
                 onChange={e => setNewPpChairs(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box', height: '42px' }}
               />
             </div>
             <div>
@@ -3008,18 +3593,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 min="0"
                 value={newPpStands}
                 onChange={e => setNewPpStands(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box', height: '42px' }}
               />
             </div>
-          </div>
-          <div>
-            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Technische Anforderungen (Mikros, Amps, DI...)</label>
-            <textarea
-              placeholder="z.B. 2 Gesangsmikros, 1x DI-Box für Keyboard"
-              value={newPpTechRequirements}
-              onChange={e => setNewPpTechRequirements(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', minHeight: '60px', boxSizing: 'border-box', fontFamily: 'inherit' }}
-            />
           </div>
         </div>
 
@@ -3059,6 +3635,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 setNewPpArranger('');
                 setNewPpPublisher('');
                 setNewPpTechRequirements('');
+                setTechRiderItems([]);
+                setBuilderNotes('');
                 setNewPpChairs('0');
                 setNewPpStands('0');
                 setNewPpRemarks('');
@@ -3382,7 +3960,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 setNewPpComposer(pp.composer || '');
                                 setNewPpArranger(pp.arranger || '');
                                 setNewPpPublisher(pp.publisher || '');
-                                setNewPpTechRequirements(pp.tech_requirements || '');
+                                if (pp.tech_requirements) {
+                                  try {
+                                    if (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{')) {
+                                      const res = JSON.parse(pp.tech_requirements);
+                                      setTechRiderItems(Array.isArray(res) ? res : [res]);
+                                    } else {
+                                      setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
+                                    }
+                                  } catch (e) {
+                                    setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
+                                  }
+                                } else {
+                                  setTechRiderItems([]);
+                                }
                                 setNewPpChairs(String(pp.chairs_needed || 0));
                                 setNewPpStands(String(pp.music_stands_needed || 0));
                                 setNewPpRemarks(pp.remarks || '');
@@ -3481,23 +4072,23 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     const panelContent = (
       <div style={{
-        background: '#ffffff',
-        border: asOverlay ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        background: asOverlay ? 'transparent' : 'rgba(255, 255, 255, 0.4)',
+        border: asOverlay ? 'none' : '1px solid rgba(255, 255, 255, 0.5)',
         borderRadius: asOverlay ? '0' : '24px',
-        padding: '24px',
-        boxShadow: asOverlay ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
+        padding: asOverlay ? '0' : '24px',
+        boxShadow: asOverlay ? 'none' : '0 8px 32px rgba(0,0,0,0.03)',
         display: 'flex',
         flexDirection: 'column',
         gap: '20px',
-        height: asOverlay ? '100%' : 'calc(100vh - 120px)',
+        height: '100%',
         overflow: 'hidden'
       }}>
         {/* Event Header */}
         {!asOverlay && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase' }}>PLANUNGS-MODUL</span>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>{activeEvent.title}</h3>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>PLANUNGS-MODUL</span>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: '4px 0 0 0', letterSpacing: '-0.01em' }}>{activeEvent.title}</h3>
             </div>
             <button
               onClick={() => { setSelectedEvent(null); setSecretaryPlanningEvent(null); }}
@@ -3508,8 +4099,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </div>
         )}
 
-        {/* Tab Buttons */}
-        <div style={{ display: 'flex', background: '#f8fafc', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+        {/* Tab Buttons (iOS Segmented Control) */}
+        <div style={{ 
+          display: 'flex', 
+          background: 'rgba(118, 118, 128, 0.12)', 
+          padding: '2px', 
+          borderRadius: '9px', 
+          gap: '2px',
+          alignSelf: 'flex-start',
+          minWidth: '380px',
+          boxShadow: 'inset 0 0.5px 1px rgba(0, 0, 0, 0.05)'
+        }}>
           {[
             { id: 'eckdaten', label: 'Eckdaten' },
             { id: 'feedback', label: 'Feedback' },
@@ -3524,12 +4124,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 flex: 1,
                 border: 'none',
                 background: coordinatorTab === tab.id ? '#ffffff' : 'transparent',
-                color: coordinatorTab === tab.id ? '#0f172a' : '#64748b',
-                padding: '8px 4px',
-                borderRadius: '8px',
-                fontWeight: 800,
-                fontSize: '0.72rem',
-                cursor: 'pointer'
+                color: coordinatorTab === tab.id ? '#1d1d1f' : '#86868b',
+                padding: '5px 12px',
+                borderRadius: '7px',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                boxShadow: coordinatorTab === tab.id ? '0 1px 3px rgba(0,0,0,0.06), 0 4px 10px rgba(0,0,0,0.04)' : 'none',
+                transition: 'all 0.15s ease-in-out'
               }}
             >
               {tab.label}
@@ -3538,7 +4140,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         </div>
 
         {/* Tab Content */}
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', marginTop: '12px' }}>
           {coordinatorTab === 'eckdaten' && (() => {
             const calcTotalMin = programPoints.reduce((sum, pp) => sum + (pp.duration || 0), 0);
             const calcProgMin = programPoints.filter(pp => !pp.is_pause).reduce((sum, pp) => sum + (pp.duration || 0), 0);
@@ -3548,19 +4150,49 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               planung:       { label: 'In Planung',    color: '#b45309', bg: '#fef3c7' },
               bestaetigt:    { label: 'Bestätigt',     color: '#1d4ed8', bg: '#dbeafe' },
               laufend:       { label: 'Laufend',       color: '#15803d', bg: '#dcfce7' },
-                      abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
+              abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
             };
             const currentStatus = statusConfig[eventStatus] || statusConfig.planung;
-            const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '0.82rem', boxSizing: 'border-box', background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' };
-            const labelStyle: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' };
-            const readOnlyBadge: React.CSSProperties = { padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #f1f5f9', background: '#f8fafc', color: '#334155', fontSize: '0.82rem', fontWeight: 700 };
+            const inputStyle: React.CSSProperties = { 
+              width: '100%', 
+              padding: '10px 14px', 
+              borderRadius: '10px', 
+              border: '1px solid rgba(0,0,0,0.06)', 
+              fontSize: '0.84rem', 
+              boxSizing: 'border-box', 
+              background: 'rgba(0,0,0,0.03)', 
+              outline: 'none', 
+              fontFamily: 'inherit', 
+              color: '#1d1d1f',
+              transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+            };
+            const labelStyle: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 700, color: '#86868b', display: 'block', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' };
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                {/* Status Row: Buttons on the left, current status indicator on the right */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-                  {/* Status Buttons */}
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderRadius: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.6)',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.01)',
+                padding: '24px',
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '24px'
+              }}>
+                {/* Header row: Datum, Frist und Speichern */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'flex-end', 
+                  paddingBottom: '20px', 
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.05)', 
+                  gap: '16px',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Status buttons on the left */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {Object.entries(statusConfig).map(([id, cfg]) => {
                       const isSelected = eventStatus === id;
                       return (
@@ -3583,55 +4215,98 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     })}
                   </div>
 
-                  {/* Current Status Badge */}
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '5px 14px', borderRadius: '20px',
-                    background: currentStatus.bg,
-                    color: currentStatus.color,
-                    fontSize: '0.72rem', fontWeight: 800,
-                    border: `1px solid ${currentStatus.color}22`,
-                    letterSpacing: '0.02em'
-                  }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: currentStatus.color, display: 'inline-block' }} />
-                    {currentStatus.label}
-                  </span>
-                </div>
+                  {/* Right side aligned elements */}
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                    {/* Datum (Read-only Calendar Widget Style) */}
+                    <div style={{
+                      padding: '10px 16px',
+                      background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                      borderRadius: '12px',
+                      border: '1px solid #dcfce7',
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'center',
+                      height: '44px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{
+                        background: '#10b981',
+                        color: '#ffffff',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
+                      }}>
+                        <Calendar size={12} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Datum</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d1d1f' }}>
+                          {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Datum (Read-only Calendar Widget Style) */}
-                <div style={{
-                  marginBottom: '20px',
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                  borderRadius: '16px',
-                  border: '1px solid #dcfce7',
-                  display: 'flex',
-                  gap: '12px',
-                  alignItems: 'center'
-                }}>
-                  <div style={{
-                    background: '#10b981',
-                    color: '#ffffff',
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <Calendar size={18} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Datum & Tag</span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
-                      {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-                    </span>
+                    {/* Frist für Programmanmeldungen (Input) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '220px' }}>
+                      <label style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Frist für Programmanmeldungen
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={eventSubmissionDeadline}
+                        onChange={e => setEventSubmissionDeadline(e.target.value)}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(0,0,0,0.06)',
+                          fontSize: '0.82rem',
+                          boxSizing: 'border-box',
+                          background: 'rgba(0,0,0,0.03)',
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                          color: '#1d1d1f',
+                          fontWeight: 700,
+                          height: '44px',
+                          transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                      />
+                    </div>
+
+                    {/* Speichern Button */}
+                    <button
+                      type="button"
+                      onClick={handleSaveEventSettings}
+                      disabled={!!admissionTimeError}
+                      style={{
+                        background: admissionTimeError 
+                          ? 'rgba(0, 0, 0, 0.05)' 
+                          : `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}dd 100%)`,
+                        color: admissionTimeError ? '#86868b' : '#ffffff',
+                        border: 'none',
+                        padding: '12px 24px',
+                        borderRadius: '10px',
+                        fontWeight: 750,
+                        fontSize: '0.82rem',
+                        cursor: admissionTimeError ? 'not-allowed' : 'pointer',
+                        transition: 'opacity 0.2s, transform 0.15s',
+                        whiteSpace: 'nowrap',
+                        boxShadow: admissionTimeError ? 'none' : '0 4px 14px rgba(0,0,0,0.1)',
+                        height: '44px'
+                      }}
+                      onMouseOver={e => { if (!admissionTimeError) e.currentTarget.style.opacity = '0.9'; }}
+                      onMouseOut={e => { e.currentTarget.style.opacity = '1'; }}
+                    >
+                      Eckdaten speichern
+                    </button>
                   </div>
                 </div>
 
                 {/* 2-Column Main Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '28px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '28px' }}>
                   {/* ── LEFT COLUMN ── */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
@@ -3665,55 +4340,90 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       </div>
                     </div>
 
-                    {/* Beginn */}
-                    <div>
-                      <label style={labelStyle}>Beginn (Uhrzeit) *</label>
-                      <input
-                        type="time"
-                        required
-                        value={eventStartTime}
-                        onChange={e => {
-                          setEventStartTime(e.target.value);
-                          // Clear admission error if now beginn is moved later
-                          if (eventAdmissionTime && e.target.value >= eventAdmissionTime) {
-                            setAdmissionTimeError('');
-                          }
-                        }}
-                        style={{ ...inputStyle, border: `1.5px solid ${eventStartTime ? '#a3e635' : '#e2e8f0'}` }}
-                      />
-                    </div>
+                    {/* Beginn & Einlass Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      {/* Beginn */}
+                      <div>
+                        <label style={labelStyle}>Beginn (Uhrzeit) *</label>
+                        <input
+                          type="time"
+                          required
+                          value={eventStartTime}
+                          onChange={e => {
+                            setEventStartTime(e.target.value);
+                            // Clear admission error if now beginn is moved later
+                            if (eventAdmissionTime && e.target.value >= eventAdmissionTime) {
+                              setAdmissionTimeError('');
+                            }
+                          }}
+                          style={{ ...inputStyle, border: `1.5px solid ${eventStartTime ? brandColor : 'rgba(0,0,0,0.08)'}` }}
+                        />
+                      </div>
 
-                    {/* Einlass with fallback logic */}
-                    <div>
-                      <label style={labelStyle}>
-                        Einlass (Uhrzeit)
-                        <span style={{ marginLeft: '6px', color: '#94a3b8', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
-                          {!eventAdmissionTime && eventStartTime ? `— Fallback: ${eventStartTime} Uhr` : '(optional)'}
-                        </span>
-                      </label>
-                      <input
-                        type="time"
-                        value={eventAdmissionTime}
-                        onChange={e => {
-                          setEventAdmissionTime(e.target.value);
-                          if (e.target.value && eventStartTime && e.target.value > eventStartTime) {
-                            setAdmissionTimeError('Einlass kann nicht nach dem Beginn liegen.');
-                          } else {
-                            setAdmissionTimeError('');
-                          }
-                        }}
-                        placeholder={eventStartTime || undefined}
-                        style={{
-                          ...inputStyle,
-                          border: `1.5px solid ${admissionTimeError ? '#f87171' : '#e2e8f0'}`,
-                          color: eventAdmissionTime ? '#0f172a' : '#94a3b8'
-                        }}
-                      />
-                      {admissionTimeError && (
-                        <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '4px', display: 'block' }}>
-                          ⚠ {admissionTimeError}
-                        </span>
-                      )}
+                      {/* Einlass with fallback logic */}
+                      <div>
+                        <label style={labelStyle}>
+                          Einlass (Uhrzeit)
+                          <span style={{ marginLeft: '4px', color: '#94a3b8', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
+                            {!eventAdmissionTime && eventStartTime ? `— Fallback: ${eventStartTime} Uhr` : '(optional)'}
+                          </span>
+                        </label>
+                        <input
+                          type="time"
+                          value={eventAdmissionTime}
+                          onChange={e => {
+                            setEventAdmissionTime(e.target.value);
+                            if (e.target.value && eventStartTime && e.target.value > eventStartTime) {
+                              setAdmissionTimeError('Einlass kann nicht nach dem Beginn liegen.');
+                            } else {
+                              setAdmissionTimeError('');
+                            }
+                          }}
+                          placeholder={eventStartTime || undefined}
+                          style={{
+                            ...inputStyle,
+                            border: `1.5px solid ${admissionTimeError ? '#f87171' : 'rgba(0,0,0,0.08)'}`,
+                            color: eventAdmissionTime ? '#1d1d1f' : '#94a3b8'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    {admissionTimeError && (
+                      <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '-6px', display: 'block' }}>
+                        ⚠ {admissionTimeError}
+                      </span>
+                    )}
+
+                    {/* Anzahl Bühnen & Budget Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      {/* Anzahl Bühnen */}
+                      <div>
+                        <label style={labelStyle}>Anzahl Bühnen</label>
+                        <select
+                          value={stageCount}
+                          onChange={e => setStageCount(parseInt(e.target.value, 10))}
+                          style={{ ...inputStyle }}
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} Bühne{n !== 1 ? 'n' : ''}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Budget */}
+                      <div>
+                        <label style={labelStyle}>Budget</label>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '12px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8' }}>€</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={eventBudget}
+                            onChange={e => setEventBudget(e.target.value)}
+                            placeholder="1.500,00"
+                            style={{ ...inputStyle, paddingLeft: '28px' }}
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     {/* Erwartete Besucherzahl */}
@@ -3746,57 +4456,28 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                     {/* Read-only metrics block */}
-                    <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live-Metriken</span>
+                    <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live-Metriken</span>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Gesamtdauer</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{fmtMin(calcTotalMin)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Gesamtdauer</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{fmtMin(calcTotalMin)}</span>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Programm-Dauer</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{fmtMin(calcProgMin)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Programm-Dauer</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{fmtMin(calcProgMin)}</span>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Teilnehmer (Schüler)</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{totalParticipants}</span>
-                      </div>
-                    </div>
-
-                    {/* Anzahl Bühnen */}
-                    <div>
-                      <label style={labelStyle}>Anzahl Bühnen</label>
-                      <select
-                        value={stageCount}
-                        onChange={e => setStageCount(parseInt(e.target.value, 10))}
-                        style={{ ...inputStyle }}
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} Bühne{n !== 1 ? 'n' : ''}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Budget */}
-                    <div>
-                      <label style={labelStyle}>Budget</label>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ position: 'absolute', left: '12px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8' }}>€</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={eventBudget}
-                          onChange={e => setEventBudget(e.target.value)}
-                          placeholder="1.500,00"
-                          style={{ ...inputStyle, paddingLeft: '28px' }}
-                        />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Teilnehmer (Schüler)</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{totalParticipants}</span>
                       </div>
                     </div>
 
                     {/* Verantwortliche */}
-                    <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verantwortliche</span>
+                    <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verantwortliche</span>
 
                       {[
                         { label: 'Programm', val: eventMainResponsible, set: setEventMainResponsible },
@@ -3821,29 +4502,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     </div>
                   </div>
                 </div>
-
-                {/* Save Button */}
-                <button
-                  onClick={handleSaveEventSettings}
-                  disabled={!!admissionTimeError}
-                  style={{
-                    marginTop: '24px',
-                    background: admissionTimeError ? '#e2e8f0' : brandColor,
-                    color: admissionTimeError ? '#94a3b8' : '#ffffff',
-                    border: 'none',
-                    padding: '13px 24px',
-                    borderRadius: '12px',
-                    fontWeight: 900,
-                    fontSize: '0.84rem',
-                    cursor: admissionTimeError ? 'not-allowed' : 'pointer',
-                    transition: 'opacity 0.2s',
-                    alignSelf: 'flex-start'
-                  }}
-                  onMouseOver={e => { if (!admissionTimeError) e.currentTarget.style.opacity = '0.88'; }}
-                  onMouseOut={e => { e.currentTarget.style.opacity = '1'; }}
-                >
-                  Eckdaten speichern
-                </button>
               </div>
             );
           })()}
@@ -3893,90 +4551,436 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             </div>
           )}
 
-          {coordinatorTab === 'timeline' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Insert Pause Form */}
-              <form onSubmit={handleAddPause} style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-                <input
-                  type="number"
-                  placeholder="Pausendauer in Min."
-                  value={pauseDuration}
-                  onChange={e => setPauseDuration(e.target.value)}
-                  style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem' }}
-                />
-                <button
-                  type="submit"
-                  style={{ background: '#0f172a', color: '#ffffff', border: 'none', padding: '10px 16px', borderRadius: '10px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
-                >
-                  + Pause einfügen
-                </button>
-              </form>
+          {coordinatorTab === 'timeline' && (() => {
+            // Unscheduled Pool: is_scheduled === false && status === 'approved' (and not pause)
+            const unscheduledPoints = programPoints.filter(pp => !pp.is_scheduled && !pp.is_pause && pp.status === 'approved');
 
-              {/* Points List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {programPoints.map((pp, idx) => (
-                  <div key={pp.id} style={{
-                    padding: '12px 14px',
-                    background: pp.is_pause ? '#fffbeb' : '#ffffff',
-                    border: pp.is_pause ? '1px solid #fef3c7' : '1px solid rgba(0,0,0,0.06)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+            // Scheduled Points on active stage, sorted by sort_order
+            const activeStagePoints = programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && pp.stage_number === activeStage)
+              .sort((a, b) => a.sort_order - b.sort_order);
+
+            // Compute conflicts and time map
+            const activeEv = secretaryPlanningEvent || selectedEvent;
+            const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+            const conflicts = getConflictsMap(programPoints, eventDayLessons, activeEventStartTime);
+            const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Stage count switcher if stage_count > 1 */}
+                {stageCount > 1 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    background: 'rgba(120, 120, 128, 0.06)', 
+                    padding: '3px', 
+                    borderRadius: '8px', 
+                    gap: '2px',
+                    alignSelf: 'flex-start'
                   }}>
-                    <div>
-                      <strong style={{ fontSize: '0.85rem' }}>{pp.name}</strong>
-                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>⏱️ {pp.duration} Min.</span>
-                      {/* Render Songs */}
-                      {(() => {
-                        const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
-                        if (songsList.length === 0) return null;
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px' }}>
-                            {songsList.map((song: any, sIdx: number) => (
-                              <div key={sIdx} style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                                🎵 {song.artist ? `${song.artist} - ` : ''}{song.title}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+                    {Array.from({ length: stageCount }, (_, i) => i + 1).map(stageNum => (
+                      <button
+                        key={stageNum}
+                        type="button"
+                        onClick={() => setActiveStage(stageNum)}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: activeStage === stageNum ? '#ffffff' : 'transparent',
+                          color: activeStage === stageNum ? '#1d1d1f' : '#86868b',
+                          fontWeight: 'bold',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          boxShadow: activeStage === stageNum ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        Bühne {stageNum}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+                  {/* Left Column: Pool of Unscheduled Program Points */}
+                  <div
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={handleDropOnUnscheduledPool}
+                    style={{
+                      flex: 1,
+                      background: '#f5f5f7',
+                      borderRadius: '20px',
+                      padding: '20px',
+                      border: '1.5px dashed rgba(0, 0, 0, 0.12)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>Unverplante Beiträge</h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsManualEntryModalOpen(true)}
+                        style={{
+                          background: brandColor,
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          transition: 'opacity 0.15s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
+                        onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                      >
+                        + Beitrag hinzufügen
+                      </button>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {idx > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleSwapProgramPoints(pp, programPoints[idx - 1])}
-                          style={{ border: 'none', background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          ⬆️
-                        </button>
-                      )}
-                      {idx < programPoints.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleSwapProgramPoints(pp, programPoints[idx + 1])}
-                          style={{ border: 'none', background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          ⬇️
-                        </button>
-                      )}
-                      {!pp.is_pause && pp.status !== 'approved' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateProgramPointStatus(pp.id, 'approved')}
-                          style={{ border: 'none', background: '#dcfce7', color: '#16a34a', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800 }}
-                        >
-                          Freigeben
-                        </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                      {unscheduledPoints.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 16px', fontSize: '0.78rem', color: '#86868b', lineHeight: 1.5 }}>
+                          Keine unverplanten Beiträge.<br />Ziehe Beiträge hierher, um sie aus dem Ablaufplan zu entfernen.
+                        </div>
+                      ) : (
+                        unscheduledPoints.map(pp => (
+                          <div
+                            key={pp.id}
+                            draggable
+                            onDragStart={e => {
+                              e.dataTransfer.setData('ppId', pp.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            style={{
+                              padding: '12px 14px',
+                              background: 'rgba(255, 255, 255, 0.85)',
+                              border: '1px solid rgba(255, 255, 255, 0.6)',
+                              borderRadius: '16px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.01)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              cursor: 'grab',
+                              fontSize: '0.8rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: '#1d1d1f' }}>{pp.name}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', color: '#86868b' }}>
+                              {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                              {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                              {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: brandColor, fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              ⏱️ {pp.duration} Min.
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>
-                ))}
+
+                  {/* Right Column: Stage Timeline */}
+                  <div
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => handleDropOnTimeline(e)}
+                    style={{
+                      flex: 1.6,
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(255, 255, 255, 0.6)',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.01)',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#1d1d1f' }}>
+                        Bühne {activeStage} - Ablaufplan
+                      </h4>
+                      {/* Add Pause Form */}
+                      <form onSubmit={handleAddPause} style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="number"
+                          placeholder="Pause (Min.)"
+                          value={pauseDuration}
+                          onChange={e => setPauseDuration(e.target.value)}
+                          style={{ 
+                            width: '95px', 
+                            padding: '6px 10px', 
+                            borderRadius: '8px', 
+                            border: '1px solid rgba(0,0,0,0.06)', 
+                            background: 'rgba(0,0,0,0.03)',
+                            fontSize: '0.78rem',
+                            outline: 'none',
+                            fontWeight: 600
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          style={{ 
+                            background: '#1d1d1f', 
+                            color: '#ffffff', 
+                            border: 'none', 
+                            padding: '6px 12px', 
+                            borderRadius: '8px', 
+                            fontWeight: 'bold', 
+                            fontSize: '0.76rem', 
+                            cursor: 'pointer' 
+                          }}
+                        >
+                          + Pause
+                        </button>
+                      </form>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                      {activeStagePoints.length === 0 ? (
+                        <div style={{ 
+                          textAlign: 'center', 
+                          padding: '60px 20px', 
+                          border: '1.5px dashed rgba(0, 0, 0, 0.08)', 
+                          borderRadius: '14px', 
+                          color: '#86868b', 
+                          fontSize: '0.8rem',
+                          lineHeight: 1.5
+                        }}>
+                          Bühne leer.<br />Ziehe Beiträge aus der linken Spalte hierher, um sie zeitlich einzuplanen.
+                        </div>
+                      ) : (
+                        activeStagePoints.map((pp, idx) => {
+                          const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+                          const conflictReason = conflicts[pp.id];
+                          const hasConflict = !!conflictReason;
+
+                          return (
+                            <div
+                              key={pp.id}
+                              draggable
+                              onDragStart={e => {
+                                e.dataTransfer.setData('ppId', pp.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragOver={e => e.preventDefault()}
+                              onDrop={e => {
+                                e.stopPropagation();
+                                handleDropOnTimeline(e, pp.id);
+                              }}
+                              style={{
+                                padding: '12px 16px',
+                                background: hasConflict 
+                                  ? 'rgba(255, 69, 58, 0.06)' 
+                                  : (pp.is_pause ? 'rgba(255, 204, 0, 0.06)' : 'rgba(255, 255, 255, 0.85)'),
+                                border: hasConflict 
+                                  ? '1px solid rgba(255, 69, 58, 0.25)' 
+                                  : (pp.is_pause ? '1px solid rgba(255, 204, 0, 0.25)' : '1px solid rgba(255, 255, 255, 0.6)'),
+                                borderRadius: '16px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.01)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                cursor: 'grab',
+                                gap: '12px'
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ 
+                                    fontSize: '0.74rem', 
+                                    background: pp.is_pause ? 'rgba(255, 214, 10, 0.15)' : 'rgba(0, 0, 0, 0.04)', 
+                                    color: pp.is_pause ? '#b28600' : '#1d1d1f',
+                                    padding: '2px 8px', 
+                                    borderRadius: '6px', 
+                                    fontWeight: 700 
+                                  }}>
+                                    {timeInfo.start} - {timeInfo.end}
+                                  </span>
+                                  <strong style={{ fontSize: '0.84rem', color: hasConflict ? '#d70015' : '#1d1d1f' }}>
+                                    {pp.name}
+                                  </strong>
+                                </div>
+
+                                {hasConflict && (
+                                  <div style={{ fontSize: '0.74rem', color: '#ff3b30', fontWeight: 700, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    ⚠️ {conflictReason}
+                                  </div>
+                                )}
+
+                                {!pp.is_pause && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#86868b' }}>
+                                    {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                                    {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                                    {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                  <label style={{ fontSize: '0.6rem', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Min.</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={pp.duration}
+                                    onChange={e => handleEditDuration(pp.id, parseInt(e.target.value, 10))}
+                                    style={{
+                                      width: '55px',
+                                      padding: '4px 6px',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(0,0,0,0.08)',
+                                      fontSize: '0.76rem',
+                                      textAlign: 'center',
+                                      fontWeight: 600,
+                                      outline: 'none'
+                                    }}
+                                  />
+                                </div>
+
+                                {pp.is_pause && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
+                                      if (!error) {
+                                        setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
+                                      }
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#ff3b30',
+                                      fontSize: '1rem',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center'
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Manual Entry Modal */}
+                {isManualEntryModalOpen && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 10000
+                  }}>
+                    <div style={{
+                      background: '#ffffff',
+                      padding: '28px',
+                      borderRadius: '20px',
+                      width: '400px',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f' }}>Neuen Beitrag hinzufügen</h3>
+                      <form onSubmit={handleAddManualEntry} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Titel</label>
+                          <input
+                            type="text"
+                            required
+                            value={manualTitle}
+                            onChange={e => setManualTitle(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Ensemble / Band</label>
+                          <input
+                            type="text"
+                            value={manualEnsemble}
+                            onChange={e => setManualEnsemble(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrer</label>
+                          <select
+                            value={manualTeacherId}
+                            onChange={e => setManualTeacherId(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                          >
+                            <option value="">-- Kein Lehrer --</option>
+                            {allUsers.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary').map(u => (
+                              <option key={u.id} value={u.id}>
+                                {u.first_name} {u.last_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Instrument</label>
+                          <input
+                            type="text"
+                            value={manualInstrument}
+                            onChange={e => setManualInstrument(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Dauer (Minuten)</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            value={manualDuration}
+                            onChange={e => setManualDuration(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIsManualEntryModalOpen(false)}
+                            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', background: '#f5f5f7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            type="submit"
+                            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#1d1d1f', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                          >
+                            Speichern
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {coordinatorTab === 'tech' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -4007,36 +5011,70 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     if (asOverlay) {
       return (
         <div
-          onClick={() => setSecretaryPlanningEvent(null)}
+          onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 1200,
-            background: 'rgba(15,23,42,0.45)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '40px', boxSizing: 'border-box'
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(245, 245, 247, 0.65)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            display: 'flex',
+            zIndex: 9999,
+            padding: 0,
+            margin: 0,
+            width: '100vw',
+            height: '100vh',
+            boxSizing: 'border-box'
           }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#ffffff', borderRadius: '32px',
-              width: '100%', maxWidth: '1100px', maxHeight: '88vh',
-              boxShadow: '0 32px 80px rgba(0,0,0,0.18)',
-              display: 'flex', flexDirection: 'column',
-              overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)'
+              background: '#f5f5f7',
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxSizing: 'border-box'
             }}
           >
-            <div style={{ padding: '20px 32px', borderBottom: '1px solid #f1f5f9', background: 'linear-gradient(to right, #f0fdf4, #fff)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Elegant Header bar */}
+            <div style={{
+              padding: '18px 32px',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'rgba(255, 255, 255, 0.7)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
               <div>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: brandColor }}>Verwaltung · Planungs-Modul</span>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>{(secretaryPlanningEvent || selectedEvent)?.title}</h2>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: brandColor }}>Verwaltung · Planungs-Modul</span>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1d1d1f', margin: '4px 0 0 0', letterSpacing: '-0.015em' }}>{(secretaryPlanningEvent || selectedEvent)?.title}</h2>
               </div>
-              <button onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '38px', height: '38px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18} color="#64748b" />
+              <button 
+                onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }} 
+                style={{ 
+                  background: 'rgba(0,0,0,0.05)', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  width: '36px', 
+                  height: '36px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+              >
+                <X size={18} color="#1d1d1f" />
               </button>
             </div>
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 32px' }}>
               {panelContent}
             </div>
           </div>
@@ -4084,12 +5122,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       {showLessons ? renderLessonsColumn() : renderTimelineColumn()}
 
       {/* COLUMN 2 */}
-      {showLessons ? renderTimelineColumn() : (role === 'secretary' ? renderTeacherEventPlanningColumn() : renderAdminCoordinatorPanel())}
+      {showLessons ? renderTimelineColumn() : renderTeacherEventPlanningColumn()}
 
       {/* COLUMN 3 */}
       {role === 'teacher' 
         ? renderTeacherEventPlanningColumn() 
-        : (role === 'secretary' ? renderAdminCoordinatorPanel() : renderAnnouncementsColumn())}
+        : renderAnnouncementsColumn()}
 
       {/* Fullscreen Overlay for Teacher submissions */}
       {renderFullscreenTeacherSubmissionOverlay()}
@@ -4343,6 +5381,31 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   >
                     <CalendarPlus size={14} />
                     Für Event-Planung aktivieren
+                  </button>
+                )}
+
+                {/* Planungs-Modul öffnen button — admin/secretary only */}
+                {ev.is_planning_active && (role === 'admin' || role === 'secretary') && (
+                  <button
+                    onClick={() => {
+                      setSecretaryPlanningEvent(ev);
+                      setSelectedEvent(null);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      background: brandColor, color: '#ffffff',
+                      border: 'none',
+                      padding: '10px', borderRadius: '12px', cursor: 'pointer',
+                      fontWeight: 800, fontSize: '0.82rem',
+                      transition: 'opacity 0.15s',
+                      marginTop: '6px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.opacity = '0.9'; }}
+                    onMouseOut={e => { e.currentTarget.style.opacity = '1'; }}
+                  >
+                    <Settings size={14} />
+                    Planungs-Modul öffnen
                   </button>
                 )}
 
