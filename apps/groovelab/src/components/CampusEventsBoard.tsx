@@ -516,7 +516,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     let updatedList = [...programPoints];
     if (!draggedPp.is_scheduled || draggedPp.stage_number !== activeStage) {
-      updatedList = updatedList.map(p => p.id === ppId ? { ...p, is_scheduled: true, stage_number: activeStage } : p);
+      updatedList = updatedList.map(p => p.id === ppId ? { ...p, is_scheduled: true, stage_number: activeStage, status: 'approved' } : p);
     }
 
     const otherPoints = updatedList.filter(p => p.id !== ppId);
@@ -563,7 +563,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return (
         original.is_scheduled !== p.is_scheduled ||
         original.stage_number !== p.stage_number ||
-        original.sort_order !== p.sort_order
+        original.sort_order !== p.sort_order ||
+        original.status !== p.status
       );
     });
 
@@ -573,7 +574,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         .update({
           is_scheduled: pp.is_scheduled,
           stage_number: pp.stage_number,
-          sort_order: pp.sort_order
+          sort_order: pp.sort_order,
+          status: pp.status
         })
         .eq('id', pp.id);
       if (error) {
@@ -4516,33 +4518,75 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {programPoints.filter(pp => !pp.is_pause).map(pp => {
                 const hasPending = pp.additional_feedback_responses?.status === 'pending_response';
+                
+                // Determine status badge styling
+                let statusLabel = 'Eingereicht';
+                let statusBg = '#fef3c7'; // yellow
+                let statusColor = '#d97706';
+                if (pp.status === 'approved') {
+                  statusLabel = 'Freigegeben';
+                  statusBg = '#dcfce7'; // green
+                  statusColor = '#15803d';
+                } else if (pp.status === 'rejected') {
+                  statusLabel = 'Abgelehnt';
+                  statusBg = '#fee2e2'; // red
+                  statusColor = '#b91c1c';
+                }
+
                 return (
-                  <div key={pp.id} style={{ padding: '14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                    <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{pp.name}</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                      Status: {hasPending ? '⏳ Warten auf Antwort' : '✅ Keine offenen Fragen'}
+                  <div key={pp.id} style={{ padding: '16px', background: 'rgba(255,255,255,0.7)', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.86rem', color: '#1d1d1f' }}>{pp.name}</strong>
+                        {pp.ensemble_band && <span style={{ display: 'block', fontSize: '0.72rem', color: '#86868b', marginTop: '2px' }}>👥 {pp.ensemble_band}</span>}
+                      </div>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 800, background: statusBg, color: statusColor, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <span style={{ fontSize: '0.72rem', color: '#86868b', display: 'block', marginBottom: '12px' }}>
+                      Rückmeldung: {hasPending ? '⏳ Warten auf Antwort' : '✅ Keine offenen Fragen'}
                     </span>
                     
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <input
                         placeholder="Rückfrage stellen..."
                         value={feedbackQuestion[pp.id] || ''}
                         onChange={e => setFeedbackQuestion(prev => ({ ...prev, [pp.id]: e.target.value }))}
-                        style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.78rem' }}
+                        style={{ flex: 1, minWidth: '150px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#ffffff' }}
                       />
                       <button
                         onClick={() => handleSendFeedbackQuestion(pp.id)}
-                        style={{ background: brandColor, color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.74rem', cursor: 'pointer' }}
+                        style={{ background: brandColor, color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         Fragen
                       </button>
                       {hasPending && (
                         <button
                           onClick={() => handleCancelFeedbackQuestion(pp.id)}
-                          style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.74rem', cursor: 'pointer' }}
+                          style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Storno
                         </button>
+                      )}
+                      
+                      {/* Approve / Reject buttons for submitted status */}
+                      {pp.status === 'submitted' && (
+                        <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+                          <button
+                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'approved')}
+                            style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Freigeben
+                          </button>
+                          <button
+                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'rejected')}
+                            style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Ablehnen
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -4552,8 +4596,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           )}
 
           {coordinatorTab === 'timeline' && (() => {
-            // Unscheduled Pool: is_scheduled === false && status === 'approved' (and not pause)
-            const unscheduledPoints = programPoints.filter(pp => !pp.is_scheduled && !pp.is_pause && pp.status === 'approved');
+            // Unscheduled Pool: is_scheduled === false && (status === 'approved' || status === 'submitted') (and not pause)
+            const unscheduledPoints = programPoints.filter(pp => !pp.is_scheduled && !pp.is_pause && (pp.status === 'approved' || pp.status === 'submitted'));
 
             // Scheduled Points on active stage, sorted by sort_order
             const activeStagePoints = programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && pp.stage_number === activeStage)
