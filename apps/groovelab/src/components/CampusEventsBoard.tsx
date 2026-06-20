@@ -297,6 +297,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [builderType, setBuilderType] = useState('Gesang');
   const [builderConnection, setBuilderConnection] = useState('Mikrofon');
   const [builderCount, setBuilderCount] = useState<number | string>(1);
+  const [isBlasmusikSelected, setIsBlasmusikSelected] = useState(false);
   const [builderSource, setBuilderSource] = useState('venue');
   const [builderNotes, setBuilderNotes] = useState('');
   const [newPpSelectedStudentIds, setNewPpSelectedStudentIds] = useState<string[]>([]);
@@ -331,9 +332,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       alert('Die Anzahl muss mindestens 1 sein.');
       return;
     }
+    const finalType = (builderType.trim() === '' && isBlasmusikSelected) ? 'Blasmusik' : builderType;
     const newItem = {
       id: Math.random().toString(36).substring(2, 9),
-      type: builderType,
+      type: finalType,
       connection: builderConnection,
       count: countNum,
       source: builderSource,
@@ -342,6 +344,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     setTechRiderItems(prev => [...prev, newItem]);
     setBuilderNotes('');
     setBuilderCount(1);
+    setIsBlasmusikSelected(false);
   };
 
   const handleRemoveTechRiderItem = (id: string) => {
@@ -999,6 +1002,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     setNewPpTechRequirements('');
     setTechRiderItems([]);
     setBuilderNotes('');
+    setIsBlasmusikSelected(false);
     setNewPpChairs('0');
     setNewPpStands('0');
     setNewPpRemarks('');
@@ -1008,6 +1012,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const handleStartEditing = (pp: any, tab: 'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary') => {
     setEditingPpId(pp.id);
+    setIsBlasmusikSelected(false);
     setNewPpName(pp.name || '');
     setNewPpEnsemble(pp.ensemble_band || '');
     setNewPpPerformerCount(String(pp.performer_count || 1));
@@ -3921,38 +3926,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   { label: '🎹 Keyboard', value: 'E-Piano / Keyboard', conn: 'Line-In', src: 'venue' },
                   { label: '🥁 Drums', value: 'Schlagzeug / E-Drum', conn: 'Mikrofon', src: 'venue' },
                   { label: '🔌 DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' }
-                ].map(badge => (
-                  <button
-                    key={badge.value}
-                    type="button"
-                    onClick={() => {
-                      if (badge.value === 'Blasmusik') {
-                        setBuilderType('');
-                      } else {
-                        setBuilderType(badge.value);
-                      }
-                      setBuilderConnection(badge.conn);
-                      setBuilderSource(badge.src);
-                      setTimeout(() => {
-                        instrumentInputRef.current?.focus();
-                      }, 50);
-                    }}
-                    style={{
-                      padding: '5px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      background: builderType === badge.value ? `${brandColor}10` : '#ffffff',
-                      borderColor: builderType === badge.value ? brandColor : '#cbd5e1',
-                      color: builderType === badge.value ? brandColor : '#334155',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {badge.label}
-                  </button>
-                ))}
+                ].map(badge => {
+                  const isSelected = badge.value === 'Blasmusik' ? isBlasmusikSelected : (builderType === badge.value && !isBlasmusikSelected);
+                  return (
+                    <button
+                      key={badge.value}
+                      type="button"
+                      onClick={() => {
+                        if (badge.value === 'Blasmusik') {
+                          setBuilderType('');
+                          setIsBlasmusikSelected(true);
+                        } else {
+                          setBuilderType(badge.value);
+                          setIsBlasmusikSelected(false);
+                        }
+                        setBuilderConnection(badge.conn);
+                        setBuilderSource(badge.src);
+                        setTimeout(() => {
+                          instrumentInputRef.current?.focus();
+                        }, 50);
+                      }}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: isSelected ? `${brandColor}10` : '#ffffff',
+                        borderColor: isSelected ? brandColor : '#cbd5e1',
+                        color: isSelected ? brandColor : '#334155',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {badge.label}
+                      {badge.value === 'Blasmusik' && isBlasmusikSelected && (
+                        <span style={{ color: '#007aff', marginLeft: '4px', fontWeight: 'bold' }}>✓</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
