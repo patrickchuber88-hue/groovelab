@@ -28,6 +28,7 @@ import {
   CalendarPlus,
   Maximize2,
   Minimize2,
+  Minus,
   Search
 } from 'lucide-react';
 
@@ -242,6 +243,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [eventTechResponsible, setEventTechResponsible] = useState('');
   const [eventCoordResponsible, setEventCoordResponsible] = useState('');
   const [allUsers, setAllUsers] = useState<any[]>([]);
+
+  const isMeEventResponsible = (ev: any) => {
+    if (!ev) return false;
+    const me = allUsers.find(u => u.id === userId);
+    const myName = me ? `${me.first_name || ''} ${me.last_name || ''}`.trim() : '';
+    if (!myName) return ev.created_by === userId;
+    const nameLower = myName.toLowerCase();
+    return ev.created_by === userId || 
+      (ev.responsible_program && ev.responsible_program.toLowerCase() === nameLower) ||
+      (ev.responsible_tech && ev.responsible_tech.toLowerCase() === nameLower) ||
+      (ev.responsible_coordination && ev.responsible_coordination.toLowerCase() === nameLower);
+  };
   const [admissionTimeError, setAdmissionTimeError] = useState('');
   const [expandedPoints, setExpandedPoints] = useState<Record<string, boolean>>({});
   const [isTimelineFullscreen, setIsTimelineFullscreen] = useState(false);
@@ -272,9 +285,36 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [teacherOverlayTab, setTeacherOverlayTab] = useState<'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary'>('einreichung');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [activeStudentSuggestionIndex, setActiveStudentSuggestionIndex] = useState(0);
 
   // Secretary planning fullscreen overlay state (separate from selectedEvent to avoid visibility modal)
   const [secretaryPlanningEvent, setSecretaryPlanningEvent] = useState<any | null>(null);
+
+  // Console Night Mode & Active Live Point states
+  const [techConsoleNightMode, setTechConsoleNightMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('groovelab_tech_night_mode') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [activeLivePointId, setActiveLivePointId] = useState<string | null>(null);
+  const [techCheckTrigger, setTechCheckTrigger] = useState<number>(0);
+
+  useEffect(() => {
+    try {
+      const activeEv = selectedEvent || secretaryPlanningEvent || teacherSubmissionEvent;
+      if (activeEv) {
+        const stored = localStorage.getItem(`groovelab_active_live_pp_id_${activeEv.id}_${activeStage}`);
+        setActiveLivePointId(stored || null);
+      } else {
+        setActiveLivePointId(null);
+      }
+    } catch (e) {
+      setActiveLivePointId(null);
+    }
+  }, [selectedEvent, secretaryPlanningEvent, teacherSubmissionEvent, activeStage]);
   
   // Teacher program point form states
   const [newPpName, setNewPpName] = useState('');
@@ -353,6 +393,122 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // State to edit an existing program point for teacher
   const [editingPpId, setEditingPpId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+
+  // Helper to check if form states differ from original database entry
+  const hasFormChanges = () => {
+    if (!editingPpId) return false;
+    const originalPp = programPoints.find(p => p.id === editingPpId);
+    if (!originalPp) return false;
+
+    const perfCount = parseInt(newPpPerformerCount, 10) || 1;
+    const dur = parseInt(newPpDuration, 10) || 10;
+    const chairs = parseInt(newPpChairs, 10) || 0;
+    const stands = parseInt(newPpStands, 10) || 0;
+
+    const currentName = newPpName.trim() || newPpEnsemble.trim();
+    if ((originalPp.name || '').trim() !== currentName) return true;
+
+    const currentEnsemble = newPpEnsemble.trim();
+    if ((originalPp.ensemble_band || '').trim() !== currentEnsemble) return true;
+
+    if ((originalPp.performer_count || 1) !== perfCount) return true;
+    if ((originalPp.duration || 10) !== dur) return true;
+
+    if ((originalPp.preferred_time || '').trim() !== newPpPreferredTime.trim()) return true;
+    
+    if ((originalPp.publisher || '').trim() !== newPpPublisher.trim()) return true;
+
+    // Compare songs arrays
+    const originalSongs = originalPp.songs || [];
+    if (JSON.stringify(originalSongs) !== JSON.stringify(addedSongs)) return true;
+
+    // Compare tech requirements
+    const originalTech = originalPp.tech_requirements || null;
+    const currentTech = techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null;
+    if (originalTech !== currentTech) return true;
+
+    if ((originalPp.chairs_needed || 0) !== chairs) return true;
+    if ((originalPp.music_stands_needed || 0) !== stands) return true;
+
+    if ((originalPp.remarks || '').trim() !== newPpRemarks.trim()) return true;
+
+    // Compare assigned students
+    const originalStudents = originalPp.additional_feedback_responses?.assigned_students || [];
+    if (JSON.stringify(originalStudents) !== JSON.stringify(newPpSelectedStudentIds)) return true;
+
+    return false;
+  };
+
+  useEffect(() => {
+    if (!editingPpId) {
+      setSaveStatus('idle');
+      setSaveErrorMessage(null);
+      return;
+    }
+
+    if (!hasFormChanges()) {
+      return;
+    }
+
+    setSaveStatus('saving');
+    setSaveErrorMessage(null);
+    const timer = setTimeout(async () => {
+      try {
+        await handleAutoSave();
+        setSaveStatus('saved');
+      } catch (err: any) {
+        console.error('AutoSave failed:', err);
+        setSaveStatus('error');
+        setSaveErrorMessage(err?.message || 'Speichern fehlgeschlagen');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    editingPpId,
+    newPpName,
+    newPpEnsemble,
+    newPpPerformerCount,
+    newPpDuration,
+    newPpPreferredTime,
+    newPpPublisher,
+    newPpChairs,
+    newPpStands,
+    newPpRemarks,
+    techRiderItems,
+    addedSongs,
+    newPpSelectedStudentIds
+  ]);
+
+  const renderSaveStatus = () => {
+    if (saveStatus === 'saving') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '2px 8px', borderRadius: '20px' }}>
+          <span className="autosave-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+          Speichert...
+        </span>
+      );
+    }
+    if (saveStatus === 'saved') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#16a34a', fontWeight: 650, background: '#f0fdf4', padding: '2px 8px', borderRadius: '20px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+          Gespeichert
+        </span>
+      );
+    }
+    if (saveStatus === 'error') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#dc2626', fontWeight: 650, background: '#fef2f2', padding: '2px 8px', borderRadius: '20px' }} title={saveErrorMessage || ''}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+          Fehler: {saveErrorMessage || 'Fehler beim Speichern'}
+        </span>
+      );
+    }
+    return null;
+  };
 
   // Feedback question answers state for teacher
   const [feedbackAnswers, setFeedbackAnswers] = useState<Record<string, string>>({}); // ppId_questionIdx -> answer
@@ -1175,32 +1331,37 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       const firstSong = finalSongs[0];
       const currentPp = programPoints.find(p => p.id === editingPpId);
-      const existingFeedback = currentPp?.additional_feedback_responses || {};
-      const newFeedback = {
-        ...existingFeedback,
-        assigned_students: newPpSelectedStudentIds
+      const originalStudents = currentPp?.additional_feedback_responses?.assigned_students || [];
+      const studentsChanged = JSON.stringify(originalStudents) !== JSON.stringify(newPpSelectedStudentIds);
+
+      const updatePayload: any = {
+        name: newPpName.trim() || newPpEnsemble.trim(),
+        ensemble_band: newPpEnsemble.trim() || null,
+        performer_count: perfCount,
+        duration: dur,
+        preferred_time: newPpPreferredTime.trim() || null,
+        title: firstSong ? firstSong.title : null,
+        artist: firstSong ? firstSong.artist : null,
+        composer: firstSong ? firstSong.composer : null,
+        arranger: firstSong ? firstSong.arranger : null,
+        publisher: newPpPublisher.trim() || null,
+        tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
+        chairs_needed: chairs,
+        music_stands_needed: stands,
+        remarks: newPpRemarks.trim() || null,
+        songs: finalSongs
       };
+
+      if (studentsChanged) {
+        updatePayload.additional_feedback_responses = {
+          ...(currentPp?.additional_feedback_responses || {}),
+          assigned_students: newPpSelectedStudentIds
+        };
+      }
 
       const { data, error } = await supabase
         .from('campus_event_program_points')
-        .update({
-          name: newPpName.trim() || newPpEnsemble.trim(),
-          ensemble_band: newPpEnsemble.trim() || null,
-          performer_count: perfCount,
-          duration: dur,
-          preferred_time: newPpPreferredTime.trim() || null,
-          title: firstSong ? firstSong.title : null,
-          artist: firstSong ? firstSong.artist : null,
-          composer: firstSong ? firstSong.composer : null,
-          arranger: firstSong ? firstSong.arranger : null,
-          publisher: newPpPublisher.trim() || null,
-          tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
-          chairs_needed: chairs,
-          music_stands_needed: stands,
-          remarks: newPpRemarks.trim() || null,
-          songs: finalSongs,
-          additional_feedback_responses: newFeedback
-        })
+        .update(updatePayload)
         .eq('id', editingPpId)
         .select()
         .single();
@@ -1243,46 +1404,39 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     try {
       const finalSongs = [...addedSongs];
-      if (newPpTitle.trim()) {
-        const isSongAlreadyAdded = addedSongs.some(s => s.title.trim() === newPpTitle.trim());
-        if (!isSongAlreadyAdded) {
-          finalSongs.push({
-            title: newPpTitle.trim(),
-            artist: newPpArtist.trim(),
-            composer: newPpComposer.trim(),
-            arranger: newPpArranger.trim()
-          });
-        }
-      }
-
       const firstSong = finalSongs[0];
       const currentPp = programPoints.find(p => p.id === editingPpId);
-      const existingFeedback = currentPp?.additional_feedback_responses || {};
-      const newFeedback = {
-        ...existingFeedback,
-        assigned_students: newPpSelectedStudentIds
+      const originalStudents = currentPp?.additional_feedback_responses?.assigned_students || [];
+      const studentsChanged = JSON.stringify(originalStudents) !== JSON.stringify(newPpSelectedStudentIds);
+
+      const updatePayload: any = {
+        name: newPpName.trim() || newPpEnsemble.trim(),
+        ensemble_band: newPpEnsemble.trim() || null,
+        performer_count: perfCount,
+        duration: dur,
+        preferred_time: newPpPreferredTime.trim() || null,
+        title: firstSong ? firstSong.title : null,
+        artist: firstSong ? firstSong.artist : null,
+        composer: firstSong ? firstSong.composer : null,
+        arranger: firstSong ? firstSong.arranger : null,
+        publisher: newPpPublisher.trim() || null,
+        tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
+        chairs_needed: chairs,
+        music_stands_needed: stands,
+        remarks: newPpRemarks.trim() || null,
+        songs: finalSongs
       };
+
+      if (studentsChanged) {
+        updatePayload.additional_feedback_responses = {
+          ...(currentPp?.additional_feedback_responses || {}),
+          assigned_students: newPpSelectedStudentIds
+        };
+      }
 
       const { data, error } = await supabase
         .from('campus_event_program_points')
-        .update({
-          name: newPpName.trim() || newPpEnsemble.trim(),
-          ensemble_band: newPpEnsemble.trim() || null,
-          performer_count: perfCount,
-          duration: dur,
-          preferred_time: newPpPreferredTime.trim() || null,
-          title: firstSong ? firstSong.title : null,
-          artist: firstSong ? firstSong.artist : null,
-          composer: firstSong ? firstSong.composer : null,
-          arranger: firstSong ? firstSong.arranger : null,
-          publisher: newPpPublisher.trim() || null,
-          tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
-          chairs_needed: chairs,
-          music_stands_needed: stands,
-          remarks: newPpRemarks.trim() || null,
-          songs: finalSongs,
-          additional_feedback_responses: newFeedback
-        })
+        .update(updatePayload)
         .eq('id', editingPpId)
         .select()
         .single();
@@ -1291,12 +1445,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setProgramPoints(prev => prev.map(pp => pp.id === editingPpId ? data : pp));
     } catch (err: any) {
       console.error('Error in handleAutoSave:', err);
+      throw err;
     }
   };
 
   const handleTabSwitch = async (newTab: 'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary') => {
     if (editingPpId) {
-      await handleAutoSave();
+      try {
+        await handleAutoSave();
+      } catch (err) {
+        console.error('Error auto-saving during tab switch:', err);
+      }
     }
     setTeacherOverlayTab(newTab);
   };
@@ -3562,7 +3721,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              {renderSaveStatus()}
+            </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
               Bearbeiten beenden
             </button>
@@ -3827,7 +3989,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              {renderSaveStatus()}
+            </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
               Bearbeiten beenden
             </button>
@@ -4203,14 +4368,28 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const allStudents = allUsers.filter(u => u.role === 'student');
     const myStudents = allUsers.filter(u => u.role === 'student' && myStudentIds.includes(u.id));
     
-    const q = studentSearchQuery.toLowerCase().trim();
-    const searchResults = q 
-      ? myStudents.filter(s => {
+    const trimmedQuery = studentSearchQuery.toLowerCase().trim();
+    
+    const allowedStudents = role === 'teacher' ? myStudents : allStudents;
+
+    // Determine the list of students shown in the dropdown
+    const dropdownStudents = trimmedQuery
+      ? allowedStudents.filter(s => {
           const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
           const instrument = (s.instrument || '').toLowerCase();
-          return fullName.includes(q) || instrument.includes(q);
+          return fullName.includes(trimmedQuery) || instrument.includes(trimmedQuery);
         })
-      : [];
+      : allowedStudents;
+
+    // Ensure the selection index is within valid bounds
+    const safeActiveIndex = dropdownStudents.length > 0 
+      ? Math.min(activeStudentSuggestionIndex, dropdownStudents.length - 1)
+      : 0;
+
+    const suggestedStudent = dropdownStudents[safeActiveIndex] || null;
+    const suggestedName = suggestedStudent ? `${suggestedStudent.first_name || ''} ${suggestedStudent.last_name || ''}` : '';
+    const hasSuggestion = studentSearchQuery.trim() !== '' && suggestedName && suggestedName.toLowerCase().startsWith(studentSearchQuery.toLowerCase());
+    const suggestionRemaining = hasSuggestion ? suggestedName.substring(studentSearchQuery.length) : '';
 
     const selectedStudents = allStudents.filter(s => newPpSelectedStudentIds.includes(s.id));
 
@@ -4218,7 +4397,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              {renderSaveStatus()}
+            </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
               Bearbeiten beenden
             </button>
@@ -4234,53 +4416,145 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {/* Smart Search Input */}
         <div style={{ position: 'relative' }}>
           <h4 style={{ fontSize: '0.82rem', fontWeight: 750, color: '#475569', margin: '0 0 8px 0' }}>
-            Schüler suchen &amp; hinzufügen:
+            Schüler suchen &amp; hinzufügen (Pfeiltasten zum Navigieren, Enter zum Auswählen):
           </h4>
-          <div style={{ position: 'relative' }}>
+          <div 
+            style={{ 
+              position: 'relative', 
+              width: '100%', 
+              height: '46px',
+              borderRadius: '14px',
+              border: `1.5px solid ${isSearchFocused ? brandColor : '#e2e8f0'}`,
+              background: isSearchFocused ? '#ffffff' : '#f8fafc',
+              boxSizing: 'border-box',
+              transition: 'all 0.2s ease-in-out',
+              boxShadow: isSearchFocused 
+                ? `0 10px 25px -5px ${brandColor}15, 0 0 0 3px ${brandColor}22` 
+                : '0 1px 2px rgba(0, 0, 0, 0.02)'
+            }}
+            onMouseEnter={e => {
+              if (!isSearchFocused) {
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isSearchFocused) {
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+              }
+            }}
+          >
+            {/* Inline autocomplete ghost text overlay rendered behind input */}
+            {hasSuggestion && (
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '100%',
+                height: '100%',
+                padding: '0 16px 0 42px',
+                display: 'flex',
+                alignItems: 'center',
+                pointerEvents: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+                whiteSpace: 'pre',
+                overflow: 'hidden',
+                zIndex: 1
+              }}>
+                {/* Transparent spacer matching what the user has typed */}
+                <span style={{ color: 'transparent' }}>{studentSearchQuery}</span>
+                {/* Gray ghost suggestion text for the remainder */}
+                <span style={{ color: '#94a3b8' }}>{suggestionRemaining}</span>
+              </div>
+            )}
+
             <input
               type="text"
-              placeholder="Schüler oder Instrument suchen..."
+              placeholder="Schüler-Name eingeben..."
               value={studentSearchQuery}
-              onChange={(e) => setStudentSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setStudentSearchQuery(e.target.value);
+                setActiveStudentSuggestionIndex(0);
+              }}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => {
-                // Delay blur slightly so click on dropdown can register
+                // Short delay to allow click events to complete
                 setTimeout(() => setIsSearchFocused(false), 200);
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  if (searchResults.length > 0) {
-                    const firstStudent = searchResults[0];
-                    const isAlreadySelected = newPpSelectedStudentIds.includes(firstStudent.id);
+                  if (dropdownStudents.length > 0) {
+                    setActiveStudentSuggestionIndex(prev => (prev + 1) % dropdownStudents.length);
+                  }
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (dropdownStudents.length > 0) {
+                    setActiveStudentSuggestionIndex(prev => (prev - 1 + dropdownStudents.length) % dropdownStudents.length);
+                  }
+                } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
+                  if (hasSuggestion) {
+                    e.preventDefault();
+                    setStudentSearchQuery(suggestedName);
+                  }
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (suggestedStudent) {
+                    const isAlreadySelected = newPpSelectedStudentIds.includes(suggestedStudent.id);
                     if (!isAlreadySelected) {
-                      setNewPpSelectedStudentIds(prev => [...prev, firstStudent.id]);
+                      const maxLimit = techRiderItems.length > 0 
+                        ? techRiderItems.reduce((sum, item) => sum + (parseInt(item.count, 10) || 0), 0)
+                        : (parseInt(newPpPerformerCount, 10) || 1);
+                      if (newPpSelectedStudentIds.length >= maxLimit) {
+                        alert(techRiderItems.length > 0 
+                          ? `Limit erreicht: Du kannst maximal ${maxLimit} Schüler hinzufügen, da im Tech Rider insgesamt ${maxLimit} Instrumente/Inputs eingetragen sind.`
+                          : `Limit erreicht: Du kannst maximal ${maxLimit} Schüler hinzufügen, da die Teilnehmeranzahl auf ${maxLimit} eingestellt ist.`
+                        );
+                        return;
+                      }
+                      setNewPpSelectedStudentIds(prev => [...prev, suggestedStudent.id]);
                     }
                     setStudentSearchQuery('');
+                    setActiveStudentSuggestionIndex(0);
                   }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setStudentSearchQuery('');
+                  setActiveStudentSuggestionIndex(0);
+                  e.currentTarget.blur();
                 }
               }}
               style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
                 width: '100%',
-                padding: '10px 14px 10px 36px',
-                borderRadius: '12px',
-                border: `1.5px solid ${isSearchFocused ? brandColor : '#cbd5e1'}`,
-                fontSize: '0.88rem',
-                fontWeight: 650,
+                height: '100%',
+                padding: '0 16px 0 42px',
+                background: 'transparent',
+                border: 'none',
                 outline: 'none',
-                background: '#ffffff',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                color: '#1e293b',
                 boxSizing: 'border-box',
-                transition: 'all 0.15s ease',
-                boxShadow: isSearchFocused ? `0 0 0 3px ${brandColor}22` : '0 1px 2px rgba(0,0,0,0.02)'
+                zIndex: 2
               }}
             />
-            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-              <Search size={16} />
+            <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: isSearchFocused ? brandColor : '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease-in-out', zIndex: 3 }}>
+              <Search size={18} />
             </span>
             {studentSearchQuery && (
               <button
                 type="button"
-                onClick={() => setStudentSearchQuery('')}
+                onClick={() => {
+                  setStudentSearchQuery('');
+                  setActiveStudentSuggestionIndex(0);
+                }}
                 style={{
                   position: 'absolute',
                   right: '12px',
@@ -4293,7 +4567,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 0
+                  padding: 0,
+                  zIndex: 3
                 }}
               >
                 <X size={16} />
@@ -4301,8 +4576,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             )}
           </div>
 
-          {/* Quick search suggestions dropdown */}
-          {(isSearchFocused || studentSearchQuery.trim() !== '') && (
+          {/* Autocomplete Dropdown List */}
+          {isSearchFocused && dropdownStudents.length > 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -4317,68 +4592,72 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               overflowY: 'auto',
               zIndex: 100
             }}>
-              {/* Dropdown Header */}
               <div style={{ padding: '8px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.7rem', fontWeight: 750, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {studentSearchQuery.trim() !== '' ? 'Suchergebnisse (Meine Schüler)' : 'Meine Schüler'}
+                {trimmedQuery ? 'Suchergebnisse (Alle Schüler)' : 'Meine Schüler'}
               </div>
-
-              {(studentSearchQuery.trim() !== '' ? searchResults : myStudents).length === 0 ? (
-                <div style={{ padding: '16px 12px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', fontStyle: 'italic' }}>
-                  {studentSearchQuery.trim() !== '' 
-                    ? 'Keine passenden Schüler in deiner Liste gefunden.' 
-                    : 'Keine verknüpften Schüler in deiner Liste gefunden.'}
-                </div>
-              ) : (
-                (studentSearchQuery.trim() !== '' ? searchResults : myStudents).map(student => {
-                  const isAlreadySelected = newPpSelectedStudentIds.includes(student.id);
-                  return (
-                    <div
-                      key={student.id}
-                      onMouseDown={(e) => {
-                        e.preventDefault(); // prevent losing focus and immediate blur
-                        if (!isAlreadySelected) {
-                          setNewPpSelectedStudentIds(prev => [...prev, student.id]);
-                        } else {
-                          setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+              {dropdownStudents.map((student, idx) => {
+                const isAlreadySelected = newPpSelectedStudentIds.includes(student.id);
+                const isHighlighted = idx === safeActiveIndex;
+                return (
+                  <div
+                    key={student.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // Prevent blur before selection completes
+                      if (!isAlreadySelected) {
+                        const maxLimit = techRiderItems.length > 0 
+                          ? techRiderItems.reduce((sum, item) => sum + (parseInt(item.count, 10) || 0), 0)
+                          : (parseInt(newPpPerformerCount, 10) || 1);
+                        if (newPpSelectedStudentIds.length >= maxLimit) {
+                          alert(techRiderItems.length > 0 
+                            ? `Limit erreicht: Du kannst maximal ${maxLimit} Schüler hinzufügen, da im Tech Rider insgesamt ${maxLimit} Instrumente/Inputs eingetragen sind.`
+                            : `Limit erreicht: Du kannst maximal ${maxLimit} Schüler hinzufügen, da die Teilnehmeranzahl auf ${maxLimit} eingestellt ist.`
+                          );
+                          return;
                         }
-                        setStudentSearchQuery('');
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderBottom: '1px solid #f1f5f9',
-                        cursor: 'pointer',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
-                        background: isAlreadySelected ? '#f0fdf4' : '#ffffff',
-                        transition: 'background 0.1s'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isAlreadySelected ? '#dcfce7' : '#f8fafc'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = isAlreadySelected ? '#f0fdf4' : '#ffffff'}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ color: '#0f172a' }}>{student.first_name} {student.last_name}</span>
-                        {student.instrument && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{student.instrument}</span>}
-                      </div>
-                      <div style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        border: isAlreadySelected ? 'none' : '1.5px solid #cbd5e1',
-                        background: isAlreadySelected ? '#22c55e' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff'
-                      }}>
-                        {isAlreadySelected && <Check size={12} />}
-                      </div>
+                        setNewPpSelectedStudentIds(prev => [...prev, student.id]);
+                      } else {
+                        setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+                      }
+                      setStudentSearchQuery('');
+                      setActiveStudentSuggestionIndex(0);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      borderBottom: '1px solid #f1f5f9',
+                      cursor: 'pointer',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      background: isHighlighted 
+                        ? `${brandColor}0a` 
+                        : (isAlreadySelected ? '#f0fdf4' : '#ffffff'),
+                      borderLeft: `3px solid ${isHighlighted ? brandColor : 'transparent'}`,
+                      transition: 'all 0.1s'
+                    }}
+                    onMouseEnter={() => setActiveStudentSuggestionIndex(idx)}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ color: isHighlighted ? brandColor : '#0f172a' }}>{student.first_name} {student.last_name}</span>
+                      {student.instrument && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{student.instrument}</span>}
                     </div>
-                  );
-                })
-              )}
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: isAlreadySelected ? 'none' : '1.5px solid #cbd5e1',
+                      background: isAlreadySelected ? '#22c55e' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff'
+                    }}>
+                      {isAlreadySelected && <Check size={12} />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -4434,7 +4713,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         </div>
 
         <div style={{ fontSize: '0.8rem', fontWeight: 750, color: '#334155' }}>
-          Ausgewählt: <span style={{ color: brandColor }}>{newPpSelectedStudentIds.length} Schüler</span>
+          Ausgewählt: <span style={{ color: brandColor }}>
+            {newPpSelectedStudentIds.length} von {techRiderItems.length > 0 ? techRiderItems.reduce((sum, item) => sum + (parseInt(item.count, 10) || 0), 0) : (parseInt(newPpPerformerCount, 10) || 1)} Schülern
+          </span>
+          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550, marginLeft: '8px' }}>
+            {techRiderItems.length > 0 
+              ? '(Limit orientiert sich an der Anzahl der Instrumente)' 
+              : '(Limit orientiert sich an der Teilnehmeranzahl)'}
+          </span>
         </div>
 
         {/* Submit Buttons */}
@@ -4852,22 +5138,57 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setTeacherSubmissionEvent(null)}
-              style={{
-                background: '#f1f5f9',
-                border: 'none',
-                borderRadius: '50%',
-                width: '38px',
-                height: '38px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <X size={18} color="#64748b" />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isMeEventResponsible(teacherSubmissionEvent) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSecretaryPlanningEvent(teacherSubmissionEvent);
+                    setTeacherSubmissionEvent(null);
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '20px',
+                    padding: '8px 16px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#e2e8f0';
+                    e.currentTarget.style.color = '#1e293b';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  🛠️ Verwaltungsansicht
+                </button>
+              )}
+              <button
+                onClick={() => setTeacherSubmissionEvent(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '38px',
+                  height: '38px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={18} color="#64748b" />
+              </button>
+            </div>
           </div>
 
           {/* Tab Buttons (6 tabs) */}
@@ -5224,12 +5545,47 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>PLANUNGS-MODUL</span>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: '4px 0 0 0', letterSpacing: '-0.01em' }}>{activeEvent.title}</h3>
             </div>
-            <button
-              onClick={() => { setSelectedEvent(null); setSecretaryPlanningEvent(null); }}
-              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <X size={15} color="#64748b" />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isMeEventResponsible(activeEvent) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTeacherSubmissionEvent(activeEvent);
+                    setSecretaryPlanningEvent(null);
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '20px',
+                    padding: '6px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#e2e8f0';
+                    e.currentTarget.style.color = '#1e293b';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  📝 Einreichungen
+                </button>
+              )}
+              <button
+                onClick={() => { setSelectedEvent(null); setSecretaryPlanningEvent(null); }}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={15} color="#64748b" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -6282,118 +6638,121 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     </span>
                                   </div>
 
-                                  {/* Chat bubble list */}
-                                  {questions.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                      {questions.map((q: string, idx: number) => {
-                                        const answerText = answers[idx];
-                                        return (
-                                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {/* Question Bubble (sent by secretary/admin) - aligned right */}
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
-                                              <div style={{
-                                                maxWidth: '80%',
-                                                background: brandColor,
-                                                color: '#ffffff',
-                                                padding: '10px 14px',
-                                                borderRadius: '16px 16px 4px 16px',
-                                                fontSize: '0.8rem',
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                              }}>
-                                                <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginBottom: '3px', textTransform: 'uppercase' }}>Sekretariat / Orga</span>
-                                                {q}
-                                              </div>
-                                            </div>
-
-                                            {/* Answer Bubble (sent by teacher) - aligned left */}
-                                            <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
-                                              {answerText ? (
+                                  {/* Centered Chat & Action Wrapper */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '620px', width: '100%', alignSelf: 'center', boxSizing: 'border-box' }}>
+                                    {/* Chat bubble list */}
+                                    {questions.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {questions.map((q: string, idx: number) => {
+                                          const answerText = answers[idx];
+                                          return (
+                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              {/* Question Bubble (sent by secretary/admin) - aligned right */}
+                                              <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
                                                 <div style={{
-                                                  maxWidth: '80%',
-                                                  background: '#ffffff',
-                                                  color: '#1e293b',
+                                                  maxWidth: '85%',
+                                                  background: brandColor,
+                                                  color: '#ffffff',
                                                   padding: '10px 14px',
-                                                  borderRadius: '16px 16px 16px 4px',
+                                                  borderRadius: '16px 16px 4px 16px',
                                                   fontSize: '0.8rem',
-                                                  border: '1px solid #cbd5e1',
                                                   boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                                 }}>
-                                                  <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: brandColor, marginBottom: '3px', textTransform: 'uppercase' }}>{teacher.first_name} {teacher.last_name}</span>
-                                                  {answerText}
+                                                  <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginBottom: '3px', textTransform: 'uppercase' }}>Sekretariat / Orga</span>
+                                                  {q}
                                                 </div>
-                                              ) : (
-                                                <div style={{
-                                                  maxWidth: '80%',
-                                                  background: '#fff9db',
-                                                  color: '#b28600',
-                                                  padding: '8px 12px',
-                                                  borderRadius: '16px 16px 16px 4px',
-                                                  fontSize: '0.74rem',
-                                                  fontStyle: 'italic',
-                                                  border: '1px solid #ffe57f'
-                                                }}>
-                                                  ⏳ Noch keine Antwort erhalten
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
+                                              </div>
 
-                                  {/* Action bar (Send new question or cancel) */}
-                                  {!expandedFeedbackForms[pp.id] ? (
-                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: true }))}
-                                        className="google-btn-outlined"
-                                        style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', border: '1px solid #cbd5e1', color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                      >
-                                        <MessageSquare size={13} /> {questions.length > 0 ? 'Weitere Rückfrage' : 'Rückfrage stellen'}
-                                      </button>
-                                      {hasPending && (
+                                              {/* Answer Bubble (sent by teacher) - aligned left */}
+                                              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+                                                {answerText ? (
+                                                  <div style={{
+                                                    maxWidth: '85%',
+                                                    background: '#ffffff',
+                                                    color: '#1e293b',
+                                                    padding: '10px 14px',
+                                                    borderRadius: '16px 16px 16px 4px',
+                                                    fontSize: '0.8rem',
+                                                    border: '1px solid #cbd5e1',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                  }}>
+                                                    <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: brandColor, marginBottom: '3px', textTransform: 'uppercase' }}>{teacher.first_name} {teacher.last_name}</span>
+                                                    {answerText}
+                                                  </div>
+                                                ) : (
+                                                  <div style={{
+                                                    maxWidth: '85%',
+                                                    background: '#fff9db',
+                                                    color: '#b28600',
+                                                    padding: '8px 12px',
+                                                    borderRadius: '16px 16px 16px 4px',
+                                                    fontSize: '0.74rem',
+                                                    fontStyle: 'italic',
+                                                    border: '1px solid #ffe57f'
+                                                  }}>
+                                                    ⏳ Noch keine Antwort erhalten
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
+                                    {/* Action bar (Send new question or cancel) */}
+                                    {!expandedFeedbackForms[pp.id] ? (
+                                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                         <button
                                           type="button"
-                                          onClick={() => handleCancelFeedbackQuestion(pp.id)}
+                                          onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: true }))}
                                           className="google-btn-outlined"
-                                          style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', color: '#b3261e', border: '1.5px solid #ff8a80' }}
+                                          style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', border: '1px solid #cbd5e1', color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                         >
-                                          Storno
+                                          <MessageSquare size={13} /> {questions.length > 0 ? 'Weitere Rückfrage' : 'Rückfrage stellen'}
                                         </button>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
-                                      <input
-                                        placeholder="Neue Rückfrage formulieren..."
-                                        value={feedbackQuestion[pp.id] || ''}
-                                        onChange={e => setFeedbackQuestion(prev => ({ ...prev, [pp.id]: e.target.value }))}
-                                        className="google-input google-input-noicon"
-                                        style={{ flex: 1, minWidth: '150px', height: '36px', boxSizing: 'border-box' }}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleSendFeedbackQuestion(pp.id);
-                                          setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }));
-                                        }}
-                                        className="google-btn-filled"
-                                        style={{ height: '36px', fontSize: '0.76rem' }}
-                                      >
-                                        Senden
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }))}
-                                        className="google-btn-outlined"
-                                        style={{ height: '36px', fontSize: '0.76rem', border: '1px solid #cbd5e1', color: '#475569' }}
-                                      >
-                                        Abbrechen
-                                      </button>
-                                    </div>
-                                  )}
+                                        {hasPending && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCancelFeedbackQuestion(pp.id)}
+                                            className="google-btn-outlined"
+                                            style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', color: '#b3261e', border: '1.5px solid #ff8a80' }}
+                                          >
+                                            Storno
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+                                        <input
+                                          placeholder="Neue Rückfrage formulieren..."
+                                          value={feedbackQuestion[pp.id] || ''}
+                                          onChange={e => setFeedbackQuestion(prev => ({ ...prev, [pp.id]: e.target.value }))}
+                                          className="google-input google-input-noicon"
+                                          style={{ flex: 1, minWidth: '150px', height: '36px', boxSizing: 'border-box' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleSendFeedbackQuestion(pp.id);
+                                            setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }));
+                                          }}
+                                          className="google-btn-filled"
+                                          style={{ height: '36px', fontSize: '0.76rem' }}
+                                        >
+                                          Senden
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }))}
+                                          className="google-btn-outlined"
+                                          style={{ height: '36px', fontSize: '0.76rem', border: '1px solid #cbd5e1', color: '#475569' }}
+                                        >
+                                          Abbrechen
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
 
                                 </div>
                               );
@@ -6740,18 +7099,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       ) : (
                         <div style={{
                           position: 'relative',
-                          paddingLeft: '75px',
+                          paddingLeft: '85px',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '12px'
                         }}>
                           <div style={{
                             position: 'absolute',
-                            left: '55px',
+                            left: '60px',
                             top: '24px',
                             bottom: '24px',
-                            width: '2px',
-                            background: '#cbd5e1',
+                            width: '1px',
+                            background: 'rgba(0, 0, 0, 0.08)',
                             zIndex: 0
                           }} />
                           {activeStagePoints.map((pp, idx) => {
@@ -6772,134 +7131,256 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                    e.stopPropagation();
                                    handleDropOnTimeline(e, pp.id);
                                  }}
+                                 onMouseEnter={e => {
+                                   e.currentTarget.style.transform = 'translateY(-2px)';
+                                   e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.05)';
+                                   e.currentTarget.style.borderColor = hasConflict 
+                                     ? 'rgba(255, 59, 48, 0.3)' 
+                                     : (pp.is_pause ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0, 0, 0, 0.12)');
+                                 }}
+                                 onMouseLeave={e => {
+                                   e.currentTarget.style.transform = 'none';
+                                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01)';
+                                   e.currentTarget.style.borderColor = hasConflict 
+                                     ? 'rgba(255, 59, 48, 0.15)' 
+                                     : (pp.is_pause ? 'rgba(245, 158, 11, 0.12)' : 'rgba(0, 0, 0, 0.06)');
+                                 }}
                                  style={{
-                                   padding: '12px 16px',
+                                   padding: '14px 18px',
                                    background: hasConflict 
-                                     ? '#fff5f5' 
-                                     : (pp.is_pause ? '#fffdf0' : '#ffffff'),
+                                     ? 'rgba(255, 59, 48, 0.02)' 
+                                     : (pp.is_pause ? '#fffbeb' : '#ffffff'),
                                    border: hasConflict 
-                                     ? '1px solid #ff8a80' 
-                                     : (pp.is_pause ? '1px solid #ffe57f' : '1px solid #cbd5e1'),
-                                   borderRadius: '12px',
-                                   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                     ? '1.5px solid rgba(255, 59, 48, 0.15)' 
+                                     : (pp.is_pause ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid rgba(0, 0, 0, 0.06)'),
+                                   borderRadius: '14px',
+                                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01)',
                                    display: 'flex',
                                    justifyContent: 'space-between',
                                    alignItems: 'center',
                                    cursor: 'grab',
-                                   gap: '12px',
-                                   position: 'relative'
+                                   gap: '16px',
+                                   position: 'relative',
+                                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                                  }}
                                >
                                  {/* Timeline Dot Indicator */}
                                  <div style={{
                                    position: 'absolute',
-                                   left: '-25px',
-                                   top: 'calc(50% - 5px)',
-                                   width: '10px',
-                                   height: '10px',
+                                   left: '-29px',
+                                   top: '20px',
+                                   width: '8px',
+                                   height: '8px',
                                    borderRadius: '50%',
-                                   backgroundColor: hasConflict ? '#ef4444' : (pp.is_pause ? '#b28600' : brandColor),
-                                   border: '2px solid #ffffff',
-                                   boxShadow: '0 0 0 1px #cbd5e1',
-                                   zIndex: 1
+                                   backgroundColor: '#ffffff',
+                                   border: `2.5px solid ${hasConflict ? '#ff3b30' : (pp.is_pause ? '#f59e0b' : brandColor)}`,
+                                   boxShadow: `0 0 0 4px ${hasConflict ? 'rgba(255, 59, 48, 0.1)' : (pp.is_pause ? 'rgba(245, 158, 11, 0.15)' : `${brandColor}15`)}`,
+                                   zIndex: 1,
+                                   transition: 'all 0.2s ease'
                                  }} />
+                                 
                                  {/* Timeline Time Text */}
                                  <div style={{
                                    position: 'absolute',
-                                   left: '-70px',
-                                   width: '45px',
+                                   left: '-88px',
+                                   width: '50px',
                                    textAlign: 'right',
-                                   top: 'calc(50% - 15px)',
+                                   top: '16px',
                                    display: 'flex',
                                    flexDirection: 'column',
-                                   alignItems: 'flex-end',
-                                   lineHeight: '1.1'
+                                   gap: '2px'
                                  }}>
-                                   <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f1f1f' }}>
+                                   <span style={{
+                                     fontSize: '0.92rem',
+                                     fontWeight: 600,
+                                     color: hasConflict ? '#ff3b30' : (pp.is_pause ? '#6e6e73' : '#1d1d1f'),
+                                     fontVariantNumeric: 'tabular-nums',
+                                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                     lineHeight: '1.1'
+                                    }}>
                                      {timeInfo.start}
                                    </span>
-                                   <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
+                                   <span style={{
+                                     fontSize: '0.72rem',
+                                     fontWeight: 500,
+                                     color: '#86868b',
+                                     fontVariantNumeric: 'tabular-nums',
+                                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                     lineHeight: '1'
+                                   }}>
                                      {timeInfo.end}
                                    </span>
                                  </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span style={{ 
-                                      fontSize: '0.74rem', 
-                                      background: pp.is_pause ? '#fff9db' : '#f0f4f0', 
-                                      color: pp.is_pause ? '#b28600' : brandColor,
-                                      padding: '2px 8px', 
-                                      borderRadius: '6px', 
-                                      fontWeight: 700 
-                                    }}>
-                                      {timeInfo.start} - {timeInfo.end}
-                                    </span>
-                                    <strong style={{ fontSize: '0.84rem', color: hasConflict ? '#b3261e' : '#1f1f1f' }}>
-                                      {pp.name}
-                                    </strong>
-                                    {!pp.is_pause && (
-                                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginLeft: '6px' }}>
-                                        ({pp.duration} Min.)
-                                      </span>
+                                 
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  {/* Left accent indicator bar */}
+                                  <div style={{
+                                    width: '4px',
+                                    alignSelf: 'stretch',
+                                    minHeight: '28px',
+                                    borderRadius: '100px',
+                                    backgroundColor: hasConflict ? '#ff3b30' : (pp.is_pause ? '#f59e0b' : brandColor),
+                                    marginRight: '2px'
+                                  }} />
+                                  
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                      {pp.is_pause && (
+                                        <span style={{ 
+                                          fontSize: '0.72rem', 
+                                          background: 'rgba(245, 158, 11, 0.1)', color: '#d97706',
+                                          padding: '2px 6px', 
+                                          borderRadius: '4px', 
+                                          fontWeight: 700,
+                                          letterSpacing: '0.02em',
+                                          textTransform: 'uppercase'
+                                        }}>
+                                          ☕ Pause
+                                        </span>
+                                      )}
+                                      <strong style={{ fontSize: '0.86rem', color: hasConflict ? '#ff3b30' : (pp.is_pause ? '#6e6e73' : '#1d1d1f'), fontWeight: 600 }}>
+                                        {pp.name}
+                                      </strong>
+                                      {!pp.is_pause && (
+                                        <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginLeft: '4px' }}>
+                                          ({pp.duration} Min.)
+                                        </span>
+                                      )}
+                                      {!pp.is_pause && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedPoints(prev => ({ ...prev, [pp.id]: !prev[pp.id] }));
+                                          }}
+                                          style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: '2px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#86868b',
+                                            marginLeft: '4px'
+                                          }}
+                                        >
+                                          {expandedPoints[pp.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        </button>
+                                      )}
+                                    </div>
+  
+                                    {hasConflict && (
+                                      <div style={{ fontSize: '0.74rem', color: '#ff3b30', fontWeight: 700, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        ⚠️ {conflictReason}
+                                      </div>
                                     )}
-                                    {!pp.is_pause && (
+  
+                                    {!pp.is_pause && expandedPoints[pp.id] && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#444746' }}>
+                                        {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                                        {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                                        {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+  
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                                    <label style={{ 
+                                      fontSize: '0.58rem', 
+                                      color: '#86868b', 
+                                      fontWeight: 700, 
+                                      textTransform: 'uppercase', 
+                                      letterSpacing: '0.05em' 
+                                    }}>
+                                      Dauer
+                                    </label>
+                                    
+                                    {/* Custom Stepper Pill */}
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      background: '#f5f5f7', 
+                                      borderRadius: '8px', 
+                                      padding: '2px',
+                                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                                      boxSizing: 'border-box',
+                                      height: '28px'
+                                    }}>
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setExpandedPoints(prev => ({ ...prev, [pp.id]: !prev[pp.id] }));
+                                          handleEditDuration(pp.id, Math.max(1, pp.duration - 1));
                                         }}
                                         style={{
-                                          background: 'transparent',
                                           border: 'none',
+                                          background: 'transparent',
                                           cursor: 'pointer',
-                                          padding: '2px',
-                                          display: 'inline-flex',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          color: '#64748b',
-                                          marginLeft: '6px'
+                                          borderRadius: '6px',
+                                          color: '#1d1d1f',
+                                          transition: 'background 0.2s'
                                         }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                       >
-                                        {expandedPoints[pp.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        <Minus size={12} strokeWidth={2.5} />
                                       </button>
-                                    )}
-                                  </div>
-  
-                                  {hasConflict && (
-                                    <div style={{ fontSize: '0.74rem', color: '#b3261e', fontWeight: 700, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      ⚠️ {conflictReason}
+                                      
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={pp.duration}
+                                        onChange={e => handleEditDuration(pp.id, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                        className="mini-time-input"
+                                        style={{
+                                          width: '30px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          fontSize: '0.78rem',
+                                          textAlign: 'center',
+                                          fontWeight: 600,
+                                          outline: 'none',
+                                          padding: 0,
+                                          margin: 0,
+                                          color: '#1d1d1f',
+                                          fontVariantNumeric: 'tabular-nums',
+                                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                        }}
+                                      />
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditDuration(pp.id, pp.duration + 1);
+                                        }}
+                                        style={{
+                                          border: 'none',
+                                          background: 'transparent',
+                                          cursor: 'pointer',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          borderRadius: '6px',
+                                          color: '#1d1d1f',
+                                          transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <Plus size={12} strokeWidth={2.5} />
+                                      </button>
                                     </div>
-                                  )}
-  
-                                  {!pp.is_pause && expandedPoints[pp.id] && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#444746' }}>
-                                      {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
-                                      {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
-                                      {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
-                                    </div>
-                                  )}
-                                </div>
-  
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                    <label style={{ fontSize: '0.6rem', color: '#444746', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Min.</label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      value={pp.duration}
-                                      onChange={e => handleEditDuration(pp.id, parseInt(e.target.value, 10))}
-                                      style={{
-                                        width: '55px',
-                                        padding: '4px 6px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #cbd5e1',
-                                        fontSize: '0.76rem',
-                                        textAlign: 'center',
-                                        fontWeight: 600,
-                                        outline: 'none'
-                                      }}
-                                    />
                                   </div>
   
                                   {pp.is_pause && (
@@ -6919,7 +7400,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         cursor: 'pointer',
                                         padding: '4px',
                                         display: 'flex',
-                                        alignItems: 'center'
+                                        alignItems: 'center',
+                                        marginLeft: '4px'
                                       }}
                                     >
                                       <Trash2 size={16} />
@@ -7037,17 +7519,557 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             );
           })()}
 
-          {coordinatorTab === 'tech' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block', marginBottom: '8px' }}>Materialbedarf</strong>
-                <span style={{ fontSize: '0.8rem', color: '#475569', display: 'block' }}>
-                  🪑 Stühle benötigt: {programPoints.reduce((acc, pp) => acc + (pp.chairs_needed || 0), 0)}<br />
-                  🎼 Notenständer benötigt: {programPoints.reduce((acc, pp) => acc + (pp.music_stands_needed || 0), 0)}
-                </span>
+          {coordinatorTab === 'tech' && (() => {
+            // Get all scheduled program points on active stage in order
+            const stagePoints = programPoints
+              .filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage)
+              .sort((a, b) => a.sort_order - b.sort_order);
+
+            // Compute timeline times
+            const activeEv = secretaryPlanningEvent || selectedEvent;
+            const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+            const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+
+            // Compute logistics sums and peaks
+            const totalChairs = stagePoints.reduce((acc, pp) => acc + (pp.chairs_needed || 0), 0);
+            const peakChairs = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.chairs_needed || 0)) : 0;
+            const totalStands = stagePoints.reduce((acc, pp) => acc + (pp.music_stands_needed || 0), 0);
+            const peakStands = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.music_stands_needed || 0)) : 0;
+
+            const normalizeTechType = (type: string): string => {
+              const t = type.trim().toLowerCase();
+              if (t.includes('gesang') || t.includes('vocal') || t.includes('mikrofon') || t === 'mic' || t === 'mikro') {
+                return 'Mikrofon (Gesang/Amp)';
+              }
+              if (t.includes('di-box') || t.includes('di box') || t.includes('d.i. box') || t.includes('direct box') || t === 'di') {
+                return 'D.I. Box';
+              }
+              if (t.includes('e-bass') || t === 'bass' || t === 'bassgitarre') {
+                return 'E-Bass';
+              }
+              if (t.includes('e-piano') || t.includes('keyboard') || t === 'piano' || t === 'klavier') {
+                return 'E-Piano / Keyboard';
+              }
+              if (t.includes('a-gitarre') || t.includes('akustik') || t === 'akustikgitarre' || t === 'akustik-gitarre') {
+                return 'A-Gitarre';
+              }
+              if (t.includes('e-gitarre') || t === 'gitarre') {
+                return 'E-Gitarre';
+              }
+              if (t.includes('schlagzeug') || t.includes('drumset') || t.includes('drums') || t.includes('drum-set') || t.includes('e-drum')) {
+                return 'Schlagzeug-Set';
+              }
+              if (t.includes('trompete')) {
+                return 'Trompete';
+              }
+              return type.trim().charAt(0).toUpperCase() + type.trim().slice(1);
+            };
+
+            // Compute FOH Audio/Patch Peak summary (max concurrent channels per type)
+            const audioSetup: Record<string, number> = {};
+            stagePoints.forEach(pp => {
+              if (pp.tech_requirements) {
+                const actSetup: Record<string, number> = {};
+                try {
+                  const cleaned = pp.tech_requirements.trim();
+                  if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+                    const items = JSON.parse(cleaned);
+                    if (Array.isArray(items)) {
+                      items.forEach((item: any) => {
+                        const typeName = normalizeTechType(item.type || 'Sonstiges');
+                        const count = parseInt(item.count, 10) || 1;
+                        actSetup[typeName] = (actSetup[typeName] || 0) + count;
+                      });
+                    }
+                  } else {
+                    const typeName = normalizeTechType(pp.tech_requirements);
+                    actSetup[typeName] = (actSetup[typeName] || 0) + 1;
+                  }
+                } catch (err) {
+                  const typeName = normalizeTechType(pp.tech_requirements || 'Sonstige Inputs');
+                  actSetup[typeName] = (actSetup[typeName] || 0) + 1;
+                }
+
+                // Update peak for each normalized type
+                Object.entries(actSetup).forEach(([type, count]) => {
+                  audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+                });
+              }
+            });
+
+            // Night mode colors
+            const isNight = techConsoleNightMode;
+            const theme = {
+              bg: isNight ? '#0b0b0d' : 'transparent',
+              cardBg: isNight ? '#16161a' : '#ffffff',
+              cardBorder: isNight ? '1px solid #222228' : '1px solid rgba(0,0,0,0.06)',
+              text: isNight ? '#f4f4f7' : '#1d1d1f',
+              textMuted: isNight ? '#8e8e93' : '#86868b',
+              border: isNight ? '1px solid #1f1f26' : '1px solid rgba(0,0,0,0.04)',
+              headerBg: isNight ? '#1e1e24' : '#f5f5f7',
+              thColor: isNight ? '#8e8e93' : '#86868b',
+              liveColor: isNight ? '#ff453a' : '#ff3b30',
+              nextColor: isNight ? '#30b0c7' : '#007aff',
+              okColor: isNight ? '#30d158' : '#34c759',
+              okBg: isNight ? 'rgba(48, 209, 88, 0.15)' : 'rgba(52, 199, 89, 0.08)',
+              p48vColor: isNight ? '#ff9f0a' : '#ff9500',
+              p48vBg: isNight ? 'rgba(255, 159, 10, 0.15)' : 'rgba(255, 149, 0, 0.08)',
+              rowHoverBg: isNight ? '#22222a' : '#f5f5f7',
+            };
+
+            const activeLiveIdx = stagePoints.findIndex(pp => pp.id === activeLivePointId);
+
+            const handleToggleCheck = (ppId: string, itemId: string) => {
+              const key = `groovelab_chk_${ppId}_${itemId}`;
+              const checked = localStorage.getItem(key) === 'true';
+              localStorage.setItem(key, String(!checked));
+              setTechCheckTrigger(prev => prev + 1);
+            };
+
+            const isItemChecked = (ppId: string, itemId: string) => {
+              return localStorage.getItem(`groovelab_chk_${ppId}_${itemId}`) === 'true';
+            };
+
+            const handleToggleDelta = (ppId: string, type: 'chairs' | 'stands') => {
+              const key = `groovelab_chk_delta_${ppId}_${type}`;
+              const checked = localStorage.getItem(key) === 'true';
+              localStorage.setItem(key, String(!checked));
+              setTechCheckTrigger(prev => prev + 1);
+            };
+
+            const isDeltaChecked = (ppId: string, type: 'chairs' | 'stands') => {
+              return localStorage.getItem(`groovelab_chk_delta_${ppId}_${type}`) === 'true';
+            };
+
+            const setLiveFocus = (ppId: string) => {
+              const eventId = selectedEvent?.id || secretaryPlanningEvent?.id || 'default';
+              const stageKey = `groovelab_active_live_pp_id_${eventId}_${activeStage}`;
+              if (activeLivePointId === ppId) {
+                localStorage.removeItem(stageKey);
+                setActiveLivePointId(null);
+              } else {
+                localStorage.setItem(stageKey, ppId);
+                setActiveLivePointId(ppId);
+              }
+              setTechCheckTrigger(prev => prev + 1);
+            };
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', background: theme.bg, color: theme.text, padding: isNight ? '12px' : '0', borderRadius: isNight ? '16px' : '0', transition: 'all 0.3s' }}>
+                <style>{`
+                  @keyframes pulse {
+                    0% { opacity: 0.6; }
+                    50% { opacity: 1; }
+                    100% { opacity: 0.6; }
+                  }
+                `}</style>
+                
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: theme.text }}>
+                      Technik-Rundown & Patchplan · Bühne {activeStage}
+                    </h3>
+                    <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontWeight: 500 }}>
+                      {stagePoints.length} Beiträge geplant
+                    </span>
+                  </div>
+                  
+                  {/* Console Night Mode toggle */}
+                  <button
+                    onClick={() => {
+                      const nextVal = !techConsoleNightMode;
+                      setTechConsoleNightMode(nextVal);
+                      localStorage.setItem('groovelab_tech_night_mode', String(nextVal));
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: isNight ? '1px solid #ff9f0a' : '1px solid #007aff',
+                      background: isNight ? 'rgba(255, 159, 10, 0.15)' : 'rgba(0, 122, 255, 0.05)',
+                      color: isNight ? '#ff9f0a' : '#007aff',
+                      cursor: 'pointer',
+                      fontSize: '0.74rem',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {isNight ? '☀️ Studio-Licht' : '🎛️ Mischpult-Ansicht'}
+                  </button>
+                </div>
+
+                {/* Dashboard Summary Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  {/* Logistics Card */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: theme.cardBg, border: theme.cardBorder, borderRadius: '14px', padding: '16px', boxShadow: isNight ? 'none' : '0 1px 3px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bühnen-Logistik</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '4px' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '1.6rem', display: 'block' }}>🪑</span>
+                        <strong style={{ fontSize: '1.25rem', color: theme.text, display: 'block', margin: '4px 0 2px 0' }}>{peakChairs}</strong>
+                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontWeight: 600 }}>Stühle Peak (Summe: {totalChairs})</span>
+                      </div>
+                      <div style={{ width: '1px', height: '40px', background: isNight ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '1.6rem', display: 'block' }}>🎼</span>
+                        <strong style={{ fontSize: '1.25rem', color: theme.text, display: 'block', margin: '4px 0 2px 0' }}>{peakStands}</strong>
+                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontWeight: 600 }}>Ständer Peak (Summe: {totalStands})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Audio Card */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: theme.cardBg, border: theme.cardBorder, borderRadius: '14px', padding: '16px', boxShadow: isNight ? 'none' : '0 1px 3px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FOH Audio Patch (Gesamtbedarf)</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {Object.keys(audioSetup).length === 0 ? (
+                        <span style={{ fontSize: '0.74rem', color: theme.textMuted, fontStyle: 'italic', padding: '4px 0' }}>Kein spezieller Audiobedarf angemeldet</span>
+                      ) : (
+                        Object.entries(audioSetup).map(([name, count]) => (
+                          <span 
+                            key={name}
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              background: isNight ? 'rgba(48, 176, 199, 0.15)' : 'rgba(59, 130, 246, 0.08)',
+                              color: isNight ? '#30b0c7' : '#2563eb',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            🎙️ {count}x {name}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Changeover rundown timeline */}
+                <div style={{ border: theme.cardBorder, borderRadius: '14px', background: theme.cardBg, overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                      <thead>
+                        <tr style={{ background: theme.headerBg, borderBottom: theme.border }}>
+                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '90px' }}>Zeit</th>
+                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '220px' }}>Beitrag & Besetzung</th>
+                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '260px' }}>Signal / Patch (FOH)</th>
+                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>Aufbau & Umbau</th>
+                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status / Notizen</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stagePoints.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', fontSize: '0.78rem', color: theme.textMuted, fontStyle: 'italic' }}>
+                              Keine geplanten Beiträge auf dieser Bühne.
+                            </td>
+                          </tr>
+                        ) : (
+                          stagePoints.map((pp, idx) => {
+                            const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+                            
+                            // Calculate deltas relative to previous planned point
+                            const prevPp = idx > 0 ? stagePoints[idx - 1] : null;
+                            const deltaChairs = prevPp ? (pp.chairs_needed || 0) - (prevPp.chairs_needed || 0) : 0;
+                            const deltaStands = prevPp ? (pp.music_stands_needed || 0) - (prevPp.music_stands_needed || 0) : 0;
+
+                            const isLive = pp.id === activeLivePointId;
+                            const isNext = activeLiveIdx !== -1 && idx === activeLiveIdx + 1;
+
+                            // Parse audio needs
+                            let techItems: any[] = [];
+                            if (pp.tech_requirements && (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{'))) {
+                              try {
+                                techItems = JSON.parse(pp.tech_requirements);
+                              } catch (e) {}
+                            }
+
+                            // Dynamic row outline / background based on Live Focus
+                            let rowStyle: React.CSSProperties = {
+                              borderBottom: theme.border,
+                              background: isLive
+                                ? (isNight ? 'rgba(255, 69, 58, 0.08)' : 'rgba(255, 59, 48, 0.04)')
+                                : isNext
+                                  ? (isNight ? 'rgba(48, 176, 199, 0.05)' : 'rgba(0, 122, 255, 0.02)')
+                                  : pp.is_pause ? (isNight ? '#101013' : '#fbfbfc') : theme.cardBg,
+                              transition: 'background 0.2s',
+                              position: 'relative'
+                            };
+
+                            if (isLive) {
+                              rowStyle.boxShadow = `inset 4px 0 0 0 ${theme.liveColor}`;
+                            } else if (isNext) {
+                              rowStyle.boxShadow = `inset 4px 0 0 0 ${theme.nextColor}`;
+                            }
+
+                            return (
+                              <tr 
+                                key={pp.id} 
+                                style={rowStyle}
+                                onMouseEnter={e => {
+                                  if (!isLive && !isNext) {
+                                    e.currentTarget.style.background = theme.rowHoverBg;
+                                  }
+                                }}
+                                onMouseLeave={e => {
+                                  if (!isLive && !isNext) {
+                                    e.currentTarget.style.background = pp.is_pause ? (isNight ? '#101013' : '#fbfbfc') : theme.cardBg;
+                                  }
+                                }}
+                              >
+                                {/* Time column */}
+                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                                  <strong style={{ fontSize: '0.8rem', color: pp.is_pause ? theme.textMuted : theme.text, display: 'block', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.start}</strong>
+                                  <span style={{ fontSize: '0.66rem', color: theme.textMuted, display: 'block', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.end}</span>
+                                </td>
+
+                                {/* Name & Ensemble */}
+                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                      <strong style={{ fontSize: '0.8rem', color: pp.is_pause ? theme.textMuted : theme.text }}>
+                                        {pp.is_pause ? '☕ ' : ''}{pp.name}
+                                      </strong>
+                                      {isLive && (
+                                        <span style={{
+                                          fontSize: '0.58rem',
+                                          fontWeight: 'bold',
+                                          background: theme.liveColor,
+                                          color: '#ffffff',
+                                          padding: '1px 5px',
+                                          borderRadius: '4px',
+                                          textTransform: 'uppercase',
+                                          animation: 'pulse 1.5s infinite',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px'
+                                        }}>
+                                          ● LIVE
+                                        </span>
+                                      )}
+                                      {isNext && (
+                                        <span style={{
+                                          fontSize: '0.58rem',
+                                          fontWeight: 'bold',
+                                          background: theme.nextColor,
+                                          color: '#ffffff',
+                                          padding: '1px 5px',
+                                          borderRadius: '4px',
+                                          textTransform: 'uppercase',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px'
+                                        }}>
+                                          ● NEXT
+                                        </span>
+                                      )}
+                                    </div>
+                                    {!pp.is_pause && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.68rem', color: theme.textMuted }}>
+                                        {pp.ensemble_band && <span>👥 {pp.ensemble_band}</span>}
+                                        {pp.performer_count > 0 && <span>👤 {pp.performer_count} Person(en)</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Signal patch */}
+                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                                  {!pp.is_pause && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {pp.instrument && (
+                                        <span style={{ fontSize: '0.68rem', color: theme.text, fontWeight: 600 }}>
+                                          🎸 {pp.instrument}
+                                        </span>
+                                      )}
+                                      {techItems.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          {techItems.map((item) => {
+                                            const itemId = item.id || `item_${item.type}`;
+                                            const checked = isItemChecked(pp.id, itemId);
+                                            const needsPhantom = item.connection?.toLowerCase().includes('+48') || item.type?.toLowerCase().includes('kondensator');
+                                            
+                                            return (
+                                              <div 
+                                                key={itemId} 
+                                                onClick={() => handleToggleCheck(pp.id, itemId)}
+                                                style={{ 
+                                                  display: 'flex', 
+                                                  alignItems: 'center', 
+                                                  gap: '6px', 
+                                                  fontSize: '0.66rem', 
+                                                  cursor: 'pointer',
+                                                  userSelect: 'none',
+                                                  opacity: checked ? 0.45 : 1,
+                                                  transition: 'opacity 0.2s'
+                                                }}
+                                              >
+                                                <input 
+                                                  type="checkbox" 
+                                                  checked={checked} 
+                                                  readOnly
+                                                  style={{ cursor: 'pointer', margin: 0, width: '12px', height: '12px', accentColor: theme.okColor }}
+                                                />
+                                                <span style={{ 
+                                                  color: checked ? theme.textMuted : theme.text, 
+                                                  textDecoration: checked ? 'line-through' : 'none',
+                                                  fontWeight: 500
+                                                }}>
+                                                  {item.count}x {item.type} ({item.connection})
+                                                </span>
+                                                {needsPhantom && (
+                                                  <span style={{
+                                                    fontSize: '0.55rem',
+                                                    fontWeight: 'bold',
+                                                    background: theme.p48vBg,
+                                                    color: theme.p48vColor,
+                                                    padding: '0px 3px',
+                                                    borderRadius: '3px',
+                                                    letterSpacing: '0.02em',
+                                                    boxShadow: isNight ? '0 0 4px rgba(255, 159, 10, 0.4)' : 'none'
+                                                  }}>
+                                                    +48V
+                                                  </span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : pp.tech_requirements ? (
+                                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontStyle: 'italic' }}>
+                                          {pp.tech_requirements}
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontStyle: 'italic' }}>Kein spezieller Audiobedarf</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Stage Setup & Changeover */}
+                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                                  {!pp.is_pause ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      {/* Absolute values */}
+                                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.74rem', fontWeight: 600, color: theme.text }}>
+                                        <span>🪑 {pp.chairs_needed || 0}</span>
+                                        <span>🎼 {pp.music_stands_needed || 0}</span>
+                                      </div>
+                                      
+                                      {/* Changeover instructions (Deltas) */}
+                                      {(deltaChairs !== 0 || deltaStands !== 0) && (
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                                          {deltaChairs !== 0 && (() => {
+                                            const checked = isDeltaChecked(pp.id, 'chairs');
+                                            return (
+                                              <span 
+                                                onClick={() => handleToggleDelta(pp.id, 'chairs')}
+                                                style={{
+                                                  fontSize: '0.6rem',
+                                                  fontWeight: 700,
+                                                  background: checked 
+                                                    ? (isNight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.04)')
+                                                    : (deltaChairs > 0 ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
+                                                  color: checked 
+                                                    ? theme.textMuted 
+                                                    : (deltaChairs > 0 ? (isNight ? '#30d158' : '#15803d') : (isNight ? '#ff453a' : '#b91c1c')),
+                                                  padding: '1px 6px',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  textDecoration: checked ? 'line-through' : 'none',
+                                                  userSelect: 'none',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '2px',
+                                                  border: checked ? '1px solid transparent' : (isNight ? '1px solid rgba(255,255,255,0.05)' : 'none')
+                                                }}
+                                              >
+                                                {checked ? '✓' : ''} {deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} 🪑
+                                              </span>
+                                            );
+                                          })()}
+                                          
+                                          {deltaStands !== 0 && (() => {
+                                            const checked = isDeltaChecked(pp.id, 'stands');
+                                            return (
+                                              <span 
+                                                onClick={() => handleToggleDelta(pp.id, 'stands')}
+                                                style={{
+                                                  fontSize: '0.6rem',
+                                                  fontWeight: 700,
+                                                  background: checked 
+                                                    ? (isNight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.04)')
+                                                    : (deltaStands > 0 ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
+                                                  color: checked 
+                                                    ? theme.textMuted 
+                                                    : (deltaStands > 0 ? (isNight ? '#30d158' : '#15803d') : (isNight ? '#ff453a' : '#b91c1c')),
+                                                  padding: '1px 6px',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  textDecoration: checked ? 'line-through' : 'none',
+                                                  userSelect: 'none',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '2px',
+                                                  border: checked ? '1px solid transparent' : (isNight ? '1px solid rgba(255,255,255,0.05)' : 'none')
+                                                }}
+                                              >
+                                                {checked ? '✓' : ''} {deltaStands > 0 ? `+${deltaStands}` : deltaStands} 🎼
+                                              </span>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: '0.7rem', color: theme.textMuted }}>-</span>
+                                  )}
+                                </td>
+
+                                {/* Remarks & Live Trigger */}
+                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ fontSize: '0.7rem', color: theme.text, lineHeight: 1.4 }}>
+                                      {pp.remarks || <span style={{ color: theme.textMuted, fontStyle: 'italic' }}>-</span>}
+                                    </div>
+                                    <div style={{ marginTop: '2px' }}>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setLiveFocus(pp.id); }}
+                                        style={{
+                                          padding: '3px 8px',
+                                          borderRadius: '6px',
+                                          border: isLive ? '1px solid rgba(255,69,58,0.3)' : `1px solid ${isNight ? '#3a3a42' : '#d1d1d6'}`,
+                                          background: isLive ? 'rgba(255,69,58,0.1)' : 'transparent',
+                                          color: isLive ? theme.liveColor : theme.text,
+                                          fontSize: '0.62rem',
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.15s',
+                                        }}
+                                      >
+                                        {isLive ? '🔴 Live beenden' : 'Setzt Live'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {coordinatorTab === 'export' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -7106,25 +8128,60 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: brandColor }}>Verwaltung · Planungs-Modul</span>
                 <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1f1f1f', margin: '4px 0 0 0', letterSpacing: '-0.01em' }}>{(secretaryPlanningEvent || selectedEvent)?.title}</h2>
               </div>
-              <button 
-                onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }} 
-                style={{ 
-                  background: 'transparent', 
-                  border: 'none', 
-                  borderRadius: '50%', 
-                  width: '36px', 
-                  height: '36px', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <X size={20} color="#1f1f1f" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {isMeEventResponsible(secretaryPlanningEvent) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTeacherSubmissionEvent(secretaryPlanningEvent);
+                      setSecretaryPlanningEvent(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '20px',
+                      padding: '8px 16px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#e2e8f0';
+                      e.currentTarget.style.color = '#1e293b';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#f1f5f9';
+                      e.currentTarget.style.color = '#475569';
+                    }}
+                  >
+                    📝 Einreichungsansicht
+                  </button>
+                )}
+                <button 
+                  onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }} 
+                  style={{ 
+                    background: 'transparent', 
+                    border: 'none', 
+                    borderRadius: '50%', 
+                    width: '36px', 
+                    height: '36px', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <X size={20} color="#1f1f1f" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 32px' }}>
               {panelContent}
@@ -7167,6 +8224,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
         .pulse-calendar {
           animation: calendarPulse 2s infinite ease-in-out;
+        }
+        @keyframes autoSaveFade {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        .autosave-pulse {
+          animation: autoSaveFade 1.5s infinite ease-in-out;
         }
 
         /* Google UI / Material Design 3 Styling (White/Green Theme) */
