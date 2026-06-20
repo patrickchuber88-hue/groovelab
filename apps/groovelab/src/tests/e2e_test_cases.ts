@@ -2346,13 +2346,13 @@ export const testCases: TestCase[] = [
     tier: 3,
     description: 'Verify feedback cycle triggers duration modification and recalculates offsets.',
     run: async (client) => {
-      sessionStorage.setItem('groovelab_user_id', 'teacher-1');
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
       const ppId = uuid();
       const eventId = uuid();
       await client.from('campus_events').insert({ id: eventId, school_id: 'school-1', title: 'Feedback Timeline Concert', event_date: '2026-07-23', start_time: '18:00', category: 'Konzert' });
       await client.from('campus_event_program_points').insert([
-        { id: ppId, event_id: eventId, school_id: 'school-1', name: 'Act A', duration: 10, sort_order: 1, status: 'approved' },
-        { event_id: eventId, school_id: 'school-1', name: 'Act B', duration: 15, sort_order: 2, status: 'approved' }
+        { id: ppId, event_id: eventId, school_id: 'school-1', name: 'Act A', duration: 10, sort_order: 1, status: 'approved', teacher_id: 'teacher-1' },
+        { event_id: eventId, school_id: 'school-1', name: 'Act B', duration: 15, sort_order: 2, status: 'approved', teacher_id: 'teacher-1' }
       ]);
       
       sessionStorage.setItem('groovelab_user_id', 'teacher-1');
@@ -2764,5 +2764,511 @@ export const testCases: TestCase[] = [
         throw new Error('Song array data mismatch');
       }
     }
+  },
+  {
+    id: 'T3_M5_1',
+    name: 'T3: Database operations and trigger constraints',
+    tier: 3,
+    description: 'Ensure teacher role cannot directly modify is_scheduled, and is_scheduled defaults to false on insert.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'teacher-1');
+      const ppId = uuid();
+      const { error: insErr } = await client.from('campus_event_program_points').insert({
+        id: ppId,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Teacher Act 1',
+        duration: 10
+      });
+      if (insErr) throw new Error('Teacher insert failed: ' + insErr.message);
+
+      const { data: ppData, error: getErr } = await client.from('campus_event_program_points').select('is_scheduled').eq('id', ppId).single();
+      if (getErr) throw new Error(getErr.message);
+      if (ppData.is_scheduled !== false) throw new Error('is_scheduled should be false by default');
+
+      const { error: updErr } = await client.from('campus_event_program_points').update({
+        is_scheduled: true
+      }).eq('id', ppId);
+      
+      if (!updErr) {
+        throw new Error('Teacher should be blocked from modifying is_scheduled');
+      }
+
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+      const { error: adminUpdErr } = await client.from('campus_event_program_points').update({
+        is_scheduled: true
+      }).eq('id', ppId);
+      if (adminUpdErr) throw new Error('Admin update failed: ' + adminUpdErr.message);
+
+      const { data: adminPpData } = await client.from('campus_event_program_points').select('is_scheduled').eq('id', ppId).single();
+      if (adminPpData.is_scheduled !== true) throw new Error('Admin update was not persisted');
+    }
+  },
+  {
+    id: 'T3_M5_2',
+    name: 'T3: Coordinator scheduling updates persistence',
+    tier: 3,
+    description: 'Ensure secretary/admin can save all scheduling fields (stage_number, sort_order, instrument).',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+      const ppId = uuid();
+      
+      const { error: insErr } = await client.from('campus_event_program_points').insert({
+        id: ppId,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Coordinator Act',
+        duration: 15,
+        status: 'approved'
+      });
+      if (insErr) throw new Error(insErr.message);
+
+      const { error: updErr } = await client.from('campus_event_program_points').update({
+        is_scheduled: true,
+        stage_number: 3,
+        sort_order: 12,
+        instrument: 'Violoncello'
+      }).eq('id', ppId);
+      if (updErr) throw new Error('Scheduling update failed: ' + updErr.message);
+
+      const { data, error: getErr } = await client.from('campus_event_program_points').select('*').eq('id', ppId).single();
+      if (getErr) throw new Error(getErr.message);
+      if (data.is_scheduled !== true) throw new Error('is_scheduled mismatch');
+      if (data.stage_number !== 3) throw new Error('stage_number mismatch');
+      if (data.sort_order !== 12) throw new Error('sort_order mismatch');
+      if (data.instrument !== 'Violoncello') throw new Error('instrument mismatch');
+    }
+  },
+  {
+    id: 'T3_M5_3',
+    name: 'T3: Double-booking teacher conflict checks on other stages',
+    tier: 3,
+    description: 'Ensure double-booking a teacher on two different stages at the same calculated time is flagged as conflict.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+      
+      const ppIdA = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdA,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Act A',
+        duration: 30,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 1,
+        sort_order: 0,
+        teacher_id: 'teacher-1'
+      });
+
+      const ppIdB = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdB,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Act B',
+        duration: 20,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 2,
+        sort_order: 0,
+        teacher_id: 'teacher-1'
+      });
+
+      const { data: pps, error } = await client.from('campus_event_program_points').select('*').eq('event_id', 'event-1');
+      if (error) throw new Error(error.message);
+
+      const parseTimeToMinutes = (t: string) => {
+        const p = t.split(':');
+        return (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+      };
+      
+      const startMin = parseTimeToMinutes('14:00');
+      const timeMap: Record<string, { startMin: number; endMin: number }> = {};
+      
+      const s1Points = pps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 1).sort((a: any, b: any) => a.sort_order - b.sort_order);
+      let s1Cur = startMin;
+      s1Points.forEach((p: any) => {
+        timeMap[p.id] = { startMin: s1Cur, endMin: s1Cur + p.duration };
+        s1Cur += p.duration;
+      });
+
+      const s2Points = pps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 2).sort((a: any, b: any) => a.sort_order - b.sort_order);
+      let s2Cur = startMin;
+      s2Points.forEach((p: any) => {
+        timeMap[p.id] = { startMin: s2Cur, endMin: s2Cur + p.duration };
+        s2Cur += p.duration;
+      });
+
+      const timeA = timeMap[ppIdA];
+      const timeB = timeMap[ppIdB];
+      if (!timeA || !timeB) throw new Error('Time calculation failed');
+
+      const overlaps = timeA.startMin < timeB.endMin && timeA.endMin > timeB.startMin;
+      if (!overlaps) throw new Error('Expected Acts to overlap in calculated time');
+
+      const hasConflict = overlaps && (pps.find((p: any) => p.id === ppIdA).teacher_id === pps.find((p: any) => p.id === ppIdB).teacher_id);
+      if (!hasConflict) throw new Error('Teacher double-booking not flagged as conflict');
+    }
+  },
+  {
+    id: 'T3_M5_4',
+    name: 'T3: Lesson conflicts checks on the same day',
+    tier: 3,
+    description: 'Ensure program points overlapping with a teacher\'s lesson on the same day are flagged as conflict.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'master-1');
+
+      const lessonId = uuid();
+      const { error: insErr } = await client.from('lessons').insert({
+        id: lessonId,
+        teacher_id: 'teacher-1',
+        school_id: 'school-1',
+        date: '2026-07-01',
+        start_time: '15:00',
+        duration: 45,
+        status: 'scheduled'
+      });
+      if (insErr) throw new Error('Lesson insert failed: ' + insErr.message);
+
+      const ppId = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppId,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Lesson Conflict Act',
+        duration: 75,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 1,
+        sort_order: 0,
+      });
+      sessionStorage.setItem('groovelab_user_id', 'teacher-1');
+      const { data: lessons } = await client.from('lessons').select('*').eq('date', '2026-07-01');
+      if (!lessons || lessons.length === 0) throw new Error('Lessons not found');
+
+      const parseTimeToMinutes = (t: string) => {
+        const p = t.split(':');
+        return (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+      };
+
+      const ppStart = parseTimeToMinutes('14:00');
+      const ppEnd = ppStart + 75; // 15:15
+
+      const lesson = lessons.find((l: any) => l.teacher_id === 'teacher-1' && l.status !== 'cancelled');
+      if (!lesson) throw new Error('Lesson not found');
+
+      const lesStart = parseTimeToMinutes(lesson.start_time);
+      const lesEnd = lesStart + lesson.duration; // 15:45
+
+      const overlaps = ppStart < lesEnd && ppEnd > lesStart;
+      if (!overlaps) throw new Error('Expected program point to overlap with lesson');
+    }
+  },
+  {
+    id: 'T3_M5_5',
+    name: 'T3: Re-ordering and duration updates shifts sequential times',
+    tier: 3,
+    description: 'Ensure changing duration or re-ordering shifts subsequent program points start and end times.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+
+      const ppId1 = uuid();
+      const ppId2 = uuid();
+      const ppId3 = uuid();
+
+      await client.from('campus_event_program_points').insert([
+        { id: ppId1, event_id: 'event-1', school_id: 'school-1', name: 'PP1', duration: 10, is_scheduled: true, stage_number: 1, sort_order: 0, status: 'approved' },
+        { id: ppId2, event_id: 'event-1', school_id: 'school-1', name: 'PP2', duration: 15, is_scheduled: true, stage_number: 1, sort_order: 1, status: 'approved' },
+        { id: ppId3, event_id: 'event-1', school_id: 'school-1', name: 'PP3', duration: 20, is_scheduled: true, stage_number: 1, sort_order: 2, status: 'approved' }
+      ]);
+
+      const parseTimeToMinutes = (t: string) => {
+        const p = t.split(':');
+        return (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+      };
+
+      const getTimes = (pps: any[]) => {
+        const startMin = parseTimeToMinutes('14:00');
+        const sorted = pps.sort((a, b) => a.sort_order - b.sort_order);
+        const map: Record<string, { start: number; end: number }> = {};
+        let cur = startMin;
+        sorted.forEach(p => {
+          map[p.id] = { start: cur, end: cur + p.duration };
+          cur += p.duration;
+        });
+        return map;
+      };
+
+      const { data: initialPps } = await client.from('campus_event_program_points').select('*').in('id', [ppId1, ppId2, ppId3]);
+      const initialTimes = getTimes(initialPps);
+
+      if (initialTimes[ppId1].start !== 840) throw new Error('PP1 initial start mismatch'); // 14:00
+      if (initialTimes[ppId2].start !== 850) throw new Error('PP2 initial start mismatch'); // 14:10
+      if (initialTimes[ppId3].start !== 865) throw new Error('PP3 initial start mismatch'); // 14:25
+
+      await client.from('campus_event_program_points').update({ duration: 20 }).eq('id', ppId1);
+      const { data: durationPps } = await client.from('campus_event_program_points').select('*').in('id', [ppId1, ppId2, ppId3]);
+      const durationTimes = getTimes(durationPps);
+
+      if (durationTimes[ppId1].start !== 840) throw new Error('PP1 post-duration start mismatch'); // 14:00
+      if (durationTimes[ppId2].start !== 860) throw new Error('PP2 post-duration start mismatch'); // 14:20
+      if (durationTimes[ppId3].start !== 875) throw new Error('PP3 post-duration start mismatch'); // 14:35
+
+      await client.from('campus_event_program_points').update({ sort_order: 2 }).eq('id', ppId2);
+      await client.from('campus_event_program_points').update({ sort_order: 1 }).eq('id', ppId3);
+
+      const { data: swapPps } = await client.from('campus_event_program_points').select('*').in('id', [ppId1, ppId2, ppId3]);
+      const swapTimes = getTimes(swapPps);
+
+      if (swapTimes[ppId1].start !== 840) throw new Error('PP1 post-swap start mismatch'); // 14:00
+      if (swapTimes[ppId3].start !== 860) throw new Error('PP3 post-swap start mismatch'); // 14:20
+      if (swapTimes[ppId2].start !== 880) throw new Error('PP2 post-swap start mismatch'); // 14:40
+    }
+  },
+  {
+    id: 'T3_M5_6',
+    name: 'T3: Exact boundary start/end time matches do not trigger conflict',
+    tier: 3,
+    description: 'Ensure that two items sharing a boundary time (one ending exactly when the next starts) do not trigger a conflict, but overlapping by 1 minute does.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+
+      const ppIdA = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdA,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Act A (Ends 14:30)',
+        duration: 30,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 1,
+        sort_order: 0,
+        teacher_id: 'teacher-1'
+      });
+
+      const pauseId = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: pauseId,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Pause Stage 2 (14:00-14:30)',
+        duration: 30,
+        status: 'approved',
+        is_pause: true,
+        stage_number: 2,
+        sort_order: 0
+      });
+
+      const ppIdB = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdB,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Act B (Starts 14:30)',
+        duration: 30,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 2,
+        sort_order: 1,
+        teacher_id: 'teacher-1'
+      });
+
+      const { data: pps } = await client.from('campus_event_program_points').select('*').eq('event_id', 'event-1');
+      
+      const parseTimeToMinutes = (t: string) => {
+        const p = t.split(':');
+        return (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+      };
+      
+      const startMin = parseTimeToMinutes('14:00');
+      const timeMap: Record<string, { startMin: number; endMin: number }> = {};
+      
+      // Calculate Stage 1 times
+      const s1Points = pps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 1).sort((a: any, b: any) => a.sort_order - b.sort_order);
+      let s1Cur = startMin;
+      s1Points.forEach((p: any) => {
+        timeMap[p.id] = { startMin: s1Cur, endMin: s1Cur + p.duration };
+        s1Cur += p.duration;
+      });
+
+      // Calculate Stage 2 times
+      const s2Points = pps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 2).sort((a: any, b: any) => a.sort_order - b.sort_order);
+      let s2Cur = startMin;
+      s2Points.forEach((p: any) => {
+        timeMap[p.id] = { startMin: s2Cur, endMin: s2Cur + p.duration };
+        s2Cur += p.duration;
+      });
+
+      const timeA = timeMap[ppIdA];
+      const timeB = timeMap[ppIdB];
+
+      if (!timeA || !timeB) throw new Error('Time calculation failed');
+
+      // 1. Boundary match: PP1 (14:00 - 14:30) and PP2 (14:30 - 15:00)
+      const overlapsBoundary = timeA.startMin < timeB.endMin && timeA.endMin > timeB.startMin;
+      if (overlapsBoundary) throw new Error('Exact boundary match should NOT overlap');
+
+      // 2. Overlap by 1 minute: PP1 duration = 31 (ends at 14:31)
+      await client.from('campus_event_program_points').update({ duration: 31 }).eq('id', ppIdA);
+      
+      const { data: updatedPps } = await client.from('campus_event_program_points').select('*').eq('event_id', 'event-1');
+      const updatedTimeMap: Record<string, { startMin: number; endMin: number }> = {};
+      
+      let s1CurUpd = startMin;
+      updatedPps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 1).sort((a: any, b: any) => a.sort_order - b.sort_order).forEach((p: any) => {
+        updatedTimeMap[p.id] = { startMin: s1CurUpd, endMin: s1CurUpd + p.duration };
+        s1CurUpd += p.duration;
+      });
+
+      let s2CurUpd = startMin;
+      updatedPps.filter((p: any) => (p.is_scheduled || p.is_pause) && p.stage_number === 2).sort((a: any, b: any) => a.sort_order - b.sort_order).forEach((p: any) => {
+        updatedTimeMap[p.id] = { startMin: s2CurUpd, endMin: s2CurUpd + p.duration };
+        s2CurUpd += p.duration;
+      });
+
+      const timeAUpd = updatedTimeMap[ppIdA];
+      const timeBUpd = updatedTimeMap[ppIdB];
+      
+      const overlapsByOneMin = timeAUpd.startMin < timeBUpd.endMin && timeAUpd.endMin > timeBUpd.startMin;
+      if (!overlapsByOneMin) throw new Error('Overlapping by 1 minute should be flagged as overlapping');
+    }
+  },
+  {
+    id: 'T3_M5_7',
+    name: 'T3: Multiple conflicts on same teacher are correctly tracked',
+    tier: 3,
+    description: 'Ensure that a teacher having both a lesson conflict and a staging overlap has both conflict conditions detected.',
+    run: async (client) => {
+      sessionStorage.setItem('groovelab_user_id', 'master-1');
+
+      // 1. Insert lesson for teacher-1 on 2026-07-01 at 14:15 with 30m duration (ends 14:45)
+      const lessonId = uuid();
+      const { error: insErr } = await client.from('lessons').insert({
+        id: lessonId,
+        teacher_id: 'teacher-1',
+        school_id: 'school-1',
+        date: '2026-07-01',
+        start_time: '14:15',
+        duration: 30,
+        status: 'scheduled'
+      });
+      if (insErr) throw new Error('Lesson insert failed: ' + insErr.message);
+
+      sessionStorage.setItem('groovelab_user_id', 'admin-1');
+
+      // 2. Insert program point on Stage 1 (14:00 - 14:30)
+      const ppIdA = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdA,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Stage 1 Act',
+        duration: 30,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 1,
+        sort_order: 0,
+        teacher_id: 'teacher-1'
+      });
+
+      // 3. Insert program point on Stage 2 (14:00 - 14:30)
+      const ppIdB = uuid();
+      await client.from('campus_event_program_points').insert({
+        id: ppIdB,
+        event_id: 'event-1',
+        school_id: 'school-1',
+        name: 'Stage 2 Act',
+        duration: 30,
+        status: 'approved',
+        is_scheduled: true,
+        stage_number: 2,
+        sort_order: 0,
+        teacher_id: 'teacher-1'
+      });
+
+      // Re-run getConflictsMap logic to check for both types of conflicts
+      const { data: pps } = await client.from('campus_event_program_points').select('*').eq('event_id', 'event-1');
+      sessionStorage.setItem('groovelab_user_id', 'teacher-1');
+      const { data: lessons } = await client.from('lessons').select('*').eq('date', '2026-07-01');
+
+      const parseTimeToMinutes = (t: string) => {
+        const p = t.split(':');
+        return (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+      };
+      const formatMinutesToTime = (totalMinutes: number) => {
+        const hours = Math.floor(totalMinutes / 60) % 24;
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      };
+
+      const startMin = parseTimeToMinutes('14:00');
+      const timeMap: Record<string, { startMin: number; endMin: number; start: string; end: string }> = {};
+      
+      const stages: Record<number, any[]> = {};
+      pps.forEach((pp: any) => {
+        if (pp.is_scheduled || pp.is_pause) {
+          const stage = pp.stage_number || 1;
+          if (!stages[stage]) stages[stage] = [];
+          stages[stage].push(pp);
+        }
+      });
+
+      Object.keys(stages).forEach(stageStr => {
+        const stageNum = parseInt(stageStr, 10);
+        const stagePoints = stages[stageNum].sort((a, b) => a.sort_order - b.sort_order);
+        let currentMin = startMin;
+        stagePoints.forEach(pp => {
+          timeMap[pp.id] = {
+            startMin: currentMin,
+            endMin: currentMin + pp.duration,
+            start: formatMinutesToTime(currentMin),
+            end: formatMinutesToTime(currentMin + pp.duration)
+          };
+          currentMin += pp.duration;
+        });
+      });
+
+      // Find conflicts for ppIdB (Stage 2 Act)
+      // Conflict 1: Overlaps with lesson (14:15 - 14:45) since ppIdB runs 14:00 - 14:30
+      // Conflict 2: Overlaps with Stage 1 Act (14:00 - 14:30)
+      const ppTime = timeMap[ppIdB];
+      let hasLessonConflict = false;
+      let hasStageConflict = false;
+
+      // Check lesson conflict
+      for (const lesson of lessons) {
+        if (lesson.teacher_id === 'teacher-1' && lesson.status !== 'cancelled') {
+          const lessonStart = parseTimeToMinutes(lesson.start_time);
+          const lessonEnd = lessonStart + lesson.duration;
+          if (ppTime.startMin < lessonEnd && ppTime.endMin > lessonStart) {
+            hasLessonConflict = true;
+          }
+        }
+      }
+
+      // Check other stage conflict
+      for (const otherPp of pps) {
+        if (
+          otherPp.id !== ppIdB &&
+          (otherPp.is_scheduled || otherPp.is_pause) &&
+          !otherPp.is_pause &&
+          otherPp.teacher_id === 'teacher-1' &&
+          otherPp.stage_number !== 2
+        ) {
+          const otherTime = timeMap[otherPp.id];
+          if (otherTime) {
+            if (ppTime.startMin < otherTime.endMin && ppTime.endMin > otherTime.startMin) {
+              hasStageConflict = true;
+            }
+          }
+        }
+      }
+
+      if (!hasLessonConflict) throw new Error('Expected lesson conflict to be detected');
+      if (!hasStageConflict) throw new Error('Expected double-stage conflict to be detected');
+    }
   }
 ];
+

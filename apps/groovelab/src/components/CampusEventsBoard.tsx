@@ -296,7 +296,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [techRiderItems, setTechRiderItems] = useState<any[]>([]);
   const [builderType, setBuilderType] = useState('Gesang');
   const [builderConnection, setBuilderConnection] = useState('Mikrofon');
-  const [builderCount, setBuilderCount] = useState(1);
+  const [builderCount, setBuilderCount] = useState<number | string>(1);
   const [builderSource, setBuilderSource] = useState('venue');
   const [builderNotes, setBuilderNotes] = useState('');
   const [newPpSelectedStudentIds, setNewPpSelectedStudentIds] = useState<string[]>([]);
@@ -326,7 +326,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const handleAddTechRiderItem = () => {
-    if (builderCount <= 0) {
+    const countNum = parseInt(String(builderCount), 10) || 1;
+    if (countNum <= 0) {
       alert('Die Anzahl muss mindestens 1 sein.');
       return;
     }
@@ -334,7 +335,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       id: Math.random().toString(36).substring(2, 9),
       type: builderType,
       connection: builderConnection,
-      count: builderCount,
+      count: countNum,
       source: builderSource,
       notes: builderNotes.trim()
     };
@@ -3999,7 +4000,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   type="number"
                   min="1"
                   value={builderCount}
-                  onChange={(e) => setBuilderCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setBuilderCount('');
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      setBuilderCount(isNaN(parsed) ? '' : Math.max(1, parsed));
+                    }
+                  }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
                 />
               </div>

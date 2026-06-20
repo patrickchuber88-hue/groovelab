@@ -124,3 +124,72 @@ The user has finalized the requirements for the Teacher Event Planning view (Col
 
 Please incorporate this 4-tab workflow into the Teacher Column 3 Event Planning view. Ensure all components compile, look beautiful, and connect to the database schemas.
 
+## Follow-up — 2026-06-19T14:57:32Z
+
+# Teamwork Project Prompt — Draft
+
+We need to implement the "Programm" planning board within the secretary/administrator view of the event planning module. This allows manually entering program points, scheduling submissions into a timeline via drag-and-drop, inserting pauses, and validating conflicts.
+
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Two-Column Layout for Program Scheduling
+- Display a two-column drag-and-drop board for program scheduling within the "Programm" tab of the administrator/secretary event planning board:
+  - **Left Column**: Scheduled timeline (Tagesplan) starting at the event's start time. Program points snap sequentially ("magnetic layout").
+  - **Right Column**: Unscheduled submissions (approved or submitted program points) and pauses.
+- Show a switch/tab selector at the top when there are multiple stages (`Anzahl Bühnen` > 1) to toggle between stages in the timeline.
+
+### R2. Drag-and-Drop & Timeline Control
+- Implement drag-and-drop to schedule items from the unscheduled submissions column into the scheduled timeline.
+- Dragging/re-ordering or editing the duration of a program point or pause automatically shifts all subsequent program points sequentially.
+- Allow adding pauses directly to the timeline (with custom durations).
+- Program points in the scheduled timeline should show: Ensemble/Band Name, Teacher Name, and Instrument.
+
+### R3. Conflict Checking (Teacher Double-Booking)
+- Automatically validate that no teacher is scheduled at the same time on different stages (in case of multiple stages).
+- If a conflict occurs, visually mark it (e.g., in red) and prevent the drop/action that causes the double-booking.
+
+### R4. Manual Entries
+- Provide a "Beitrag hinzufügen" (Add Point) button that opens a modal form.
+- The administrator can fill in: Name/Title, Ensemble/Band Name, Teacher, Instrument, and Duration.
+- Creating a manual entry adds it to the unscheduled list so it can be scheduled.
+
+### R5. Database Persistence
+- Persist scheduling changes (stage_number, sort_order, durations) immediately in the background using Supabase (`campus_event_program_points` table).
+
+## Acceptance Criteria
+
+### Timeline & Stage Management
+- [ ] Users can view the left timeline column starting at the event's start time.
+- [ ] Users can toggle between stages using a tab/switch at the top if `stages > 1`.
+- [ ] Items snap sequentially and update scheduled start times automatically when re-ordered.
+
+### Drag and Drop
+- [ ] Dragging an item from the unscheduled list to the timeline schedules it on the active stage.
+- [ ] Dragging an item back to the unscheduled list unschedules it.
+
+### Conflict Prevention
+- [ ] Drag-and-drop is blocked if it schedules a teacher parallel to their scheduling on another stage at the same time.
+
+### Manual Submissions
+- [ ] "Beitrag hinzufügen" modal allows entering details and saves the program point to the database, listing it under unscheduled.
+
+### Persistence
+- [ ] All changes are persisted to the database via API calls immediately.
+
+
+## 2026-06-19T15:56:00Z
+You are assigned to investigate the git and workspace state in the Groovelab app repository.
+
+### Objectives
+1. Run `git status` to see if there are any uncommitted changes, stashed changes, or if we are on a detached HEAD.
+2. Run `git stash list` to list all stashes.
+3. Check `apps/groovelab/src/components/CampusEventsBoard.tsx` line count and check if the Milestone 5 changes (like `getConflictsMap`, drag-and-drop code, and manual entry modal) are present in the active file or if they are stashed.
+4. Report the git branch, status, stash list, and the exact state of `CampusEventsBoard.tsx`. Write your findings to `git_status_investigation.txt` in the root or in your folder, and report back.
+
+### MANDATORY INTEGRITY WARNING
+DO NOT CHEAT. Report only authentic git commands output.
+
+Please report your findings.

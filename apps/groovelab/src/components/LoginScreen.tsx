@@ -4190,14 +4190,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Admin Bypass for Localhost */}
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Manuel Wagner Bypass */}
           <button
             onClick={async () => {
               try {
-                console.log('[Bypass] Attempting Admin login...');
+                console.log('[Bypass] Attempting Manuel Wagner login...');
+                // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
+                sessionStorage.setItem('groovelab_qr_token', '897ed2f0-d0e6-47e8-b799-a09efe9e51e5');
+                
                 const { data: user, error } = await supabase
                   .from('users')
                   .select('id, role')
-                  .eq('qr_token', '7b8e1a2c-4d5f-6a7b-8c9d-0e1f2a3b4c5d')
+                  .eq('qr_token', '897ed2f0-d0e6-47e8-b799-a09efe9e51e5')
                   .maybeSingle();
 
                 if (error) {
@@ -4207,11 +4211,66 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (user) {
-                  console.log('[Bypass] User found, logging in:', user.id);
+                  console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
                   onLogin(user.id, true);
                 } else {
-                  console.warn('[Bypass] No user found with this token.');
-                  alert('Admin-Nutzer wurde in der Datenbank nicht gefunden.');
+                  console.warn('[Bypass] No user found with Manuel Wagner token.');
+                  alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
+                }
+              } catch (err: any) {
+                console.error('[Bypass] Runtime Error:', err);
+                alert('Ein Fehler ist aufgetreten: ' + err.message);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '16px',
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '2px solid rgba(59, 130, 246, 0.25)',
+              borderRadius: '24px',
+              color: '#93c5fd',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(59,130,246,0.1)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
+          >
+            🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
+          </button>
+
+          {/* Master Admin Bypass */}
+          <button
+            onClick={async () => {
+              try {
+                console.log('[Bypass] Attempting Admin login...');
+                // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
+                sessionStorage.setItem('groovelab_qr_token', '2e2e7ec2-46b0-4ab6-9805-284e66186ab1');
+
+                const { data: user, error } = await supabase
+                  .from('users')
+                  .select('id, role')
+                  .eq('qr_token', '2e2e7ec2-46b0-4ab6-9805-284e66186ab1')
+                  .maybeSingle();
+
+                if (error) {
+                  console.error('[Bypass] Supabase Error:', error);
+                  alert('Datenbank-Fehler: ' + error.message);
+                  return;
+                }
+
+                if (user) {
+                  console.log('[Bypass] Admin found, logging in:', user.id);
+                  onLogin(user.id, true);
+                } else {
+                  console.warn('[Bypass] No user found with Admin token.');
+                  alert('Admin wurde in der Datenbank nicht gefunden.');
                 }
               } catch (err: any) {
                 console.error('[Bypass] Runtime Error:', err);
@@ -4238,9 +4297,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
             onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.08)'; }}
           >
-            🔓 ADMIN BYPASS (LOCAL ONLY)
+            🔓 BYPASS: ADMIN (MASTER ADMIN)
           </button>
-          
         </div>
       )}
 

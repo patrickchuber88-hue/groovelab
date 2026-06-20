@@ -2246,6 +2246,9 @@ export function TeacherDashboard({
   const [responseTextInput, setResponseTextInput] = useState<string>('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [adminFeedbackTab, setAdminFeedbackTab] = useState<'open' | 'done'>('open');
+  const [planningEvents, setPlanningEvents] = useState<any[]>([]);
+  const [mySubmittedProgramPoints, setMySubmittedProgramPoints] = useState<any[]>([]);
+  const [dismissedBanners, setDismissedBanners] = useState<Record<string, boolean>>({});
 
   const lastSickUntilRef = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -4319,6 +4322,29 @@ export function TeacherDashboard({
           console.error('Error fetching admin feedback:', fErr);
         }
 
+        // Fetch planning events & teacher program points submissions
+        try {
+          const { data: evs } = await supabase
+            .from('campus_events')
+            .select('*')
+            .eq('school_id', tData.school_id)
+            .eq('planning_status', 'planung');
+          setPlanningEvents(evs || []);
+
+          const isStaff = tData.role?.toLowerCase() === 'teacher' || tData.role?.toLowerCase() === 'admin';
+          if (isStaff) {
+            const { data: myPP } = await supabase
+              .from('campus_event_program_points')
+              .select('*')
+              .eq('teacher_id', userId);
+            setMySubmittedProgramPoints(myPP || []);
+          } else {
+            setMySubmittedProgramPoints([]);
+          }
+        } catch (pErr) {
+          console.error('Error fetching planning events:', pErr);
+        }
+
         // 10. Fetch Live Campus Feed Announcements from campus_announcements table
         try {
           const { data: annData, error: annErr } = await supabase
@@ -4739,6 +4765,31 @@ export function TeacherDashboard({
     }
   };
 
+  const isStaff = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
+  const activePlanningEvents = isStaff ? planningEvents.filter(ev => {
+    if (!ev.is_planning_active) return false;
+    const hasSubmitted = mySubmittedProgramPoints.some(pp => pp.event_id === ev.id);
+    if (hasSubmitted) return false;
+    const hasConfirmedNoSubmission = ev.no_submission_teacher_ids?.includes(userId);
+    if (hasConfirmedNoSubmission) return false;
+    if (ev.submission_deadline) {
+      const deadlineTime = new Date(ev.submission_deadline).getTime();
+      if (Date.now() > deadlineTime) return false;
+    }
+    return true;
+  }) : [];
+
+  const getCountdownString = (deadlineStr: string) => {
+    const diff = new Date(deadlineStr).getTime() - Date.now();
+    if (diff <= 0) return 'Abgelaufen';
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    if (days > 0) return `${days}T ${hours}Std übrig`;
+    if (hours > 0) return `${hours}Std ${minutes}Min übrig`;
+    return `${minutes}Min übrig`;
+  };
+
   if (!teacher) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Zentrale...</div>;
 
   return (
@@ -5136,6 +5187,109 @@ export function TeacherDashboard({
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Planning Active Banners */}
+                  {activePlanningEvents.map(ev => {
+                    if (dismissedBanners[ev.id]) return null;
+                    return (
+                      <div
+                        key={`planning-banner-${ev.id}`}
+                        style={{
+                          background: 'linear-gradient(to right, #ffedd5, #fffbeb)',
+                          border: '1.5px solid #ffedd5',
+                          borderRadius: '16px',
+                          padding: '12px 20px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          boxShadow: '0 4px 20px rgba(234, 88, 12, 0.06)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>📢</span>
+                          <div>
+                            <strong style={{ fontSize: '0.86rem', color: '#7c2d12' }}>Planung aktiv: {ev.title}</strong>
+                            <span style={{ fontSize: '0.78rem', color: '#9a3412', marginLeft: '12px' }}>
+                              {ev.submission_deadline
+                                ? `Frist endet am ${new Date(ev.submission_deadline).toLocaleString('de-DE', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} Uhr`
+                                : 'Reiche jetzt deine Beiträge ein!'}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              localStorage.setItem('groovelab_auto_submit_event_id', ev.id);
+                              onTabChange?.('events');
+                            }}
+                            style={{
+                              background: '#ea580c',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            Jetzt Einreichen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm('Bist du sicher, dass du für diese Veranstaltung keine Beiträge einreichen möchtest?')) {
+                                const currentIds = ev.no_submission_teacher_ids || [];
+                                const { error } = await supabase
+                                  .from('campus_events')
+                                  .update({ no_submission_teacher_ids: [...currentIds, userId] })
+                                  .eq('id', ev.id);
+                                if (!error) {
+                                  fetchData();
+                                } else {
+                                  alert('Fehler beim Speichern: ' + error.message);
+                                }
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              color: '#ea580c',
+                              border: '1.5px solid #ea580c',
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            Keine Beiträge
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDismissedBanners(prev => ({ ...prev, [ev.id]: true }))}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#9a3412',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              opacity: 0.7
+                            }}
+                            title="Schließen"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
                   {/* Holiday Banner */}
                   {isTodayHoliday && (
                     <div style={{
@@ -8070,7 +8224,11 @@ export function TeacherDashboard({
                 }}>
                   {(['open', 'done'] as const).map(tab => {
                     const isActive = adminFeedbackTab === tab;
-                    const openCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+                    const feedbackCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+                    const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+                      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+                    );
+                    const openCount = feedbackCount + activePlanningEvents.length + pendingFeedbackPoints.length;
                     const label = tab === 'open' ? `Offen${openCount > 0 ? ` (${openCount})` : ''}` : 'Erledigt';
                     return (
                       <button
@@ -8098,7 +8256,11 @@ export function TeacherDashboard({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {(() => {
-                    if (adminFeedbackRequests.length === 0) {
+                    const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+                      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+                    );
+
+                    if (adminFeedbackRequests.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
                           <Bell size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
@@ -8111,79 +8273,222 @@ export function TeacherDashboard({
 
                     if (adminFeedbackTab === 'open') {
                       const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
-                      if (openItems.length === 0) {
+                      if (openItems.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center' }}>
                             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
                           </div>
                         );
                       }
-                      return openItems.map((item, idx) => {
-                        const isResponding = respondingToRequestId === item.id;
-                        return (
-                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b' }}>
-                                Aktion erforderlich
-                              </span>
-                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
-                                {new Date(item.created_at).toLocaleDateString('de-DE')}
-                              </span>
-                            </div>
-                            <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
-                            {item.description && (
-                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>{item.description}</p>
-                            )}
-                            <div style={{ marginTop: '4px' }}>
-                              {isResponding ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <textarea
-                                    value={responseTextInput}
-                                    onChange={(e) => setResponseTextInput(e.target.value)}
-                                    placeholder="Schreibe deine Antwort an die Verwaltung..."
-                                    rows={2}
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px 10px',
-                                      borderRadius: '10px',
-                                      border: '1px solid #cbd5e1',
-                                      fontSize: '0.78rem',
-                                      fontFamily: 'inherit',
-                                      outline: 'none',
-                                      resize: 'none',
-                                      boxSizing: 'border-box'
-                                    }}
-                                  />
-                                  <div style={{ display: 'flex', gap: '6px' }}>
-                                    <button
-                                      onClick={() => handleSubmitFeedbackResponse(item.id)}
-                                      disabled={submittingFeedback || !responseTextInput.trim()}
-                                      style={{ flex: 1, background: '#171717', color: '#ffffff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
-                                    >
-                                      Senden
-                                    </button>
-                                    <button
-                                      onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
-                                      style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
-                                    >
-                                      Abbrechen
-                                    </button>
-                                  </div>
+                      return (
+                        <>
+                          {pendingFeedbackPoints.map(pp => {
+                            const ev = planningEvents.find(e => e.id === pp.event_id);
+                            const evTitle = ev ? ev.title : 'Event';
+                            return (
+                              <div
+                                key={`feedback-card-${pp.id}`}
+                                style={{
+                                  background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)',
+                                  border: '1.5px solid #f59e0b',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '10px',
+                                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.08)',
+                                  marginBottom: '12px'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    ⚠️ Offene Rückfrage
+                                  </span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#b45309' }}>
+                                    Aktion erforderlich
+                                  </span>
                                 </div>
-                              ) : (
+                                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {pp.name} ({evTitle})
+                                </h4>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                  Die Verwaltung hat eine Rückfrage zu deiner Einreichung gestellt.
+                                </p>
                                 <button
-                                  onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
-                                  style={{ background: 'transparent', color: '#0b57d0', border: '1px solid #0b57d0', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                                  className="hover-scale"
+                                  onClick={() => {
+                                    localStorage.setItem('groovelab_auto_submit_event_id', pp.event_id);
+                                    localStorage.setItem('groovelab_auto_submit_tab', 'feedback');
+                                    onTabChange?.('events');
+                                  }}
+                                  style={{
+                                    background: '#d97706',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    width: 'fit-content'
+                                  }}
                                 >
-                                  Rückmeldung geben
+                                  Jetzt beantworten
                                 </button>
-                              )}
+                              </div>
+                            );
+                          })}
+                          {activePlanningEvents.map(ev => (
+                            <div
+                              key={`planning-card-${ev.id}`}
+                              style={{
+                                background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)',
+                                border: '1.5px solid #ffedd5',
+                                borderRadius: '16px',
+                                padding: '16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                boxShadow: '0 4px 14px rgba(251, 146, 60, 0.08)',
+                                marginBottom: '12px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ea580c', background: '#ffedd5', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  Programmeinreichung
+                                </span>
+                                {ev.submission_deadline && (
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#f97316' }}>
+                                    {getCountdownString(ev.submission_deadline)}
+                                  </span>
+                                )}
+                              </div>
+                              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                {ev.title}
+                              </h4>
+                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                Bitte reiche dein Programm für diese Veranstaltung ein.
+                              </p>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  onClick={() => {
+                                    localStorage.setItem('groovelab_auto_submit_event_id', ev.id);
+                                    onTabChange?.('events');
+                                  }}
+                                  style={{
+                                    background: '#ea580c',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    width: 'fit-content'
+                                  }}
+                                >
+                                  Jetzt Einreichen
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('Bist du sicher, dass du für diese Veranstaltung keine Beiträge einreichen möchtest?')) {
+                                      const currentIds = ev.no_submission_teacher_ids || [];
+                                      const { error } = await supabase
+                                        .from('campus_events')
+                                        .update({ no_submission_teacher_ids: [...currentIds, userId] })
+                                        .eq('id', ev.id);
+                                      if (!error) {
+                                        fetchData();
+                                      } else {
+                                        alert('Fehler beim Speichern: ' + error.message);
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    color: '#ea580c',
+                                    border: '1.5px solid #ea580c',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    width: 'fit-content'
+                                  }}
+                                >
+                                  Keine Beiträge
+                                </button>
+                              </div>
                             </div>
-                            {idx < openItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
-                          </div>
-                        );
-                      });
+                          ))}
+
+                          {openItems.map((item, idx) => {
+                            const isResponding = respondingToRequestId === item.id;
+                            return (
+                              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b' }}>
+                                    Aktion erforderlich
+                                  </span>
+                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
+                                    {new Date(item.created_at).toLocaleDateString('de-DE')}
+                                  </span>
+                                </div>
+                                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
+                                {item.description && (
+                                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>{item.description}</p>
+                                )}
+                                <div style={{ marginTop: '4px' }}>
+                                  {isResponding ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <textarea
+                                        value={responseTextInput}
+                                        onChange={(e) => setResponseTextInput(e.target.value)}
+                                        placeholder="Schreibe deine Antwort an die Verwaltung..."
+                                        rows={2}
+                                        style={{
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          borderRadius: '10px',
+                                          border: '1px solid #cbd5e1',
+                                          fontSize: '0.78rem',
+                                          fontFamily: 'inherit',
+                                          outline: 'none',
+                                          resize: 'none',
+                                          boxSizing: 'border-box'
+                                        }}
+                                      />
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button
+                                          onClick={() => handleSubmitFeedbackResponse(item.id)}
+                                          disabled={submittingFeedback || !responseTextInput.trim()}
+                                          style={{ flex: 1, background: '#171717', color: '#ffffff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
+                                        >
+                                          Senden
+                                        </button>
+                                        <button
+                                          onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
+                                          style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
+                                        >
+                                          Abbrechen
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
+                                      style={{ background: 'transparent', color: '#0b57d0', border: '1px solid #0b57d0', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                                      className="hover-scale"
+                                    >
+                                      Rückmeldung geben
+                                    </button>
+                                  )}
+                                </div>
+                                {idx < openItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
                     }
 
                     // Erledigt tab – max 5 most recent
