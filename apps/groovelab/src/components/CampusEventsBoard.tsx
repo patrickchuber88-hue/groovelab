@@ -18,13 +18,17 @@ import {
   CalendarDays,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   MessageSquare,
   Palmtree,
   Building2,
   ExternalLink,
   Eye,
   Edit3,
-  CalendarPlus
+  CalendarPlus,
+  Maximize2,
+  Minimize2,
+  Search
 } from 'lucide-react';
 
 interface CampusEventsBoardProps {
@@ -99,6 +103,7 @@ interface CampusEvent {
   planning_status?: 'planung' | 'bestaetigt' | 'laufend' | 'abgeschlossen';
   is_planning_active?: boolean;
   submission_deadline?: string;
+  no_submission_teacher_ids?: string[];
 }
 
 const formatToLocalDatetime = (isoString: string | null | undefined): string => {
@@ -238,19 +243,35 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [eventCoordResponsible, setEventCoordResponsible] = useState('');
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [admissionTimeError, setAdmissionTimeError] = useState('');
+  const [expandedPoints, setExpandedPoints] = useState<Record<string, boolean>>({});
+  const [isTimelineFullscreen, setIsTimelineFullscreen] = useState(false);
 
   // States for pause insertion
   const [pauseDuration, setPauseDuration] = useState<string>('');
 
   // States for additional feedback queries
   const [feedbackQuestion, setFeedbackQuestion] = useState<Record<string, string>>({}); // ppId -> question text
+  const [expandedFeedbackForms, setExpandedFeedbackForms] = useState<Record<string, boolean>>({});
 
   // Coordinator active tab
-  const [coordinatorTab, setCoordinatorTab] = useState<'eckdaten' | 'feedback' | 'timeline' | 'tech' | 'export'>('eckdaten');
+  const [coordinatorTab, setCoordinatorTab] = useState<'eckdaten' | 'submissions' | 'timeline' | 'feedback' | 'tech' | 'export'>('eckdaten');
+
+  // Submissions filter
+  const [submissionsFilter, setSubmissionsFilter] = useState<'all' | 'submitted' | 'no_submission' | 'pending'>('all');
+  const [collapsedTeachers, setCollapsedTeachers] = useState<Record<string, boolean>>({});
+  const [expandedSubmissionDetails, setExpandedSubmissionDetails] = useState<Record<string, boolean>>({});
+  const [selectedTeacherIdForSubmissions, setSelectedTeacherIdForSubmissions] = useState<string | null>(null);
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
+  const [teacherStatusFilter, setTeacherStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [selectedTeacherIdForFeedback, setSelectedTeacherIdForFeedback] = useState<string | null>(null);
+  const [feedbackSearchQuery, setFeedbackSearchQuery] = useState('');
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
 
   // Teacher fullscreen overlay state
   const [teacherSubmissionEvent, setTeacherSubmissionEvent] = useState<any | null>(null);
-  const [teacherOverlayTab, setTeacherOverlayTab] = useState<'einreichung' | 'feedback' | 'packliste' | 'summary'>('einreichung');
+  const [teacherOverlayTab, setTeacherOverlayTab] = useState<'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary'>('einreichung');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Secretary planning fullscreen overlay state (separate from selectedEvent to avoid visibility modal)
   const [secretaryPlanningEvent, setSecretaryPlanningEvent] = useState<any | null>(null);
@@ -515,12 +536,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
 
     let updatedList = [...programPoints];
-    if (!draggedPp.is_scheduled || draggedPp.stage_number !== activeStage) {
+    if (!draggedPp.is_scheduled || (draggedPp.stage_number || 1) !== activeStage) {
       updatedList = updatedList.map(p => p.id === ppId ? { ...p, is_scheduled: true, stage_number: activeStage, status: 'approved' } : p);
     }
 
     const otherPoints = updatedList.filter(p => p.id !== ppId);
-    const stageScheduled = otherPoints.filter(p => (p.is_scheduled || p.is_pause) && p.stage_number === activeStage)
+    const stageScheduled = otherPoints.filter(p => (p.is_scheduled || p.is_pause) && (p.stage_number || 1) === activeStage)
       .sort((a, b) => a.sort_order - b.sort_order);
 
     let newStageScheduled: any[] = [];
@@ -542,6 +563,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     newStageScheduled.forEach((p, index) => {
       p.sort_order = index;
+      if (p.is_pause && !p.stage_number) {
+        p.stage_number = activeStage;
+      }
     });
 
     const finalPoints = updatedList.map(p => {
@@ -551,12 +575,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     const activeEv = secretaryPlanningEvent || selectedEvent;
     const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+    // Check conflicts for warning indication, but do not block scheduling
     const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
-
-    if (Object.keys(conflicts).length > 0) {
-      alert('Aktion blockiert: ' + Object.values(conflicts)[0]);
-      return;
-    }
 
     const pointsToUpdate = finalPoints.filter(p => {
       const original = programPoints.find(orig => orig.id === p.id);
@@ -595,12 +615,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     const activeEv = secretaryPlanningEvent || selectedEvent;
     const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
+    // Check conflicts but do not block duration changes
     const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
-
-    if (Object.keys(conflicts).length > 0) {
-      alert('Dauer-Änderung blockiert: ' + Object.values(conflicts)[0]);
-      return;
-    }
 
     const { error } = await supabase
       .from('campus_event_program_points')
@@ -662,9 +678,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, first_name, last_name, role')
+          .select('id, first_name, last_name, role, instrument')
           .eq('school_id', schoolId)
-          .in('role', ['teacher', 'admin', 'secretary']);
+          .in('role', ['teacher', 'admin', 'secretary', 'student']);
         if (!error && data) {
           const sorted = data.sort((a: any, b: any) => {
             const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim();
@@ -768,30 +784,108 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         .single();
       if (error) throw error;
       setProgramPoints(prev => prev.map(pp => pp.id === ppId ? data : pp));
+      
+      // Auto-resolve feedback questions if rejected
+      if (newStatus === 'rejected' && data?.additional_feedback_responses?.status === 'pending_response') {
+        const clearedFeedback = {
+          ...data.additional_feedback_responses,
+          status: 'resolved'
+        };
+        await supabase
+          .from('campus_event_program_points')
+          .update({ additional_feedback_responses: clearedFeedback })
+          .eq('id', ppId);
+        setProgramPoints(prev => prev.map(pp => pp.id === ppId ? { ...pp, additional_feedback_responses: clearedFeedback } : pp));
+      }
     } catch (err: any) {
       alert('Fehler bei der Status-Aktualisierung: ' + err.message);
     }
   };
 
+  const handleResetNoSubmissionStatus = async (teacherId: string) => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+    const currentIds = activeEv.no_submission_teacher_ids || [];
+    const newIds = currentIds.filter((id: string) => id !== teacherId);
+    try {
+      const { data, error } = await supabase
+        .from('campus_events')
+        .update({ no_submission_teacher_ids: newIds })
+        .eq('id', activeEv.id)
+        .select('*, room:room_id(id, name)')
+        .single();
+      if (error) throw error;
+      setCustomEvents(prev => prev.map(ev => ev.id === activeEv.id ? data : ev));
+      if (selectedEvent && selectedEvent.id === activeEv.id) setSelectedEvent((prev: any) => ({ ...prev, ...data }));
+      if (secretaryPlanningEvent && secretaryPlanningEvent.id === activeEv.id) setSecretaryPlanningEvent((prev: any) => ({ ...prev, ...data }));
+      alert('Status zurückgesetzt!');
+    } catch (err: any) {
+      alert('Fehler beim Zurücksetzen: ' + err.message);
+    }
+  };
+
+  const handleBulkUpdateStatus = async (teacherId: string, status: 'approved' | 'rejected') => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+    const pendingPoints = programPoints.filter(pp => pp.teacher_id === teacherId && pp.status === 'submitted' && !pp.is_pause);
+    if (pendingPoints.length === 0) return;
+    
+    try {
+      const { error } = await supabase
+        .from('campus_event_program_points')
+        .update({ status })
+        .eq('event_id', activeEv.id)
+        .eq('teacher_id', teacherId)
+        .eq('status', 'submitted');
+        
+      if (error) throw error;
+      
+      // Update local state
+      setProgramPoints(prev => prev.map(pp => 
+        (pp.teacher_id === teacherId && pp.status === 'submitted' && !pp.is_pause) ? { ...pp, status } : pp
+      ));
+      
+      // If rejected, auto-resolve feedback on all rejected points
+      if (status === 'rejected') {
+        for (const pp of pendingPoints) {
+          if (pp.additional_feedback_responses?.status === 'pending_response') {
+            const cleared = { ...pp.additional_feedback_responses, status: 'resolved' };
+            await supabase.from('campus_event_program_points').update({ additional_feedback_responses: cleared }).eq('id', pp.id);
+            setProgramPoints(prev => prev.map(p => p.id === pp.id ? { ...p, additional_feedback_responses: cleared } : p));
+          }
+        }
+      }
+
+      alert(`Erfolgreich ${pendingPoints.length} Beiträge ${status === 'approved' ? 'freigegeben' : 'abgelehnt'}!`);
+    } catch (err: any) {
+      alert('Fehler bei der Massenaktualisierung: ' + err.message);
+    }
+  };
+
   const handleAddPause = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEvent) return;
+    const activeEvent = secretaryPlanningEvent || selectedEvent;
+    if (!activeEvent) return;
     const durationVal = parseInt(pauseDuration, 10);
     if (isNaN(durationVal) || durationVal <= 0) {
       alert('Bitte geben Sie eine gültige Pausendauer ein (eine positive Zahl).');
       return;
     }
+    const activeStagePoints = programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage);
+    const nextSortOrder = activeStagePoints.length;
     try {
       const { data, error } = await supabase
         .from('campus_event_program_points')
         .insert({
-          event_id: selectedEvent.id,
-          school_id: schoolId,
+          event_id: activeEvent.id,
+          school_id: activeEvent.school_id || schoolId,
           name: 'Pause / Unterbrechung',
           duration: durationVal,
           is_pause: true,
           status: 'approved',
-          sort_order: programPoints.length
+          sort_order: nextSortOrder,
+          stage_number: activeStage,
+          is_scheduled: true
         })
         .select()
         .single();
@@ -829,8 +923,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const questionText = feedbackQuestion[ppId]?.trim();
     if (!questionText) return;
     try {
+      const pp = programPoints.find(p => p.id === ppId);
+      const prevFeedback = pp?.additional_feedback_responses || {};
+      const newQuestions = [...(prevFeedback.questions || []), questionText];
+      const newAnswers = [...(prevFeedback.answers || []), '']; // Aligned with questions length
+      
       const newFeedback = {
-        questions: [questionText],
+        questions: newQuestions,
+        answers: newAnswers,
         status: 'pending_response'
       };
       const { data, error } = await supabase
@@ -840,7 +940,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         .select()
         .single();
       if (error) throw error;
-      setProgramPoints(prev => prev.map(pp => pp.id === ppId ? data : pp));
+      setProgramPoints(prev => prev.map(p => p.id === ppId ? data : p));
       setFeedbackQuestion(prev => ({ ...prev, [ppId]: '' }));
       alert('Rückfrage erfolgreich gesendet!');
     } catch (err: any) {
@@ -850,18 +950,106 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const handleCancelFeedbackQuestion = async (ppId: string) => {
     try {
+      const pp = programPoints.find(p => p.id === ppId);
+      const prevFeedback = pp?.additional_feedback_responses || {};
+      const questions = prevFeedback.questions || [];
+      const answers = prevFeedback.answers || [];
+      
+      let newFeedback = {};
+      if (questions.length > 1) {
+        const newQuestions = questions.slice(0, -1);
+        const newAnswers = answers.slice(0, -1);
+        const hasUnanswered = newAnswers.some((ans: any) => !ans || ans.trim() === '');
+        newFeedback = {
+          questions: newQuestions,
+          answers: newAnswers,
+          status: hasUnanswered ? 'pending_response' : 'responded'
+        };
+      } else {
+        newFeedback = {};
+      }
+      
       const { data, error } = await supabase
         .from('campus_event_program_points')
-        .update({ additional_feedback_responses: {} })
+        .update({ additional_feedback_responses: newFeedback })
         .eq('id', ppId)
         .select()
         .single();
       if (error) throw error;
-      setProgramPoints(prev => prev.map(pp => pp.id === ppId ? data : pp));
+      setProgramPoints(prev => prev.map(p => p.id === ppId ? data : p));
       alert('Rückfrage erfolgreich storniert!');
     } catch (err: any) {
       alert('Fehler beim Stornieren der Rückfrage: ' + err.message);
     }
+  };
+
+  const handleCancelEditing = () => {
+    setEditingPpId(null);
+    setNewPpName('');
+    setNewPpEnsemble('');
+    setNewPpPerformerCount('1');
+    setNewPpDuration('10');
+    setNewPpPreferredTime('');
+    setNewPpTitle('');
+    setNewPpArtist('');
+    setNewPpComposer('');
+    setNewPpArranger('');
+    setNewPpPublisher('');
+    setNewPpTechRequirements('');
+    setTechRiderItems([]);
+    setBuilderNotes('');
+    setNewPpChairs('0');
+    setNewPpStands('0');
+    setNewPpRemarks('');
+    setAddedSongs([]);
+    setNewPpSelectedStudentIds([]);
+  };
+
+  const handleStartEditing = (pp: any, tab: 'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary') => {
+    setEditingPpId(pp.id);
+    setNewPpName(pp.name || '');
+    setNewPpEnsemble(pp.ensemble_band || '');
+    setNewPpPerformerCount(String(pp.performer_count || 1));
+    setNewPpDuration(String(pp.duration || 10));
+    setNewPpPreferredTime(pp.preferred_time || '');
+    setNewPpTitle(pp.title || '');
+    setNewPpArtist(pp.artist || '');
+    setNewPpComposer(pp.composer || '');
+    setNewPpArranger(pp.arranger || '');
+    setNewPpPublisher(pp.publisher || '');
+    if (pp.tech_requirements) {
+      try {
+        if (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{')) {
+          const res = JSON.parse(pp.tech_requirements);
+          setTechRiderItems(Array.isArray(res) ? res : [res]);
+        } else {
+          setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
+        }
+      } catch (e) {
+        setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
+      }
+    } else {
+      setTechRiderItems([]);
+    }
+    setNewPpChairs(String(pp.chairs_needed || 0));
+    setNewPpStands(String(pp.music_stands_needed || 0));
+    setNewPpRemarks(pp.remarks || '');
+    
+    const assignedStudents = pp.additional_feedback_responses?.assigned_students || [];
+    setNewPpSelectedStudentIds(assignedStudents);
+    
+    const loadedSongs = pp.songs && Array.isArray(pp.songs) ? pp.songs : [];
+    if (loadedSongs.length === 0 && pp.title) {
+      setAddedSongs([{
+        title: pp.title,
+        artist: pp.artist || '',
+        composer: pp.composer || '',
+        arranger: pp.arranger || ''
+      }]);
+    } else {
+      setAddedSongs(loadedSongs);
+    }
+    setTeacherOverlayTab(tab);
   };
 
   const handleCreateProgramPoint = async (e: React.FormEvent) => {
@@ -917,7 +1105,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           remarks: newPpRemarks.trim() || null,
           status: 'submitted',
           sort_order: programPoints.length,
-          songs: finalSongs
+          songs: finalSongs,
+          additional_feedback_responses: {
+            assigned_students: newPpSelectedStudentIds
+          }
         })
         .select()
         .single();
@@ -943,6 +1134,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setNewPpStands('0');
       setNewPpRemarks('');
       setAddedSongs([]);
+      setNewPpSelectedStudentIds([]);
       alert('Programmpunkt erfolgreich eingereicht! 🎉');
     } catch (err: any) {
       alert('Fehler beim Einreichen: ' + err.message);
@@ -976,6 +1168,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       }
 
       const firstSong = finalSongs[0];
+      const currentPp = programPoints.find(p => p.id === editingPpId);
+      const existingFeedback = currentPp?.additional_feedback_responses || {};
+      const newFeedback = {
+        ...existingFeedback,
+        assigned_students: newPpSelectedStudentIds
+      };
 
       const { data, error } = await supabase
         .from('campus_event_program_points')
@@ -994,7 +1192,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           chairs_needed: chairs,
           music_stands_needed: stands,
           remarks: newPpRemarks.trim() || null,
-          songs: finalSongs
+          songs: finalSongs,
+          additional_feedback_responses: newFeedback
         })
         .eq('id', editingPpId)
         .select()
@@ -1022,10 +1221,78 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setNewPpStands('0');
       setNewPpRemarks('');
       setAddedSongs([]);
+      setNewPpSelectedStudentIds([]);
       alert('Programmpunkt erfolgreich aktualisiert!');
     } catch (err: any) {
       alert('Fehler beim Aktualisieren: ' + err.message);
     }
+  };
+
+  const handleAutoSave = async () => {
+    if (!editingPpId) return;
+    const perfCount = parseInt(newPpPerformerCount, 10) || 1;
+    const dur = parseInt(newPpDuration, 10) || 10;
+    const chairs = parseInt(newPpChairs, 10) || 0;
+    const stands = parseInt(newPpStands, 10) || 0;
+
+    try {
+      const finalSongs = [...addedSongs];
+      if (newPpTitle.trim()) {
+        const isSongAlreadyAdded = addedSongs.some(s => s.title.trim() === newPpTitle.trim());
+        if (!isSongAlreadyAdded) {
+          finalSongs.push({
+            title: newPpTitle.trim(),
+            artist: newPpArtist.trim(),
+            composer: newPpComposer.trim(),
+            arranger: newPpArranger.trim()
+          });
+        }
+      }
+
+      const firstSong = finalSongs[0];
+      const currentPp = programPoints.find(p => p.id === editingPpId);
+      const existingFeedback = currentPp?.additional_feedback_responses || {};
+      const newFeedback = {
+        ...existingFeedback,
+        assigned_students: newPpSelectedStudentIds
+      };
+
+      const { data, error } = await supabase
+        .from('campus_event_program_points')
+        .update({
+          name: newPpName.trim() || newPpEnsemble.trim(),
+          ensemble_band: newPpEnsemble.trim() || null,
+          performer_count: perfCount,
+          duration: dur,
+          preferred_time: newPpPreferredTime.trim() || null,
+          title: firstSong ? firstSong.title : null,
+          artist: firstSong ? firstSong.artist : null,
+          composer: firstSong ? firstSong.composer : null,
+          arranger: firstSong ? firstSong.arranger : null,
+          publisher: newPpPublisher.trim() || null,
+          tech_requirements: techRiderItems.length > 0 ? JSON.stringify(techRiderItems) : null,
+          chairs_needed: chairs,
+          music_stands_needed: stands,
+          remarks: newPpRemarks.trim() || null,
+          songs: finalSongs,
+          additional_feedback_responses: newFeedback
+        })
+        .eq('id', editingPpId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setProgramPoints(prev => prev.map(pp => pp.id === editingPpId ? data : pp));
+    } catch (err: any) {
+      console.error('Error in handleAutoSave:', err);
+    }
+  };
+
+  const handleTabSwitch = async (newTab: 'einreichung' | 'technik' | 'schueler' | 'feedback' | 'packliste' | 'summary') => {
+    if (editingPpId) {
+      await handleAutoSave();
+    }
+    setTeacherOverlayTab(newTab);
   };
 
   const handleDeleteProgramPoint = async (ppId: string) => {
@@ -1043,12 +1310,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const handleSaveTeacherFeedback = async (pp: any) => {
-    const qCount = pp.additional_feedback_responses?.questions?.length || 0;
+    const questions = pp.additional_feedback_responses?.questions || [];
+    const existingAnswers = pp.additional_feedback_responses?.answers || [];
     const answers: string[] = [];
-    for (let i = 0; i < qCount; i++) {
+    
+    for (let i = 0; i < questions.length; i++) {
       const ansKey = `${pp.id}_${i}`;
-      answers.push(feedbackAnswers[ansKey] || '');
+      const newAnswer = feedbackAnswers[ansKey]?.trim();
+      if (existingAnswers[i] && existingAnswers[i].trim() !== '') {
+        answers.push(existingAnswers[i]);
+      } else {
+        answers.push(newAnswer || '');
+      }
     }
+
+    const hasEmpty = answers.some(ans => !ans || ans.trim() === '');
+    if (hasEmpty) {
+      alert('Bitte beantworte alle offenen Rückfragen!');
+      return;
+    }
+
     try {
       const updatedFeedback = {
         ...pp.additional_feedback_responses,
@@ -1115,6 +1396,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       fetchStudentEnsembles();
     }
   }, [userId, schoolId, role]);
+
+  // Handle auto-open of event planning submissions from teacher dashboard
+  useEffect(() => {
+    if (customEvents.length > 0) {
+      const autoEventId = localStorage.getItem('groovelab_auto_submit_event_id');
+      if (autoEventId) {
+        const ev = customEvents.find(e => e.id === autoEventId);
+        if (ev) {
+          setTeacherSubmissionEvent(ev);
+          const autoTab = localStorage.getItem('groovelab_auto_submit_tab');
+          if (autoTab === 'feedback') {
+            setTeacherOverlayTab('feedback');
+          } else {
+            setTeacherOverlayTab('einreichung');
+          }
+        }
+        localStorage.removeItem('groovelab_auto_submit_event_id');
+        localStorage.removeItem('groovelab_auto_submit_tab');
+      }
+    }
+  }, [customEvents]);
 
 
   // Re-check room availability when date, start time or end time changes (Column 3 create form)
@@ -3052,6 +3354,72 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             </div>
           </form>
         )}
+        {(() => {
+          const pendingQPs = programPoints.filter(pp => 
+            pp.teacher_id === userId && 
+            pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+          );
+          if (pendingQPs.length === 0) return null;
+          
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#b45309' }}>
+                ⚠️ Offene Rückfragen ({pendingQPs.length})
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pendingQPs.map(pp => {
+                  const ev = customEvents.find(e => e.id === pp.event_id);
+                  const evName = ev ? ev.title : 'Event';
+                  return (
+                    <div 
+                      key={pp.id} 
+                      onClick={() => {
+                        if (ev) {
+                          setTeacherSubmissionEvent(ev);
+                          setTeacherOverlayTab('feedback');
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '14px',
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.05)',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.1)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.05)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#92400e', textTransform: 'uppercase' }}>
+                          {evName}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309' }}>→ Beantworten</span>
+                      </div>
+                      <strong style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 800 }}>
+                        {pp.name}
+                      </strong>
+                      <span style={{ fontSize: '0.74rem', color: '#451a03', fontWeight: 550 }}>
+                        {pp.additional_feedback_responses.questions.filter((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx]).length} offene Frage(n)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ height: '1px', background: '#e2e8f0', margin: '8px 0' }} />
+            </div>
+          );
+        })()}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {schoolAnnouncements.length === 0 ? (
@@ -3186,6 +3554,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const renderTeacherSubmissionFormTab = () => {
     return (
       <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        {editingPpId && (
+          <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
+              Bearbeiten beenden
+            </button>
+          </div>
+        )}
         <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
           {editingPpId ? 'Programmpunkt bearbeiten' : 'Neuen Programmpunkt anmelden'}
         </h3>
@@ -3345,262 +3721,701 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </button>
         </div>
 
-        {/* Equipment & Tech details */}
-        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '8px' }}>
-          <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', margin: '0 0 12px 0' }}>Bühnen-Bedarf & Technik</h4>
-          
-          {/* Technical Rider - Now on TOP */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '8px' }}>
-              Technical Rider / Bühnen-Inputs
-            </label>
 
-            {/* List of currently added items */}
-            {techRiderItems.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                {techRiderItems.map((item) => {
-                  let emoji = '🎵';
-                  if (item.type.toLowerCase().includes('gesang')) emoji = '🎤';
-                  else if (item.type.toLowerCase().includes('gitarre')) emoji = '🎸';
-                  else if (item.type.toLowerCase().includes('bass')) emoji = '🎸';
-                  else if (item.type.toLowerCase().includes('piano') || item.type.toLowerCase().includes('keyboard')) emoji = '🎹';
-                  else if (item.type.toLowerCase().includes('schlagzeug') || item.type.toLowerCase().includes('drum')) emoji = '🥁';
-                  else if (item.type.toLowerCase().includes('di-box') || item.type.toLowerCase().includes('di box')) emoji = '🔌';
-
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
-                        <div>
-                          <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>
-                            {item.count}x {item.type}
-                          </strong>
-                          <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>
-                            Anschluss: {item.connection} | Bereitstellung: {item.source === 'venue' ? 'Gestellt von Schule' : 'Selbst mitgebracht'}
-                            {item.notes ? ` (${item.notes})` : ''}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTechRiderItem(item.id)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          padding: '4px'
-                        }}
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Input row for adding new item */}
-            <div
+        {/* Submit Buttons */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+          {editingPpId ? (
+            <>
+              <button
+                type="submit"
+                disabled={submittingPp}
+                style={{
+                  flex: 1,
+                  background: brandColor,
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  opacity: submittingPp ? 0.7 : 1
+                }}
+              >
+                Änderungen speichern
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('technik')}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  padding: '12px 20px',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Weiter ➜
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!newPpEnsemble.trim()) {
+                  alert('Bitte fülle das Feld Ensemble / Band aus.');
+                  return;
+                }
+                handleTabSwitch('technik');
+              }}
               style={{
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
-                padding: '14px',
-                borderRadius: '16px',
+                flex: 1,
+                background: brandColor,
+                color: '#ffffff',
+                border: 'none',
+                padding: '12px',
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
               }}
             >
-              {/* Badges for Quick Selection */}
-              <div>
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                  Schnellauswahl:
-                </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {[
-                    { label: '🎤 Gesang', value: 'Gesang', conn: 'Mikrofon', src: 'venue' },
-                    { label: '🎸 E-Gitarre', value: 'E-Gitarre', conn: 'Mikrofon', src: 'own' },
-                    { label: '🎸 A-Gitarre', value: 'A-Gitarre', conn: 'DI-Box', src: 'own' },
-                    { label: '🎸 E-Bass', value: 'E-Bass', conn: 'DI-Box', src: 'own' },
-                    { label: '🎹 Keyboard', value: 'E-Piano / Keyboard', conn: 'Line-In', src: 'venue' },
-                    { label: '🥁 Drums', value: 'Schlagzeug / E-Drum', conn: 'Mikrofon', src: 'venue' },
-                    { label: '🔌 DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' },
-                    { label: '🎺 Blasinstrument', value: 'Blasinstrument', conn: 'Mikrofon', src: 'own' }
-                  ].map(badge => (
+              Weiter zu Bühnenbedarf & Technik ➜
+            </button>
+          )}
+          {editingPpId && (
+            <button
+              type="button"
+              onClick={handleCancelEditing}
+              style={{
+                background: '#fef2f2',
+                color: '#ef4444',
+                border: 'none',
+                padding: '12px 20px',
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          )}
+        </div>
+      </form>
+    );
+  };
+
+  const renderTeacherTechnikTab = () => {
+    return (
+      <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        {editingPpId && (
+          <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
+              Bearbeiten beenden
+            </button>
+          </div>
+        )}
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+          {editingPpId ? 'Bühnenbedarf & Technik bearbeiten' : 'Bühnenbedarf & Technik eintragen'}
+        </h3>
+        
+        {/* Technical Rider / Bühnen-Inputs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Technical Rider / Bühnen-Inputs</label>
+          
+          {/* List of currently added items */}
+          {techRiderItems.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+              {techRiderItems.map((item) => {
+                let emoji = '🎵';
+                if (item.type.toLowerCase().includes('gesang')) emoji = '🎤';
+                else if (item.type.toLowerCase().includes('gitarre')) emoji = '🎸';
+                else if (item.type.toLowerCase().includes('bass')) emoji = '🎸';
+                else if (item.type.toLowerCase().includes('piano') || item.type.toLowerCase().includes('keyboard')) emoji = '🎹';
+                else if (item.type.toLowerCase().includes('schlagzeug') || item.type.toLowerCase().includes('drum')) emoji = '🥁';
+                else if (item.type.toLowerCase().includes('di-box') || item.type.toLowerCase().includes('di box')) emoji = '🔌';
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
+                      <div>
+                        <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>
+                          {item.count}x {item.type}
+                        </strong>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>
+                          Anschluss: {item.connection} | Bereitstellung: {item.source === 'venue' ? 'Gestellt von Schule' : 'Selbst mitgebracht'}
+                          {item.notes ? ` (${item.notes})` : ''}
+                        </span>
+                      </div>
+                    </div>
                     <button
-                      key={badge.value}
                       type="button"
-                      onClick={() => {
-                        if (badge.value === 'Blasinstrument') {
-                          setBuilderType('');
-                        } else {
-                          setBuilderType(badge.value);
-                        }
-                        setBuilderConnection(badge.conn);
-                        setBuilderSource(badge.src);
-                        // Focus the input field immediately
-                        setTimeout(() => {
-                          instrumentInputRef.current?.focus();
-                        }, 50);
-                      }}
+                      onClick={() => handleRemoveTechRiderItem(item.id)}
                       style={{
-                        padding: '5px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        background: builderType === badge.value ? `${brandColor}10` : '#ffffff',
-                        borderColor: builderType === badge.value ? brandColor : '#cbd5e1',
-                        color: builderType === badge.value ? brandColor : '#334155',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
                         cursor: 'pointer',
-                        transition: 'all 0.15s ease'
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        padding: '4px'
                       }}
                     >
-                      {badge.label}
+                      Löschen
                     </button>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-              {/* Grid 1: Input name & connection & count */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 0.7fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Instrument / Input</label>
-                  <input
-                    ref={instrumentInputRef}
-                    type="text"
-                    list="default-instruments"
-                    value={builderType}
-                    placeholder="z.B. Gesang, Percussion"
-                    onChange={(e) => setBuilderType(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
-                  />
-                  <datalist id="default-instruments">
-                    <option value="Gesang" />
-                    <option value="E-Gitarre" />
-                    <option value="A-Gitarre" />
-                    <option value="E-Bass" />
-                    <option value="E-Piano / Keyboard" />
-                    <option value="Schlagzeug / E-Drum" />
-                    <option value="DI-Box" />
-                    <option value="Verstärker (Amp)" />
-                    <option value="Line-In" />
-                    <option value="Blasinstrument" />
-                  </datalist>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anschluss</label>
-                  <select
-                    value={builderConnection}
-                    onChange={(e) => setBuilderConnection(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
+          {/* Input builder */}
+          <div
+            style={{
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              padding: '14px',
+              borderRadius: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}
+          >
+            <div>
+              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                Schnellauswahl:
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  { label: '🎺 Blasmusik', value: 'Blasmusik', conn: 'Mikrofon', src: 'own' },
+                  { label: '🎤 Gesang', value: 'Gesang', conn: 'Mikrofon', src: 'venue' },
+                  { label: '🎸 E-Gitarre', value: 'E-Gitarre', conn: 'Mikrofon', src: 'own' },
+                  { label: '🎸 A-Gitarre', value: 'A-Gitarre', conn: 'DI-Box', src: 'own' },
+                  { label: '🎸 E-Bass', value: 'E-Bass', conn: 'DI-Box', src: 'own' },
+                  { label: '🎹 Keyboard', value: 'E-Piano / Keyboard', conn: 'Line-In', src: 'venue' },
+                  { label: '🥁 Drums', value: 'Schlagzeug / E-Drum', conn: 'Mikrofon', src: 'venue' },
+                  { label: '🔌 DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' }
+                ].map(badge => (
+                  <button
+                    key={badge.value}
+                    type="button"
+                    onClick={() => {
+                      if (badge.value === 'Blasmusik') {
+                        setBuilderType('');
+                      } else {
+                        setBuilderType(badge.value);
+                      }
+                      setBuilderConnection(badge.conn);
+                      setBuilderSource(badge.src);
+                      setTimeout(() => {
+                        instrumentInputRef.current?.focus();
+                      }, 50);
+                    }}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: builderType === badge.value ? `${brandColor}10` : '#ffffff',
+                      borderColor: builderType === badge.value ? brandColor : '#cbd5e1',
+                      color: builderType === badge.value ? brandColor : '#334155',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
                   >
-                    <option value="Mikrofon">Mikrofon</option>
-                    <option value="DI-Box">DI-Box</option>
-                    <option value="Line-In">Line-In</option>
-                    <option value="Verstärker (Amp)">Verstärker (Amp)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anzahl</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={builderCount}
-                    onChange={(e) => setBuilderCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
-                  />
-                </div>
+                    {badge.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Grid 2: Source & notes & add button */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.4fr auto', gap: '8px', alignItems: 'end' }}>
-                <div>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Bereitgestellt durch</label>
-                  <select
-                    value={builderSource}
-                    onChange={(e) => setBuilderSource(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
-                  >
-                    <option value="venue">Gestellt von Schule</option>
-                    <option value="own">Selbst mitgebracht</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Details / Notiz</label>
-                  <input
-                    type="text"
-                    value={builderNotes}
-                    placeholder="z.B. Phantomspeisung"
-                    onChange={(e) => setBuilderNotes(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddTechRiderItem}
-                  style={{
-                    background: '#0f172a',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontWeight: 900,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    height: '35px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px'
-                  }}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 0.7fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Instrument / Input</label>
+                <input
+                  ref={instrumentInputRef}
+                  type="text"
+                  list="default-instruments-tech"
+                  value={builderType}
+                  placeholder="z.B. Gesang, Percussion"
+                  onChange={(e) => setBuilderType(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                />
+                <datalist id="default-instruments-tech">
+                  <option value="Gesang" />
+                  <option value="E-Gitarre" />
+                  <option value="A-Gitarre" />
+                  <option value="E-Bass" />
+                  <option value="E-Piano / Keyboard" />
+                  <option value="Schlagzeug / E-Drum" />
+                  <option value="DI-Box" />
+                  <option value="Verstärker (Amp)" />
+                  <option value="Line-In" />
+                  <option value="Blasinstrument" />
+                </datalist>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anschluss</label>
+                <select
+                  value={builderConnection}
+                  onChange={(e) => setBuilderConnection(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
                 >
-                  <Plus size={14} /> Add
-                </button>
+                  <option value="Mikrofon">Mikrofon</option>
+                  <option value="DI-Box">DI-Box</option>
+                  <option value="Line-In">Line-In</option>
+                  <option value="Verstärker (Amp)">Verstärker (Amp)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Anzahl</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={builderCount}
+                  onChange={(e) => setBuilderCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                />
               </div>
             </div>
-          </div>
 
-          {/* Chairs & Music Stands - Now below Technical Rider */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Anzahl Stühle</label>
-              <input
-                type="number"
-                min="0"
-                value={newPpChairs}
-                onChange={e => setNewPpChairs(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box', height: '42px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Anzahl Notenständer</label>
-              <input
-                type="number"
-                min="0"
-                value={newPpStands}
-                onChange={e => setNewPpStands(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box', height: '42px' }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.4fr auto', gap: '8px', alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Bereitgestellt durch</label>
+                <select
+                  value={builderSource}
+                  onChange={(e) => setBuilderSource(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#fff', boxSizing: 'border-box', height: '35px' }}
+                >
+                  <option value="venue">Gestellt von Schule</option>
+                  <option value="own">Selbst mitgebracht</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Details / Notiz</label>
+                <input
+                  type="text"
+                  value={builderNotes}
+                  placeholder="z.B. Phantomspeisung"
+                  onChange={(e) => setBuilderNotes(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', boxSizing: 'border-box', background: '#fff', height: '35px' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddTechRiderItem}
+                style={{
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontWeight: 900,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  height: '35px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Plus size={14} /> Add
+              </button>
             </div>
           </div>
         </div>
 
+        {/* Chairs & Stands */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Anzahl Stühle</label>
+            <input
+              type="number"
+              min="0"
+              value={newPpChairs}
+              onChange={e => setNewPpChairs(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box', height: '42px' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Anzahl Notenständer</label>
+            <input
+              type="number"
+              min="0"
+              value={newPpStands}
+              onChange={e => setNewPpStands(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box', height: '42px' }}
+            />
+          </div>
+        </div>
+
+        {/* Remarks */}
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Bemerkungen</label>
+          <textarea
+            value={newPpRemarks}
+            onChange={e => setNewPpRemarks(e.target.value)}
+            placeholder="Besondere Hinweise für den Bühnenbau..."
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.88rem', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Submit Buttons */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+          {editingPpId ? (
+            <>
+              <button
+                type="submit"
+                disabled={submittingPp}
+                style={{
+                  flex: 1,
+                  background: brandColor,
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  opacity: submittingPp ? 0.7 : 1
+                }}
+              >
+                Technik speichern
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('schueler')}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  padding: '12px 20px',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Weiter ➜
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleTabSwitch('schueler');
+              }}
+              style={{
+                flex: 1,
+                background: brandColor,
+                color: '#ffffff',
+                border: 'none',
+                padding: '12px',
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              Weiter zur Schüler-Auswahl ➜
+            </button>
+          )}
+          {editingPpId && (
+            <button
+              type="button"
+              onClick={handleCancelEditing}
+              style={{
+                background: '#fef2f2',
+                color: '#ef4444',
+                border: 'none',
+                padding: '12px 20px',
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          )}
+        </div>
+      </form>
+    );
+  };
+
+  const renderTeacherSchuelerTab = () => {
+    const allStudents = allUsers.filter(u => u.role === 'student');
+    const myStudents = allUsers.filter(u => u.role === 'student' && myStudentIds.includes(u.id));
+    
+    const q = studentSearchQuery.toLowerCase().trim();
+    const searchResults = q 
+      ? myStudents.filter(s => {
+          const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+          const instrument = (s.instrument || '').toLowerCase();
+          return fullName.includes(q) || instrument.includes(q);
+        })
+      : [];
+
+    const selectedStudents = allStudents.filter(s => newPpSelectedStudentIds.includes(s.id));
+
+    return (
+      <form onSubmit={editingPpId ? handleUpdateProgramPoint : handleCreateProgramPoint} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        {editingPpId && (
+          <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+            <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
+              Bearbeiten beenden
+            </button>
+          </div>
+        )}
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+          {editingPpId ? 'Teilnehmende Schüler verwalten' : 'Teilnehmende Schüler auswählen'}
+        </h3>
+        <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 550 }}>
+          Wähle aus, welche Schüler an diesem Programmpunkt mitwirken.
+        </p>
+
+        {/* Smart Search Input */}
+        <div style={{ position: 'relative' }}>
+          <h4 style={{ fontSize: '0.82rem', fontWeight: 750, color: '#475569', margin: '0 0 8px 0' }}>
+            Schüler suchen &amp; hinzufügen:
+          </h4>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Schüler oder Instrument suchen..."
+              value={studentSearchQuery}
+              onChange={(e) => setStudentSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => {
+                // Delay blur slightly so click on dropdown can register
+                setTimeout(() => setIsSearchFocused(false), 200);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (searchResults.length > 0) {
+                    const firstStudent = searchResults[0];
+                    const isAlreadySelected = newPpSelectedStudentIds.includes(firstStudent.id);
+                    if (!isAlreadySelected) {
+                      setNewPpSelectedStudentIds(prev => [...prev, firstStudent.id]);
+                    }
+                    setStudentSearchQuery('');
+                  }
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 14px 10px 36px',
+                borderRadius: '12px',
+                border: `1.5px solid ${isSearchFocused ? brandColor : '#cbd5e1'}`,
+                fontSize: '0.88rem',
+                fontWeight: 650,
+                outline: 'none',
+                background: '#ffffff',
+                boxSizing: 'border-box',
+                transition: 'all 0.15s ease',
+                boxShadow: isSearchFocused ? `0 0 0 3px ${brandColor}22` : '0 1px 2px rgba(0,0,0,0.02)'
+              }}
+            />
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <Search size={16} />
+            </span>
+            {studentSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setStudentSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Quick search suggestions dropdown */}
+          {(isSearchFocused || studentSearchQuery.trim() !== '') && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '6px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              background: '#ffffff',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03)',
+              maxHeight: '220px',
+              overflowY: 'auto',
+              zIndex: 100
+            }}>
+              {/* Dropdown Header */}
+              <div style={{ padding: '8px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.7rem', fontWeight: 750, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {studentSearchQuery.trim() !== '' ? 'Suchergebnisse (Meine Schüler)' : 'Meine Schüler'}
+              </div>
+
+              {(studentSearchQuery.trim() !== '' ? searchResults : myStudents).length === 0 ? (
+                <div style={{ padding: '16px 12px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', fontStyle: 'italic' }}>
+                  {studentSearchQuery.trim() !== '' 
+                    ? 'Keine passenden Schüler in deiner Liste gefunden.' 
+                    : 'Keine verknüpften Schüler in deiner Liste gefunden.'}
+                </div>
+              ) : (
+                (studentSearchQuery.trim() !== '' ? searchResults : myStudents).map(student => {
+                  const isAlreadySelected = newPpSelectedStudentIds.includes(student.id);
+                  return (
+                    <div
+                      key={student.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // prevent losing focus and immediate blur
+                        if (!isAlreadySelected) {
+                          setNewPpSelectedStudentIds(prev => [...prev, student.id]);
+                        } else {
+                          setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+                        }
+                        setStudentSearchQuery('');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderBottom: '1px solid #f1f5f9',
+                        cursor: 'pointer',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        background: isAlreadySelected ? '#f0fdf4' : '#ffffff',
+                        transition: 'background 0.1s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isAlreadySelected ? '#dcfce7' : '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = isAlreadySelected ? '#f0fdf4' : '#ffffff'}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ color: '#0f172a' }}>{student.first_name} {student.last_name}</span>
+                        {student.instrument && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{student.instrument}</span>}
+                      </div>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: isAlreadySelected ? 'none' : '1.5px solid #cbd5e1',
+                        background: isAlreadySelected ? '#22c55e' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff'
+                      }}>
+                        {isAlreadySelected && <Check size={12} />}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Selected Students List (Pills) */}
+        <div>
+          <h4 style={{ fontSize: '0.82rem', fontWeight: 750, color: '#475569', margin: '0 0 8px 0' }}>
+            Zugewiesene Schüler:
+          </h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '36px', alignItems: 'center', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            {selectedStudents.length === 0 ? (
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                Noch keine Schüler zugewiesen. Nutze die Suche oben.
+              </span>
+            ) : (
+              selectedStudents.map(student => (
+                <div 
+                  key={student.id} 
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    padding: '4px 10px', 
+                    background: '#e0f2fe',
+                    color: '#0369a1',
+                    borderRadius: '20px',
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    border: '1px solid #bae6fd'
+                  }}
+                >
+                  <span>{student.first_name} {student.last_name} {student.instrument && `(${student.instrument})`}</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#0284c7',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontSize: '0.8rem', fontWeight: 750, color: '#334155' }}>
+          Ausgewählt: <span style={{ color: brandColor }}>{newPpSelectedStudentIds.length} Schüler</span>
+        </div>
+
+        {/* Submit Buttons */}
         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
           <button
             type="submit"
@@ -3619,34 +4434,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               opacity: submittingPp ? 0.7 : 1
             }}
           >
-            {editingPpId ? 'Änderungen speichern' : 'Programmpunkt einreichen'}
+            {editingPpId ? 'Schüler speichern' : 'Programmpunkt einreichen'}
           </button>
           {editingPpId && (
             <button
               type="button"
-              onClick={() => {
-                setEditingPpId(null);
-                setNewPpName('');
-                setNewPpEnsemble('');
-                setNewPpPerformerCount('1');
-                setNewPpDuration('10');
-                setNewPpPreferredTime('');
-                setNewPpTitle('');
-                setNewPpArtist('');
-                setNewPpComposer('');
-                setNewPpArranger('');
-                setNewPpPublisher('');
-                setNewPpTechRequirements('');
-                setTechRiderItems([]);
-                setBuilderNotes('');
-                setNewPpChairs('0');
-                setNewPpStands('0');
-                setNewPpRemarks('');
-                setAddedSongs([]);
-              }}
+              onClick={handleCancelEditing}
               style={{
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#fef2f2',
+                color: '#ef4444',
                 border: 'none',
                 padding: '12px 20px',
                 borderRadius: '12px',
@@ -3664,54 +4460,191 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const renderTeacherFeedbackTab = () => {
-    const ppsWithQueries = programPoints.filter(pp => pp.teacher_id === userId && pp.additional_feedback_responses?.questions?.length > 0);
+    const ppsWithQueries = programPoints.filter(pp => 
+      pp.teacher_id === userId && 
+      pp.event_id === teacherSubmissionEvent.id && 
+      pp.additional_feedback_responses?.questions?.length > 0
+    );
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-          Rückmeldungen &amp; Fragen der Verwaltung
-        </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>
+            Rückmeldungen &amp; Fragen der Verwaltung
+          </h3>
+          <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, fontWeight: 550 }}>
+            Kläre offene Fragen zu deinen Beiträgen direkt im Chat-Verlauf.
+          </p>
+        </div>
+
         {ppsWithQueries.length === 0 ? (
-          <div style={{ padding: '40px 20px', border: '1.5px dashed #cbd5e1', borderRadius: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-            Aktuell keine offenen Rückfragen vorhanden.
+          <div style={{ padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>
+            🎉 Aktuell keine offenen Rückfragen zu diesem Event vorhanden.
           </div>
         ) : (
           ppsWithQueries.map(pp => {
+            const hasUnanswered = pp.additional_feedback_responses.questions.some((_: any, i: number) => !pp.additional_feedback_responses.answers?.[i]);
             return (
-              <div key={pp.id} style={{ padding: '20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #e2e8f0' }}>
-                <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block', marginBottom: '12px' }}>
-                  Beitrag: {pp.name}
-                </strong>
-                {pp.additional_feedback_responses.questions.map((q: string, idx: number) => {
-                  const ansKey = `${pp.id}_${idx}`;
-                  return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>❓ {q}</span>
-                      <textarea
-                        value={feedbackAnswers[ansKey] || ''}
-                        onChange={e => setFeedbackAnswers(prev => ({ ...prev, [ansKey]: e.target.value }))}
-                        placeholder="Deine Antwort eingeben..."
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => handleSaveTeacherFeedback(pp)}
-                  style={{
-                    background: brandColor,
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Rückmeldung absenden
-                </button>
+              <div key={pp.id} style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                {/* Header of contribution */}
+                <div style={{
+                  padding: '16px 20px',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #f1f5f9',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: brandColor }}>
+                      Beitrag
+                    </span>
+                    <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block', fontWeight: 800 }}>
+                      {pp.name}
+                    </strong>
+                  </div>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    background: hasUnanswered ? '#fef3c7' : '#dcfce7',
+                    color: hasUnanswered ? '#d97706' : '#15803d',
+                    padding: '4px 10px',
+                    borderRadius: '100px',
+                    textTransform: 'uppercase'
+                  }}>
+                    {hasUnanswered ? '⏳ Offene Fragen' : '✅ Geklärt'}
+                  </span>
+                </div>
+
+                {/* Chat Feed Area */}
+                <div style={{
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  background: '#fafbfc'
+                }}>
+                  {pp.additional_feedback_responses.questions.map((q: string, idx: number) => {
+                    const ansKey = `${pp.id}_${idx}`;
+                    const answeredText = pp.additional_feedback_responses.answers?.[idx];
+                    
+                    return (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Question Bubble (Verwaltung) - Left aligned */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+                          <div style={{
+                            maxWidth: '75%',
+                            background: '#ffffff',
+                            color: '#1e293b',
+                            padding: '12px 16px',
+                            borderRadius: '16px 16px 16px 4px',
+                            fontSize: '0.82rem',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+                            lineHeight: 1.45
+                          }}>
+                            <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 800, color: '#ef4444', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Verwaltung / Orga
+                            </span>
+                            {q}
+                          </div>
+                        </div>
+
+                        {/* Answer Bubble (Du) - Right aligned */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                          {answeredText && answeredText.trim() !== '' ? (
+                            <div style={{
+                              maxWidth: '75%',
+                              background: brandColor,
+                              color: '#ffffff',
+                              padding: '12px 16px',
+                              borderRadius: '16px 16px 4px 16px',
+                              fontSize: '0.82rem',
+                              boxShadow: '0 4px 12px ' + brandColor + '20',
+                              lineHeight: 1.45
+                            }}>
+                              <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Du (Lehrkraft)
+                              </span>
+                              {answeredText}
+                            </div>
+                          ) : (
+                            <div style={{
+                              width: '75%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              alignItems: 'flex-end'
+                            }}>
+                              <textarea
+                                value={feedbackAnswers[ansKey] || ''}
+                                onChange={e => setFeedbackAnswers(prev => ({ ...prev, [ansKey]: e.target.value }))}
+                                placeholder="Antwort schreiben..."
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 16px',
+                                  borderRadius: '16px 16px 4px 16px',
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: '0.82rem',
+                                  minHeight: '70px',
+                                  fontFamily: 'inherit',
+                                  resize: 'none',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                  background: '#ffffff',
+                                  transition: 'border-color 0.2s',
+                                  lineHeight: 1.4
+                                }}
+                                onFocus={e => e.target.style.borderColor = brandColor}
+                                onBlur={e => e.target.style.borderColor = '#cbd5e1'}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer Send Bar */}
+                {hasUnanswered && (
+                  <div style={{
+                    padding: '16px 24px',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveTeacherFeedback(pp)}
+                      style={{
+                        background: brandColor,
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px ' + brandColor + '30',
+                        transition: 'transform 0.15s, opacity 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                    >
+                      ✉️ Rückmeldungen absenden
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })
@@ -3803,6 +4736,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const renderFullscreenTeacherSubmissionOverlay = () => {
     if (!teacherSubmissionEvent) return null;
 
+    const pendingQuestionsPoints = programPoints.filter(pp => 
+      pp.teacher_id === userId && 
+      pp.event_id === teacherSubmissionEvent.id &&
+      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+    );
+
     return (
       <div style={{
         position: 'fixed',
@@ -3839,13 +4778,57 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             alignItems: 'center',
             background: 'linear-gradient(to right, #f8fafc, #ffffff)'
           }}>
-            <div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: brandColor }}>
-                Programm-Einreichung &amp; Planung
-              </span>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>
-                {teacherSubmissionEvent.title}
-              </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: brandColor }}>
+                  Programm-Einreichung &amp; Planung
+                </span>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 0 0' }}>
+                  {teacherSubmissionEvent.title}
+                </h2>
+              </div>
+
+              {pendingQuestionsPoints.length > 0 && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '12px',
+                  padding: '8px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)'
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#92400e' }}>
+                      Offene Rückfragen vorhanden
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 500 }}>
+                      Es gibt Rückfragen zu deinen Beiträgen ({pendingQuestionsPoints.length}).
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setTeacherOverlayTab('feedback')}
+                    style={{
+                      background: '#92400e',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      marginLeft: '8px',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#78350f'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#92400e'}
+                  >
+                    Ansehen
+                  </button>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setTeacherSubmissionEvent(null)}
@@ -3865,35 +4848,48 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             </button>
           </div>
 
-          {/* Tab Buttons (4 tabs) */}
-          <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '0 32px' }}>
-            {[
-              { id: 'einreichung', label: '1. Programmpunkt einreichen' },
-              { id: 'feedback', label: '2. Rückmeldungen & Fragen' },
-              { id: 'packliste', label: '3. Equipment-Packliste' },
-              { id: 'summary', label: '4. Zusammenfassung' }
-            ].map(tab => {
-              const isSel = teacherOverlayTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setTeacherOverlayTab(tab.id as any)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    padding: '16px 20px',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    color: isSel ? brandColor : '#64748b',
-                    borderBottom: isSel ? `3px solid ${brandColor}` : '3px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+          {/* Tab Buttons (6 tabs) */}
+          <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '0 32px', overflowX: 'auto' }}>
+            {(() => {
+              const isEnsembleFilled = !!newPpEnsemble.trim();
+              const isTechnikFilled = techRiderItems.length > 0 || (parseInt(newPpChairs, 10) || 0) > 0 || (parseInt(newPpStands, 10) || 0) > 0;
+              const isSchuelerFilled = newPpSelectedStudentIds.length > 0;
+
+              const tabs = [
+                { id: 'einreichung', label: `${isEnsembleFilled ? '✓ ' : ''}1. Programmpunkt einreichen`, disabled: false },
+                { id: 'technik', label: `${isTechnikFilled ? '✓ ' : ''}2. Bühnenbedarf & Technik`, disabled: !isEnsembleFilled },
+                { id: 'schueler', label: `${isSchuelerFilled ? '✓ ' : ''}3. Schüler`, disabled: !isEnsembleFilled },
+                { id: 'feedback', label: '4. Rückmeldungen & Fragen', disabled: false },
+                { id: 'packliste', label: '5. Packliste', disabled: false },
+                { id: 'summary', label: '6. Zusammenfassung', disabled: false }
+              ];
+
+              return tabs.map(tab => {
+                const isSel = teacherOverlayTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => !tab.disabled && handleTabSwitch(tab.id as any)}
+                    disabled={tab.disabled}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '16px 20px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      color: tab.disabled ? '#cbd5e1' : (isSel ? brandColor : '#64748b'),
+                      borderBottom: isSel ? `3px solid ${brandColor}` : '3px solid transparent',
+                      cursor: tab.disabled ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      opacity: tab.disabled ? 0.6 : 1
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              });
+            })()}
           </div>
 
           {/* Content Body split into two columns */}
@@ -3901,6 +4897,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             {/* Left Panel */}
             <div style={{ flex: 1.2, padding: '32px', overflowY: 'auto', borderRight: '1px solid #f1f5f9' }}>
               {teacherOverlayTab === 'einreichung' && renderTeacherSubmissionFormTab()}
+              {teacherOverlayTab === 'technik' && renderTeacherTechnikTab()}
+              {teacherOverlayTab === 'schueler' && renderTeacherSchuelerTab()}
               {teacherOverlayTab === 'feedback' && renderTeacherFeedbackTab()}
               {teacherOverlayTab === 'packliste' && renderTeacherPacklistTab()}
               {teacherOverlayTab === 'summary' && renderTeacherSummaryTab()}
@@ -3932,111 +4930,216 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       statusLabel = 'Abgelehnt';
                     }
 
-                    return (
-                      <div key={pp.id} style={{
-                        background: '#ffffff',
-                        border: '1px solid rgba(0, 0, 0, 0.05)',
-                        borderRadius: '16px',
-                        padding: '16px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 800 }}>{pp.name}</strong>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: statusBg, color: statusColor, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                              {statusLabel}
-                            </span>
+                    const assignedStudents = pp.additional_feedback_responses?.assigned_students || [];
+                      const hasSchueler = assignedStudents.length > 0;
+                      
+                      let hasTech = false;
+                      try {
+                        if (pp.tech_requirements) {
+                          if (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{')) {
+                            const res = JSON.parse(pp.tech_requirements);
+                            hasTech = Array.isArray(res) ? res.length > 0 : !!res;
+                          } else {
+                            hasTech = !!pp.tech_requirements.trim();
+                          }
+                        }
+                      } catch (e) {}
+                      if ((pp.chairs_needed || 0) > 0 || (pp.music_stands_needed || 0) > 0) {
+                        hasTech = true;
+                      }
+
+                      const isCurrentlyEditing = editingPpId === pp.id;
+
+                      return (
+                        <div 
+                          key={pp.id} 
+                          onClick={() => handleStartEditing(pp, teacherOverlayTab)}
+                          style={{
+                            background: isCurrentlyEditing ? `${brandColor}03` : '#ffffff',
+                            border: isCurrentlyEditing ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)',
+                            borderRadius: '20px',
+                            padding: isCurrentlyEditing ? '19px' : '20px',
+                            boxShadow: isCurrentlyEditing ? `0 10px 30px ${brandColor}10` : '0 4px 20px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '14px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            position: 'relative',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <h4 style={{ fontSize: '1rem', color: '#1d1d1f', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
+                                {pp.name}
+                              </h4>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '0.74rem', color: '#86868b', fontWeight: 550, marginTop: '6px', alignItems: 'center' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Clock size={12} color="#86868b" /> {pp.duration} Min.
+                                </span>
+                                {pp.ensemble_band && (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Users size={12} color="#86868b" /> {pp.ensemble_band}
+                                  </span>
+                                )}
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <MapPin size={12} color="#86868b" /> Bühne {pp.stage_number || 1}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ 
+                                fontSize: '0.62rem', 
+                                fontWeight: 800, 
+                                background: statusBg, 
+                                color: statusColor, 
+                                padding: '4px 10px', 
+                                borderRadius: '20px', 
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em'
+                              }}>
+                                {statusLabel}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Action links */}
+                          <div style={{ 
+                            position: 'absolute', 
+                            right: '20px', 
+                            bottom: '20px', 
+                            display: 'flex', 
+                            gap: '12px', 
+                            alignItems: 'center', 
+                            opacity: 0.8 
+                          }}>
                             <button
-                              onClick={() => {
-                                setEditingPpId(pp.id);
-                                setNewPpName(pp.name || '');
-                                setNewPpEnsemble(pp.ensemble_band || '');
-                                setNewPpPerformerCount(String(pp.performer_count || 1));
-                                setNewPpDuration(String(pp.duration || 10));
-                                setNewPpPreferredTime(pp.preferred_time || '');
-                                setNewPpTitle(pp.title || '');
-                                setNewPpArtist(pp.artist || '');
-                                setNewPpComposer(pp.composer || '');
-                                setNewPpArranger(pp.arranger || '');
-                                setNewPpPublisher(pp.publisher || '');
-                                if (pp.tech_requirements) {
-                                  try {
-                                    if (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{')) {
-                                      const res = JSON.parse(pp.tech_requirements);
-                                      setTechRiderItems(Array.isArray(res) ? res : [res]);
-                                    } else {
-                                      setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
-                                    }
-                                  } catch (e) {
-                                    setTechRiderItems([{ id: 'legacy', type: 'Blasinstrument / Sonstiges', count: 1, connection: 'Line-In', source: 'venue', notes: pp.tech_requirements }]);
-                                  }
-                                } else {
-                                  setTechRiderItems([]);
-                                }
-                                setNewPpChairs(String(pp.chairs_needed || 0));
-                                setNewPpStands(String(pp.music_stands_needed || 0));
-                                setNewPpRemarks(pp.remarks || '');
-                                
-                                const loadedSongs = pp.songs && Array.isArray(pp.songs) ? pp.songs : [];
-                                if (loadedSongs.length === 0 && pp.title) {
-                                  setAddedSongs([{
-                                    title: pp.title,
-                                    artist: pp.artist || '',
-                                    composer: pp.composer || '',
-                                    arranger: pp.arranger || ''
-                                  }]);
-                                  setNewPpTitle('');
-                                  setNewPpArtist('');
-                                  setNewPpComposer('');
-                                  setNewPpArranger('');
-                                } else {
-                                  setAddedSongs(loadedSongs);
-                                  setNewPpTitle('');
-                                  setNewPpArtist('');
-                                  setNewPpComposer('');
-                                  setNewPpArranger('');
-                                }
-                                
-                                setTeacherOverlayTab('einreichung');
+                              onClick={(e) => { e.stopPropagation(); handleStartEditing(pp, 'einreichung'); }}
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                color: '#0071e3', 
+                                cursor: 'pointer', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: 0
                               }}
-                              style={{ background: 'transparent', border: 'none', color: brandColor, cursor: 'pointer', fontSize: '0.74rem', fontWeight: 800 }}
                             >
-                              Bearbeiten
+                              <Edit3 size={11} /> Bearbeiten
                             </button>
                             <button
-                              onClick={() => handleDeleteProgramPoint(pp.id)}
-                              style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 800 }}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteProgramPoint(pp.id); }}
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                color: '#ff453a', 
+                                cursor: 'pointer', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: 0
+                              }}
                             >
-                              Löschen
+                              <Trash2 size={11} /> Löschen
                             </button>
                           </div>
+
+                          {/* Interactive status buttons for Technik and Schüler */}
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '2px' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleStartEditing(pp, 'technik'); }}
+                              style={{
+                                flex: 1,
+                                background: hasTech ? '#e6f6ec' : '#fff1f2',
+                                color: hasTech ? '#097939' : '#b91c1c',
+                                border: 'none',
+                                padding: '8px 14px',
+                                borderRadius: '40px',
+                                fontSize: '0.74rem',
+                                fontWeight: 650,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {hasTech ? <Check size={13} strokeWidth={3} /> : <AlertCircle size={13} strokeWidth={2.5} />}
+                              {hasTech ? 'Technik' : 'Technik fehlt'}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleStartEditing(pp, 'schueler'); }}
+                              style={{
+                                flex: 1,
+                                background: hasSchueler ? '#e6f6ec' : '#fff3c7',
+                                color: hasSchueler ? '#097939' : '#b45309',
+                                border: 'none',
+                                padding: '8px 14px',
+                                borderRadius: '40px',
+                                fontSize: '0.74rem',
+                                fontWeight: 650,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {hasSchueler ? <Check size={13} strokeWidth={3} /> : <AlertCircle size={13} strokeWidth={2.5} />}
+                              {hasSchueler ? `Schüler (${assignedStudents.length})` : 'Schüler fehlen'}
+                            </button>
+                          </div>
+
+                          {/* Render Songs */}
+                          {(() => {
+                            const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
+                            if (songsList.length === 0) return null;
+                            return (
+                              <div style={{ 
+                                borderTop: '1px solid rgba(0,0,0,0.04)', 
+                                paddingTop: '10px', 
+                                marginTop: '2px', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: '6px',
+                                paddingBottom: '20px' // Leave space for absolute buttons
+                              }}>
+                                <span style={{ 
+                                  fontSize: '0.62rem', 
+                                  fontWeight: 800, 
+                                  color: '#86868b', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.08em' 
+                                }}>
+                                  Repertoire
+                                </span>
+                                {songsList.map((song: any, sIdx: number) => (
+                                  <div key={sIdx} style={{ 
+                                    fontSize: '0.76rem', 
+                                    color: '#3a3a3c', 
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                  }}>
+                                    <Music size={11} color="#86868b" /> 
+                                    <span>{song.title}</span>
+                                    {song.artist && <span style={{ color: '#86868b', fontWeight: 500 }}>• {song.artist}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>⏱️ {pp.duration} Min.</span>
-                          {pp.ensemble_band && <span>👥 {pp.ensemble_band}</span>}
-                          <span>🎭 Stufe/Bühne {pp.stage_number || 1}</span>
-                        </div>
-                        {/* Render Songs */}
-                        {(() => {
-                          const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
-                          if (songsList.length === 0) return null;
-                          return (
-                            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Repertoire:</span>
-                              {songsList.map((song: any, sIdx: number) => (
-                                <div key={sIdx} style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 650 }}>
-                                  🎵 {song.artist ? `${song.artist} - ` : ''}{song.title}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
@@ -4072,6 +5175,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       );
     }
 
+    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+      planung:       { label: 'In Planung',    color: '#b45309', bg: '#fef3c7' },
+      bestaetigt:    { label: 'Bestätigt',     color: '#1d4ed8', bg: '#dbeafe' },
+      laufend:       { label: 'Laufend',       color: '#15803d', bg: '#dcfce7' },
+      abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
+    };
+
     const panelContent = (
       <div style={{
         background: asOverlay ? 'transparent' : 'rgba(255, 255, 255, 0.4)',
@@ -4101,44 +5211,67 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </div>
         )}
 
-        {/* Tab Buttons (iOS Segmented Control) */}
+        {/* Tab Buttons (Google Underline Tabs) & Status Chips */}
         <div style={{ 
           display: 'flex', 
-          background: 'rgba(118, 118, 128, 0.12)', 
-          padding: '2px', 
-          borderRadius: '9px', 
-          gap: '2px',
-          alignSelf: 'flex-start',
-          minWidth: '380px',
-          boxShadow: 'inset 0 0.5px 1px rgba(0, 0, 0, 0.05)'
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid #e2e8f0',
+          width: '100%',
+          gap: '8px',
+          paddingBottom: '0',
+          flexWrap: 'wrap'
         }}>
-          {[
-            { id: 'eckdaten', label: 'Eckdaten' },
-            { id: 'feedback', label: 'Feedback' },
-            { id: 'timeline', label: 'Programm' },
-            { id: 'tech', label: 'Technik' },
-            { id: 'export', label: 'Export' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setCoordinatorTab(tab.id as any)}
-              style={{
-                flex: 1,
-                border: 'none',
-                background: coordinatorTab === tab.id ? '#ffffff' : 'transparent',
-                color: coordinatorTab === tab.id ? '#1d1d1f' : '#86868b',
-                padding: '5px 12px',
-                borderRadius: '7px',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                boxShadow: coordinatorTab === tab.id ? '0 1px 3px rgba(0,0,0,0.06), 0 4px 10px rgba(0,0,0,0.04)' : 'none',
-                transition: 'all 0.15s ease-in-out'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {/* Left side: Tab navigation */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { id: 'eckdaten', label: 'Eckdaten' },
+              { id: 'submissions', label: 'Alle Einreichungen' },
+              { id: 'timeline', label: 'Programm' },
+              { id: 'feedback', label: 'Feedback' },
+              { id: 'tech', label: 'Technik' },
+              { id: 'export', label: 'Export' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setCoordinatorTab(tab.id as any)}
+                className={`google-tab ${coordinatorTab === tab.id ? 'google-tab-active' : ''}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right side: Status choice chips */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingBottom: '4px' }}>
+            {Object.entries(statusConfig).map(([id, cfg]) => {
+              const isSelected = eventStatus === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={async () => {
+                    setEventStatus(id as any);
+                    const activeEv = secretaryPlanningEvent || selectedEvent;
+                    if (activeEv) {
+                      await supabase.from('campus_events').update({ planning_status: id }).eq('id', activeEv.id);
+                    }
+                  }}
+                  className={`google-chip ${isSelected ? 'google-chip-selected' : ''}`}
+                  style={{
+                    borderColor: isSelected ? cfg.color : '#d1ebd5',
+                    color: isSelected ? cfg.color : '#385c3f',
+                    backgroundColor: isSelected ? `${cfg.color}18` : '#ffffff',
+                    padding: '4px 12px',
+                    fontSize: '0.7rem'
+                  }}
+                >
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -4147,133 +5280,99 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             const calcTotalMin = programPoints.reduce((sum, pp) => sum + (pp.duration || 0), 0);
             const calcProgMin = programPoints.filter(pp => !pp.is_pause).reduce((sum, pp) => sum + (pp.duration || 0), 0);
             const totalParticipants = programPoints.filter(pp => !pp.is_pause).reduce((sum, pp) => sum + (pp.performer_count || 0), 0);
-            const fmtMin = (min: number) => min >= 60 ? `${Math.floor(min / 60)} h ${min % 60 > 0 ? (min % 60) + ' min' : ''}`.trim() : `${min} min`;
-            const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-              planung:       { label: 'In Planung',    color: '#b45309', bg: '#fef3c7' },
-              bestaetigt:    { label: 'Bestätigt',     color: '#1d4ed8', bg: '#dbeafe' },
-              laufend:       { label: 'Laufend',       color: '#15803d', bg: '#dcfce7' },
-              abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
-            };
-            const currentStatus = statusConfig[eventStatus] || statusConfig.planung;
-            const inputStyle: React.CSSProperties = { 
-              width: '100%', 
-              padding: '10px 14px', 
-              borderRadius: '10px', 
-              border: '1px solid rgba(0,0,0,0.06)', 
-              fontSize: '0.84rem', 
-              boxSizing: 'border-box', 
-              background: 'rgba(0,0,0,0.03)', 
-              outline: 'none', 
-              fontFamily: 'inherit', 
-              color: '#1d1d1f',
-              transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-            };
-            const labelStyle: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 700, color: '#86868b', display: 'block', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' };
+             const fmtMin = (min: number) => min >= 60 ? `${Math.floor(min / 60)} h ${min % 60 > 0 ? (min % 60) + ' min' : ''}`.trim() : `${min} min`;
+            const labelStyle: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 700, color: '#444746', display: 'block', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' };
+
+            const plannedProgMin = parseInt(programDuration, 10) || activeEvent.program_duration || 0;
+            const isDurationExceeded = plannedProgMin > 0 && calcProgMin > plannedProgMin;
+
+            const hasRoomConflict = activeEvent.room_id && customEvents.some(ev => 
+              ev.id !== activeEvent.id && 
+              ev.room_id === activeEvent.room_id && 
+              ev.event_date === activeEvent.event_date &&
+              (parseTimeToMinutes(ev.start_time) < (parseTimeToMinutes(activeEvent.end_time || '23:59')) && 
+               parseTimeToMinutes(activeEvent.start_time) < parseTimeToMinutes(ev.end_time || '23:59'))
+            );
 
             return (
               <div style={{ 
-                background: 'rgba(255, 255, 255, 0.7)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.6)',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.01)',
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 padding: '24px',
                 display: 'flex', 
                 flexDirection: 'column', 
                 gap: '24px'
               }}>
+                {isDurationExceeded && (
+                  <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '12px 16px', color: '#b91c1c', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚠ Warnung: Die Summe der Beiträge ({fmtMin(calcProgMin)}) überschreitet die geplante Programmdauer ({fmtMin(plannedProgMin)})!</span>
+                  </div>
+                )}
+                {hasRoomConflict && (
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fef3c7', borderRadius: '12px', padding: '12px 16px', color: '#b45309', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚠ Raumkonflikt: Der ausgewählte Raum ist an diesem Tag bereits belegt!</span>
+                  </div>
+                )}
                 {/* Header row: Datum, Frist und Speichern */}
                 <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'flex-end', 
                   paddingBottom: '20px', 
-                  borderBottom: '1px solid rgba(0, 0, 0, 0.05)', 
+                  borderBottom: '1px solid #e2e8f0', 
                   gap: '16px',
                   flexWrap: 'wrap'
                 }}>
-                  {/* Status buttons on the left */}
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {Object.entries(statusConfig).map(([id, cfg]) => {
-                      const isSelected = eventStatus === id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setEventStatus(id as any)}
-                          style={{
-                            border: `1.5px solid ${isSelected ? cfg.color : '#e2e8f0'}`,
-                            background: isSelected ? cfg.bg : '#fafafa',
-                            color: isSelected ? cfg.color : '#94a3b8',
-                            padding: '5px 12px', borderRadius: '20px',
-                            fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-                            transition: 'all 0.15s'
-                          }}
-                        >
-                          {cfg.label}
-                        </button>
-                      );
-                    })}
+                  {/* Datum (Read-only Calendar Widget Style) */}
+                  <div style={{
+                    padding: '10px 16px',
+                    background: '#f2fdf6',
+                    borderRadius: '8px',
+                    border: '1px solid #d1e2d4',
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'center',
+                    height: '40px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
+                      background: brandColor,
+                      color: '#ffffff',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Calendar size={12} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: brandColor, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Datum</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1f1f1f' }}>
+                        {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Right side aligned elements */}
                   <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
-                    {/* Datum (Read-only Calendar Widget Style) */}
-                    <div style={{
-                      padding: '10px 16px',
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                      borderRadius: '12px',
-                      border: '1px solid #dcfce7',
-                      display: 'flex',
-                      gap: '12px',
-                      alignItems: 'center',
-                      height: '44px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{
-                        background: '#10b981',
-                        color: '#ffffff',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
-                      }}>
-                        <Calendar size={12} />
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Datum</span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d1d1f' }}>
-                          {activeEvent.event_date ? new Date(activeEvent.event_date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}
-                        </span>
-                      </div>
-                    </div>
 
                     {/* Frist für Programmanmeldungen (Input) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '220px' }}>
-                      <label style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         Frist für Programmanmeldungen
                       </label>
                       <input
                         type="datetime-local"
                         value={eventSubmissionDeadline}
                         onChange={e => setEventSubmissionDeadline(e.target.value)}
+                        className="google-input google-input-noicon"
                         style={{
-                          padding: '10px 14px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(0,0,0,0.06)',
-                          fontSize: '0.82rem',
-                          boxSizing: 'border-box',
-                          background: 'rgba(0,0,0,0.03)',
-                          outline: 'none',
-                          fontFamily: 'inherit',
-                          color: '#1d1d1f',
                           fontWeight: 700,
-                          height: '44px',
-                          transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+                          height: '40px'
                         }}
                       />
                     </div>
@@ -4283,24 +5382,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       type="button"
                       onClick={handleSaveEventSettings}
                       disabled={!!admissionTimeError}
+                      className="google-btn-filled"
                       style={{
-                        background: admissionTimeError 
-                          ? 'rgba(0, 0, 0, 0.05)' 
-                          : `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}dd 100%)`,
-                        color: admissionTimeError ? '#86868b' : '#ffffff',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '10px',
-                        fontWeight: 750,
-                        fontSize: '0.82rem',
-                        cursor: admissionTimeError ? 'not-allowed' : 'pointer',
-                        transition: 'opacity 0.2s, transform 0.15s',
                         whiteSpace: 'nowrap',
-                        boxShadow: admissionTimeError ? 'none' : '0 4px 14px rgba(0,0,0,0.1)',
-                        height: '44px'
+                        height: '40px'
                       }}
-                      onMouseOver={e => { if (!admissionTimeError) e.currentTarget.style.opacity = '0.9'; }}
-                      onMouseOut={e => { e.currentTarget.style.opacity = '1'; }}
                     >
                       Eckdaten speichern
                     </button>
@@ -4316,13 +5402,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     <div>
                       <label style={labelStyle}>Veranstaltungsort</label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Building2 size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px' }} />
+                        <Building2 size={15} color="#74777f" style={{ position: 'absolute', left: '12px' }} />
                         <input
                           type="text"
                           value={eventLocation}
                           onChange={e => setEventLocation(e.target.value)}
                           placeholder="z.B. Aula, Turnhalle, Stadtpark"
-                          style={{ ...inputStyle, paddingLeft: '32px' }}
+                          className="google-input"
                         />
                       </div>
                     </div>
@@ -4331,13 +5417,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     <div>
                       <label style={labelStyle}>Adresse</label>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <MapPin size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px' }} />
+                        <MapPin size={15} color="#74777f" style={{ position: 'absolute', left: '12px' }} />
                         <input
                           type="text"
                           value={eventLocationAddress}
                           onChange={e => setEventLocationAddress(e.target.value)}
                           placeholder="z.B. Musterstraße 12, 80333 München"
-                          style={{ ...inputStyle, paddingLeft: '32px' }}
+                          className="google-input"
                         />
                       </div>
                     </div>
@@ -4353,12 +5439,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           value={eventStartTime}
                           onChange={e => {
                             setEventStartTime(e.target.value);
-                            // Clear admission error if now beginn is moved later
                             if (eventAdmissionTime && e.target.value >= eventAdmissionTime) {
                               setAdmissionTimeError('');
                             }
                           }}
-                          style={{ ...inputStyle, border: `1.5px solid ${eventStartTime ? brandColor : 'rgba(0,0,0,0.08)'}` }}
+                          className="google-input google-input-noicon"
                         />
                       </div>
 
@@ -4366,7 +5451,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <div>
                         <label style={labelStyle}>
                           Einlass (Uhrzeit)
-                          <span style={{ marginLeft: '4px', color: '#94a3b8', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
+                          <span style={{ marginLeft: '4px', color: '#74777f', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
                             {!eventAdmissionTime && eventStartTime ? `— Fallback: ${eventStartTime} Uhr` : '(optional)'}
                           </span>
                         </label>
@@ -4382,16 +5467,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             }
                           }}
                           placeholder={eventStartTime || undefined}
+                          className="google-input google-input-noicon"
                           style={{
-                            ...inputStyle,
-                            border: `1.5px solid ${admissionTimeError ? '#f87171' : 'rgba(0,0,0,0.08)'}`,
-                            color: eventAdmissionTime ? '#1d1d1f' : '#94a3b8'
+                            borderColor: admissionTimeError ? '#b3261e' : undefined,
+                            color: eventAdmissionTime ? '#1f1f1f' : '#74777f'
                           }}
                         />
                       </div>
                     </div>
                     {admissionTimeError && (
-                      <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '-6px', display: 'block' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#b3261e', marginTop: '-6px', display: 'block' }}>
                         ⚠ {admissionTimeError}
                       </span>
                     )}
@@ -4404,7 +5489,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         <select
                           value={stageCount}
                           onChange={e => setStageCount(parseInt(e.target.value, 10))}
-                          style={{ ...inputStyle }}
+                          className="google-input google-input-noicon"
+                          style={{ background: '#ffffff url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207.5L10%2012.5L15%207.5%22%20stroke%3D%22%2374777f%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E") no-repeat right 12px center', appearance: 'none', paddingRight: '36px' }}
                         >
                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} Bühne{n !== 1 ? 'n' : ''}</option>)}
                         </select>
@@ -4414,7 +5500,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <div>
                         <label style={labelStyle}>Budget</label>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ position: 'absolute', left: '12px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8' }}>€</span>
+                          <span style={{ position: 'absolute', left: '12px', fontSize: '0.85rem', fontWeight: 700, color: '#74777f' }}>€</span>
                           <input
                             type="number"
                             min="0"
@@ -4422,7 +5508,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             value={eventBudget}
                             onChange={e => setEventBudget(e.target.value)}
                             placeholder="1.500,00"
-                            style={{ ...inputStyle, paddingLeft: '28px' }}
+                            className="google-input"
+                            style={{ paddingLeft: '28px' }}
                           />
                         </div>
                       </div>
@@ -4437,7 +5524,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         value={eventAudience}
                         onChange={e => setEventAudience(e.target.value)}
                         placeholder="z.B. 300"
-                        style={inputStyle}
+                        className="google-input google-input-noicon"
                       />
                     </div>
 
@@ -4449,54 +5536,58 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         onChange={e => setEventDescription(e.target.value)}
                         placeholder="Kurze Beschreibung für Besucher und das Planungsteam..."
                         rows={4}
-                        style={{ ...inputStyle, resize: 'none', lineHeight: 1.5 }}
+                        className="google-input google-input-noicon"
+                        style={{ resize: 'none', lineHeight: 1.5 }}
                       />
                     </div>
                   </div>
 
                   {/* ── RIGHT COLUMN (SIDEBAR) ── */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                     {/* Read-only metrics block */}
-                    <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live-Metriken</span>
+                    <div className="google-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#444746', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live-Metriken</span>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Gesamtdauer</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{fmtMin(calcTotalMin)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f4f9f5', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#444746', fontWeight: 600 }}>Gesamtdauer</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1f1f1f' }}>{fmtMin(calcTotalMin)}</span>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Programm-Dauer</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{fmtMin(calcProgMin)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: isDurationExceeded ? '#fef2f2' : '#f4f9f5', borderRadius: '8px', border: isDurationExceeded ? '1px solid #fecaca' : 'none' }}>
+                        <span style={{ fontSize: '0.74rem', color: isDurationExceeded ? '#b91c1c' : '#444746', fontWeight: 600 }}>Programm-Dauer</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isDurationExceeded ? '#b91c1c' : '#1f1f1f' }}>
+                          {fmtMin(calcProgMin)} {plannedProgMin > 0 && `(Max: ${fmtMin(plannedProgMin)})`}
+                        </span>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Teilnehmer (Schüler)</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1d1d1f' }}>{totalParticipants}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f4f9f5', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#444746', fontWeight: 600 }}>Teilnehmer (Schüler)</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1f1f1f' }}>{totalParticipants}</span>
                       </div>
                     </div>
 
                     {/* Verantwortliche */}
-                    <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verantwortliche</span>
+                    <div className="google-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#444746', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verantwortliche</span>
 
                       {[
                         { label: 'Programm', val: eventMainResponsible, set: setEventMainResponsible },
                         { label: 'Technik', val: eventTechResponsible, set: setEventTechResponsible },
                         { label: 'Gesamtkoordination', val: eventCoordResponsible, set: setEventCoordResponsible },
                       ].map(({ label, val, set }) => (
-                        <div key={label}>
-                          <label style={{ ...labelStyle, marginBottom: '4px' }}>{label}</label>
+                        <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#444746', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
                           <select
                             value={val}
                             onChange={e => set(e.target.value)}
-                            style={{ ...inputStyle, padding: '8px 10px', fontSize: '0.78rem' }}
+                            className="google-input google-input-noicon"
+                            style={{ padding: '8px 10px', fontSize: '0.78rem', background: '#ffffff url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M5%207.5L10%2012.5L15%207.5%22%20stroke%3D%22%2374777f%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E") no-repeat right 10px center', appearance: 'none', paddingRight: '30px' }}
                           >
                             <option value="">— Nicht zugewiesen —</option>
-                            {allUsers.map(u => {
+                            {allUsers.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary').map(u => {
                               const name = `${u.first_name || ''} ${u.last_name || ''}`.trim();
-                              return <option key={u.id} value={name}>{name} ({u.role})</option>;
+                              return <option key={u.id} value={name}>{name} ({u.role === 'admin' ? 'Admin' : u.role === 'secretary' ? 'Sekretariat' : 'Lehrer'})</option>;
                             })}
                           </select>
                         </div>
@@ -4514,93 +5605,793 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
 
 
-          {coordinatorTab === 'feedback' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {programPoints.filter(pp => !pp.is_pause).map(pp => {
-                const hasPending = pp.additional_feedback_responses?.status === 'pending_response';
+          {coordinatorTab === 'submissions' && (() => {
+            const relevantTeachers = allUsers.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary');
+
+            // Apply search filter and status filter to the teachers list
+            const filteredTeachers = relevantTeachers.filter(teacher => {
+              // 1. Search Query filter (first_name, last_name)
+              const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.toLowerCase();
+              if (teacherSearchQuery && !fullName.includes(teacherSearchQuery.toLowerCase())) {
+                return false;
+              }
+
+              // 2. Status Filter
+              const hasConfirmedNoSubmission = activeEvent.no_submission_teacher_ids?.includes(teacher.id);
+              const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+              const hasPendingSubmissions = teacherPoints.some(pp => pp.status === 'submitted');
+              const hasSubmissions = teacherPoints.length > 0;
+
+              if (teacherStatusFilter === 'pending') {
+                return (hasSubmissions && hasPendingSubmissions) || (!hasSubmissions && !hasConfirmedNoSubmission);
+              } else if (teacherStatusFilter === 'completed') {
+                return hasConfirmedNoSubmission || (hasSubmissions && !hasPendingSubmissions);
+              }
+              return true;
+            });
+
+            // Set default selected teacher if not set or not in list
+            const activeTeacher = filteredTeachers.find(t => t.id === selectedTeacherIdForSubmissions) || filteredTeachers[0] || null;
+
+            const getTeacherStatusBadge = (teacher: any) => {
+              const hasConfirmedNoSubmission = activeEvent.no_submission_teacher_ids?.includes(teacher.id);
+              const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+              const hasPending = teacherPoints.some(pp => pp.status === 'submitted');
+              const hasSubmissions = teacherPoints.length > 0;
+
+              if (hasConfirmedNoSubmission) {
+                return { label: 'Keine', bg: '#f1f5f9', color: '#64748b' };
+              }
+              if (!hasSubmissions) {
+                return { label: 'Ausstehend', bg: '#fff9db', color: '#b28600' };
+              }
+              if (hasPending) {
+                return { label: `${teacherPoints.filter(pp => pp.status === 'submitted').length} Offen`, bg: '#ffe8cc', color: '#ea580c' };
+              }
+              return { label: 'Freigegeben', bg: '#e2f8e9', color: brandColor };
+            };
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', height: 'calc(100vh - 280px)', minHeight: '500px', boxSizing: 'border-box' }}>
                 
-                // Determine status badge styling
-                let statusLabel = 'Eingereicht';
-                let statusBg = '#fef3c7'; // yellow
-                let statusColor = '#d97706';
-                if (pp.status === 'approved') {
-                  statusLabel = 'Freigegeben';
-                  statusBg = '#dcfce7'; // green
-                  statusColor = '#15803d';
-                } else if (pp.status === 'rejected') {
-                  statusLabel = 'Abgelehnt';
-                  statusBg = '#fee2e2'; // red
-                  statusColor = '#b91c1c';
-                }
+                {/* LEFT COLUMN: Teacher chat list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
+                  
+                  {/* Search Bar */}
+                  <input
+                    type="text"
+                    placeholder="Lehrer suchen..."
+                    value={teacherSearchQuery}
+                    onChange={e => setTeacherSearchQuery(e.target.value)}
+                    className="google-input google-input-noicon"
+                    style={{ height: '36px', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                  />
 
-                return (
-                  <div key={pp.id} style={{ padding: '16px', background: 'rgba(255,255,255,0.7)', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.86rem', color: '#1d1d1f' }}>{pp.name}</strong>
-                        {pp.ensemble_band && <span style={{ display: 'block', fontSize: '0.72rem', color: '#86868b', marginTop: '2px' }}>👥 {pp.ensemble_band}</span>}
-                      </div>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 800, background: statusBg, color: statusColor, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                        {statusLabel}
-                      </span>
-                    </div>
-
-                    <span style={{ fontSize: '0.72rem', color: '#86868b', display: 'block', marginBottom: '12px' }}>
-                      Rückmeldung: {hasPending ? '⏳ Warten auf Antwort' : '✅ Keine offenen Fragen'}
-                    </span>
-                    
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <input
-                        placeholder="Rückfrage stellen..."
-                        value={feedbackQuestion[pp.id] || ''}
-                        onChange={e => setFeedbackQuestion(prev => ({ ...prev, [pp.id]: e.target.value }))}
-                        style={{ flex: 1, minWidth: '150px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#ffffff' }}
-                      />
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {(['all', 'pending', 'completed'] as const).map(f => (
                       <button
-                        onClick={() => handleSendFeedbackQuestion(pp.id)}
-                        style={{ background: brandColor, color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                        key={f}
+                        type="button"
+                        onClick={() => setTeacherStatusFilter(f)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: teacherStatusFilter === f ? brandColor : '#ffffff',
+                          color: teacherStatusFilter === f ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          transition: 'all 0.15s ease'
+                        }}
                       >
-                        Fragen
+                        {f === 'all' ? 'Alle' : f === 'pending' ? 'Offen' : 'Erledigt'}
                       </button>
-                      {hasPending && (
-                        <button
-                          onClick={() => handleCancelFeedbackQuestion(pp.id)}
-                          style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Storno
-                        </button>
-                      )}
-                      
-                      {/* Approve / Reject buttons for submitted status */}
-                      {pp.status === 'submitted' && (
-                        <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
-                          <button
-                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'approved')}
-                            style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            Freigeben
-                          </button>
-                          <button
-                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'rejected')}
-                            style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            Ablehnen
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          )}
+
+                  {/* Vertically scrollable teacher list */}
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {filteredTeachers.length === 0 ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
+                        Keine Lehrer gefunden.
+                      </div>
+                    ) : (
+                      filteredTeachers.map(teacher => {
+                        const isSelected = activeTeacher && activeTeacher.id === teacher.id;
+                        const badge = getTeacherStatusBadge(teacher);
+                        return (
+                          <div
+                            key={teacher.id}
+                            onClick={() => setSelectedTeacherIdForSubmissions(teacher.id)}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              border: isSelected ? `1px solid ${brandColor}` : '1px solid transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <strong style={{ fontSize: '0.84rem', color: isSelected ? brandColor : '#1f1f1f' }}>
+                                {teacher.first_name} {teacher.last_name}
+                              </strong>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 800, background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '100px' }}>
+                                {badge.label}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'capitalize' }}>
+                              {teacher.role === 'admin' ? 'Admin' : teacher.role === 'secretary' ? 'Sekretariat' : 'Lehrer'}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Selected teacher details pane */}
+                <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+                  {!activeTeacher ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px' }}>
+                      <span style={{ fontSize: '2rem' }}>👤</span>
+                      <span style={{ fontSize: '0.84rem' }}>Bitte wählen Sie einen Lehrer aus der Liste aus.</span>
+                    </div>
+                  ) : (() => {
+                    const teacher = activeTeacher;
+                    const hasConfirmedNoSubmission = activeEvent.no_submission_teacher_ids?.includes(teacher.id);
+                    const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+                    const submittedCount = teacherPoints.filter(pp => pp.status === 'submitted').length;
+                    const approvedCount = teacherPoints.filter(pp => pp.status === 'approved').length;
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        
+                        {/* Detail Header */}
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1f1f1f' }}>
+                              {teacher.first_name} {teacher.last_name}
+                            </h4>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              {teacherPoints.length} Beiträge insgesamt ({approvedCount} freigegeben, {submittedCount} ausstehend)
+                            </span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {hasConfirmedNoSubmission && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetNoSubmissionStatus(teacher.id)}
+                                className="google-btn-outlined"
+                                style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', border: '1px solid #cbd5e1' }}
+                              >
+                                Zurücksetzen
+                              </button>
+                            )}
+
+                            {!hasConfirmedNoSubmission && teacherPoints.length === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => alert(`Erinnerung wurde per Mail/Shoutbox an ${teacher.first_name} ${teacher.last_name} gesendet!`)}
+                                className="google-btn-filled"
+                                style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', background: '#ea580c' }}
+                              >
+                                ✉ Erinnern
+                              </button>
+                            )}
+
+                            {teacherPoints.some(pp => pp.status === 'submitted') && (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBulkUpdateStatus(teacher.id, 'approved')}
+                                  className="google-btn-filled"
+                                  style={{ height: '30px', padding: '0 14px', fontSize: '0.74rem' }}
+                                >
+                                  Alle freigeben
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBulkUpdateStatus(teacher.id, 'rejected')}
+                                  className="google-btn-outlined"
+                                  style={{ height: '30px', padding: '0 14px', fontSize: '0.74rem', border: '1.5px solid #cbd5e1' }}
+                                >
+                                  Alle ablehnen
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Detail Scroll Area (Submissions List) */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box' }}>
+                          {hasConfirmedNoSubmission ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                              ℹ️ Dieser Lehrer hat gemeldet, dass er für dieses Event **keine Beiträge** einreichen wird.
+                            </div>
+                          ) : teacherPoints.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                              Bislang wurden keine Beiträge eingereicht.
+                            </div>
+                          ) : (
+                            teacherPoints.map(pp => {
+                              let ppStatusLabel = 'Eingereicht';
+                              let ppStatusBg = '#fff9db';
+                              let ppStatusColor = '#b28600';
+                              if (pp.status === 'approved') {
+                                ppStatusLabel = 'Freigegeben';
+                                ppStatusBg = '#e2f8e9';
+                                ppStatusColor = brandColor;
+                              } else if (pp.status === 'rejected') {
+                                ppStatusLabel = 'Abgelehnt';
+                                ppStatusBg = '#ffebee';
+                                ppStatusColor = '#b3261e';
+                              }
+
+                              const hasPendingFeedback = pp.additional_feedback_responses?.status === 'pending_response';
+                              const hasRespondedFeedback = pp.additional_feedback_responses?.status === 'responded';
+                              const isExpanded = expandedSubmissionDetails[pp.id] || false;
+
+                              return (
+                                <div
+                                  key={pp.id}
+                                  onClick={() => setExpandedSubmissionDetails(prev => ({ ...prev, [pp.id]: !prev[pp.id] }))}
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    background: isExpanded ? '#f8faf9' : '#fafbfa',
+                                    padding: '14px',
+                                    borderRadius: '12px',
+                                    border: isExpanded ? '1px solid #cbd5e1' : '1px solid #eef3ef',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  {/* Row Info */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <strong style={{ fontSize: '0.88rem', color: '#2e3a30' }}>
+                                          {pp.name} {isExpanded ? '▲' : '▼'}
+                                        </strong>
+                                        {pp.created_at && (
+                                          <span style={{ fontSize: '0.72rem', color: '#7c8b80' }}>
+                                            ({new Date(pp.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr)
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                                        {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                                        <span>⏱️ {pp.duration} Min.</span>
+                                        {hasPendingFeedback && <span style={{ color: '#b45309', fontWeight: 600 }}>⏳ Rückfrage ausstehend</span>}
+                                        {hasRespondedFeedback && <span style={{ color: brandColor, fontWeight: 600 }}>✅ Rückmeldung erhalten</span>}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                                      <span style={{ fontSize: '0.64rem', fontWeight: 800, background: ppStatusBg, color: ppStatusColor, padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                        {ppStatusLabel}
+                                      </span>
+                                      {pp.status === 'submitted' && (
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'approved')}
+                                            className="google-btn-filled"
+                                            style={{ height: '28px', padding: '0 12px', fontSize: '0.7rem' }}
+                                          >
+                                            Freigeben
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateProgramPointStatus(pp.id, 'rejected')}
+                                            className="google-btn-outlined"
+                                            style={{ height: '28px', padding: '0 12px', fontSize: '0.7rem', border: '1.5px solid #d1ebd5' }}
+                                          >
+                                            Ablehnen
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Expandable Details Pane */}
+                                  {isExpanded && (
+                                    <div
+                                      style={{
+                                        marginTop: '12px',
+                                        padding: '14px',
+                                        background: '#ffffff',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '10px',
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        cursor: 'default'
+                                      }}
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      {/* New Redesigned detailed card layout in columns */}
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}>
+                                        
+                                        {/* Section 1: Besetzung & Schüler */}
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            👥 Besetzung & Schüler
+                                          </h4>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {pp.performer_count !== undefined && (
+                                              <div>
+                                                <span style={{ color: '#64748b', fontWeight: 600 }}>Anzahl Mitwirkende:</span> {pp.performer_count}
+                                              </div>
+                                            )}
+                                            {pp.preferred_time && (
+                                              <div>
+                                                <span style={{ color: '#64748b', fontWeight: 600 }}>Wunsch-Uhrzeit:</span> {pp.preferred_time}
+                                              </div>
+                                            )}
+                                            {pp.instrument && (
+                                              <div>
+                                                <span style={{ color: '#64748b', fontWeight: 600 }}>Hauptinstrument:</span> {pp.instrument}
+                                              </div>
+                                            )}
+                                            {pp.publisher && (
+                                              <div>
+                                                <span style={{ color: '#64748b', fontWeight: 600 }}>Verlag:</span> {pp.publisher}
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Assigned students list */}
+                                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: 'auto' }}>
+                                            <span style={{ color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Zuweisungen ({ (pp.additional_feedback_responses?.assigned_students || []).length }):</span>
+                                            {(() => {
+                                              const studentIds = pp.additional_feedback_responses?.assigned_students || [];
+                                              const assigned = allUsers.filter(u => studentIds.includes(u.id));
+                                              if (assigned.length === 0) {
+                                                return <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.74rem' }}>Keine Schüler zugewiesen</span>;
+                                              }
+                                              return (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                  {assigned.map((st: any) => (
+                                                    <span key={st.id} style={{ display: 'inline-block', padding: '3px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 650, border: '1px solid #bae6fd' }}>
+                                                      {st.first_name} {st.last_name} {st.instrument && `(${st.instrument})`}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              );
+                                            })()}
+                                          </div>
+                                        </div>
+
+                                        {/* Section 2: Repertoire & GEMA */}
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            🎼 Repertoire & GEMA
+                                          </h4>
+                                          {pp.songs && pp.songs.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                              {pp.songs.map((song: any, idx: number) => (
+                                                <div key={idx} style={{ background: '#ffffff', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                  <strong style={{ color: '#0f172a', fontSize: '0.78rem' }}>{song.title}</strong> {song.artist && <span style={{ color: '#475569', fontSize: '0.74rem' }}> von {song.artist}</span>}
+                                                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                    {song.composer && <span>Komp: {song.composer}</span>}
+                                                    {song.arranger && <span>Arr: {song.arranger}</span>}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.74rem' }}>Keine Stücke eingetragen</span>
+                                          )}
+                                        </div>
+
+                                        {/* Section 3: Bühnenbedarf & Technik */}
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            🎸 Bühnenbedarf & Technik
+                                          </h4>
+                                          
+                                          {/* Seating / Chairs / Stands */}
+                                          <div style={{ display: 'flex', gap: '16px' }}>
+                                            <div>
+                                              <span style={{ color: '#64748b', fontWeight: 600 }}>🪑 Stühle:</span> {pp.chairs_needed || 0}
+                                            </div>
+                                            <div>
+                                              <span style={{ color: '#64748b', fontWeight: 600 }}>🎼 Notenständer:</span> {pp.music_stands_needed || 0}
+                                            </div>
+                                          </div>
+
+                                          {/* Tech rider items */}
+                                          {(() => {
+                                            let techItems = [];
+                                            try {
+                                              if (pp.tech_requirements && (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{'))) {
+                                                techItems = JSON.parse(pp.tech_requirements);
+                                              }
+                                            } catch (err) {}
+
+                                            return (
+                                              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
+                                                <span style={{ color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Tech Rider / Inputs:</span>
+                                                {techItems.length > 0 ? (
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    {techItems.map((item: any, idx: number) => {
+                                                      const isOwn = item.source === 'own';
+                                                      const connColor = item.connection === 'XLR' || item.connection === 'Mikrofon' ? '#2563eb' : '#65a30d';
+                                                      return (
+                                                        <div key={idx} style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', fontSize: '0.74rem' }}>
+                                                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{item.count}x {item.type}</span>
+                                                          <span style={{ padding: '1px 4px', borderRadius: '4px', background: `${connColor}15`, color: connColor, fontSize: '0.62rem', fontWeight: 700 }}>
+                                                            {item.connection}
+                                                          </span>
+                                                          <span style={{ padding: '1px 4px', borderRadius: '4px', background: isOwn ? '#fef3c7' : '#f1f5f9', color: isOwn ? '#b45309' : '#475569', fontSize: '0.62rem', fontWeight: 700 }}>
+                                                            {isOwn ? 'Eigenes' : 'Schule'}
+                                                          </span>
+                                                          {item.notes && <span style={{ color: '#64748b', fontStyle: 'italic', fontSize: '0.68rem' }}>({item.notes})</span>}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                ) : pp.tech_requirements ? (
+                                                  <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#475569', fontSize: '0.74rem' }}>
+                                                    {pp.tech_requirements}
+                                                  </div>
+                                                ) : (
+                                                  <span style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '0.74rem' }}>Keine Inputs</span>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
+
+                                          {/* Remarks */}
+                                          {pp.remarks && (
+                                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
+                                              <span style={{ color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Anmerkungen:</span>
+                                              <div style={{ background: '#fef3c7', borderLeft: '3px solid #f59e0b', padding: '6px 8px', borderRadius: '4px', fontStyle: 'italic', color: '#b45309', fontSize: '0.74rem' }}>
+                                                "{pp.remarks}"
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                      </div>
+                                      
+                                      {/* Spacer block */}
+
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })()}
+                </div>
+
+              </div>
+            );
+          })()}
+
+
+          {coordinatorTab === 'feedback' && (() => {
+            const relevantTeachers = allUsers.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary');
+
+            // Apply search & status filters
+            const filteredTeachers = relevantTeachers.filter(teacher => {
+              const fullName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.toLowerCase();
+              if (feedbackSearchQuery && !fullName.includes(feedbackSearchQuery.toLowerCase())) {
+                return false;
+              }
+
+              const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+              const hasPending = teacherPoints.some(pp => pp.additional_feedback_responses?.status === 'pending_response');
+              
+              if (feedbackStatusFilter === 'pending') {
+                return hasPending;
+              } else if (feedbackStatusFilter === 'completed') {
+                return !hasPending && teacherPoints.some(pp => pp.additional_feedback_responses?.questions && pp.additional_feedback_responses.questions.length > 0);
+              }
+              // Show all teachers who have at least one submission
+              return teacherPoints.length > 0;
+            });
+
+            const activeTeacher = filteredTeachers.find(t => t.id === selectedTeacherIdForFeedback) || filteredTeachers[0] || null;
+
+            const getTeacherFeedbackBadge = (teacher: any) => {
+              const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+              const hasPending = teacherPoints.some(pp => pp.additional_feedback_responses?.status === 'pending_response');
+              const hasAnyQuestions = teacherPoints.some(pp => pp.additional_feedback_responses?.questions && pp.additional_feedback_responses.questions.length > 0);
+
+              if (hasPending) {
+                return { label: '⏳ Offen', bg: '#ffe8cc', color: '#ea580c' };
+              }
+              if (hasAnyQuestions) {
+                return { label: '✅ Klärt', bg: '#e2f8e9', color: brandColor };
+              }
+              return { label: 'Keine', bg: '#f1f5f9', color: '#64748b' };
+            };
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', height: 'calc(100vh - 280px)', minHeight: '500px', boxSizing: 'border-box' }}>
+                
+                {/* LEFT COLUMN: Teacher list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
+                  
+                  {/* Search Bar */}
+                  <input
+                    type="text"
+                    placeholder="Lehrer suchen..."
+                    value={feedbackSearchQuery}
+                    onChange={e => setFeedbackSearchQuery(e.target.value)}
+                    className="google-input google-input-noicon"
+                    style={{ height: '36px', fontSize: '0.8rem', width: '100%', boxSizing: 'border-box' }}
+                  />
+
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {(['all', 'pending', 'completed'] as const).map(f => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setFeedbackStatusFilter(f)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: feedbackStatusFilter === f ? brandColor : '#ffffff',
+                          color: feedbackStatusFilter === f ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {f === 'all' ? 'Alle' : f === 'pending' ? 'Wartend' : 'Erledigt'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Scrollable list */}
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {filteredTeachers.length === 0 ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
+                        Keine Lehrer gefunden.
+                      </div>
+                    ) : (
+                      filteredTeachers.map(teacher => {
+                        const isSelected = activeTeacher && activeTeacher.id === teacher.id;
+                        const badge = getTeacherFeedbackBadge(teacher);
+                        return (
+                          <div
+                            key={teacher.id}
+                            onClick={() => setSelectedTeacherIdForFeedback(teacher.id)}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              border: isSelected ? `1px solid ${brandColor}` : '1px solid transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <strong style={{ fontSize: '0.84rem', color: isSelected ? brandColor : '#1f1f1f' }}>
+                                {teacher.first_name} {teacher.last_name}
+                              </strong>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 800, background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '100px' }}>
+                                {badge.label}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {teacher.role === 'admin' ? 'Admin' : teacher.role === 'secretary' ? 'Sekretariat' : 'Lehrer'}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Chat history / Message thread */}
+                <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+                  {!activeTeacher ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px' }}>
+                      <span style={{ fontSize: '2rem' }}>💬</span>
+                      <span style={{ fontSize: '0.84rem' }}>Bitte wählen Sie einen Lehrer aus der Liste aus.</span>
+                    </div>
+                  ) : (() => {
+                    const teacher = activeTeacher;
+                    const teacherPoints = programPoints.filter(pp => pp.teacher_id === teacher.id && !pp.is_pause);
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        {/* Header */}
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', boxSizing: 'border-box' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1f1f1f' }}>
+                            Rückfragen & Feedback: {teacher.first_name} {teacher.last_name}
+                          </h4>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            Kommunikation bezüglich der Beiträge des Lehrers
+                          </span>
+                        </div>
+
+                        {/* Scroll Area */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
+                          {teacherPoints.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                              Keine Beiträge für diesen Lehrer vorhanden.
+                            </div>
+                          ) : (
+                            teacherPoints.map(pp => {
+                              const hasPending = pp.additional_feedback_responses?.status === 'pending_response';
+                              const questions = pp.additional_feedback_responses?.questions || [];
+                              const answers = pp.additional_feedback_responses?.answers || [];
+
+                              return (
+                                <div key={pp.id} className="google-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#fafbfa', border: '1px solid #eef3ef', padding: '16px' }}>
+                                  
+                                  {/* Program Point Header */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                                    <div>
+                                      <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>{pp.name}</strong>
+                                      {pp.ensemble_band && <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>👥 {pp.ensemble_band}</span>}
+                                    </div>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: hasPending ? '#ea580c' : brandColor }}>
+                                      {hasPending ? '⏳ Warten auf Antwort' : questions.length > 0 ? '✅ Geklärt' : '💬 Keine Rückfragen'}
+                                    </span>
+                                  </div>
+
+                                  {/* Chat bubble list */}
+                                  {questions.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                      {questions.map((q: string, idx: number) => {
+                                        const answerText = answers[idx];
+                                        return (
+                                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {/* Question Bubble (sent by secretary/admin) - aligned right */}
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                                              <div style={{
+                                                maxWidth: '80%',
+                                                background: brandColor,
+                                                color: '#ffffff',
+                                                padding: '10px 14px',
+                                                borderRadius: '16px 16px 4px 16px',
+                                                fontSize: '0.8rem',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                              }}>
+                                                <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', marginBottom: '3px', textTransform: 'uppercase' }}>Sekretariat / Orga</span>
+                                                {q}
+                                              </div>
+                                            </div>
+
+                                            {/* Answer Bubble (sent by teacher) - aligned left */}
+                                            <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+                                              {answerText ? (
+                                                <div style={{
+                                                  maxWidth: '80%',
+                                                  background: '#ffffff',
+                                                  color: '#1e293b',
+                                                  padding: '10px 14px',
+                                                  borderRadius: '16px 16px 16px 4px',
+                                                  fontSize: '0.8rem',
+                                                  border: '1px solid #cbd5e1',
+                                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                }}>
+                                                  <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: brandColor, marginBottom: '3px', textTransform: 'uppercase' }}>{teacher.first_name} {teacher.last_name}</span>
+                                                  {answerText}
+                                                </div>
+                                              ) : (
+                                                <div style={{
+                                                  maxWidth: '80%',
+                                                  background: '#fff9db',
+                                                  color: '#b28600',
+                                                  padding: '8px 12px',
+                                                  borderRadius: '16px 16px 16px 4px',
+                                                  fontSize: '0.74rem',
+                                                  fontStyle: 'italic',
+                                                  border: '1px solid #ffe57f'
+                                                }}>
+                                                  ⏳ Noch keine Antwort erhalten
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Action bar (Send new question or cancel) */}
+                                  {!expandedFeedbackForms[pp.id] ? (
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: true }))}
+                                        className="google-btn-outlined"
+                                        style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', border: '1px solid #cbd5e1', color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <MessageSquare size={13} /> {questions.length > 0 ? 'Weitere Rückfrage' : 'Rückfrage stellen'}
+                                      </button>
+                                      {hasPending && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelFeedbackQuestion(pp.id)}
+                                          className="google-btn-outlined"
+                                          style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', color: '#b3261e', border: '1.5px solid #ff8a80' }}
+                                        >
+                                          Storno
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+                                      <input
+                                        placeholder="Neue Rückfrage formulieren..."
+                                        value={feedbackQuestion[pp.id] || ''}
+                                        onChange={e => setFeedbackQuestion(prev => ({ ...prev, [pp.id]: e.target.value }))}
+                                        className="google-input google-input-noicon"
+                                        style={{ flex: 1, minWidth: '150px', height: '36px', boxSizing: 'border-box' }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleSendFeedbackQuestion(pp.id);
+                                          setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }));
+                                        }}
+                                        className="google-btn-filled"
+                                        style={{ height: '36px', fontSize: '0.76rem' }}
+                                      >
+                                        Senden
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedFeedbackForms(prev => ({ ...prev, [pp.id]: false }))}
+                                        className="google-btn-outlined"
+                                        style={{ height: '36px', fontSize: '0.76rem', border: '1px solid #cbd5e1', color: '#475569' }}
+                                      >
+                                        Abbrechen
+                                      </button>
+                                    </div>
+                                  )}
+
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            );
+          })()}
 
           {coordinatorTab === 'timeline' && (() => {
             // Unscheduled Pool: is_scheduled === false && (status === 'approved' || status === 'submitted') (and not pause)
             const unscheduledPoints = programPoints.filter(pp => !pp.is_scheduled && !pp.is_pause && (pp.status === 'approved' || pp.status === 'submitted'));
 
             // Scheduled Points on active stage, sorted by sort_order
-            const activeStagePoints = programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && pp.stage_number === activeStage)
+            const activeStagePoints = programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage)
               .sort((a, b) => a.sort_order - b.sort_order);
 
             // Compute conflicts and time map
@@ -4611,39 +6402,85 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Stage count switcher if stage_count > 1 */}
-                {stageCount > 1 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    background: 'rgba(120, 120, 128, 0.06)', 
-                    padding: '3px', 
-                    borderRadius: '8px', 
-                    gap: '2px',
-                    alignSelf: 'flex-start'
-                  }}>
-                    {Array.from({ length: stageCount }, (_, i) => i + 1).map(stageNum => (
-                      <button
-                        key={stageNum}
-                        type="button"
-                        onClick={() => setActiveStage(stageNum)}
-                        style={{
-                          padding: '5px 12px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: activeStage === stageNum ? '#ffffff' : 'transparent',
-                          color: activeStage === stageNum ? '#1d1d1f' : '#86868b',
-                          fontWeight: 'bold',
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          boxShadow: activeStage === stageNum ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        Bühne {stageNum}
-                      </button>
-                    ))}
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  {/* Stage count switcher if stage_count > 1 */}
+                  {stageCount > 1 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      background: 'rgba(120, 120, 128, 0.06)', 
+                      padding: '3px', 
+                      borderRadius: '8px', 
+                      gap: '2px'
+                    }}>
+                      {Array.from({ length: stageCount }, (_, i) => i + 1).map(stageNum => (
+                        <button
+                          key={stageNum}
+                          type="button"
+                          onClick={() => setActiveStage(stageNum)}
+                          style={{
+                            padding: '5px 12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: activeStage === stageNum ? '#ffffff' : 'transparent',
+                            color: activeStage === stageNum ? '#1f1f1f' : '#384a3c',
+                            fontWeight: 'bold',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: activeStage === stageNum ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          Bühne {stageNum}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Stage count editor */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#384a3c', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Bühnen Anzahl:
+                    </label>
+                    <select
+                      value={stageCount}
+                      onChange={async (e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setStageCount(val);
+                        const activeEv = secretaryPlanningEvent || selectedEvent;
+                        if (activeEv) {
+                          await supabase.from('campus_events').update({ stage_count: val }).eq('id', activeEv.id);
+                          // Auto update active stage if it exceeds new count
+                          if (activeStage > val) setActiveStage(val);
+                        }
+                      }}
+                      className="google-input google-input-noicon"
+                      style={{ width: '100px', height: '32px', padding: '0 8px', fontSize: '0.78rem' }}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} Bühne{n !== 1 ? 'n' : ''}</option>)}
+                    </select>
                   </div>
-                )}
+
+                  {/* Start time editor */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#384a3c', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Startzeit:
+                    </label>
+                    <input
+                      type="time"
+                      value={eventStartTime || '14:00'}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setEventStartTime(val);
+                        const activeEv = secretaryPlanningEvent || selectedEvent;
+                        if (activeEv) {
+                          await supabase.from('campus_events').update({ event_start_time: val }).eq('id', activeEv.id);
+                        }
+                      }}
+                      className="google-input google-input-noicon"
+                      style={{ width: '90px', height: '32px', padding: '0 8px', fontSize: '0.78rem', fontWeight: 'bold' }}
+                    />
+                  </div>
+                </div>
 
                 <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 280px)', minHeight: '500px' }}>
                   {/* Left Column: Pool of Unscheduled Program Points */}
@@ -4652,10 +6489,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     onDrop={handleDropOnUnscheduledPool}
                     style={{
                       flex: 1,
-                      background: '#f5f5f7',
-                      borderRadius: '20px',
+                      background: '#ffffff',
+                      borderRadius: '16px',
                       padding: '20px',
-                      border: '1.5px dashed rgba(0, 0, 0, 0.12)',
+                      border: '1.5px dashed #cbd5e1',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '16px',
@@ -4701,12 +6538,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             }}
                             style={{
                               padding: '12px 14px',
-                              background: 'rgba(255, 255, 255, 0.85)',
-                              border: '1px solid rgba(255, 255, 255, 0.6)',
-                              borderRadius: '16px',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.01)',
-                              backdropFilter: 'blur(10px)',
-                              WebkitBackdropFilter: 'blur(10px)',
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '12px',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                               cursor: 'grab',
                               fontSize: '0.8rem',
                               display: 'flex',
@@ -4714,8 +6549,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               gap: '6px'
                             }}
                           >
-                            <div style={{ fontWeight: 700, color: '#1d1d1f' }}>{pp.name}</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', color: '#86868b' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 700, color: '#1f1f1f' }}>{pp.name}</span>
+                              {pp.created_at && (
+                                <span style={{ fontSize: '0.68rem', color: '#8c9e90', fontWeight: 500 }}>
+                                  {new Date(pp.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', color: '#444746' }}>
                               {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
                               {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
                               {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
@@ -4735,66 +6577,138 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     onDrop={e => handleDropOnTimeline(e)}
                     style={{
                       flex: 1.6,
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      backdropFilter: 'blur(20px)',
-                      WebkitBackdropFilter: 'blur(20px)',
-                      borderRadius: '24px',
-                      border: '1px solid rgba(255, 255, 255, 0.6)',
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.01)',
-                      padding: '20px',
+                      background: '#ffffff',
+                      borderRadius: isTimelineFullscreen ? '0' : '16px',
+                      border: isTimelineFullscreen ? 'none' : '1px solid #cbd5e1',
+                      boxShadow: isTimelineFullscreen ? 'none' : '0 1px 3px rgba(0,0,0,0.05)',
+                      padding: isTimelineFullscreen ? '32px' : '20px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '16px',
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
+                      position: isTimelineFullscreen ? 'fixed' : 'relative',
+                      top: isTimelineFullscreen ? 0 : 'auto',
+                      left: isTimelineFullscreen ? 0 : 'auto',
+                      right: isTimelineFullscreen ? 0 : 'auto',
+                      bottom: isTimelineFullscreen ? 0 : 'auto',
+                      width: isTimelineFullscreen ? '100vw' : 'auto',
+                      height: isTimelineFullscreen ? '100vh' : 'auto',
+                      zIndex: isTimelineFullscreen ? 99999 : 'auto'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#1d1d1f' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#1f1f1f' }}>
                         Bühne {activeStage} - Ablaufplan
                       </h4>
-                      {/* Add Pause Form */}
-                      <form onSubmit={handleAddPause} style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {activeStagePoints.length > 0 && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allExpanded = activeStagePoints.filter(pp => !pp.is_pause).every(pp => expandedPoints[pp.id]);
+                                if (allExpanded) {
+                                  setExpandedPoints({});
+                                } else {
+                                  const nextExpanded: Record<string, boolean> = {};
+                                  activeStagePoints.forEach(pp => {
+                                    if (!pp.is_pause) nextExpanded[pp.id] = true;
+                                  });
+                                  setExpandedPoints(nextExpanded);
+                                }
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                padding: '0 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                height: '32px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {activeStagePoints.filter(pp => !pp.is_pause).every(pp => expandedPoints[pp.id]) ? '↕ Alle einklappen' : '↕ Alle ausklappen'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsTimelineFullscreen(prev => !prev)}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                padding: '0 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                height: '32px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {isTimelineFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                              {isTimelineFullscreen ? 'Verkleinern' : 'Fullscreen'}
+                            </button>
+                          </div>
+                        )}
+                        {/* Add Pause Form */}
+                        <form onSubmit={handleAddPause} style={{ display: 'flex', gap: '8px' }}>
                         <input
                           type="number"
                           placeholder="Pause (Min.)"
                           value={pauseDuration}
                           onChange={e => setPauseDuration(e.target.value)}
+                          className="google-input google-input-noicon"
                           style={{ 
                             width: '95px', 
-                            padding: '6px 10px', 
-                            borderRadius: '8px', 
-                            border: '1px solid rgba(0,0,0,0.06)', 
-                            background: 'rgba(0,0,0,0.03)',
+                            height: '32px',
                             fontSize: '0.78rem',
-                            outline: 'none',
                             fontWeight: 600
                           }}
                         />
                         <button
                           type="submit"
                           style={{ 
-                            background: '#1d1d1f', 
+                            background: brandColor, 
                             color: '#ffffff', 
                             border: 'none', 
-                            padding: '6px 12px', 
-                            borderRadius: '8px', 
+                            padding: '0 12px', 
+                            borderRadius: '100px', 
                             fontWeight: 'bold', 
                             fontSize: '0.76rem', 
-                            cursor: 'pointer' 
+                            cursor: 'pointer',
+                            height: '32px',
+                            display: 'inline-flex',
+                            alignItems: 'center'
                           }}
                         >
                           + Pause
                         </button>
                       </form>
                     </div>
+                  </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      overflowY: 'auto', 
+                      flex: 1, 
+                      paddingRight: '4px',
+                      boxSizing: 'border-box'
+                    }}>
                       {activeStagePoints.length === 0 ? (
                         <div style={{ 
                           textAlign: 'center', 
                           padding: '60px 20px', 
-                          border: '1.5px dashed rgba(0, 0, 0, 0.08)', 
-                          borderRadius: '14px', 
+                          border: '1.5px dashed #cbd5e1', 
+                          borderRadius: '12px', 
                           color: '#86868b', 
                           fontSize: '0.8rem',
                           lineHeight: 1.5
@@ -4802,123 +6716,198 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           Bühne leer.<br />Ziehe Beiträge aus der linken Spalte hierher, um sie zeitlich einzuplanen.
                         </div>
                       ) : (
-                        activeStagePoints.map((pp, idx) => {
-                          const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
-                          const conflictReason = conflicts[pp.id];
-                          const hasConflict = !!conflictReason;
-
-                          return (
-                            <div
-                              key={pp.id}
-                              draggable
-                              onDragStart={e => {
-                                e.dataTransfer.setData('ppId', pp.id);
-                                e.dataTransfer.effectAllowed = 'move';
-                              }}
-                              onDragOver={e => e.preventDefault()}
-                              onDrop={e => {
-                                e.stopPropagation();
-                                handleDropOnTimeline(e, pp.id);
-                              }}
-                              style={{
-                                padding: '12px 16px',
-                                background: hasConflict 
-                                  ? 'rgba(255, 69, 58, 0.06)' 
-                                  : (pp.is_pause ? 'rgba(255, 204, 0, 0.06)' : 'rgba(255, 255, 255, 0.85)'),
-                                border: hasConflict 
-                                  ? '1px solid rgba(255, 69, 58, 0.25)' 
-                                  : (pp.is_pause ? '1px solid rgba(255, 204, 0, 0.25)' : '1px solid rgba(255, 255, 255, 0.6)'),
-                                borderRadius: '16px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.01)',
-                                backdropFilter: 'blur(10px)',
-                                WebkitBackdropFilter: 'blur(10px)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                cursor: 'grab',
-                                gap: '12px'
-                              }}
-                            >
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                  <span style={{ 
-                                    fontSize: '0.74rem', 
-                                    background: pp.is_pause ? 'rgba(255, 214, 10, 0.15)' : 'rgba(0, 0, 0, 0.04)', 
-                                    color: pp.is_pause ? '#b28600' : '#1d1d1f',
-                                    padding: '2px 8px', 
-                                    borderRadius: '6px', 
-                                    fontWeight: 700 
-                                  }}>
-                                    {timeInfo.start} - {timeInfo.end}
-                                  </span>
-                                  <strong style={{ fontSize: '0.84rem', color: hasConflict ? '#d70015' : '#1d1d1f' }}>
-                                    {pp.name}
-                                  </strong>
-                                </div>
-
-                                {hasConflict && (
-                                  <div style={{ fontSize: '0.74rem', color: '#ff3b30', fontWeight: 700, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    ⚠️ {conflictReason}
+                        <div style={{
+                          position: 'relative',
+                          paddingLeft: '75px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            left: '55px',
+                            top: '24px',
+                            bottom: '24px',
+                            width: '2px',
+                            background: '#cbd5e1',
+                            zIndex: 0
+                          }} />
+                          {activeStagePoints.map((pp, idx) => {
+                            const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+                            const conflictReason = conflicts[pp.id];
+                            const hasConflict = !!conflictReason;
+   
+                             return (
+                               <div
+                                 key={pp.id}
+                                 draggable
+                                 onDragStart={e => {
+                                   e.dataTransfer.setData('ppId', pp.id);
+                                   e.dataTransfer.effectAllowed = 'move';
+                                 }}
+                                 onDragOver={e => e.preventDefault()}
+                                 onDrop={e => {
+                                   e.stopPropagation();
+                                   handleDropOnTimeline(e, pp.id);
+                                 }}
+                                 style={{
+                                   padding: '12px 16px',
+                                   background: hasConflict 
+                                     ? '#fff5f5' 
+                                     : (pp.is_pause ? '#fffdf0' : '#ffffff'),
+                                   border: hasConflict 
+                                     ? '1px solid #ff8a80' 
+                                     : (pp.is_pause ? '1px solid #ffe57f' : '1px solid #cbd5e1'),
+                                   borderRadius: '12px',
+                                   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                   display: 'flex',
+                                   justifyContent: 'space-between',
+                                   alignItems: 'center',
+                                   cursor: 'grab',
+                                   gap: '12px',
+                                   position: 'relative'
+                                 }}
+                               >
+                                 {/* Timeline Dot Indicator */}
+                                 <div style={{
+                                   position: 'absolute',
+                                   left: '-25px',
+                                   top: 'calc(50% - 5px)',
+                                   width: '10px',
+                                   height: '10px',
+                                   borderRadius: '50%',
+                                   backgroundColor: hasConflict ? '#ef4444' : (pp.is_pause ? '#b28600' : brandColor),
+                                   border: '2px solid #ffffff',
+                                   boxShadow: '0 0 0 1px #cbd5e1',
+                                   zIndex: 1
+                                 }} />
+                                 {/* Timeline Time Text */}
+                                 <div style={{
+                                   position: 'absolute',
+                                   left: '-70px',
+                                   width: '45px',
+                                   textAlign: 'right',
+                                   top: 'calc(50% - 15px)',
+                                   display: 'flex',
+                                   flexDirection: 'column',
+                                   alignItems: 'flex-end',
+                                   lineHeight: '1.1'
+                                 }}>
+                                   <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1f1f1f' }}>
+                                     {timeInfo.start}
+                                   </span>
+                                   <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
+                                     {timeInfo.end}
+                                   </span>
+                                 </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ 
+                                      fontSize: '0.74rem', 
+                                      background: pp.is_pause ? '#fff9db' : '#f0f4f0', 
+                                      color: pp.is_pause ? '#b28600' : brandColor,
+                                      padding: '2px 8px', 
+                                      borderRadius: '6px', 
+                                      fontWeight: 700 
+                                    }}>
+                                      {timeInfo.start} - {timeInfo.end}
+                                    </span>
+                                    <strong style={{ fontSize: '0.84rem', color: hasConflict ? '#b3261e' : '#1f1f1f' }}>
+                                      {pp.name}
+                                    </strong>
+                                    {!pp.is_pause && (
+                                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginLeft: '6px' }}>
+                                        ({pp.duration} Min.)
+                                      </span>
+                                    )}
+                                    {!pp.is_pause && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedPoints(prev => ({ ...prev, [pp.id]: !prev[pp.id] }));
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          padding: '2px',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: '#64748b',
+                                          marginLeft: '6px'
+                                        }}
+                                      >
+                                        {expandedPoints[pp.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                      </button>
+                                    )}
                                   </div>
-                                )}
-
-                                {!pp.is_pause && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#86868b' }}>
-                                    {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
-                                    {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
-                                    {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                  <label style={{ fontSize: '0.6rem', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Min.</label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={pp.duration}
-                                    onChange={e => handleEditDuration(pp.id, parseInt(e.target.value, 10))}
-                                    style={{
-                                      width: '55px',
-                                      padding: '4px 6px',
-                                      borderRadius: '6px',
-                                      border: '1px solid rgba(0,0,0,0.08)',
-                                      fontSize: '0.76rem',
-                                      textAlign: 'center',
-                                      fontWeight: 600,
-                                      outline: 'none'
-                                    }}
-                                  />
+  
+                                  {hasConflict && (
+                                    <div style={{ fontSize: '0.74rem', color: '#b3261e', fontWeight: 700, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      ⚠️ {conflictReason}
+                                    </div>
+                                  )}
+  
+                                  {!pp.is_pause && expandedPoints[pp.id] && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#444746' }}>
+                                      {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                                      {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                                      {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                                    </div>
+                                  )}
                                 </div>
-
-                                {pp.is_pause && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
-                                      if (!error) {
-                                        setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
-                                      }
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#ff3b30',
-                                      fontSize: '1rem',
-                                      cursor: 'pointer',
-                                      padding: '4px',
-                                      display: 'flex',
-                                      alignItems: 'center'
-                                    }}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                )}
+  
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                    <label style={{ fontSize: '0.6rem', color: '#444746', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Min.</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={pp.duration}
+                                      onChange={e => handleEditDuration(pp.id, parseInt(e.target.value, 10))}
+                                      style={{
+                                        width: '55px',
+                                        padding: '4px 6px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #cbd5e1',
+                                        fontSize: '0.76rem',
+                                        textAlign: 'center',
+                                        fontWeight: 600,
+                                        outline: 'none'
+                                      }}
+                                    />
+                                  </div>
+  
+                                  {pp.is_pause && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        const { error } = await supabase.from('campus_event_program_points').delete().eq('id', pp.id);
+                                        if (!error) {
+                                          setProgramPoints(prev => prev.filter(p => p.id !== pp.id));
+                                        }
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ff3b30',
+                                        fontSize: '1rem',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                      }}
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -5056,12 +7045,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return (
         <div
           onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }}
+          className="google-dialog-overlay"
           style={{
             position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(245, 245, 247, 0.65)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
+            background: 'rgba(31, 31, 31, 0.4)',
             display: 'flex',
             zIndex: 9999,
             padding: 0,
@@ -5074,7 +7062,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#f5f5f7',
+              background: '#ffffff',
               width: '100vw',
               height: '100vh',
               display: 'flex',
@@ -5085,23 +7073,21 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           >
             {/* Elegant Header bar */}
             <div style={{
-              padding: '18px 32px',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-              background: 'rgba(255, 255, 255, 0.7)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              padding: '16px 32px',
+              borderBottom: '1px solid #e2e8f0',
+              background: '#ffffff',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
               <div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: brandColor }}>Verwaltung · Planungs-Modul</span>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1d1d1f', margin: '4px 0 0 0', letterSpacing: '-0.015em' }}>{(secretaryPlanningEvent || selectedEvent)?.title}</h2>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: brandColor }}>Verwaltung · Planungs-Modul</span>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#1f1f1f', margin: '4px 0 0 0', letterSpacing: '-0.01em' }}>{(secretaryPlanningEvent || selectedEvent)?.title}</h2>
               </div>
               <button 
                 onClick={() => { setSecretaryPlanningEvent(null); setSelectedEvent(null); }} 
                 style={{ 
-                  background: 'rgba(0,0,0,0.05)', 
+                  background: 'transparent', 
                   border: 'none', 
                   borderRadius: '50%', 
                   width: '36px', 
@@ -5112,10 +7098,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   justifyContent: 'center',
                   transition: 'background 0.2s'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
               >
-                <X size={18} color="#1d1d1f" />
+                <X size={20} color="#1f1f1f" />
               </button>
             </div>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 32px' }}>
@@ -5159,6 +7145,141 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
         .pulse-calendar {
           animation: calendarPulse 2s infinite ease-in-out;
+        }
+
+        /* Google UI / Material Design 3 Styling (White/Green Theme) */
+        .google-tab {
+          font-family: "Roboto", "Google Sans", -apple-system, sans-serif;
+          font-size: 0.88rem;
+          font-weight: 500;
+          color: #384a3c;
+          border: none;
+          background: transparent;
+          padding: 12px 16px;
+          cursor: pointer;
+          position: relative;
+          transition: color 0.15s, background-color 0.15s;
+          border-radius: 4px 4px 0 0;
+          outline: none;
+        }
+        .google-tab:hover {
+          background-color: ${brandColor}08;
+          color: ${brandColor};
+        }
+        .google-tab-active {
+          color: ${brandColor} !important;
+          font-weight: 600;
+        }
+        .google-tab-active::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 16px;
+          right: 16px;
+          height: 3px;
+          background-color: ${brandColor};
+          border-radius: 3px 3px 0 0;
+        }
+
+        .google-input {
+          width: 100%;
+          padding: 10px 14px 10px 36px;
+          border-radius: 8px;
+          border: 1.5px solid #d2ded5;
+          font-size: 0.86rem;
+          font-family: inherit;
+          color: #1a2a1e;
+          background: #ffffff;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .google-input-noicon {
+          padding-left: 14px !important;
+        }
+        .google-input:hover {
+          border-color: ${brandColor};
+        }
+        .google-input:focus {
+          border-color: ${brandColor};
+          box-shadow: 0 0 0 1px ${brandColor};
+        }
+
+        .google-chip {
+          border-radius: 8px;
+          border: 1.5px solid #d1ebd5;
+          background: #ffffff;
+          color: #385c3f;
+          padding: 5px 14px;
+          font-size: 0.74rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .google-chip:hover {
+          border-color: ${brandColor};
+          background: ${brandColor}0d;
+          color: ${brandColor};
+        }
+        .google-chip-selected {
+          font-weight: 800;
+        }
+
+        .google-card {
+          background: #ffffff;
+          border: 1px solid #d2ded5;
+          border-radius: 12px;
+          padding: 16px;
+          box-sizing: border-box;
+        }
+
+        .google-btn-filled {
+          background: ${brandColor};
+          color: #ffffff;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 100px;
+          font-weight: 700;
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: opacity 0.2s, box-shadow 0.15s;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 38px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .google-btn-filled:hover:not(:disabled) {
+          opacity: 0.9;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .google-btn-filled:disabled {
+          background: #e2eae4 !important;
+          color: #8c9e90 !important;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .google-btn-outlined {
+          border-radius: 100px;
+          border: 1px solid #d1ebd5;
+          background-color: transparent;
+          color: ${brandColor};
+          padding: 8px 16px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.15s, border-color 0.15s;
+        }
+        .google-btn-outlined:hover {
+          background-color: ${brandColor}0d;
+          border-color: ${brandColor};
         }
       `}} />
       

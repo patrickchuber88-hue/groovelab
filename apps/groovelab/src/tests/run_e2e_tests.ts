@@ -35,6 +35,7 @@ interface User {
   school_id: string;
   first_name: string;
   last_name: string;
+  is_master_admin?: boolean;
 }
 
 interface School {
@@ -93,6 +94,8 @@ interface ProgramPoint {
   status: 'submitted' | 'approved' | 'rejected';
   additional_feedback_responses: Record<string, any>;
   songs?: any[];
+  instrument?: string | null;
+  is_scheduled: boolean;
 }
 
 // In-Memory Mock Database
@@ -114,7 +117,8 @@ class MockDatabase {
       { id: 'student-1', role: 'student', school_id: 'school-1', first_name: 'Jane', last_name: 'Smith' },
       { id: 'student-2', role: 'student', school_id: 'school-1', first_name: 'Bob', last_name: 'Jones' },
       { id: 'admin-1', role: 'admin', school_id: 'school-1', first_name: 'Admin', last_name: 'User' },
-      { id: 'secretary-1', role: 'secretary', school_id: 'school-1', first_name: 'Sec', last_name: 'Retary' }
+      { id: 'secretary-1', role: 'secretary', school_id: 'school-1', first_name: 'Sec', last_name: 'Retary' },
+      { id: 'master-1', role: 'admin', school_id: 'school-1', first_name: 'Master', last_name: 'Admin', is_master_admin: true }
     ];
 
     this.schools = [
@@ -192,6 +196,9 @@ class MockDatabase {
       for (const filter of options.filters) {
         data = data.filter(item => {
           if (filter.col.includes('.')) return true;
+          if (filter.isIn) {
+            return filter.val.includes(item[filter.col]);
+          }
           return item[filter.col] === filter.val;
         });
       }
@@ -328,6 +335,10 @@ class MockDatabase {
                   throw { message: 'Cannot submit answers when there are no pending questions', code: '42501' };
                 }
               }
+              // Prevent teacher from modifying is_scheduled column
+              if (options.updateData.is_scheduled !== undefined && options.updateData.is_scheduled !== item.is_scheduled) {
+                throw { message: 'Unauthorized column modification', code: '42501' };
+              }
             }
           }
           Object.assign(item, options.updateData);
@@ -439,7 +450,9 @@ class MockDatabase {
             is_pause: row.is_pause || false,
             status,
             additional_feedback_responses: row.additional_feedback_responses || {},
-            songs: row.songs || []
+            songs: row.songs || [],
+            instrument: row.instrument || null,
+            is_scheduled: (user && user.role === 'teacher') ? false : (row.is_scheduled !== undefined ? row.is_scheduled : false)
           };
           this.campus_event_program_points.push(newRow);
           insertedRows.push(JSON.parse(JSON.stringify(newRow)));
@@ -475,7 +488,7 @@ class MockDatabase {
 class MockSupabaseQueryBuilder {
   private tableName: string;
   private db: MockDatabase;
-  private filters: { col: string; val: any }[] = [];
+  private filters: { col: string; val: any; isIn?: boolean }[] = [];
   private isSingle = false;
   private isDelete = false;
   private updateData: any = null;
@@ -511,6 +524,11 @@ class MockSupabaseQueryBuilder {
 
   eq(column: string, value: any) {
     this.filters.push({ col: column, val: value });
+    return this;
+  }
+
+  in(column: string, values: any[]) {
+    this.filters.push({ col: column, val: values, isIn: true });
     return this;
   }
 
@@ -590,6 +608,7 @@ async function main() {
       'student-2': '33333333-3333-3333-3333-333333333332',
       'admin-1': '44444444-4444-4444-4444-444444444441',
       'secretary-1': '44444444-4444-4444-4444-444444444442',
+      'master-1': '99999999-9999-9999-9999-999999999999',
       'event-1': '55555555-5555-5555-5555-555555555555',
       'lesson-1': '66666666-6666-6666-6666-666666666661',
       'lesson-2': '66666666-6666-6666-6666-666666666662',
@@ -661,7 +680,7 @@ async function main() {
           }
 
           let finalResponseText = translatedText;
-          if (init?.method === 'POST' || init?.method === 'PATCH') {
+          if (init?.method === 'POST') {
             try {
               const parsed = JSON.parse(translatedText);
               if (Array.isArray(parsed) && parsed.length === 1) {
@@ -699,10 +718,13 @@ async function main() {
       // Clear remote database for real-mode test isolation
       try {
         sessionStorage.setItem('groovelab_user_id', 'admin-1');
-        // Delete all events
-        await client.from('campus_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // Delete only test events to prevent wiping out user's real events
+        const delRes = await client.from('campus_events').delete().in('school_id', ['school-1', '11111111-1111-1111-1111-111111111111']);
+        if (delRes.error) {
+          console.warn(`[Cleanup] Delete events failed:`, delRes.error);
+        }
         // Re-seed event-1
-        await client.from('campus_events').insert({
+        const insRes = await client.from('campus_events').insert({
           id: 'event-1',
           school_id: 'school-1',
           title: 'Summer Festival 2026',
@@ -714,6 +736,9 @@ async function main() {
           is_public: true,
           visibility: 'all'
         });
+        if (insRes.error) {
+          console.warn(`[Cleanup] Insert event-1 failed:`, insRes.error);
+        }
       } catch (e) {
         console.warn('Test isolation cleanup failed:', e);
       }
