@@ -2865,104 +2865,71 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     document.body.removeChild(link);
   };
 
-  // Export Excel (.xls XML with Style Metadata in Apple style)
+  // Export Excel (styled HTML table format that opens natively in Excel/OpenOffice without JRE warnings)
   const handleExportExcel = () => {
     const activeEv = secretaryPlanningEvent || selectedEvent;
     if (!activeEv) return;
 
-    const rowsXML = programPoints.map((pp, idx) => {
+    const rowsHTML = programPoints.map((pp, idx) => {
       const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
       const songsFormatted = songsList.map((song: any) => `${song.title}${song.artist ? ` (${song.artist})` : ''}`).join('; ');
-      const style = idx % 2 === 0 ? 'RowEven' : 'RowOdd';
+      const bg = idx % 2 === 0 ? '#ffffff' : '#fbfbfc';
+      const statusText = pp.status === 'approved' ? 'Bestätigt' : 'Ausstehend';
+      const statusColor = pp.status === 'approved' ? '#34c759' : '#ff9500';
+
       return `
-   <Row ss:Height="22">
-    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.name || '')}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.ensemble_band || '')}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(songsFormatted)}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="Number">${pp.duration || 0}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="Number">${pp.stage_number || 1}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.status === 'approved' ? 'Bestätigt' : 'Ausstehend')}</Data></Cell>
-    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.remarks || '')}</Data></Cell>
-   </Row>`;
+        <tr style="background-color: ${bg}; height: 30px;">
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; vertical-align: middle;">${escapeXmlForExcel(pp.name || '')}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; vertical-align: middle;">${escapeXmlForExcel(pp.ensemble_band || '')}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; vertical-align: middle;">${escapeXmlForExcel(songsFormatted)}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; text-align: right; vertical-align: middle;">${pp.duration || 0}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; text-align: center; vertical-align: middle;">${pp.stage_number || 1}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: ${statusColor}; font-weight: 600; text-align: center; vertical-align: middle;">${statusText}</td>
+          <td style="border: 1px solid #e3e3e8; padding: 6px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1d1d1f; vertical-align: middle;">${escapeXmlForExcel(pp.remarks || '')}</td>
+        </tr>`;
     }).join('');
 
-    const excelContent = `<?xml version="1.0"?>
-<?mso-application myprog="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:binoculars"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
- <Styles>
-  <Style ss:ID="Default" ss:Name="Normal">
-   <Alignment ss:Vertical="Center"/>
-   <Borders/>
-   <Font ss:FontName="-apple-system, Segoe UI" x:CharSet="1" x:Family="Swiss" ss:Size="10" ss:Color="#1d1d1f"/>
-   <Interior/>
-   <NumberFormat/>
-   <Protection/>
-  </Style>
-  <Style ss:ID="Title">
-   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
-   <Font ss:FontName="-apple-system, Segoe UI" ss:Size="15" ss:Bold="1" ss:Color="#1d1d1f"/>
-  </Style>
-  <Style ss:ID="Header">
-   <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
-   <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
-   </Borders>
-   <Font ss:FontName="-apple-system, Segoe UI" ss:Size="10" ss:Color="#1d1d1f" ss:Bold="1"/>
-   <Interior ss:Color="#f5f5f7" ss:Pattern="Solid"/>
-  </Style>
-  <Style ss:ID="RowEven">
-   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-   <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-   </Borders>
-   <Interior ss:Color="#ffffff" ss:Pattern="Solid"/>
-  </Style>
-  <Style ss:ID="RowOdd">
-   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-   <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
-   </Borders>
-   <Interior ss:Color="#fbfbfc" ss:Pattern="Solid"/>
-  </Style>
- </Styles>
- <Worksheet ss:Name="Programmablauf">
-  <Table>
-   <Column ss:Width="150"/>
-   <Column ss:Width="150"/>
-   <Column ss:Width="210"/>
-   <Column ss:Width="75"/>
-   <Column ss:Width="60"/>
-   <Column ss:Width="85"/>
-   <Column ss:Width="220"/>
-   <Row ss:Height="30">
-    <Cell ss:StyleID="Title" ss:MergeAcross="6"><Data ss:Type="String">${escapeXmlForExcel(activeEv.title)} - Programmliste</Data></Cell>
-   </Row>
-   <Row ss:Height="24">
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Beitrag / Schüler</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Ensemble / Band</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Repertoire</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Dauer (Min)</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Bühne</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Status</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">Spezielle Wünsche / Notizen</Data></Cell>
-   </Row>
-   ${rowsXML}
-  </Table>
- </Worksheet>
-</Workbook>`;
+    const excelContent = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<!--[if gte mso 9]>
+<xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>Programmablauf</x:Name>
+    <x:WorksheetOptions>
+     <x:DisplayGridlines/>
+    </x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  table { border-collapse: collapse; }
+  th { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; font-weight: bold; }
+  td { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; }
+</style>
+</head>
+<body>
+  <table style="border: 1px solid #cbd5e1; border-collapse: collapse;">
+    <tr style="height: 40px;">
+      <th colspan="7" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: bold; text-align: left; padding: 10px; color: #1d1d1f; border-bottom: 2px solid #cbd5e1;">${escapeXmlForExcel(activeEv.title)} - Programmliste</th>
+    </tr>
+    <tr style="background-color: #f5f5f7; height: 32px;">
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; color: #1d1d1f; width: 180px;">Beitrag / Schüler</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; color: #1d1d1f; width: 180px;">Ensemble / Band</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; color: #1d1d1f; width: 250px;">Repertoire</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; color: #1d1d1f; width: 80px;">Dauer (Min)</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: center; color: #1d1d1f; width: 70px;">Bühne</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: center; color: #1d1d1f; width: 100px;">Status</th>
+      <th style="border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; color: #1d1d1f; width: 250px;">Spezielle Wünsche / Notizen</th>
+    </tr>
+    ${rowsHTML}
+  </table>
+</body>
+</html>`;
 
     const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
