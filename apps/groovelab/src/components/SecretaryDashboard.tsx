@@ -23737,25 +23737,46 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     {/* Bank Details Block */}
                     <div style={{ 
                       marginTop: '12px', 
-                      padding: '12px 16px', 
+                      padding: '16px', 
                       background: '#f8fafc', 
-                      borderRadius: '12px', 
+                      borderRadius: '16px', 
                       border: '1px solid #cbd5e1', 
-                      fontSize: '0.7rem', 
+                      fontSize: '0.74rem', 
                       color: '#475569', 
                       width: '100%', 
                       display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '4px',
+                      gap: '20px',
+                      alignItems: 'center',
                       textAlign: 'left'
                     }}>
-                      <strong style={{ color: '#0f172a' }}>Zahlungshinweis:</strong>
-                      <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto:</span>
-                      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', marginTop: '4px', gap: '6px' }}>
-                        <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
-                        <strong>IBAN:</strong> <span>{operatorIban}</span>
-                        <strong>BIC:</strong> <span>{operatorBic}</span>
-                        <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{selectedInvoice.id}</strong>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
+                        <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
+                          <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
+                          <strong>IBAN:</strong> <span>{operatorIban}</span>
+                          <strong>BIC:</strong> <span>{operatorBic}</span>
+                          <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{selectedInvoice.id}</strong>
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#ffffff',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        flexShrink: 0
+                      }}>
+                        <QRCode 
+                          value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${selectedInvoice.amount.toFixed(2)}\n\n\n${selectedInvoice.id}\n`} 
+                          size={96} 
+                        />
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Girocode scannen
+                        </span>
                       </div>
                     </div>
                   </div>
