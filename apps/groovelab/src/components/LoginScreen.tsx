@@ -1655,12 +1655,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           id: result.student_id
         });
 
-        if (isAlreadyDone) {
-          // Skip email collection step since they are already onboarded/registered
-          setParentOnboardingStep('preferences');
-        } else {
-          setParentOnboardingStep('email');
-        }
+        setParentOnboardingStep('preferences');
       } else {
         setParentOnboardingError(result?.message || 'Eingabe überprüfen.');
       }
@@ -1788,6 +1783,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setParentOnboardingError(null);
 
     try {
+      if (!isAlreadyOnboarded) {
+        const { error: completeErr } = await supabase.rpc('complete_onboarding', {
+          input_student_id: verifiedStudentId,
+          input_email: ''
+        });
+        if (completeErr) throw completeErr;
+      }
+
       const { data, error } = await supabase.rpc('save_schedule_preferences', {
         input_student_id: verifiedStudentId,
         slots: slotsArray
@@ -3455,9 +3458,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 850, background: '#f1f5f9', color: '#475569', padding: '5px 12px', borderRadius: '100px', fontFamily: 'Urbanist' }}>
-            {parentOnboardingStep === 'verify' && 'Schritt 1 von 4'}
-            {parentOnboardingStep === 'email' && 'Schritt 2 von 4'}
-            {parentOnboardingStep === 'preferences' && 'Schritt 3 von 4'}
+            {parentOnboardingStep === 'verify' && 'Schritt 1 von 3'}
+            {parentOnboardingStep === 'preferences' && 'Schritt 2 von 3'}
             {parentOnboardingStep === 'success' && 'Fertig! 🎉'}
           </span>
         </div>
@@ -3574,88 +3576,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </form>
         )}
 
-        {parentOnboardingStep === 'email' && (
-          <form onSubmit={(e) => handleParentEmailSubmission(e)} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
-            <div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#10b981', background: '#ecfdf5', padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Erfolgreich gefunden</span>
-              <h3 style={{ margin: '8px 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
-                Kontaktdaten für Updates
-              </h3>
-              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
-                Bitte gib deine E-Mail-Adresse an. Damit bleibst du immer informiert und kannst den Stundenplan abrufen.
-              </p>
-            </div>
 
-            <div style={{ fontSize: '12.5px', color: '#0f172a', lineHeight: '1.5', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 900, color: '#059669', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                ✨ Deine Vorteile mit E-Mail-Adresse:
-              </div>
-              <ul style={{ margin: 0, paddingLeft: '18px', color: '#334155', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <li>
-                  📅 <strong>Kalender-Abgleich:</strong> Unterrichtstermine direkt im Handy-Kalender.
-                </li>
-                <li>
-                  🔔 <strong>Ausfall-Schutz:</strong> Automatische Echtzeit-Infos bei Unterrichtsausfällen.
-                </li>
-                <li>
-                  🔒 <strong>Einfacher Login:</strong> Bequemer Zugriff ohne Passwort über einen Magic Link.
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>E-Mail-Adresse der Eltern (Optional)</label>
-              <input
-                type="email"
-                value={parentEmail}
-                onChange={(e) => setParentEmail(e.target.value)}
-                placeholder="eltern@beispiel.de"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700 }}
-              />
-              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
-                🔒 <strong>Datenschutz:</strong> Deine E-Mail wird beim Speichern sofort zerlegt und verschlüsselt abgelegt.
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-              <button
-                type="submit"
-                disabled={parentOnboardingLoading}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#10b981',
-                  color: '#ffffff',
-                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
-                }}
-              >
-                {parentOnboardingLoading ? 'Speichere...' : 'E-Mail speichern & weiter'}
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => handleParentEmailSubmission(e, true)}
-                disabled={parentOnboardingLoading}
-                style={{
-                  width: '100%', padding: '12px', borderRadius: '16px', border: '1.5px dashed #cbd5e1',
-                  background: 'none',
-                  color: '#475569',
-                  fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                }}
-              >
-                Ohne E-Mail-Adresse fortfahren
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setParentOnboardingStep('verify')}
-              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center' }}
-            >
-              Zurück
-            </button>
-          </form>
-        )}
 
         {parentOnboardingStep === 'preferences' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
