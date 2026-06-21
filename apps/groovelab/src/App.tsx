@@ -11984,50 +11984,47 @@ function App() {
               gap: '16px',
               textAlign: 'left'
             }}>
-              {school?.opening_hours?.impressum ? (
-                <div style={{ whiteSpace: 'pre-wrap' }}>
-                  {school.opening_hours.impressum}
-                </div>
-              ) : (
-                <>
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Anbieter der Plattform & technischer Dienstleister</h4>
+                <p style={{ margin: 0 }}>
+                  Manuel Wagner<br/>
+                  Friedrichstr. 33<br/>
+                  79713 Bad Säckingen
+                </p>
+                <p style={{ margin: '6px 0 0 0' }}>
+                  Telefon: 07761 – 2416<br/>
+                  E-Mail: <a href="mailto:info@musaek.de" style={{ color: '#eab308', textDecoration: 'underline' }}>info@musaek.de</a>
+                </p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Vertragspartner & inhaltlich Verantwortlicher</h4>
+                {school?.opening_hours?.impressum ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {school.opening_hours.impressum}
+                  </div>
+                ) : (
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Angaben gemäß § 5 TMG / DDG</h4>
                     <p style={{ margin: 0 }}>
-                      Manuel Wagner<br/>
-                      Friedrichstr. 33<br/>
-                      79713 Bad Säckingen
+                      <strong>{school?.name || 'Die jeweilige Musikschule'}</strong><br/>
+                      {school?.street && <>{school.street}<br/></>}
+                      {school?.zip_code || ''} {school?.city || ''}
                     </p>
                   </div>
+                )}
+              </div>
 
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Kontakt</h4>
-                    <p style={{ margin: 0 }}>
-                      Mo-Fr: 08-15 Uhr<br/>
-                      Telefon: 07761 – 2416<br/>
-                      E-Mail: info@musaek.de
-                    </p>
-                  </div>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
+                <strong>Hinweis zur Verantwortung:</strong> Für die konkreten Lehrinhalte, Stundenplanungen, die Durchführung des Unterrichts sowie die Erhebung und Verarbeitung personenbezogener Schülerdaten innerhalb dieses Schul-Mandanten ist ausschließlich die oben genannte Musikschule als Ihr direkter Vertragspartner verantwortlich.
+              </div>
 
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung</h4>
-                    <p style={{ margin: 0 }}>
-                      Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
-                      Unsere E-Mail-Adresse finden Sie oben im Impressum.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Verbraucherstreitbeilegung / Universalschlichtungsstelle</h4>
-                    <p style={{ margin: 0 }}>
-                      Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
-                    </p>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
-                    Hinweis: Für die konkreten Lehrinhalte, Stundenplanungen und personenbezogenen Daten der Schüler innerhalb der einzelnen Schul-Mandanten ist die jeweilige Musikschule als Vertragspartner der Schüler verantwortlich.
-                  </div>
-                </>
-              )}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung / Verbraucherstreitbeilegung</h4>
+                <p style={{ margin: 0, fontSize: '12px' }}>
+                  Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
+                  Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                </p>
+              </div>
             </div>
           </div>
         </div>
