@@ -3046,13 +3046,13 @@ function App() {
           ? supabase.from('bands').select(`
               *,
               songs (*),
-              band_members (*, users(*)),
+              band_members (*, users(id, first_name, last_name, photo_url, role)),
               band_songs (*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))),
               coach:users!coach_id (first_name, last_name, photo_url)
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(*)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
-        supabase.from('users').select('*').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
+        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
@@ -4428,20 +4428,23 @@ function App() {
     
     const sId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
     
-    const { error } = await supabase
+    // Optimistic UI: Show success toast immediately
+    setToastMessage({ text: 'Hilfe wurde angefordert. Der Lehrer sieht deinen Tisch im Dashboard.', type: 'success' });
+    
+    // Perform insert in background
+    supabase
       .from('help_requests')
       .insert({
         user_id: loggedInUserId,
         station_id: session.station_id,
         school_id: sId,
         status: 'pending'
+      })
+      .then(({ error }) => {
+        if (error) {
+          setToastMessage({ text: 'Fehler beim Senden: ' + error.message, type: 'error' });
+        }
       });
-      
-    if (error) {
-      setToastMessage({ text: 'Fehler beim Senden: ' + error.message, type: 'error' });
-    } else {
-      setToastMessage({ text: 'Hilfe wurde angefordert. Der Lehrer sieht deinen Tisch im Dashboard.', type: 'success' });
-    }
   };
 
   const updateProgress = async (skillId: string, newProgress: number, meta?: { songId: string, instrument: string, difficulty: string, partNumber?: number }) => {
@@ -5229,17 +5232,19 @@ function App() {
 
     try {
       if (loggedInUserId) {
-        // Mark user as offline IMMEDIATELY for dashboard
+        // Mark user as offline in background
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
-        await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
+        supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId)
+          .then(({ error }) => { if (error) console.error('Error updating last_seen on logout:', error); });
       }
 
       if (updateDb && currentSession?.id) {
-        // Session beenden in DB
-        await supabase
+        // Session beenden in background
+        supabase
           .from('sessions')
           .update({ check_out_time: new Date().toISOString() })
-          .eq('id', currentSession.id);
+          .eq('id', currentSession.id)
+          .then(({ error }) => { if (error) console.error('Error ending session on logout:', error); });
       }
     } catch (err) {
       console.error('Logout error:', err);
@@ -10697,7 +10702,7 @@ function App() {
                                           if (showTeacherVocalPicker === bandSong.id) {
                                             setShowTeacherVocalPicker(null);
                                           } else {
-                                            const { data } = await supabase.from('users').select('*').eq('is_external_vocalist', true).eq('school_id', user.school_id);
+                                            const { data } = await supabase.from('users').select('id, first_name, last_name, avatar_url, photo_url').eq('is_external_vocalist', true).eq('school_id', user.school_id);
                                             setExternalVocalists(data || []);
                                             setShowTeacherVocalPicker(bandSong.id);
                                           }

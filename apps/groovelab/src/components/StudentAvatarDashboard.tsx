@@ -1229,6 +1229,11 @@ function MobileBriefingView({
   );
 }
 
+const sanitizeTextInput = (val: string | null | undefined): string => {
+  if (!val) return '';
+  return val.replace(/<[^>]*>/g, '').trim();
+};
+
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
@@ -2351,6 +2356,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     preStartCountdownRef.current = preStartCountdown;
   }, [preStartCountdown]);
 
+  // Load saved focus session on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('groovelab_active_practice_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Only restore if session was saved within the last 4 hours
+        const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000;
+        if (parsed.timestamp > fourHoursAgo) {
+          setSecondsElapsed(parsed.secondsElapsed || 0);
+          if (parsed.selectedTopic) {
+            setSelectedTopic(parsed.selectedTopic);
+          }
+          if (parsed.sessionActive) {
+            setSessionActive(true);
+            setIsPhoneFlat(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore practice session', e);
+    }
+  }, []);
+
+  // Save focus session progress dynamically
+  useEffect(() => {
+    if (sessionActive && secondsElapsed > 0) {
+      localStorage.setItem('groovelab_active_practice_session', JSON.stringify({
+        secondsElapsed,
+        selectedTopic,
+        sessionActive,
+        timestamp: Date.now()
+      }));
+    } else if (!sessionActive) {
+      localStorage.removeItem('groovelab_active_practice_session');
+    }
+  }, [secondsElapsed, sessionActive, selectedTopic]);
+
   // Countdown timer effect for pre-start instructions
   useEffect(() => {
     if (preStartCountdown === null) return;
@@ -2834,6 +2877,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     };
   }, [songs, progressItems]);
   const [songSearch, setSongSearch] = useState('');
+  const [songSearchDebounced, setSongSearchDebounced] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSongSearchDebounced(songSearch);
+    }, 250);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [songSearch]);
+
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
     try {
@@ -3545,13 +3599,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (!editingProfile) return;
     setSavingProfile(true);
     try {
+      const cleanFirstName = sanitizeTextInput(editingProfile.first_name);
+      const cleanLastName = sanitizeTextInput(editingProfile.last_name);
+      const cleanPhone = sanitizeTextInput(editingProfile.phone);
+      const cleanInstrument = sanitizeTextInput(editingProfile.instrument);
+      const cleanEmail = sanitizeTextInput(editingProfile.email);
+      const cleanParentEmail = sanitizeTextInput(editingProfile.parent_email);
+
       const { error } = await supabase
         .from('users')
         .update({
-          first_name: editingProfile.first_name,
-          last_name: editingProfile.last_name,
-          phone: editingProfile.phone,
-          instrument: editingProfile.instrument,
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
+          phone: cleanPhone,
+          instrument: cleanInstrument,
           photo_url: editingProfile.photo_url
         })
         .eq('id', studentId);
@@ -3561,23 +3622,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       // Update encrypted emails via RPC
       const { error: emailError } = await supabase.rpc('update_student_emails', {
         student_id_param: studentId,
-        input_student_email: editingProfile.email || null,
-        input_parent_email: editingProfile.parent_email || null
+        input_student_email: cleanEmail || null,
+        input_parent_email: cleanParentEmail || null
       });
       if (emailError) throw emailError;
       
       // Update local state
-      setStudentUser((prev: any) => prev ? { ...prev, ...editingProfile } : null);
+      const updatedProfile = {
+        ...editingProfile,
+        first_name: cleanFirstName,
+        last_name: cleanLastName,
+        phone: cleanPhone,
+        instrument: cleanInstrument,
+        email: cleanEmail,
+        parent_email: cleanParentEmail
+      };
+      setStudentUser((prev: any) => prev ? { ...prev, ...updatedProfile } : null);
       
       // Call parent update if exists
       if (onProfileUpdate) {
         onProfileUpdate({
-          first_name: editingProfile.first_name,
-          last_name: editingProfile.last_name,
-          email: editingProfile.email,
-          parent_email: editingProfile.parent_email,
-          phone: editingProfile.phone,
-          instrument: editingProfile.instrument,
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
+          email: cleanEmail,
+          parent_email: cleanParentEmail,
+          phone: cleanPhone,
+          instrument: cleanInstrument,
           photo_url: editingProfile.photo_url
         });
       }
@@ -6583,9 +6653,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   };
                   
                   const filteredSongs = songs.filter(song => {
-                    const matchesSearch = songSearch === '' || 
-                      song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
-                      song.artist?.toLowerCase().includes(songSearch.toLowerCase());
+                    const matchesSearch = songSearchDebounced === '' || 
+                      song.title?.toLowerCase().includes(songSearchDebounced.toLowerCase()) || 
+                      song.artist?.toLowerCase().includes(songSearchDebounced.toLowerCase());
                     const isAssigned = progressItems.some(item => 
                       item.topic_name.toLowerCase() === song.title.toLowerCase() ||
                       item.topic_name.toLowerCase().includes(song.title.toLowerCase())
@@ -6600,9 +6670,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   });
 
                   const filteredLehrwerke = lehrwerke.filter(item => {
-                    const matchesSearch = songSearch === '' || 
-                      item.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
-                      item.author?.toLowerCase().includes(songSearch.toLowerCase());
+                    const matchesSearch = songSearchDebounced === '' || 
+                      item.title?.toLowerCase().includes(songSearchDebounced.toLowerCase()) || 
+                      item.author?.toLowerCase().includes(songSearchDebounced.toLowerCase());
                     const isAssigned = localProgress.some((p: any) => p.studentId === studentId && p.lehrwerkId === item.id);
                     return matchesSearch && isAssigned;
                   });
@@ -7577,7 +7647,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             {/* LEFT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {/* TOP 4 KPIs ROW - SLEEK GAMIFIED TILES */}
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${[xpActive, true, flamesActive, flamesActive].filter(Boolean).length}, 1fr)`, gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                 
                 {/* KPI 1: XP */}
                 {xpActive && (
@@ -10104,7 +10174,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   alignItems: 'center',
                                   justifyContent: 'center'
                                 }}>
-                                  <img src={avatarItem.url} style={{ width: '90%', height: '90%', objectFit: 'contain' }} alt={avatarItem.label} />
+                                  <img src={avatarItem.url} style={{ width: '90%', height: '90%', objectFit: 'contain' }} alt={avatarItem.label} loading="lazy" />
                                 </div>
                                 <span style={{ 
                                   fontSize: '0.62rem', 
@@ -10329,6 +10399,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               </div>
             )}
+            
+            {/* Section 3: System zurücksetzen / Cache löschen */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px', marginTop: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
+                Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten und gespeicherten Sessions zurücksetzen. Deine Spieldaten in der Datenbank bleiben erhalten.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
+                    localStorage.removeItem('groovelab_active_practice_session');
+                    localStorage.removeItem('student_lehrwerke_progress');
+                    window.location.reload();
+                  }
+                }}
+                style={{
+                  background: '#fee2e2',
+                  color: '#ef4444',
+                  border: '1px solid #fca5a5',
+                  padding: '12px 20px',
+                  borderRadius: '14px',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <RotateCcw size={14} /> Lokalen Cache leeren
+              </button>
+            </div>
           </div>
         </div>
       )}
