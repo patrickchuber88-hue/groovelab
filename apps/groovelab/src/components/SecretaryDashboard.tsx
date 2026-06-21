@@ -18533,7 +18533,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                               {checkoutStep >= 2 && billingPayer === 'school' && studentBillingOption === 'option2' && activeStudentsCount_global > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
-                                  <span>Schüler-Umlage ({activeStudentsCount_global} aktiv):</span>
+                                  <span>Schüler-Aktivierung ({activeStudentsCount_global} aktiv):</span>
                                   <strong style={{ fontWeight: 800 }}>{(activeStudentsCount_global * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
@@ -19035,7 +19035,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                             {studentLevyMonthlySim > 0 && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#4f46e5' }}>
-                                                <span>Schüler-Umlage ({activeStudents} aktiv):</span>
+                                                <span>Schüler-Aktivierung ({activeStudents} aktiv):</span>
                                                 <strong style={{ fontWeight: 800 }}>{studentLevyMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                               </div>
                                             )}
@@ -19046,7 +19046,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             </div>
                                             {billingPayer === 'school' && studentBillingOption === 'option2' && activeStudents > 0 && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
-                                                <span>Schüler-Umlage ({activeStudents} aktiv):</span>
+                                                <span>Schüler-Aktivierung ({activeStudents} aktiv):</span>
                                                 <strong style={{ fontWeight: 800 }}>{(activeStudents * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                               </div>
                                             )}
