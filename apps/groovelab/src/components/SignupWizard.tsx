@@ -161,7 +161,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               is_campus_active: true,
               is_groovelab_active: true,
               is_active: true,
-              roles: ['admin', 'teacher']
+              roles: ['admin']
             });
 
           if (userErr) throw userErr;
