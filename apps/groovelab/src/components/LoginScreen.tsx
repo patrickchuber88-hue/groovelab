@@ -1929,8 +1929,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         query = query.eq('ausweis_nummer', cleanPin.toUpperCase());
       }
 
-      const { data: user, error: userErr } = await query.maybeSingle();
+      let { data: user, error: userErr } = await query.maybeSingle();
       sessionStorage.removeItem('groovelab_qr_token');
+
+      // Fallback for custom admin passwords/PINs stored in ausweis_nummer
+      if (!user) {
+        const { data: fallbackUser } = await supabase
+          .from('users')
+          .select('*, schools(*)')
+          .eq('ausweis_nummer', cleanPin)
+          .maybeSingle();
+        if (fallbackUser) {
+          user = fallbackUser;
+          userErr = null;
+        }
+      }
 
       if (userErr || !user) {
         throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');

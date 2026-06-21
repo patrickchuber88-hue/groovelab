@@ -154,17 +154,11 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
     displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'campus') {
     if (targetUser) {
-      if (role === 'student') {
-        if (targetUser.photo_url && !targetUser.photo_url.includes('_avatar') && !targetUser.photo_url.includes('/avatars/')) {
+      if (role === 'student' || role === 'teacher') {
+        if (targetUser.photo_url && targetUser.photo_url !== '/avatar_ghost.jpg') {
           displaySrc = targetUser.photo_url;
         } else {
-          displaySrc = '/avatar_ghost.jpg';
-        }
-      } else if (role === 'teacher') {
-        if (targetUser.photo_url && !targetUser.photo_url.includes('_avatar') && !targetUser.photo_url.includes('/avatars/')) {
-          displaySrc = targetUser.photo_url;
-        } else {
-          displaySrc = '/avatar_ghost.jpg';
+          displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
         }
       }
     } else {
@@ -1591,40 +1585,7 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  if (isSignup) {
-    return (
-      <SignupWizard 
-        onBackToLogin={() => {
-          window.history.pushState({}, '', '/');
-          setIsSignup(false);
-        }} 
-        onSignupSuccess={(uid) => {
-          window.history.pushState({}, '', '/');
-          setIsSignup(false);
-          setLoggedInUserId(uid);
-        }}
-      />
-    );
-  }
-
-  // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
   const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
-  if (qrPathMatch) {
-    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
-    const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
-
-    if (isStandalone && currentUserId) {
-      // User is logged in via PWA standalone app.
-      // Redirect the QR link to the external browser (Safari/Chrome) and auto-pair it
-      const externalUrl = `${window.location.origin}/qr/${qrPathMatch[1]}?auto_pair=true`;
-      window.open(externalUrl, '_blank');
-      
-      // Clean up the URL in the PWA so it returns to the dashboard
-      window.history.replaceState({}, '', '/');
-    } else {
-      return <QRLandingPage token={qrPathMatch[1]} />;
-    }
-  }
 
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -2972,12 +2933,6 @@ function App() {
       }
 
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
-      // If a student is in GrooveLab (Lab) mode, they MUST have an active checked-in session in the database.
-      // If there is no active session (sessionRes.data is null), they have bypassed the scanner or were checked out.
-      // If this is a Kiosk device, we immediately force logout and wipe their tab state.
-      // Additionally, if the active session's station_id in the database does not match the kiosk's current station_id,
-      // it means the student has checked in at a different iPad station, so this station must log them out.
-      // On personal devices, we remain logged in so the check-in frosted glass overlay can be shown.
       const isStudent = userData.role?.toLowerCase() === 'student';
       if (isStudent && locationMode === 'lab') {
         const storedStationId = localStorage.getItem('groovelab_station_id');
@@ -3003,7 +2958,6 @@ function App() {
       } else if (!userData.is_campus_active && userData.is_groovelab_active) {
         allowedPlatform = 'groovelab';
       } else {
-        // Both active or both inactive, respect the stored platform, otherwise default to campus
         const storedPlat = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
         allowedPlatform = storedPlat || 'campus';
       }
@@ -3043,18 +2997,22 @@ function App() {
         setIsSchoolPaused(false);
       }
 
-      // Bypass heavy Stage 2 queries for staff (teacher/admin/secretary) since they use AdminDashboard/SecretaryDashboard
-      // which fetch their own data, so these queries are duplicate and completely wasted.
+      // ─── INSTANT UI UNBLOCK FOR STUDENTS ───
+      // We set the user and session immediately so the dashboard mounts.
+      // The heavier details (Stage 2) load in the background, updating the view reactively.
+      setUser(userData);
+      setSession(sessionRes.data);
+      if (isInitial) {
+        setLoading(false); 
+      }
+
+      // Bypass heavy Stage 2 queries for staff (teacher/admin/secretary)
       const isStaff = userData.role?.toLowerCase() === 'teacher' || 
                       userData.role?.toLowerCase() === 'admin' || 
                       userData.role?.toLowerCase() === 'secretary';
 
       if (isStaff) {
         console.log('[Dashboard] Staff user detected. Bypassing heavy Stage 2 student queries for instant load.');
-        setUser(userData);
-        setSession(sessionRes.data);
-        
-        // Align locationMode for teachers
         if (sessionRes.data) {
           setLocationMode('lab');
           sessionStorage.setItem('groovelab_location_mode', 'lab');
@@ -3062,13 +3020,9 @@ function App() {
           setLocationMode('home');
           sessionStorage.setItem('groovelab_location_mode', 'home');
         }
-        
-        // Fetch active student count in background (non-blocking)
         if (schoolId) {
           fetchActiveStudentCount(schoolId).catch(err => console.error('Error fetching student count:', err));
         }
-        
-        setLoading(false);
         return;
       }
 
@@ -5707,6 +5661,41 @@ function App() {
         <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
         <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Kiosk wird gestartet…</div>
       </div>
+    );
+  }
+
+  // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
+  if (qrPathMatch) {
+    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
+    const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+
+    if (isStandalone && currentUserId) {
+      // User is logged in via PWA standalone app.
+      // Redirect the QR link to the external browser (Safari/Chrome) and auto-pair it
+      const externalUrl = `${window.location.origin}/qr/${qrPathMatch[1]}?auto_pair=true`;
+      window.open(externalUrl, '_blank');
+      
+      // Clean up the URL in the PWA so it returns to the dashboard
+      window.history.replaceState({}, '', '/');
+    } else {
+      return <QRLandingPage token={qrPathMatch[1]} />;
+    }
+  }
+
+  // 1. SIGNUP WIZARD
+  if (isSignup) {
+    return (
+      <SignupWizard 
+        onBackToLogin={() => {
+          window.history.pushState({}, '', '/');
+          setIsSignup(false);
+        }} 
+        onSignupSuccess={(uid) => {
+          window.history.pushState({}, '', '/');
+          setIsSignup(false);
+          setLoggedInUserId(uid);
+        }}
+      />
     );
   }
 

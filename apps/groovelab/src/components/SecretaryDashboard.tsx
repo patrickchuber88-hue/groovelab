@@ -19115,17 +19115,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
                                             </div>
 
-                                            {hasCampusSub && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                <span>Server &amp; Service Gebühren Campus:</span>
-                                                <strong>7,99 € / Mo.</strong>
-                                              </div>
-                                            )}
-                                            {hasGroovelabSub && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                <span>Server &amp; Service Gebühren Groovelab:</span>
-                                                <strong>4,99 € / Mo.</strong>
-                                              </div>
+                                            {hasCampusSub && hasGroovelabSub ? (
+                                              <>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Server &amp; Service Gebühren Campus:</span>
+                                                  <strong>7,99 € / Mo.</strong>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Server &amp; Service Gebühren Groovelab:</span>
+                                                  <strong>4,99 € / Mo.</strong>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: 'bold' }}>
+                                                  <span>Kombi-Rabatt (Campus + Groovelab):</span>
+                                                  <strong>-2,99 € / Mo.</strong>
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <>
+                                                {hasCampusSub && (
+                                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                    <span>Server &amp; Service Gebühren Campus:</span>
+                                                    <strong>7,99 € / Mo.</strong>
+                                                  </div>
+                                                )}
+                                                {hasGroovelabSub && (
+                                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                    <span>Server &amp; Service Gebühren Groovelab:</span>
+                                                    <strong>4,99 € / Mo.</strong>
+                                                  </div>
+                                                )}
+                                              </>
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>

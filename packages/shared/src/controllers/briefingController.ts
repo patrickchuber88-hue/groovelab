@@ -479,7 +479,7 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
     const authHeader = req.headers.authorization;
     let userId = (req.query.userId || req.body.userId) as string;
 
-    if (authHeader) {
+    if (!userId && authHeader) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user } } = await supabase.auth.getUser(token);
       if (user) {
@@ -492,55 +492,57 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
       return;
     }
 
-    // Fetch student profile
-    const { data: student, error: studentErr } = await supabase
-      .from('users')
-      .select('id, school_id, first_name, last_name, role, is_premium_user')
-      .eq('id', userId)
-      .single();
+    const rawDay = new Date().getDay();
+    const todayWeekday = rawDay === 0 ? 7 : rawDay;
 
-    if (studentErr || !student || student.role !== 'student') {
+    // Run user query, avatar query, and today's schedule query in parallel
+    const [studentRes, avatarRes, scheduleRes] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, school_id, first_name, last_name, role, is_premium_user')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('avatars')
+        .select('evolution_level, xp, avatar_style, instrument_type, streak_flame')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('schedules')
+        .select(`
+          time_slot,
+          rooms (name),
+          teacher:users!schedules_teacher_id_fkey (first_name, last_name)
+        `)
+        .eq('student_id', userId)
+        .eq('day_of_week', todayWeekday)
+        .maybeSingle()
+    ]);
+
+    if (studentRes.error || !studentRes.data || studentRes.data.role !== 'student') {
       res.status(404).json({ error: 'Student profile not found or role is incorrect.' });
       return;
     }
 
-    const schoolId = student.school_id;
-    const allowMessages = await checkAllowMessagesGlobal(schoolId);
+    const student = studentRes.data;
+    const avatarRecord = avatarRes.data;
+    const todaySchedules = scheduleRes.data;
 
-    // Get today's lesson details
-    const rawDay = new Date().getDay();
-    const todayWeekday = rawDay === 0 ? 7 : rawDay;
-
-    const { data: todaySchedules, error: scheduleErr } = await supabase
-      .from('schedules')
-      .select(`
-        time_slot,
-        rooms (name),
-        teacher:users!schedules_teacher_id_fkey (first_name, last_name)
-      `)
-      .eq('student_id', userId)
-      .eq('day_of_week', todayWeekday)
-      .maybeSingle();
+    // Query messaging policy (depends on school_id)
+    const allowMessages = await checkAllowMessagesGlobal(student.school_id);
 
     let todayLesson = null;
     if (todaySchedules) {
       const teacherName = todaySchedules.teacher 
-        ? `Herr/Frau ${todaySchedules.teacher.last_name}` 
+        ? `Herr/Frau ${(todaySchedules.teacher as any).last_name}` 
         : 'Lehrkraft';
       todayLesson = {
         time: todaySchedules.time_slot,
-        room: todaySchedules.rooms?.name || 'Unterrichtsraum',
+        room: (todaySchedules.rooms as any)?.name || 'Unterrichtsraum',
         teacher: teacherName,
-        displayString: `Heute ${todaySchedules.time_slot} Uhr, ${todaySchedules.rooms?.name || 'Raum'} bei ${teacherName}`
+        displayString: `Heute ${todaySchedules.time_slot} Uhr, ${(todaySchedules.rooms as any)?.name || 'Raum'} bei ${teacherName}`
       };
     }
-
-    // Fetch avatar and gamification statistics
-    const { data: avatarRecord } = await supabase
-      .from('avatars')
-      .select('evolution_level, xp, avatar_style, instrument_type')
-      .eq('user_id', userId)
-      .maybeSingle();
 
     // Streak and XP calculations
     const currentXp = avatarRecord?.xp || 0;
@@ -554,11 +556,11 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
       todayLesson,
       gamification: {
         streakFlame: avatarRecord?.streak_flame || 0,
-        evolutionLevel: student?.is_premium_user ? currentLevel : 1,
+        evolutionLevel: student.is_premium_user ? currentLevel : 1,
         currentXp,
         remainingXp,
         xpTargetMessage: `Noch ${remainingXp} XP bis zum heutigen Meilenstein!`,
-        avatarStyle: student?.is_premium_user ? (avatarRecord?.avatar_style || 'Premium_Hero') : 'Standard_Silhouette',
+        avatarStyle: student.is_premium_user ? (avatarRecord?.avatar_style || 'Premium_Hero') : 'Standard_Silhouette',
         instrumentType: avatarRecord?.instrument_type || 'Unknown'
       }
     });

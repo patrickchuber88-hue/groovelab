@@ -143,6 +143,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
           const adminId = crypto.randomUUID();
           const qrToken = crypto.randomUUID();
+          const dummyEmail = `${subdomain.trim().toLowerCase()}@campus-groovelab.de`;
           
           // Insert admin user
           const { error: userErr } = await supabase
@@ -153,9 +154,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               role: 'admin',
               first_name: adminFirstName.trim(),
               last_name: adminLastName.trim(),
-              email: adminEmail.trim().toLowerCase(),
+              email: dummyEmail,
               password_hash: adminPassword, // Pre-hashed or demo plaintext passwords
               qr_token: qrToken,
+              ausweis_nummer: adminPassword.trim(),
               is_campus_active: true,
               is_groovelab_active: true,
               is_active: true,
@@ -194,16 +196,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const handleNextStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setStep(3);
-  };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode.trim() === generatedOtp) {
-      runProvisioning();
-    } else {
-      setOtpError('Falscher Code. Bitte überprüfe den Verifizierungscode.');
-    }
+    runProvisioning();
   };
 
   const presetColors = [
@@ -248,69 +241,74 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
       <style>{`
         .signup-input {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .signup-input:focus {
           border-color: #10b981 !important;
-          background: rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+          background: #ffffff !important;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+        }
+        .signup-input::placeholder {
+          color: #94a3b8 !important;
+          opacity: 0.85 !important;
         }
         .signup-btn-next {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .signup-btn-next:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 12px 24px rgba(16, 185, 129, 0.25) !important;
-          filter: brightness(1.05);
+          box-shadow: 0 12px 24px rgba(16, 185, 129, 0.2) !important;
+          filter: brightness(1.03);
         }
         .signup-btn-next:active:not(:disabled) {
           transform: translateY(0);
         }
         .signup-btn-back {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .signup-btn-back:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.12) !important;
+          background: rgba(0, 0, 0, 0.08) !important;
         }
       `}</style>
 
       <div style={{
         width: '100%',
         maxWidth: step === 4 ? '480px' : '580px',
-        background: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: '32px',
-        padding: '36px',
-        boxShadow: '0 40px 100px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: 'rgba(255, 255, 255, 0.94)',
+        borderRadius: '24px',
+        padding: '38px',
+        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+        border: '1px solid rgba(0, 0, 0, 0.08)',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        backdropFilter: 'blur(30px)',
-        WebkitBackdropFilter: 'blur(30px)',
+        backdropFilter: 'blur(40px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(180%)',
         boxSizing: 'border-box',
         maxHeight: '90vh',
-        overflowY: 'auto'
+        overflowY: 'auto',
+        color: '#1e293b'
       }}>
         {/* Header (except for provisioning step) */}
         {step < 4 && (
-          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', color: '#60a5fa', justifyContent: 'center' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', color: '#10b981', justifyContent: 'center' }}>
                 <School size={22} />
               </div>
               <div style={{ textAlign: 'left' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campus-Groovelab</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#ffffff', display: 'block' }}>Musikschule registrieren</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Musikschule registrieren</span>
               </div>
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', padding: '6px 14px', borderRadius: '100px' }}>
-              Schritt {step} von 3
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(0, 0, 0, 0.05)', color: '#334155', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+              Schritt {step} von 2
             </span>
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '14px', borderRadius: '16px', color: '#fca5a5', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
             {error}
           </div>
         )}
@@ -319,41 +317,41 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         {step === 1 && (
           <form onSubmit={handleNextStep1} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Name der Musikschule *</label>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Name der Musikschule *</label>
               <input
                 type="text"
                 required
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
-                placeholder="z.B. Groove Academy Berlin"
+                placeholder="z.B. Musterschule für Musik"
                 style={inputStyle}
                 className="signup-input"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Wunsch-Subdomain *</label>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Wunsch-Subdomain *</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   type="text"
                   required
                   value={subdomain}
                   onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  placeholder="groove-academy"
+                  placeholder="musterschule"
                   style={{ ...inputStyle, paddingRight: '160px' }}
                   className="signup-input"
                 />
-                <span style={{ position: 'absolute', right: '16px', fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', pointerEvents: 'none' }}>
+                <span style={{ position: 'absolute', right: '16px', fontSize: '13px', fontWeight: 600, color: '#94a3b8', pointerEvents: 'none' }}>
                   .campus-groovelab.de
                 </span>
               </div>
               <div style={{ marginTop: '6px', fontSize: '12px' }}>
-                {checkingSubdomain && <span style={{ color: '#94a3b8' }}>Prüfe Verfügbarkeit...</span>}
+                {checkingSubdomain && <span style={{ color: '#64748b' }}>Prüfe Verfügbarkeit...</span>}
                 {!checkingSubdomain && subdomainAvailable === true && (
-                  <span style={{ color: '#34d399', fontWeight: 700 }}>✓ Subdomain ist frei und verfügbar!</span>
+                  <span style={{ color: '#059669', fontWeight: 600 }}>✓ Subdomain ist frei und verfügbar!</span>
                 )}
                 {!checkingSubdomain && subdomainAvailable === false && (
-                  <span style={{ color: '#f87171', fontWeight: 700 }}>✗ Diese Subdomain ist bereits vergeben.</span>
+                  <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ Diese Subdomain ist bereits vergeben.</span>
                 )}
               </div>
             </div>
@@ -361,25 +359,25 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             {/* Address Row */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Straße *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Straße *</label>
                 <input
                   type="text"
                   required
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
-                  placeholder="Karl-Fürstenberg-Str."
+                  placeholder="Musterstraße"
                   style={inputStyle}
                   className="signup-input"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Nr. *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Nr. *</label>
                 <input
                   type="text"
                   required
                   value={houseNumber}
                   onChange={(e) => setHouseNumber(e.target.value)}
-                  placeholder="59"
+                  placeholder="12a"
                   style={inputStyle}
                   className="signup-input"
                 />
@@ -388,25 +386,25 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>PLZ *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>PLZ *</label>
                 <input
                   type="text"
                   required
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="79618"
+                  placeholder="12345"
                   style={inputStyle}
                   className="signup-input"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Ort *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Ort *</label>
                 <input
                   type="text"
                   required
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="Rheinfelden"
+                  placeholder="Musterstadt"
                   style={inputStyle}
                   className="signup-input"
                 />
@@ -414,13 +412,13 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Telefonnummer *</label>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Telefonnummer *</label>
               <input
                 type="tel"
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+49 (0) 7623..."
+                placeholder="+49 123 456789"
                 style={inputStyle}
                 className="signup-input"
               />
@@ -440,25 +438,25 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           <form onSubmit={handleNextStep2} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vorname Schulleitung *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Vorname Schulleitung *</label>
                 <input
                   type="text"
                   required
                   value={adminFirstName}
                   onChange={(e) => setAdminFirstName(e.target.value)}
-                  placeholder="z.B. Patrick"
+                  placeholder="z.B. Maria"
                   style={inputStyle}
                   className="signup-input"
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Nachname Schulleitung *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Nachname Schulleitung *</label>
                 <input
                   type="text"
                   required
                   value={adminLastName}
                   onChange={(e) => setAdminLastName(e.target.value)}
-                  placeholder="z.B. Huber"
+                  placeholder="z.B. Musterfrau"
                   style={inputStyle}
                   className="signup-input"
                 />
@@ -466,98 +464,25 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse Schulleitung *</label>
-              <input
-                type="email"
-                required
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="leitung@meineschule.de"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Passwort festlegen *</label>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Passwort festlegen *</label>
               <input
                 type="password"
                 required
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="z.B. Geheimnis123"
                 style={inputStyle}
+                className="signup-input"
               />
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
-                Wird später für den Login im Sekretariats-Bereich benötigt.
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                Mit diesem Passwort loggst du dich später über den Login-Bereich ein.
               </span>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button type="button" onClick={() => setStep(1)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
               <button type="submit" style={nextButtonStyle} className="signup-btn-next">
-                Weiter zur Verifizierung <ArrowRight size={16} />
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* STEP 3: OTP VERIFICATION */}
-        {step === 3 && (
-          <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
-            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#34d399' }}>
-                <Key size={24} />
-              </div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 900 }}>E-Mail bestätigen</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', lineHeight: '1.45' }}>
-                Wir haben einen Bestätigungscode an die Adresse <strong>{adminEmail}</strong> gesendet. Bitte gib den 6-stelligen Code hier ein.
-              </p>
-            </div>
-
-            {/* Premium OTP Mock Alert box */}
-            <div style={{
-              background: 'rgba(234, 179, 8, 0.08)',
-              border: '1px solid rgba(234, 179, 8, 0.25)',
-              borderRadius: '16px',
-              padding: '16px',
-              color: '#fef08a',
-              textAlign: 'center',
-              boxSizing: 'border-box'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#ca8a04', marginBottom: '6px' }}>
-                <Sparkles size={14} /> Demo-Verbindungscode
-              </div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '0.15em', fontFamily: 'monospace' }}>
-                {generatedOtp}
-              </div>
-              <div style={{ fontSize: '11px', color: '#fef08a', opacity: 0.8, marginTop: '4px' }}>
-                (Für Testzwecke direkt clientseitig generiert)
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', textAlign: 'center' }}>Bestätigungscode *</label>
-              <input
-                type="text"
-                required
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
-                style={{ ...inputStyle, textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.1em', fontFamily: 'monospace' }}
-                className="signup-input"
-              />
-              {otpError && (
-                <div style={{ color: '#f87171', fontSize: '12px', fontWeight: 700, marginTop: '6px', textAlign: 'center' }}>
-                  {otpError}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={() => setStep(2)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
-              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
-                Code verifizieren <ShieldCheck size={16} />
+                Konto kostenlos erstellen <ArrowRight size={16} />
               </button>
             </div>
           </form>
@@ -573,7 +498,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   cx="60"
                   cy="60"
                   r="52"
-                  stroke="rgba(255, 255, 255, 0.08)"
+                  stroke="rgba(0, 0, 0, 0.06)"
                   strokeWidth="8"
                   fill="transparent"
                 />
@@ -589,14 +514,14 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   style={{ transition: 'stroke-dashoffset 0.3s ease-out' }}
                 />
               </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 900 }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>
                 {provisionProgress}%
               </div>
             </div>
 
             <div style={{ textAlign: 'center' }}>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900 }}>Mandant wird erstellt</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>Mandant wird erstellt</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                 {provisionStatus}
               </p>
             </div>
@@ -613,13 +538,13 @@ const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
   padding: '12px 16px',
   borderRadius: '12px',
-  border: '1.5px solid rgba(255, 255, 255, 0.12)',
-  background: 'rgba(255, 255, 255, 0.05)',
-  color: '#ffffff',
+  border: '1.5px solid #d1d5db',
+  background: '#ffffff',
+  color: '#1e293b',
   outline: 'none',
   fontSize: '14px',
   fontWeight: 600,
-  transition: 'border-color 0.2s',
+  transition: 'border-color 0.2s, box-shadow 0.2s',
   fontFamily: 'inherit'
 };
 
@@ -627,9 +552,9 @@ const backButtonStyle: React.CSSProperties = {
   flex: 1,
   padding: '14px 20px',
   borderRadius: '16px',
-  background: 'rgba(255, 255, 255, 0.08)',
+  background: 'rgba(0, 0, 0, 0.05)',
   border: 'none',
-  color: '#ffffff',
+  color: '#334155',
   fontWeight: 800,
   fontSize: '0.95rem',
   cursor: 'pointer',

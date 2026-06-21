@@ -5,7 +5,7 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, Calendar, Check, Target, MessageSquare, Send,
-  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell
+  Pencil, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -1272,6 +1272,571 @@ const sanitizeTextInput = (val: string | null | undefined): string => {
   return val.replace(/<[^>]*>/g, '').trim();
 };
 
+// ─── Student Billing & Invoices Subcomponent ───────────────────────────────────
+interface StudentBillingInvoicesSectionProps {
+  studentUser: any;
+  studentId: string;
+}
+
+function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillingInvoicesSectionProps) {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [operatorDetails, setOperatorDetails] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchBillingData = async () => {
+      try {
+        setLoading(true);
+        // Load master billing operator settings (IBAN, BIC, Company Name etc.)
+        const { data: billingSettings } = await supabase
+          .from('master_billing_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+
+        setOperatorDetails({
+          companyName: billingSettings?.company_name || 'Simplified Work GbR',
+          iban: billingSettings?.iban || 'DE89 3704 0044 0532 9482 11',
+          bic: billingSettings?.bic || 'WELADED1XYZ'
+        });
+
+        // Query invoices. Direct student payment invoices are generated with school_id, type = 'AKT'
+        // We filter items where metadata/student_id or schoolStudentLevy applies to this student.
+        // As a robust client-side simulation fallback, we load invoices for the school and filter,
+        // or check if there is an invoice matching CG-[studentId].
+        const { data: invoiceList, error: invError } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('school_id', studentUser.school_id)
+          .order('billing_date', { ascending: false });
+
+        if (invError) throw invError;
+
+        // Parse & filter invoices related to this student
+        // When parent pays, it generates an invoice containing items for that student.
+        // Let's filter invoices that are marked as student billing, or where the ID contains the studentId,
+        // or if they are type 'AKT' and either contain items for this student or were paid by this student.
+        const studentInvoices = (invoiceList || []).filter((inv: any) => {
+          // If invoice is explicitly dedicated to this student via items or metadata
+          const matchesStudent = inv.id?.includes(studentId.slice(0, 8)) || 
+                                 JSON.stringify(inv.items || {}).includes(studentId) ||
+                                 JSON.stringify(inv.items || {}).toLowerCase().includes((studentUser.first_name || '').toLowerCase());
+          
+          // Or if billing_payer is student, and this is an activation invoice
+          const isStudentInvoiceType = inv.type === 'AKT' || inv.type === 'INF';
+          
+          return matchesStudent;
+        });
+
+        // If no database invoice exists yet, but the user is active, we generate a virtual one
+        // to match the legal mock activation flow.
+        if (studentInvoices.length === 0 && studentUser.is_campus_active) {
+          const actDate = studentUser.activated_at ? new Date(studentUser.activated_at) : new Date(studentUser.created_at || Date.now());
+          const m = actDate.getMonth() + 1;
+          const y = actDate.getFullYear();
+          const yearShort = String(y).slice(-2);
+          const monthStr = m < 10 ? `0${m}` : `${m}`;
+          
+          const monthsMapLocal: Record<number, number> = {
+            9: 12, 10: 11, 11: 10, 12: 9, 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1
+          };
+          const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
+          
+          // Pricing options
+          const billingOption = studentUser.schools?.opening_hours?.campus_settings?.studentBillingOption || 'student_full';
+          const studentFee = billingOption === 'student_partial' ? 0.09 : 0.49;
+          const totalAmount = restmonate * studentFee;
+
+          studentInvoices.push({
+            id: `CG-${studentId.slice(0, 8).toUpperCase()}-${yearShort}${monthStr}`,
+            type: 'AKT',
+            amount: totalAmount,
+            status: 'paid',
+            billing_date: actDate.toISOString().split('T')[0],
+            due_date: new Date(actDate.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            items: [
+              {
+                name: `Rest-Schuljahrespauschale Infrastruktur- & Servicegebühren (${restmonate} Monate)`,
+                quantity: 1,
+                unit: 'Profil',
+                unitPrice: totalAmount,
+                amount: totalAmount
+              }
+            ]
+          });
+        }
+
+        setInvoices(studentInvoices);
+      } catch (err) {
+        console.error('Error fetching student invoices:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (studentUser) {
+      fetchBillingData();
+    }
+  }, [studentId, studentUser]);
+
+  if (loading) {
+    return <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Abrechnungsinformationen werden geladen...</div>;
+  }
+
+  return (
+    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px', marginTop: '24px' }}>
+      <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <FileText size={18} color="#34a853" /> 3. Abrechnung & Rechnungen
+      </h3>
+      <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
+        Hier findest du die Rechnungen für deine Infrastruktur- & Servicegebühren (Rest-Schuljahrespauschale).
+      </p>
+
+      {invoices.length === 0 ? (
+        <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Keine Rechnungen vorhanden. Dein Account läuft momentan über die Testphase oder ein Schulguthaben.</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {invoices.map((inv) => (
+            <div key={inv.id} style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              transition: 'all 0.2s'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>
+                    Rechnung #{inv.id}
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    Rechnungsdatum: {new Date(inv.billing_date).toLocaleDateString('de-DE')}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{inv.amount.toFixed(2).replace('.', ',')} €</strong>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    textTransform: 'uppercase',
+                    background: inv.status === 'paid' || inv.status === 'Bezahlt' ? '#d1fae5' : '#fee2e2',
+                    color: inv.status === 'paid' || inv.status === 'Bezahlt' ? '#065f46' : '#991b1b'
+                  }}>
+                    {inv.status === 'paid' || inv.status === 'Bezahlt' ? 'Bezahlt' : 'Offen'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvoice(inv)}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      color: '#475569',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Rechnung anzeigen
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Invoice Detail Modal (Popup Mask for Quick View) */}
+      {selectedInvoice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            width: '100%',
+            maxWidth: '620px',
+            borderRadius: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            fontFamily: "'Outfit', sans-serif"
+          }}>
+            {/* Header / Title bar */}
+            <div style={{
+              padding: '20px 28px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Rechnung #{selectedInvoice.id} - Schnellansicht
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setSelectedInvoice(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px',
+                  borderRadius: '50%',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Scrollable invoice content */}
+            <div style={{ padding: '28px', overflowY: 'auto', flex: 1 }}>
+              {/* Logo / Header block */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #16a34a', paddingBottom: '16px', marginBottom: '24px' }}>
+                <div>
+                  <h4 style={{ margin: 0, color: '#16a34a', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Campus-Groovelab</h4>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Infrastruktur- &amp; Servicegebühren</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <h5 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 900 }}>RECHNUNG</h5>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'bold' }}>Nr. {selectedInvoice.id}</span>
+                </div>
+              </div>
+
+              {/* Addresses */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                <div>
+                  <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 800, display: 'block', marginBottom: '6px', letterSpacing: '0.05em' }}>Vertragspartner &amp; Empfänger</span>
+                  <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.9rem' }}>Eltern (als ges. Vertreter) von {studentUser.first_name || ''} {studentUser.last_name || ''}</strong>
+                  <span style={{ color: '#475569', display: 'block' }}>Musikschule: {studentUser.schools?.name || 'Mitgliedschule'}</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block', marginTop: '4px', fontStyle: 'italic' }}>Kleinbetragsrechnung gemäß § 33 UStDV</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 800, display: 'block', marginBottom: '6px', letterSpacing: '0.05em' }}>Dienstleister / Betreiber</span>
+                  <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.9rem' }}>Campus-Groovelab</strong>
+                  <strong style={{ color: '#0f172a', display: 'block', fontWeight: 700 }}>{operatorDetails.companyName}</strong>
+                  <span style={{ color: '#475569' }}>IBAN: {operatorDetails.iban}</span><br />
+                  <span style={{ color: '#475569' }}>BIC: {operatorDetails.bic}</span>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div style={{ background: '#f8fafc', padding: '14px 20px', borderRadius: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '0.78rem', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Rechnungsdatum</span>
+                  <strong style={{ color: '#0f172a' }}>{new Date(selectedInvoice.billing_date).toLocaleDateString('de-DE')}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Fälligkeitsdatum</span>
+                  <strong style={{ color: '#0f172a' }}>{new Date(selectedInvoice.due_date).toLocaleDateString('de-DE')}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '2px' }}>Zahlungsart</span>
+                  <strong style={{ color: '#0f172a' }}>Banküberweisung / Girocode</strong>
+                </div>
+              </div>
+
+              {/* Positions Table */}
+              <div style={{ marginBottom: '24px' }}>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Positionen:</h5>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
+                      <th style={{ padding: '8px 0' }}>Leistungsbeschreibung</th>
+                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Menge</th>
+                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Einzelpreis</th>
+                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Gesamtbetrag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedInvoice.items || []).map((item: any, idx: number) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '10px 0' }}>{item.name}</td>
+                        <td style={{ padding: '10px 0', textAlign: 'right' }}>{item.quantity} {item.unit || 'Stück'}</td>
+                        <td style={{ padding: '10px 0', textAlign: 'right' }}>{item.unitPrice.toFixed(2).replace('.', ',')} €</td>
+                        <td style={{ padding: '10px 0', textAlign: 'right', fontWeight: 'bold' }}>{item.amount.toFixed(2).replace('.', ',')} €</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td colSpan={2}></td>
+                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '0.9rem' }}>Gesamtsumme:</td>
+                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 900, color: '#16a34a', fontSize: '1.05rem' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Payment details box with Girocode QR */}
+              <div style={{
+                  background: '#faf5ff',
+                  border: '1px dashed #d8b4fe',
+                  borderRadius: '18px',
+                  padding: '18px',
+                  fontSize: '0.78rem',
+                  color: '#5b21b6',
+                  lineHeight: '1.6',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <strong style={{ color: '#4c1d95', fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>Zahlungsinformationen</strong>
+                    Überweisen Sie den Betrag bitte unter Angabe des Verwendungszwecks an folgende Bankverbindung:<br />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', marginTop: '6px', gap: '4px 12px' }}>
+                      <strong>Kontoinhaber:</strong> <span>{operatorDetails.companyName}</span>
+                      <strong>IBAN:</strong> <span>{operatorDetails.iban}</span>
+                      <strong>BIC:</strong> <span>{operatorDetails.bic}</span>
+                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#4c1d95' }}>{selectedInvoice.id}</strong>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', background: 'white', padding: '10px', borderRadius: '14px', border: '1px solid #e2e8f0', marginLeft: '16px', flexShrink: 0 }}>
+                    <QRCode
+                      value={`BCD\n002\n1\nSCT\n${operatorDetails.bic.replace(/\s+/g, '')}\n${operatorDetails.companyName}\n${operatorDetails.iban.replace(/\s+/g, '')}\nEUR${selectedInvoice.amount.toFixed(2)}\n\n\n${selectedInvoice.id}\n`}
+                      size={90}
+                    />
+                    <span style={{ fontSize: '0.55rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginTop: '6px' }}>Girocode</span>
+                  </div>
+                </div>
+              </div>
+
+            {/* Footer with actions */}
+            <div style={{
+              padding: '16px 28px',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              background: '#f8fafc'
+            }}>
+              <button
+                type="button"
+                onClick={() => setSelectedInvoice(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: '#475569',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+              >
+                Schließen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // In-page printing via hidden iframe
+                  const existingFrame = document.getElementById('invoice-print-frame');
+                  if (existingFrame) {
+                    document.body.removeChild(existingFrame);
+                  }
+
+                  const iframe = document.createElement('iframe');
+                  iframe.style.position = 'fixed';
+                  iframe.style.right = '0';
+                  iframe.style.bottom = '0';
+                  iframe.style.width = '0';
+                  iframe.style.height = '0';
+                  iframe.style.border = 'none';
+                  iframe.id = 'invoice-print-frame';
+                  document.body.appendChild(iframe);
+
+                  const formattedItems = (selectedInvoice.items || []).map((item: any) => `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 10px 0;">${item.name}</td>
+                      <td style="padding: 10px 0; text-align: right;">${item.quantity} ${item.unit || 'Stück'}</td>
+                      <td style="padding: 10px 0; text-align: right;">${item.unitPrice.toFixed(2).replace('.', ',')} €</td>
+                      <td style="padding: 10px 0; text-align: right; font-weight: bold;">${item.amount.toFixed(2).replace('.', ',')} €</td>
+                    </tr>
+                  `).join('');
+
+                  const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+                  if (iframeDoc) {
+                    iframeDoc.write(`
+                      <html>
+                        <head>
+                          <title>Rechnung #${selectedInvoice.id} - Campus-Groovelab</title>
+                          <style>
+                            body {
+                              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                              color: #1e293b;
+                              padding: 40px;
+                              line-height: 1.5;
+                            }
+                            @media print {
+                              body { padding: 0; }
+                              .no-print { display: none !important; }
+                            }
+                          </style>
+                        </head>
+                        <body>
+                          <!-- Header -->
+                          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #16a34a; padding-bottom: 20px; margin-bottom: 30px;">
+                            <div>
+                              <h2 style="margin: 0; color: #16a34a; font-size: 1.8rem; font-weight: 900; letter-spacing: -0.02em;">Campus-Groovelab</h2>
+                              <span style="font-size: 0.75rem; color: #64748b;">Infrastruktur- &amp; Servicegebühren</span>
+                            </div>
+                            <div style="text-align: right;">
+                              <h3 style="margin: 0; font-size: 1.1rem; color: #0f172a;">RECHNUNG</h3>
+                              <span style="font-size: 0.85rem; color: #64748b; font-weight: bold;">Nr. ${selectedInvoice.id}</span>
+                            </div>
+                          </div>
+
+                          <!-- Addresses -->
+                          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 35px; font-size: 0.85rem;">
+                            <div>
+                              <span style="color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; display: block; margin-bottom: 8px;">Vertragspartner &amp; Empfänger</span>
+                              <strong style="color: #0f172a; display: block; font-size: 1rem;">Eltern (als ges. Vertreter) von ${studentUser.first_name || ''} ${studentUser.last_name || ''}</strong>
+                              <span>Musikschule: ${studentUser.schools?.name || 'Mitgliedschule'}</span><br />
+                              <span style="color: #94a3b8; font-size: 0.75rem; display: block; margin-top: 4px; font-style: italic;">Kleinbetragsrechnung gemäß § 33 UStDV</span>
+                            </div>
+                            <div>
+                              <span style="color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; display: block; margin-bottom: 8px;">Dienstleister / Betreiber</span>
+                              <strong style="color: #16a34a; display: block; font-size: 1rem;">Campus-Groovelab</strong>
+                              <strong style="color: #0f172a; display: block; font-weight: 600;">${operatorDetails.companyName}</strong>
+                              <span>IBAN: ${operatorDetails.iban}</span><br />
+                              <span>BIC: ${operatorDetails.bic}</span>
+                            </div>
+                          </div>
+
+                          <!-- Dates -->
+                          <div style="background: #f8fafc; padding: 16px 20px; border-radius: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 0.8rem; margin-bottom: 35px; border: 1px solid #e2e8f0;">
+                            <div>
+                              <span style="color: #64748b; display: block; margin-bottom: 4px;">Rechnungsdatum</span>
+                              <strong style="color: #0f172a;">${new Date(selectedInvoice.billing_date).toLocaleDateString('de-DE')}</strong>
+                            </div>
+                            <div>
+                              <span style="color: #64748b; display: block; margin-bottom: 4px;">Fälligkeitsdatum</span>
+                              <strong style="color: #0f172a;">${new Date(selectedInvoice.due_date).toLocaleDateString('de-DE')}</strong>
+                            </div>
+                            <div>
+                              <span style="color: #64748b; display: block; margin-bottom: 4px;">Zahlungsart</span>
+                              <strong style="color: #0f172a;">Banküberweisung / Girocode</strong>
+                            </div>
+                          </div>
+
+                          <!-- Table -->
+                          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 40px;">
+                            <thead>
+                              <tr style="border-bottom: 2px solid #e2e8f0; text-align: left; color: #475569; font-weight: 700;">
+                                <th style="padding: 10px 0;">Leistungsbeschreibung</th>
+                                <th style="padding: 10px 0; text-align: right;">Menge</th>
+                                <th style="padding: 10px 0; text-align: right;">Einzelpreis</th>
+                                <th style="padding: 10px 0; text-align: right;">Gesamtbetrag</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${formattedItems}
+                              <tr>
+                                <td colspan="2"></td>
+                                <td style="padding: 20px 0 10px 0; text-align: right; font-weight: bold; font-size: 1rem;">Gesamtsumme:</td>
+                                <td style="padding: 20px 0 10px 0; text-align: right; font-weight: 900; font-size: 1.15rem; color: #16a34a;">${selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <!-- Payment details & bank transfers -->
+                          <div style="background: #faf5ff; border: 1px dashed #d8b4fe; border-radius: 16px; padding: 20px; font-size: 0.8rem; color: #5b21b6; line-height: 1.6; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                              <strong style="color: #4c1d95; font-size: 0.9rem; display: block; margin-bottom: 8px;">Zahlungsinformationen</strong>
+                              Überweisen Sie den Betrag bitte unter Angabe des Verwendungszwecks an folgende Bankverbindung:<br />
+                              <strong>Kontoinhaber:</strong> ${operatorDetails.companyName}<br />
+                              <strong>IBAN:</strong> ${operatorDetails.iban}<br />
+                              <strong>BIC:</strong> ${operatorDetails.bic}<br />
+                              <strong>Verwendungszweck:</strong> <strong style="color: #4c1d95; font-size: 0.95rem;">${selectedInvoice.id}</strong>
+                            </div>
+                            <div style="text-align: center; background: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-left: 20px;">
+                              <div id="qrcode-canvas"></div>
+                              <span style="font-size: 0.6rem; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 8px;">Girocode</span>
+                            </div>
+                          </div>
+
+                          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+                          <script>
+                            const text = \`BCD\\n002\\n1\\nSCT\\n${operatorDetails.bic.replace(/\s+/g, '')}\\n${operatorDetails.companyName}\\n${operatorDetails.iban.replace(/\s+/g, '')}\\nEUR${selectedInvoice.amount.toFixed(2)}\\n\\n\\n${selectedInvoice.id}\\n\`;
+                            new QRCode(document.getElementById("qrcode-canvas"), {
+                              text: text,
+                              width: 100,
+                              height: 100,
+                              correctLevel: QRCode.CorrectLevel.M
+                            });
+                          </script>
+                        </body>
+                      </html>
+                    `);
+                    iframeDoc.close();
+
+                    setTimeout(() => {
+                      if (iframe.contentWindow) {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                      }
+                    }, 800);
+                  }
+                }}
+                style={{
+                  background: '#16a34a',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: 'white',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#15803d'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#16a34a'; }}
+              >
+                <FileText size={16} /> PDF drucken / speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
@@ -1309,6 +1874,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
   const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'billing'>('notifications');
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -3883,19 +4449,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       const queryStartDate = resetDate && resetDate < startOfCurrentMonth ? resetDate : startOfCurrentMonth;
 
-      const { data: focusLogs } = await supabase
-        .from('fokus_logs')
-        .select('user_id, duration_minutes, created_at')
-        .in('user_id', studentIds)
-        .gte('created_at', annualStartDate.toISOString());
+      const classmateAndSelfIds = Array.from(new Set([...classmates.map(c => c.id), studentId]));
+      const otherStudentIds = studentIds.filter(id => !classmateAndSelfIds.includes(id));
+
+      const [classmateLogsRes, otherLogsRes] = await Promise.all([
+        supabase
+          .from('fokus_logs')
+          .select('user_id, duration_minutes, created_at')
+          .in('user_id', classmateAndSelfIds)
+          .gte('created_at', annualStartDate.toISOString()),
+        otherStudentIds.length > 0 ? supabase
+          .from('fokus_logs')
+          .select('user_id, duration_minutes, created_at')
+          .in('user_id', otherStudentIds)
+          .gte('created_at', queryStartDate.toISOString()) : Promise.resolve({ data: [] })
+      ]);
+
+      const focusLogs = [...(classmateLogsRes.data || []), ...(otherLogsRes.data || [])];
 
       setClassFocusLogs(focusLogs || []);
 
-      // 3. Fetch mastered song skills for this month for these students
+      // 3. Fetch mastered song skills for this month for classmates and self ONLY
       const { data: skills } = await supabase
         .from('user_song_skills')
         .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs(title)')
-        .in('user_id', studentIds)
+        .in('user_id', classmateAndSelfIds)
         .gte('last_practiced_at', queryStartDate.toISOString());
 
       // 4. Compute highlights for classmates ONLY
@@ -3997,8 +4575,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setBriefingLoading(true);
       setError(null);
 
-      // Stage 1: Fetch user, avatar, stats, and briefing API in parallel
-      const [userRes, avatarRes, statsRes, briefingRes] = await Promise.all([
+      // Stage 1: Fetch user, avatar, stats, briefing, emails, missions, pins, and personal logs in parallel
+      const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes] = await Promise.all([
         supabase
           .from('users')
           .select('*, schools(*)')
@@ -4017,7 +4595,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         fetch(`/api/briefing/student?userId=${studentId}`).catch(err => {
           console.warn('Briefing API offline or failed, falling back:', err);
           return null;
-        })
+        }),
+        supabase.rpc('get_student_emails', { student_id_param: studentId }),
+        supabase
+          .from('student_missions')
+          .select('*, mission_templates(*)')
+          .eq('student_id', studentId)
+          .maybeSingle(),
+        supabase
+          .from('one_time_upload_pins')
+          .select('*')
+          .eq('student_id', studentId),
+        supabase
+          .from('fokus_logs')
+          .select('*')
+          .eq('user_id', studentId)
+          .order('created_at', { ascending: false })
       ]);
 
       if (userRes.error) throw userRes.error;
@@ -4037,15 +4630,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       user.resolved_instrument = resolvedInst;
 
-      // Fetch decrypted student/parent emails
-      try {
-        const { data: emailData, error: emailError } = await supabase.rpc('get_student_emails', { student_id_param: studentId });
-        if (!emailError && emailData && emailData.length > 0) {
-          user.email = emailData[0].email;
-          user.parent_email = emailData[0].parent_email;
-        }
-      } catch (emailErr) {
-        console.error('Error fetching student emails:', emailErr);
+      // Assign student emails from rpc
+      if (!emailRes.error && emailRes.data && emailRes.data.length > 0) {
+        user.email = emailRes.data[0].email;
+        user.parent_email = emailRes.data[0].parent_email;
       }
 
       setStudentUser(user);
@@ -4128,24 +4716,48 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
       setTotalFocusMinutes(statsData?.total_focus_minutes || 0);
 
-      // Stage 2: Fetch announcements and highlights in parallel
-      const promises: Promise<any>[] = [];
+      // Assign student missions and pins immediately
+      setStudentMissionProgress(missionRes.data || null);
+      setStudentPins(pinsRes.data || []);
+
+      // Assign personal fokus logs immediately (anti-waterfall)
+      if (!logsRes.error && logsRes.data) {
+        setFokusLogs(logsRes.data);
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayLogs = logsRes.data.filter((log: any) => log.created_at && log.created_at.startsWith(todayStr));
+        const nonExtraMinutes = todayLogs
+          .filter((log: any) => !log.is_extra)
+          .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+        
+        const streak = avatarRecord?.streak_flame || 0;
+        const targetMins = getTargetMinutes(streak);
+        setHasCompletedTargetToday(nonExtraMinutes >= targetMins);
+      }
+
+      // Stage 2: Fetch classmates, highlights, announcements, and school goals in parallel (all depend on user config)
       if (user.school_id) {
-        promises.push(fetchClassHighlights(user.school_id, user.teacher_id));
-        promises.push(
+        const [classmatesRes, highlightsRes, announcementsRes, schoolRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('id')
+            .eq('teacher_id', user.teacher_id)
+            .eq('school_id', user.school_id),
+          fetchClassHighlights(user.school_id, user.teacher_id),
           supabase
             .from('campus_announcements')
             .select('*, users(first_name, last_name, photo_url)')
             .eq('school_id', user.school_id)
-            .order('created_at', { ascending: false }) as any
-        );
-      }
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('schools')
+            .select('opening_hours')
+            .eq('id', user.school_id)
+            .single()
+        ]);
 
-      const results = await Promise.all(promises);
-      if (user.school_id && results[1]) {
-        const annRes = results[1];
-        if (!annRes.error && annRes.data) {
-          const parsed = annRes.data.map((ann: any) => ({
+        // Process announcements
+        if (!announcementsRes.error && announcementsRes.data) {
+          const parsed = announcementsRes.data.map((ann: any) => ({
             id: ann.id,
             title: ann.title,
             content: ann.message,
@@ -4156,6 +4768,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           setCampusFeedAnnouncements(parsed.filter((ann: any) => ann.target_type === 'all' || ann.target_type === 'students'));
         } else {
           setCampusFeedAnnouncements([]);
+        }
+
+        // Process school targets / class goals
+        const schoolData = schoolRes.data;
+        const rawTargets = schoolData?.opening_hours?.weekly_targets?.[user.teacher_id];
+        let goals: any[] = [];
+        if (Array.isArray(rawTargets)) {
+          goals = rawTargets;
+        } else if (typeof rawTargets === 'number') {
+          goals = [{ id: 'default', title: 'Klassenziel', minutes: rawTargets, deadline: '' }];
+        }
+        setClassGoals(goals);
+
+        // Process classmates weekly practice minutes (depends on classmates list)
+        if (classmatesRes.data && classmatesRes.data.length > 0 && goals.length > 0) {
+          const classmateIds = classmatesRes.data.map((c: any) => c.id);
+          const now = new Date();
+          const monday = new Date(now);
+          const day = now.getDay();
+          const diff = day === 0 ? -6 : 1 - day;
+          monday.setDate(now.getDate() + diff);
+          monday.setHours(0, 0, 0, 0);
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+
+          const { data: practiceData } = await supabase
+            .from('practice_sessions')
+            .select('duration_minutes')
+            .in('student_id', classmateIds)
+            .gte('created_at', monday.toISOString())
+            .lte('created_at', sunday.toISOString());
+
+          const totalMins = (practiceData || []).reduce(
+            (sum: number, s: any) => sum + (s.duration_minutes || 0), 0
+          );
+          setClassWeeklyMins(totalMins);
         }
       }
 
@@ -4178,15 +4827,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         try {
           const schoolId = user.school_id || (user as any).school_id;
           let currentSchoolId = schoolId;
-
-          if (!currentSchoolId) {
-            const { data: userWithSchool } = await supabase
-              .from('users')
-              .select('school_id')
-              .eq('id', studentId)
-              .single();
-            currentSchoolId = userWithSchool?.school_id;
-          }
 
           if (currentSchoolId) {
             const { data: schoolData } = await supabase
@@ -4254,92 +4894,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
       setBriefingLoading(false);
-
-      // 4. Fetch Übe-Ziele (class practice goals from teacher's school opening_hours)
-      try {
-        const teacherId = user.teacher_id;
-        const schoolId = user.school_id;
-        if (teacherId && schoolId) {
-          // Load teacher's goals from school opening_hours
-          const { data: schoolData } = await supabase
-            .from('schools')
-            .select('opening_hours')
-            .eq('id', schoolId)
-            .single();
-
-          const rawTargets = schoolData?.opening_hours?.weekly_targets?.[teacherId];
-          let goals: any[] = [];
-          if (Array.isArray(rawTargets)) {
-            goals = rawTargets;
-          } else if (typeof rawTargets === 'number') {
-            goals = [{ id: 'default', title: 'Klassenziel', minutes: rawTargets, deadline: '' }];
-          }
-          setClassGoals(goals);
-
-          // Calculate this student class's weekly practice minutes
-          // Get all students of this teacher for current week
-          if (goals.length > 0) {
-            const now = new Date();
-            const monday = new Date(now);
-            const day = now.getDay();
-            const diff = day === 0 ? -6 : 1 - day;
-            monday.setDate(now.getDate() + diff);
-            monday.setHours(0, 0, 0, 0);
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
-            sunday.setHours(23, 59, 59, 999);
-
-            // Get all students of same teacher
-            const { data: classmates } = await supabase
-              .from('users')
-              .select('id')
-              .eq('teacher_id', teacherId)
-              .eq('school_id', schoolId);
-
-            if (classmates && classmates.length > 0) {
-              const classmateIds = classmates.map((c: any) => c.id);
-              const { data: practiceData } = await supabase
-                .from('practice_sessions')
-                .select('duration_minutes')
-                .in('student_id', classmateIds)
-                .gte('created_at', monday.toISOString())
-                .lte('created_at', sunday.toISOString());
-
-              const totalMins = (practiceData || []).reduce(
-                (sum: number, s: any) => sum + (s.duration_minutes || 0), 0
-              );
-              setClassWeeklyMins(totalMins);
-            }
-          }
-        }
-      } catch (goalErr) {
-        console.warn('Could not load class goals:', goalErr);
-      }
-
-      try {
-        const { data: missionData } = await supabase
-          .from('student_missions')
-          .select('*, mission_templates(*)')
-          .eq('student_id', studentId)
-          .maybeSingle();
-
-        setStudentMissionProgress(missionData);
-
-        const { data: pinsData } = await supabase
-          .from('one_time_upload_pins')
-          .select('*')
-          .eq('student_id', studentId);
-        
-        setStudentPins(pinsData || []);
-      } catch (err) {
-        console.warn('Failed to load student missions progress:', err);
-      }
     } catch (err: any) {
       console.error('Error loading student avatar:', err);
       setError('Fehler beim Laden des Profils.');
       setBriefingLoading(false);
     } finally {
-      fetchFokusLogs();
       setLoading(false);
     }
   };
@@ -4605,7 +5164,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Lade Helden-Profil...</p>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Lade Campus-Profil...</p>
       </div>
     );
   }
@@ -10269,218 +10828,278 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       {activeTab === 'settings' && studentUser && (
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
           
-          <div style={{ background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,0.02)', padding: '36px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div style={{ background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,0.02)', padding: '36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Title and General Settings */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Settings size={20} color="#34a853" /> Einstellungen
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, fontWeight: 600 }}>
-                Hier kannst du deine Benachrichtigungen und App-Einstellungen verwalten.
-              </p>
-            </div>
-
-            {/* Section 1: Benachrichtigungen */}
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Bell size={18} color="#34a853" /> 1. System & Benachrichtigungen
-              </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Settings size={20} color="#16a34a" /> Einstellungen
+                </h2>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, fontWeight: 600 }}>
+                  Hier kannst du deine Benachrichtigungen und App-Einstellungen verwalten.
+                </p>
+              </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Push-Benachrichtigungen Haupt-Toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
-                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                    <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                      <Bell size={18} />
-                    </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
-                    </div>
-                  </div>
-                  
-                  {isPremiumUser ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextVal = !pushEnabled;
-                        setPushEnabled(nextVal);
-                        if (nextVal) {
-                          const success = await subscribeUserToPush(studentId);
-                          if (!success) {
-                            setPushEnabled(false);
-                            alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
-                          } else {
-                            alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
-                          }
-                        } else {
-                          const success = await unsubscribeUserFromPush(studentId);
-                          if (!success) {
-                            setPushEnabled(true);
-                            alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                          } else {
-                            alert('Push-Benachrichtigungen deaktiviert.');
-                          }
-                        }
-                      }}
-                      className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                      style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
-                    >
-                      <div className="app-binary-switch-knob" />
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      <span>🔒 Nur für aktive Schüler</span>
-                    </div>
-                  )}
-                </div>
-
-                {!isPremiumUser && (
-                  <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
-                    * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
-                  </p>
-                )}
-
-                {/* iOS Helper Alert */}
-                {isIOS && !isStandalone && (
-                  <div style={{
-                    padding: '12px 16px',
-                    background: '#fffbeb',
-                    border: '1px solid #fef3c7',
-                    borderRadius: '16px',
-                    fontSize: '0.75rem',
-                    color: '#b45309',
-                    lineHeight: '1.4',
-                    fontWeight: 600
-                  }}>
-                    <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
-                  </div>
-                )}
+              {/* Inner Sub-tab Navigation */}
+              <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('notifications')}
+                  style={{
+                    background: settingsSubTab === 'notifications' ? 'white' : 'transparent',
+                    color: settingsSubTab === 'notifications' ? '#0f172a' : '#64748b',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 16px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: settingsSubTab === 'notifications' ? '0 4px 10px rgba(0,0,0,0.04)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Bell size={14} /> System &amp; Benachrichtigungen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('billing')}
+                  style={{
+                    background: settingsSubTab === 'billing' ? 'white' : 'transparent',
+                    color: settingsSubTab === 'billing' ? '#0f172a' : '#64748b',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 16px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: settingsSubTab === 'billing' ? '0 4px 10px rgba(0,0,0,0.04)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <FileText size={14} /> Abrechnung &amp; Rechnungen
+                </button>
               </div>
             </div>
 
-            {/* Section 2: Detaillierte Einstellungen */}
-            {pushEnabled && isPremiumUser && (
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Settings size={18} color="#34a853" /> 2. Ich möchte benachrichtigt werden bei:
-                </h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {/* Terminänderungen */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#34a85315' : '#f1f5f9', color: pushNotifScheduleChanges ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                        <Calendar size={18} />
+            {/* Conditionally Render Sections based on subTab */}
+            {settingsSubTab === 'notifications' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                {/* Section 1: Benachrichtigungen */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={18} color="#16a34a" /> 1. System &amp; Benachrichtigungen
+                  </h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Push-Benachrichtigungen Haupt-Toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
+                      <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                        <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#16a34a15' : '#f1f5f9', color: pushEnabled ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                          <Bell size={18} />
+                        </div>
+                        <div>
+                          <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Terminänderungen 📅</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Verschiebungen, Ausfälle oder Lehrerwechsel</p>
-                      </div>
+                      
+                      {isPremiumUser ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextVal = !pushEnabled;
+                            setPushEnabled(nextVal);
+                            if (nextVal) {
+                              const success = await subscribeUserToPush(studentId);
+                              if (!success) {
+                                setPushEnabled(false);
+                                alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                              } else {
+                                alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                              }
+                            } else {
+                              const success = await unsubscribeUserFromPush(studentId);
+                              if (!success) {
+                                setPushEnabled(true);
+                                alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                              } else {
+                                alert('Push-Benachrichtigungen deaktiviert.');
+                              }
+                            }
+                          }}
+                          className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
+                          style={{ backgroundColor: pushEnabled ? '#16a34a' : undefined }}
+                        >
+                          <div className="app-binary-switch-knob" />
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                          <span>🔒 Nur für aktive Schüler</span>
+                        </div>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextVal = !pushNotifScheduleChanges;
-                        setPushNotifScheduleChanges(nextVal);
-                        await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);
-                      }}
-                      className={`app-binary-switch ${pushNotifScheduleChanges ? 'active' : ''}`}
-                      style={{ backgroundColor: pushNotifScheduleChanges ? '#34a853' : undefined }}
-                    >
-                      <div className="app-binary-switch-knob" />
-                    </button>
-                  </div>
 
-                  {/* Hausaufgaben */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#34a85315' : '#f1f5f9', color: pushNotifHomework ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                        <Pencil size={18} />
-                      </div>
-                      <div>
-                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben 📝</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Neue Übe-Aufgaben oder Feedback deiner Lehrkraft</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextVal = !pushNotifHomework;
-                        setPushNotifHomework(nextVal);
-                        await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);
-                      }}
-                      className={`app-binary-switch ${pushNotifHomework ? 'active' : ''}`}
-                      style={{ backgroundColor: pushNotifHomework ? '#34a853' : undefined }}
-                    >
-                      <div className="app-binary-switch-knob" />
-                    </button>
-                  </div>
+                    {!isPremiumUser && (
+                      <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
+                        * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
+                      </p>
+                    )}
 
-                  {/* Neuigkeiten & Aktionen */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                      <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#34a85315' : '#f1f5f9', color: pushNotifAllFeatures ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                        <Users size={18} />
+                    {/* iOS Helper Alert */}
+                    {isIOS && !isStandalone && (
+                      <div style={{
+                        padding: '12px 16px',
+                        background: '#fffbeb',
+                        border: '1px solid #fef3c7',
+                        borderRadius: '16px',
+                        fontSize: '0.75rem',
+                        color: '#b45309',
+                        lineHeight: '1.4',
+                        fontWeight: 600
+                      }}>
+                        <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
                       </div>
-                      <div>
-                        <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Neuigkeiten & Aktionen 🚀</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Mitteilungen der Musikschule und interessante Aktionen</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextVal = !pushNotifAllFeatures;
-                        setPushNotifAllFeatures(nextVal);
-                        await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);
-                      }}
-                      className={`app-binary-switch ${pushNotifAllFeatures ? 'active' : ''}`}
-                      style={{ backgroundColor: pushNotifAllFeatures ? '#34a853' : undefined }}
-                    >
-                      <div className="app-binary-switch-knob" />
-                    </button>
+                    )}
                   </div>
                 </div>
+
+                {/* Section 2: Detaillierte Einstellungen */}
+                {pushEnabled && isPremiumUser && (
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Settings size={18} color="#16a34a" /> 2. Ich möchte benachrichtigt werden bei:
+                    </h3>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Terminänderungen */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#16a34a15' : '#f1f5f9', color: pushNotifScheduleChanges ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                            <Calendar size={18} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Terminänderungen 📅</h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Verschiebungen, Ausfälle oder Lehrerwechsel</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextVal = !pushNotifScheduleChanges;
+                            setPushNotifScheduleChanges(nextVal);
+                            await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);
+                          }}
+                          className={`app-binary-switch ${pushNotifScheduleChanges ? 'active' : ''}`}
+                          style={{ backgroundColor: pushNotifScheduleChanges ? '#16a34a' : undefined }}
+                        >
+                          <div className="app-binary-switch-knob" />
+                        </button>
+                      </div>
+
+                      {/* Hausaufgaben */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#16a34a15' : '#f1f5f9', color: pushNotifHomework ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                            <Pencil size={18} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben 📝</h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Neue Übe-Aufgaben oder Feedback deiner Lehrkraft</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextVal = !pushNotifHomework;
+                            setPushNotifHomework(nextVal);
+                            await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);
+                          }}
+                          className={`app-binary-switch ${pushNotifHomework ? 'active' : ''}`}
+                          style={{ backgroundColor: pushNotifHomework ? '#16a34a' : undefined }}
+                        >
+                          <div className="app-binary-switch-knob" />
+                        </button>
+                      </div>
+
+                      {/* Neuigkeiten & Aktionen */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#16a34a15' : '#f1f5f9', color: pushNotifAllFeatures ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                            <Users size={18} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Neuigkeiten & Aktionen 🚀</h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Mitteilungen der Musikschule und interessante Aktionen</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextVal = !pushNotifAllFeatures;
+                            setPushNotifAllFeatures(nextVal);
+                            await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);
+                          }}
+                          className={`app-binary-switch ${pushNotifAllFeatures ? 'active' : ''}`}
+                          style={{ backgroundColor: pushNotifAllFeatures ? '#16a34a' : undefined }}
+                        >
+                          <div className="app-binary-switch-knob" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Section 3: System zurücksetzen / Cache löschen */}
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
+                    Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten und gespeicherten Sessions zurücksetzen. Deine Spieldaten in der Datenbank bleiben erhalten.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
+                        localStorage.removeItem('groovelab_active_practice_session');
+                        localStorage.removeItem('student_lehrwerke_progress');
+                        window.location.reload();
+                      }
+                    }}
+                    style={{
+                      background: '#fee2e2',
+                      color: '#ef4444',
+                      border: '1px solid #fca5a5',
+                      padding: '12px 20px',
+                      borderRadius: '14px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <RotateCcw size={14} /> Lokalen Cache leeren
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Section 4: Abrechnung & Infrastrukturgebühren */}
+                {studentUser?.role?.toLowerCase() === 'student' && (
+                  <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
+                )}
               </div>
             )}
-            
-            {/* Section 3: System zurücksetzen / Cache löschen */}
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px', marginTop: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-                Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten und gespeicherten Sessions zurücksetzen. Deine Spieldaten in der Datenbank bleiben erhalten.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
-                    localStorage.removeItem('groovelab_active_practice_session');
-                    localStorage.removeItem('student_lehrwerke_progress');
-                    window.location.reload();
-                  }
-                }}
-                style={{
-                  background: '#fee2e2',
-                  color: '#ef4444',
-                  border: '1px solid #fca5a5',
-                  padding: '12px 20px',
-                  borderRadius: '14px',
-                  fontWeight: 800,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <RotateCcw size={14} /> Lokalen Cache leeren
-              </button>
-            </div>
           </div>
         </div>
       )}
