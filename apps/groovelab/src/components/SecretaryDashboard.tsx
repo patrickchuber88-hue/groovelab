@@ -18306,6 +18306,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         </div>
                                       </div>
 
+                                      {/* Savings Display */}
+                                      <div style={{
+                                        background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+                                        border: '1px solid #10b981',
+                                        borderRadius: '16px',
+                                        padding: '14px 16px',
+                                        marginTop: '12px',
+                                        marginBottom: '16px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px'
+                                      }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span style={{ fontSize: '1.2rem' }}>💰</span>
+                                          <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Monatlich gespart:</span>
+                                            <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                              {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global).toFixed(2).replace('.', ',')} €
+                                            </strong>
+                                          </div>
+                                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Jährlich gespart:</span>
+                                            <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                              {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global * 12).toFixed(2).replace('.', ',')} €
+                                            </strong>
+                                          </div>
+                                        </div>
+                                        <span style={{ fontSize: '0.62rem', color: '#047857', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
+                                          {(billingPayer === 'student' || studentBillingOption === 'cash') 
+                                            ? '* Basierend darauf, dass aktive Schüler-Gebühren (0,49 €/Monat) direkt von den Eltern getragen werden.' 
+                                            : '* Durch Verrechnung der passiven Infrastrukturgebühr (0,09 €) bei aktiven Schülerprofilen.'
+                                          }
+                                        </span>
+                                      </div>
+
                                       {/* Info Box: How to add students (replaces slider) */}
                                       <div style={{ 
                                         display: 'flex',
