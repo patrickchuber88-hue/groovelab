@@ -3182,6 +3182,42 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
 
+        {!isGroovelabKiosk && (
+          <div style={{ marginTop: '12px', width: '100%' }}>
+            <button 
+              onClick={() => {
+                window.history.pushState({}, '', '/signup');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                background: 'transparent',
+                border: '1px dashed rgba(255, 255, 255, 0.25)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                height: '48px',
+                outline: 'none'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <School size={16} color="#a7f3d0" />
+              Neue Schule registrieren (30 Tage kostenlos)
+            </button>
+          </div>
+        )}
+
         {error && (
           <div style={{ marginTop: '16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
             {error}

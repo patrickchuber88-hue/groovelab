@@ -10,6 +10,7 @@ import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { ContractEndPrompt } from './components/ContractEndPrompt';
 import { subscribeUserToPush } from './utils/webPush';
+import { SignupWizard } from './components/SignupWizard';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -1577,6 +1578,33 @@ const DashboardLoader = () => (
 );
 
 function App() {
+  const [isSignup, setIsSignup] = useState(() => typeof window !== 'undefined' && window.location.pathname === '/signup');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      setIsSignup(window.location.pathname === '/signup');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  if (isSignup) {
+    return (
+      <SignupWizard 
+        onBackToLogin={() => {
+          window.history.pushState({}, '', '/');
+          setIsSignup(false);
+        }} 
+        onSignupSuccess={(uid) => {
+          window.history.pushState({}, '', '/');
+          setIsSignup(false);
+          setLoggedInUserId(uid);
+        }}
+      />
+    );
+  }
+
   // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
   const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
   if (qrPathMatch) {

@@ -1517,6 +1517,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
+  const [isSchoolTrial, setIsSchoolTrial] = useState<boolean>(false);
+  const [schoolTrialEndsAt, setSchoolTrialEndsAt] = useState<string | null>(null);
+  const [schoolStatus, setSchoolStatus] = useState<string>('active');
+  const [subscriptionBypass, setSubscriptionBypass] = useState<boolean>(false);
+
   const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? (localStorage.getItem('contractStartDate') || localStorage.getItem('simulatedContractStartDate')) : null;
   });
@@ -2476,7 +2481,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours')
+        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
         .eq('id', schoolId)
         .single();
 
@@ -2488,6 +2493,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setSchoolCity(schoolData.city || '');
         setSchoolStreet(schoolData.street || '');
         setEditColor(schoolData.primary_color || '#1a73e8');
+        setIsSchoolTrial(schoolData.is_trial ?? false);
+        setSchoolTrialEndsAt(schoolData.trial_ends_at || null);
+        setSchoolStatus(schoolData.status || 'active');
+        setSubscriptionBypass(schoolData.subscription_bypass ?? false);
         setLogoUrl(schoolData.logo_url || '');
         setCalendarUrl(schoolData.calendar_url || '');
         setKioskToken(schoolData.groovelab_kiosk_token || '');
@@ -8341,6 +8350,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
+  const getTrialDaysRemaining = () => {
+    if (!isSchoolTrial || !schoolTrialEndsAt) return 0;
+    const diff = new Date(schoolTrialEndsAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+  const trialDaysRemaining = getTrialDaysRemaining();
+
+  const isTrialExpired = !subscriptionBypass && (
+    schoolStatus === 'expired' || 
+    (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now())
+  );
+
+  const showBlockedOverlay = isTrialExpired && !(activeTab === 'secretary' && secretarySubTab === 'licenses');
+
   return (
     <div style={{
       display: 'flex',
@@ -8350,6 +8373,82 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
       overflow: 'hidden'
     }}>
+      {showBlockedOverlay && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif"
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            padding: '40px',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ef4444',
+              fontSize: '2rem'
+            }}>
+              🎸
+            </div>
+            <div>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
+                Testphase abgelaufen!
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.92rem', color: '#475569', lineHeight: 1.5 }}>
+                Die 30-tägige Testphase für deine Musikschule <strong>{schoolName}</strong> ist abgelaufen. Um alle Funktionen, Stundenpläne und Schüler-Dashboards weiterhin zu nutzen, schließe bitte den offiziellen Bestellprozess ab.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setActiveTab('secretary');
+                setSecretarySubTab('licenses');
+              }}
+              style={{
+                width: '100%',
+                padding: '16px 24px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 900,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 10px 20px rgba(16, 185, 129, 0.18)',
+                transition: 'all 0.2s',
+                outline: 'none'
+              }}
+            >
+              Jetzt Vertrag abschließen (Bestellprozess)
+            </button>
+          </div>
+        </div>
+      )}
       {/* Global CSS injections matching the screenshot design */}
       <style dangerouslySetInnerHTML={{__html: `
         .google-card {
@@ -9595,7 +9694,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           flexShrink: 0
         }} />
 
-        {!hasCampusSub && !hasGroovelabSub && (
+        {!isSchoolTrial && !hasCampusSub && !hasGroovelabSub && (
           <div style={{
             background: '#e8f0fe',
             borderBottom: '1px solid #d2e3fc',
@@ -9611,6 +9710,62 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           }}>
             <span>🛠️</span>
             <span><strong>Setup-Modus aktiv:</strong> Die {schoolName || 'Musikschule'} befindet sich in der Konfigurationsphase. Aktuell entstehen für Ihre Schule keine Infrastruktur- oder Nutzungsgebühren.</span>
+          </div>
+        )}
+
+        {isSchoolTrial && !subscriptionBypass && (
+          <div style={{
+            background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
+              ? '#fef2f2'
+              : (trialDaysRemaining <= 7 ? '#fff7ed' : '#f0fdf4'),
+            borderBottom: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
+              ? '1px solid #fee2e2'
+              : (trialDaysRemaining <= 7 ? '1px solid #ffedd5' : '1px solid #dcfce7'),
+            padding: '10px 40px',
+            fontSize: '0.82rem',
+            color: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
+              ? '#b91c1c'
+              : (trialDaysRemaining <= 7 ? '#c2410c' : '#15803d'),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 700,
+            fontFamily: 'Inter, sans-serif',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>✨</span>
+              <span>
+                {(isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired') ? (
+                  <><strong>Testphase abgelaufen:</strong> Bitte schließe den Bestellprozess ab, um Campus-Groovelab weiter zu nutzen.</>
+                ) : (
+                  <><strong>Testphase aktiv:</strong> Deine Musikschule hat noch <strong>{trialDaysRemaining} Tage</strong> Zeit, um Campus-Groovelab einzurichten und zu testen.</>
+                )}
+              </span>
+            </div>
+            {!(activeTab === 'secretary' && secretarySubTab === 'licenses') && (
+              <button
+                onClick={() => {
+                  setActiveTab('secretary');
+                  setSecretarySubTab('licenses');
+                }}
+                style={{
+                  background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
+                    ? '#dc2626'
+                    : (trialDaysRemaining <= 7 ? '#ea580c' : '#16a34a'),
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '6px 16px',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+                }}
+              >
+                Bestellprozess abschließen
+              </button>
+            )}
           </div>
         )}
 
@@ -18339,6 +18494,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                                         if (simulatedToday) {
                                           setIsBillingBooked(true);
+                                          setIsSchoolTrial(false);
+                                          setSchoolStatus('active');
                                           if (typeof window !== 'undefined') {
                                             localStorage.setItem('isBillingBooked', 'true');
                                             localStorage.setItem('contractStartDate', todayStr);
@@ -18354,12 +18511,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             has_campus_subscription: hasCampusSub,
                                             has_groovelab_subscription: hasGroovelabSub,
                                             student_billing_option: studentBillingOption,
-                                            contract_start_date: todayStr
+                                            contract_start_date: todayStr,
+                                             is_trial: false,
+                                             status: 'active'
                                           })
                                           .eq('id', schoolId);
                                         if (error) throw error;
 
                                         setIsBillingBooked(true);
+                                        setIsSchoolTrial(false);
+                                        setSchoolStatus('active');
                                         if (typeof window !== 'undefined') {
                                           localStorage.setItem('isBillingBooked', 'true');
                                         }
