@@ -1,50 +1,37 @@
-# BRIEFING — 2026-06-19T17:58:00+02:00
+# BRIEFING — 2026-06-21T10:13:41Z
 
 ## Mission
-Investigate and report the git and workspace state in the Groovelab app repository.
+Execute a 15-minute real-time realistic load simulation with ca. 6,500 active users on Supabase, evaluate results with a 5-member expert team, and generate a consolidated report `simulation_reports_15m_realistic.md`.
 
 ## 🔒 My Identity
 - Archetype: sentinel
-- Roles: implementer, qa, specialist
-- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents
-- Orchestrator: b40d629c-4e93-414c-9df6-9b02cf118cba
-- Active Orchestrator: 35f78602-4988-417a-a508-8e301a0b7622
-- Successor Orchestrator (Gen 1): 428e2662-d635-4333-874d-26ad0109aa0d
-- Successor Orchestrator (Gen 2): 519cf263-97b9-436c-aaf7-7c5546234009
-- Victory Auditor: TBD
+- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/
+- Orchestrator: c20c2c3a-0ea6-4619-9246-9fc69af57e45
+- Victory Auditor: 0e45234a-d35c-4b9f-a400-492dfdb0f3d6
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
-- Development integrity mode, mac OS, Groovelab app repository
-- Benchmark integrity mode, mac OS, Groovelab app repository
+- Integrity mode: development
+- Simulation must run for exactly 15 minutes, covering all 10 newly created dummy schools with realistic pathways and comprehensive coverage of all application features (progress tracking, help requests, bands matching-board, and lab planning).
+- A script execution log must be saved in `simulation_realistic_15m.log`.
+- Report must cover precision latency metrics (p50, p95, p99), RLS policies/vulnerabilities, and database/code optimization recommendations with SQL/code examples in `simulation_reports_15m_realistic.md`.
 
-## Current Parent
-- Conversation ID: 428e2662-d635-4333-874d-26ad0109aa0d
-- Updated: 2026-06-19T17:58:00+02:00
+## User Context
+- **Last user request**: Execute a 15-minute realistic load simulation with 6,500 active users and write `simulation_reports_15m_realistic.md` evaluated by a 5-member expert team.
+- **Pending clarifications**: none
+- **Delivered results**: simulation_reports_15m_realistic.md, simulation_realistic_15m.log
 
-## Task Summary
-- **What to build**: Investigate git status, branch, stashes, and the contents of CampusEventsBoard.tsx (Milestone 5 features presence).
-- **Success criteria**: Correctly document and verify all git information and file states.
-- **Interface contracts**: N/A
-- **Code layout**: N/A
+## Project Status
+- **Phase**: complete
 
-## Key Decisions Made
-- Checked active file vs. stash@{0} using git commands.
-- Verified that Milestone 5 changes reside in stash@{0} and not the active file.
+## Victory Audit Status
+- **Triggered**: yes
+- **Verdict**: VICTORY CONFIRMED
+- **Retry count**: 0
 
 ## Artifact Index
-- /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/git_status_investigation.txt — Findings file
-
-## Change Tracker
-- **Files modified**: none
-- **Build status**: N/A
-- **Pending issues**: none
-
-## Quality Status
-- **Build/test result**: N/A
-- **Lint status**: N/A
-- **Tests added/modified**: none
-
-## Loaded Skills
-None.
+- ORIGINAL_REQUEST.md — Verbatim user request history
+- BRIEFING.md — Sentinel memory and status tracker
+- simulation_realistic_15m.log — Execution logs from the 15-minute realistic load test
+- simulation_reports_15m_realistic.md — Consolidated expert team evaluation report

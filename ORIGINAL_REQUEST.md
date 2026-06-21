@@ -37,3 +37,66 @@ Integrity mode: development
 ### Packlist & Export
 - [ ] Consolidated equipment pack list (chairs, music stands, tech requirements) is computed and displayed.
 - [ ] Excel/CSV export is functional and respects the checkbox selections for columns.
+
+## Follow-up — 2026-06-21T08:38:28Z
+
+Wir müssen die 4 verbleibenden Fehler im Real-Mode E2E-Test-Runner beheben, damit alle 123 Tests im Real-Modus (USE_MOCK=false) erfolgreich durchlaufen.
+
+Arbeitsverzeichnis: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integritätsmodus: development
+
+## Anforderungen
+
+### R1. Analyse und Behebung der 4 Testfehler im Real-Modus
+- Untersuche und behebe die folgenden fehlgeschlagenen Testfälle in `apps/groovelab/src/tests/e2e_test_cases.ts` oder den entsprechenden Datenbank-Richtlinien/Triggern:
+  1. **`T1_F1_2`**: Student lessons werden in der realen Datenbank nicht zurückgegeben. Überprüfe die RLS-Richtlinie auf der Tabelle `lessons` oder die Test-Seeding-Daten.
+  2. **`T2_F8_4`**: TypeError bei `additional_feedback_responses`. Stelle sicher, dass der Programmpunkt vor dem Auslesen korrekt angelegt wurde.
+  3. **`T4_1`**: TypeError bei `id` während des Gala-Konzert-Szenarios. Behebe fehlende Verknüpfungen oder fehlgeschlagene Datenbank-Inserts.
+  4. **`T4_5`**: TypeError bei `name` während des Security-Audits. Behebe das unvollständige Laden der Benutzer- bzw. Rollen-Objekte im Real-Modus.
+
+### R2. Beibehaltung der Test-Integrität
+- Stelle sicher, dass keine produktiven Benutzer- oder Schulinformationen modifiziert oder gelöscht werden (nur Testdaten mit `school_id` wie `school-1` oder temporär generierten IDs verwenden).
+- Die Testfälle müssen weiterhin im Mock-Modus (`USE_MOCK=true`) zu 100% bestehen.
+
+## Akzeptanzkriterien
+
+- [ ] Die 4 fehlerhaften Tests sind korrigiert.
+- [ ] Der Real-Mode E2E-Test-Runner läuft erfolgreich durch:
+  ```bash
+  USE_MOCK=false npx tsx apps/groovelab/src/tests/run_e2e_tests.ts
+  ```
+  liefert **123/123 bestandene Tests (100% Success rate)**.
+- [ ] Alle Änderungen wurden durch den Victory-Auditor auf Integrität geprüft.
+
+## Follow-up — 2026-06-21T09:15:15Z
+
+Führe eine 15-minütige Echtzeit-Lastsimulation mit ca. 6.500 aktiven Benutzern auf der Supabase-Datenbank aus und evaluiere die Ergebnisse durch ein 5-köpfiges Expertenteam.
+
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integrity mode: development
+
+## Requirements
+
+### R1. Lastsimulations-Skript & Ausführung
+Ein Node.js-Skript soll erstellt und ausgeführt werden, das 15 Minuten lang Zugriffe von den ~6.500 erstellten Dummy-Benutzern simuliert (70% Lese-Operationen, 20% Check-ins, 10% Schreib-Operationen).
+
+### R2. Expertenteam-Auswertung
+Fünf spezialisierte Agenten-Rollen (Quality Control, Cyber-Security, Database, Server/Infrastructure, App Developer) müssen die Simulationsdaten analysieren und spezifische Berichte erstellen.
+
+### R3. Konsolidierter Report
+Ein zusammenfassender Report im Format von `simulation_reports_15m.md` soll erstellt werden, der alle Erkenntnisse und konkrete Optimierungsvorschläge enthält.
+
+## Acceptance Criteria
+
+### Simulationserfolg
+- [ ] Das Lasttest-Skript läuft stabil über die vollen 15 Minuten.
+- [ ] Anfragen werden für alle 10 neu angelegten Dummy-Schulen durchgeführt.
+- [ ] Ein Log-Protokoll der Skript-Ausführung wird im Projektverzeichnis gespeichert.
+
+### Analyse-Qualität
+- [ ] Der Report enthält präzise Latenzmetriken (p50, p95, p99).
+- [ ] RLS-Richtlinien und eventuelle Sicherheitslücken (z. B. RLS-Violations) sind dokumentiert.
+- [ ] Vorschläge zur Code- und Datenbankoptimierung (z. B. RPCs, Indizes) sind mit SQL/Code-Beispielen hinterlegt.
+
+## Verification
+- Der Erfolg der Simulation wird durch das Vorhandensein des Ausführungsprotokolls (Log-Datei) und die Datei `simulation_reports_15m.md` im Projektverzeichnis verifiziert.

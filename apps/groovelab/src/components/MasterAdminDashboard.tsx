@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
-  Edit2, Settings, Sliders, Search
+  Edit2, Settings, Sliders, Search, Tag, Percent
 } from 'lucide-react';
 
 import { BillingDashboard } from './BillingDashboard';
@@ -86,7 +86,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [newSchoolZip, setNewSchoolZip] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
-  const [activePortalTab, setActivePortalTab] = useState<'schools' | 'billing'>('schools');
+  const [activePortalTab, setActivePortalTab] = useState<'schools' | 'billing' | 'banking' | 'pricing'>('schools');
   
   // Editing State
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
@@ -101,6 +101,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+
+    // Pricing States
+  const [priceCampus, setPriceCampus] = useState<number | string>(4.99);
+  const [priceGroovelab, setPriceGroovelab] = useState<number | string>(2.49);
+  const [priceTeacher, setPriceTeacher] = useState<number | string>(0.49);
+  const [priceStudent, setPriceStudent] = useState<number | string>(0.49);
+  const [specialOffers, setSpecialOffers] = useState<any[]>([]);
+  const [newOfferName, setNewOfferName] = useState('');
+  const [newOfferDiscount, setNewOfferDiscount] = useState(10);
+  const [newOfferCode, setNewOfferCode] = useState('');
+  const [newOfferActive, setNewOfferActive] = useState(true);
 
   // Master Billing Settings State
   const [billingCompany, setBillingCompany] = useState('Simplified Work GbR');
@@ -162,13 +173,68 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         setBillingCity(data.city || '');
         setBillingIban(data.iban || '');
         setBillingBic(data.bic || '');
+        setPriceCampus(data.price_module_campus ?? 4.99);
+        setPriceGroovelab(data.price_module_groovelab ?? 2.49);
+        setPriceTeacher(data.price_user_teacher ?? 0.49);
+        setPriceStudent(data.price_user_student ?? 0.49);
+        setSpecialOffers(data.special_offers ?? []);
       }
     } catch (err) {
       console.error('Error fetching billing settings:', err);
     }
   };
 
-  const handleUpdateBillingSettings = async (e: React.FormEvent) => {
+  const handleUpdatePricingSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setUpdatingBilling(true);
+      const { error } = await supabase
+        .from('master_billing_settings')
+        .update({
+          price_module_campus: Number(priceCampus),
+          price_module_groovelab: Number(priceGroovelab),
+          price_user_teacher: Number(priceTeacher),
+          price_user_student: Number(priceStudent),
+          special_offers: specialOffers,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 1);
+      if (error) throw error;
+      alert('System-Preise & Angebote erfolgreich aktualisiert!');
+    } catch (err: any) {
+      alert('Fehler beim Speichern der Preise: ' + err.message);
+    } finally {
+      setUpdatingBilling(false);
+    }
+  };
+
+  const handleAddSpecialOffer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOfferName.trim()) return;
+    const newOffer = {
+      id: Math.random().toString(36).substring(2, 9),
+      name: newOfferName.trim(),
+      discount_percent: Number(newOfferDiscount),
+      code: newOfferCode.trim().toUpperCase(),
+      is_active: newOfferActive,
+      created_at: new Date().toISOString()
+    };
+    setSpecialOffers([...specialOffers, newOffer]);
+    setNewOfferName('');
+    setNewOfferDiscount(10);
+    setNewOfferCode('');
+    setNewOfferActive(true);
+  };
+
+  const handleDeleteSpecialOffer = (id: string) => {
+    setSpecialOffers(specialOffers.filter(o => o.id !== id));
+  };
+
+  const handleToggleOfferActive = (id: string) => {
+    setSpecialOffers(specialOffers.map(o => o.id === id ? { ...o, is_active: !o.is_active } : o));
+  };
+
+    const handleUpdateBillingSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setUpdatingBilling(true);
@@ -311,40 +377,43 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       setSchools(schoolData || []);
 
       const [
-        { data: users },
+        { data: statsData },
+        { data: staffUsers },
         { data: songs },
         { data: bands },
         { count: sessionCount }
       ] = await Promise.all([
-        supabase.from('users').select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated'),
+        supabase.from('school_user_statistics').select('*'),
+        supabase.from('users').select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated').or('role.eq.secretary,role.eq.admin,role.eq.teacher'),
         supabase.from('songs').select('school_id'),
         supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
       ]);
 
-      const teachersCount = users?.filter(u => u.role === 'teacher' || u.role === 'admin').length || 0;
-      const studentsCount = users?.filter(u => u.role === 'student').length || 0;
+      const totalTeachersSum = statsData?.reduce((acc, curr) => acc + (curr.teachers || 0), 0) || 0;
+      const totalStudentsSum = statsData?.reduce((acc, curr) => acc + (curr.students || 0), 0) || 0;
 
       setStats({
         totalSchools: schoolData?.length || 0,
-        totalTeachers: teachersCount,
-        totalStudents: studentsCount,
+        totalTeachers: totalTeachersSum,
+        totalStudents: totalStudentsSum,
         totalSessions: sessionCount || 0
       });
 
       const sStats: Record<string, any> = {};
       schoolData?.forEach(school => {
-        const schoolUsers = users?.filter(u => u.school_id === school.id) || [];
+        const schoolStatsRow = statsData?.find(s => s.school_id === school.id) || {};
+        const schoolStaff = staffUsers?.filter(u => u.school_id === school.id) || [];
         sStats[school.id] = {
-          teachers: schoolUsers.filter(u => u.role === 'teacher' || u.role === 'admin').length,
-          students: schoolUsers.filter(u => u.role === 'student').length,
-          teachersCampus: schoolUsers.filter(u => (u.role === 'teacher' || u.role === 'admin') && u.is_campus_active).length,
-          teachersGroovelab: schoolUsers.filter(u => (u.role === 'teacher' || u.role === 'admin') && u.is_groovelab_active).length,
-          studentsCampus: schoolUsers.filter(u => u.role === 'student' && u.is_campus_active).length,
-          studentsGroovelab: schoolUsers.filter(u => u.role === 'student' && u.is_groovelab_active).length,
+          teachers: schoolStatsRow.teachers || 0,
+          students: schoolStatsRow.students || 0,
+          teachersCampus: schoolStatsRow.teachers_campus || 0,
+          teachersGroovelab: schoolStatsRow.teachers_groovelab || 0,
+          studentsCampus: schoolStatsRow.students_campus || 0,
+          studentsGroovelab: schoolStatsRow.students_groovelab || 0,
           songs: songs?.filter(s => s.school_id === school.id).length || 0,
           bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
-          adminUsers: schoolUsers.filter(u => u.role === 'secretary' || u.role === 'admin')
+          adminUsers: schoolStaff.filter(u => u.role === 'secretary' || u.role === 'admin')
         };
       });
       setSchoolStats(sStats);
@@ -448,1821 +517,2156 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'radial-gradient(circle at 50% 0%, #fcfdfe 0%, #f4f6fa 100%)',
-      color: '#1d1d1f',
+      background: 'radial-gradient(circle at 50% 0%, #fcfdfe 0%, #f3f6fa 50%, #e9edf5 100%)',
+      color: '#1e293b',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
-      padding: '40px 24px',
-      transition: 'all 0.3s ease'
+      padding: '0',
+      transition: 'all 0.3s ease',
+      position: 'relative',
+      overflowX: 'hidden'
     }}>
-      {/* Premium Apple-Style Header Card */}
+      {/* World-Class Background Decorative Blobs */}
       <div style={{
-        maxWidth: '100%',
-        width: '100%',
-        margin: '0 auto 40px auto',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: '#ffffff',
-        padding: '24px 32px',
-        borderRadius: '24px',
-        border: '1px solid rgba(0, 0, 0, 0.04)',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-            padding: '14px',
-            borderRadius: '18px',
-            boxShadow: '0 8px 24px rgba(234, 179, 8, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Shield size={28} color="#ffffff" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.03em', color: '#1d1d1f' }}>
-              GrooveLab Master Portal
-            </h1>
-            <p style={{ fontSize: '0.9rem', color: '#8e8e93', margin: '4px 0 0 0', fontWeight: 600 }}>
-              Globale Multi-Tenant Verwaltung & Provisionierung
-            </p>
-          </div>
-        </div>
-
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', gap: '8px', background: '#f5f5f7', padding: '4px', borderRadius: '14px' }}>
-          <button
-            onClick={() => setActivePortalTab('schools')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activePortalTab === 'schools' ? '#ffffff' : 'transparent',
-              color: activePortalTab === 'schools' ? '#1d1d1f' : '#8e8e93',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: activePortalTab === 'schools' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
-            }}
-          >
-            🏫 Schulen
-          </button>
-          <button
-            onClick={() => setActivePortalTab('billing')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activePortalTab === 'billing' ? '#ffffff' : 'transparent',
-              color: activePortalTab === 'billing' ? '#1d1d1f' : '#8e8e93',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: activePortalTab === 'billing' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
-            }}
-          >
-            💳 Abrechnung
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            onClick={fetchSchoolsAndStats}
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '14px',
-              background: '#ffffff',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-              color: '#8e8e93',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
-            }}
-            className="hover-scale-mini"
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0,0,0,0.15)';
-              e.currentTarget.style.color = '#1d1d1f';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-              e.currentTarget.style.color = '#8e8e93';
-            }}
-          >
-            <RefreshCw size={18} />
-          </button>
-          
-          <button
-            onClick={onLogout}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '14px',
-              background: '#ff3b30', // iOS Red
-              border: 'none',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 8px 24px rgba(255, 59, 48, 0.15)',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale-mini"
-          >
-            <LogOut size={16} /> Abmelden
-          </button>
-        </div>
-      </div>
-
-      {activePortalTab === 'billing' ? (
-        <BillingDashboard />
-      ) : (
-        <>
-          {/* KPI Stats Grid */}
-          <div style={{
-        maxWidth: '100%',
-        width: '100%',
-        margin: '0 auto 40px auto',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '20px'
-      }}>
-        {[
-          { title: 'Registrierte Schulen', value: stats.totalSchools, icon: <Layers size={20} />, color: '#eab308' },
-          { title: 'Verknüpfte Lehrer', value: stats.totalTeachers, icon: <Users size={20} />, color: '#3b82f6' },
-          { title: 'Aktive Schüler', value: stats.totalStudents, icon: <Award size={20} />, color: '#22c55e' },
-          { title: 'Sitzungen im Labor', value: stats.totalSessions, icon: <Clock size={20} />, color: '#a855f7' }
-        ].map((kpi, idx) => (
-          <div key={idx} style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            padding: '24px 28px',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            transition: 'all 0.2s ease',
-            cursor: 'default'
-          }}
-          className="hover-scale-mini"
-          >
-            <div>
-              <p style={{ color: '#8e8e93', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>
-                {kpi.title}
-              </p>
-              <h3 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '6px 0 0 0', color: '#1d1d1f', letterSpacing: '-0.04em' }}>
-                {kpi.value}
-              </h3>
-            </div>
-            <div style={{
-              background: `${kpi.color}0c`,
-              color: kpi.color,
-              width: '48px',
-              height: '48px',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: `1px solid ${kpi.color}15`,
-            }}>
-              {kpi.icon}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main Workspace Layout */}
+        position: 'fixed',
+        top: '-10%',
+        right: '-10%',
+        width: '50vw',
+        height: '50vw',
+        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%)',
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
       <div style={{
-        maxWidth: '100%',
-        width: '100%',
-        margin: '0 auto',
+        position: 'fixed',
+        bottom: '-10%',
+        left: '-10%',
+        width: '50vw',
+        height: '50vw',
+        background: 'radial-gradient(circle, rgba(234, 179, 8, 0.04) 0%, transparent 70%)',
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+
+      {/* Main Container Layout */}
+      <div style={{
         display: 'grid',
-        gridTemplateColumns: '7fr 5fr',
-        gap: '30px',
-        alignItems: 'start'
+        gridTemplateColumns: '290px 1fr',
+        minHeight: '100vh',
+        position: 'relative',
+        zIndex: 1
       }}>
-        
-        {/* Left Side: Schools flex card list */}
+        {/* Left Premium Sidebar */}
         <div style={{
-          background: '#ffffff',
-          borderRadius: '28px',
-          padding: '32px',
-          border: '1px solid rgba(0, 0, 0, 0.04)',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)',
-          minHeight: '400px',
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(35px)',
+          WebkitBackdropFilter: 'blur(35px)',
+          borderRight: '1px solid rgba(15, 23, 42, 0.06)',
+          padding: '40px 24px 32px 24px',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          boxShadow: '4px 0 24px rgba(15, 23, 42, 0.01)'
         }}>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
-            <Layers size={22} color="#eab308" /> Schulen & Tenants
-          </h2>
-
-          {/* School Search Input */}
-          <div style={{ position: 'relative', marginBottom: '20px' }}>
-            <Search size={18} color="#8e8e93" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Schulen nach Name, PLZ oder Ort durchsuchen..."
-              value={schoolSearchQuery}
-              onChange={(e) => setSchoolSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '12px 16px 12px 48px',
-                borderRadius: '14px',
-                border: '1.5px solid #e2e8f0',
-                background: '#f8fafc',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                outline: 'none',
-                transition: 'all 0.2s ease',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.background = '#ffffff';
-                e.currentTarget.style.borderColor = '#eab308';
-                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.background = '#f8fafc';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-
-          {loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '16px' }}>
-              <div className="loader" style={{
-                border: '4px solid rgba(0,0,0,0.05)',
-                borderLeftColor: '#eab308',
-                borderRadius: '50%',
-                width: '36px',
-                height: '36px',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <p style={{ color: '#8e8e93', fontSize: '0.95rem', fontWeight: 600 }}>Lade Schulregister...</p>
+          <div>
+            {/* App Logo & Branding */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '44px', padding: '0 8px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Shield size={20} color="#ffffff" />
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                  Campus-Groovelab
+                </h1>
+                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Admin Leitstand
+                </span>
+              </div>
             </div>
-          ) : schools.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8e8e93', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              Keine Schulen im System registriert. Lege rechts deine erste Schule an!
-            </div>
-          ) : filteredSchools.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8e8e93', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            Keine Schulen gefunden, die deiner Suche entsprechen.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filteredSchools.map((school) => {
-                const teachers = schoolStats[school.id]?.teachers || 0;
-                const students = schoolStats[school.id]?.students || 0;
-                const songs = schoolStats[school.id]?.songs || 0;
-                const bands = schoolStats[school.id]?.bands || 0;
 
+            {/* Sidebar Navigation */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'billing', label: 'Abrechnung & Lizenzen', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
+                { id: 'banking', label: 'Adresse & Banking', icon: <Settings size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
+              ].map((tab) => {
+                const isActive = activePortalTab === tab.id;
                 return (
-                  <div 
-                    key={school.id} 
-                    onClick={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('button') || target.closest('input') || target.closest('a')) {
-                        return;
-                      }
-                      setSelectedSchool(school);
-                      setEditName(school.name);
-                      setEditColor(school.primary_color || '#3b82f6');
-                      setEditLogo(school.logo_url || '');
-                      setEditStatus(school.status || 'active');
-                      setEditIsTrial(school.is_trial ?? true);
-                      setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
-                      setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
-                      setEditMaxTeachers(school.max_teachers ?? 2);
-                      setEditMaxStudents(school.max_students ?? 6);
-                      setEditMaxSongs(school.max_songs ?? 5);
-                      setEditLimitsEnabled(school.limits_enabled ?? false);
-                      setEditTrialOption('custom');
-                      setEditZipCode(school.zip_code || '');
-                      setEditCity(school.city || '');
-                      setEditHasGroovelab(school.has_groovelab_subscription ?? false);
-                      setEditHasCampus(school.has_campus_subscription ?? false);
-                      setEditSubscriptionBypass(school.subscription_bypass ?? false);
-                    }}
-                    style={{ 
-                      borderRadius: '18px',
-                      padding: '16px 20px',
-                      border: '1.5px solid #f1f5f9',
-                      background: '#ffffff',
+                  <button
+                    key={tab.id}
+                    onClick={() => setActivePortalTab(tab.id as any)}
+                    style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      gap: '12px',
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isActive ? tab.bg : 'transparent',
+                      color: isActive ? tab.color : '#475569',
+                      fontSize: '0.88rem',
+                      fontWeight: isActive ? 800 : 600,
                       cursor: 'pointer',
-                      transition: 'all 0.25s ease',
-                      gap: '16px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                      textAlign: 'left',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.02)' : 'none'
                     }}
-                    className="hover-scale-mini"
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.borderColor = school.primary_color || '#3b82f6';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.03)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.borderColor = '#f1f5f9';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
-                    }}
+                    className="sidebar-nav-btn"
                   >
-                    {/* Brand Icon / Logo & Info */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '14px',
-                        background: `linear-gradient(135deg, ${school.primary_color || '#3b82f6'} 0%, ${school.primary_color ? school.primary_color + 'dd' : '#1d4ed8'} 100%)`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 900,
-                        color: '#ffffff',
-                        fontSize: '1.1rem',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                        flexShrink: 0,
-                        overflow: 'hidden'
-                      }}>
-                        {school.logo_url ? (
-                          <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
-                        ) : (
-                          school.name.substring(0, 2).toUpperCase()
-                        )}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {school.name}
-                        </div>
-                        {(school.zip_code || school.city) && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
-                            <MapPin size={12} color="#94a3b8" />
-                            <span>{school.zip_code || ''} {school.city || ''}</span>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#8e8e93', fontFamily: 'monospace' }}>
-                            {school.id.substring(0, 8)}...
-                          </span>
-                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#d1d1d6' }}></span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93' }}>
-                            {teachers} L • {students} S • {bands} B{school.limits_enabled && ' • ⚖️ Limits'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          {school.has_campus_subscription && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0071e3', background: '#0071e310', padding: '2px 8px', borderRadius: '100px' }}>
-                              🎓 Campus
-                            </span>
-                          )}
-                          {school.has_groovelab_subscription && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ff9500', background: '#ff950010', padding: '2px 8px', borderRadius: '100px' }}>
-                              🎸 GrooveLab
-                            </span>
-                          )}
-                          {school.subscription_bypass && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ff3b30', background: '#ff3b3010', padding: '2px 8px', borderRadius: '100px', border: '1px dashed #ff3b3030' }}>
-                              ⚙️ Bypass
-                            </span>
-                          )}
-                          {!school.has_campus_subscription && !school.has_groovelab_subscription && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8e8e93', background: '#8e8e9310', padding: '2px 8px', borderRadius: '100px' }}>
-                              Kein Abo
-                            </span>
-                          )}
-                        </div>
-                        {school.limits_enabled && (
-                          <div style={{ display: 'flex', gap: '16px', marginTop: '10px', flexWrap: 'wrap' }}>
-                            {[
-                              { label: 'Lehrer', cur: teachers, max: school.max_teachers ?? 2, color: '#3b82f6' },
-                              { label: 'Schüler', cur: students, max: school.max_students ?? 6, color: '#22c55e' },
-                              { label: 'Songs', cur: songs, max: school.max_songs ?? 5, color: '#eab308' }
-                            ].map((item, i) => {
-                              const pct = Math.min(100, (item.cur / item.max) * 100);
-                              const isClose = pct >= 90;
-                              const barColor = isClose ? '#ef4444' : item.color;
-                              return (
-                                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '90px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 800, color: isClose ? '#ef4444' : '#8e8e93' }}>
-                                    <span>{item.label}</span>
-                                    <span>{item.cur}/{item.max}</span>
-                                  </div>
-                                  <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
-                                    <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions & Toggles */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                      {/* iOS Style Toggle Pause */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleSchoolPause(school.id, school.is_paused);
-                        }}
-                        style={{
-                          position: 'relative',
-                          width: '42px',
-                          height: '24px',
-                          borderRadius: '12px',
-                          background: school.is_paused ? '#e5e5ea' : '#34c759', // iOS Gray vs iOS Green
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '0',
-                          transition: 'background-color 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)'
-                        }}
-                        title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
-                      >
-                        <div style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          background: '#ffffff',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-                          transition: 'transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                          transform: school.is_paused ? 'translateX(2px)' : 'translateX(20px)'
-                        }} />
-                      </button>
-
-                      {/* Pill Invite Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyInviteLink(school.id, school.name, school.secretary_onboarding_token);
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          borderRadius: '100px',
-                          background: copiedId === school.id ? '#34c75915' : '#f2f2f7',
-                          border: 'none',
-                          color: copiedId === school.id ? '#34c759' : '#0071e3', // iOS Green vs iOS Blue
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        {copiedId === school.id ? (
-                          <>
-                            <Check size={13} /> Kopiert
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} /> Einladung
-                          </>
-                        )}
-                      </button>
-
-                      {/* Trash Delete Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSchool(school.id, school.name);
-                        }}
-                        style={{
-                          padding: '8px',
-                          borderRadius: '50%',
-                          background: '#f2f2f7',
-                          border: 'none',
-                          color: '#ff3b30',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease',
-                          width: '32px',
-                          height: '32px'
-                        }}
-                        className="hover-scale-mini"
-                        title="Schule löschen"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
+                    <span style={{ color: isActive ? tab.color : '#64748b', transition: 'color 0.2s' }}>
+                      {tab.icon}
+                    </span>
+                    <span>{tab.label}</span>
+                  </button>
                 );
               })}
             </div>
-          )}
-        </div>
-
-        {/* Right Side: Wrapper for Forms */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-          
-          {/* Create School Form Card */}
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '28px',
-            padding: '32px',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
-          }}>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
-              <Plus size={22} color="#eab308" /> Schule anlegen
-            </h2>
-
-            <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Name der Schule *
-                </label>
-                <input
-                  type="text"
-                  value={newSchoolName}
-                  onChange={(e) => setNewSchoolName(e.target.value)}
-                  placeholder="Musterschule"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = '#f5f5f7';
-                    e.currentTarget.style.borderColor = 'transparent';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    PLZ
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchoolZip}
-                    onChange={(e) => setNewSchoolZip(e.target.value)}
-                    placeholder="z.B. 80331"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#f5f5f7',
-                      border: '1px solid transparent',
-                      color: '#1d1d1f',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.borderColor = '#eab308';
-                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.background = '#f5f5f7';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Ort
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchoolCity}
-                    onChange={(e) => setNewSchoolCity(e.target.value)}
-                    placeholder="z.B. München"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#f5f5f7',
-                      border: '1px solid transparent',
-                      color: '#1d1d1f',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.borderColor = '#eab308';
-                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.background = '#f5f5f7';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Primäre Branding-Farbe
-                </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <input
-                    type="color"
-                    value={newSchoolColor}
-                    onChange={(e) => setNewSchoolColor(e.target.value)}
-                    style={{
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      background: '#ffffff',
-                      boxSizing: 'border-box',
-                      padding: '4px'
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={newSchoolColor}
-                    onChange={(e) => setNewSchoolColor(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      background: '#f5f5f7',
-                      border: '1px solid transparent',
-                      color: '#1d1d1f',
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      outline: 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.borderColor = '#eab308';
-                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.background = '#f5f5f7';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Logo URL (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newSchoolLogo}
-                  onChange={(e) => setNewSchoolLogo(e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = '#f5f5f7';
-                    e.currentTarget.style.borderColor = 'transparent';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={creating}
-                style={{
-                  marginTop: '10px',
-                  padding: '14px 20px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                  border: 'none',
-                  color: '#ffffff',
-                  fontWeight: 900,
-                  fontSize: '0.95rem',
-                  letterSpacing: '0.02em',
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(234, 179, 8, 0.2)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-                className="hover-scale-mini"
-              >
-                {creating ? 'Wird angelegt...' : (
-                  <>
-                    <Plus size={18} /> Neue Schule provisionieren
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Guide Card (iOS Style Tip) */}
-            <div style={{
-              marginTop: '32px',
-              padding: '20px',
-              background: '#fdfaf2', // Soft warm yellow
-              border: '1px solid rgba(234, 179, 8, 0.12)',
-              borderRadius: '18px',
-              fontSize: '0.85rem',
-              color: '#92400e',
-              lineHeight: '1.6'
-            }}>
-              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#b45309', fontWeight: 800 }}>
-                💡 Wie erstelle ich einen Lehrer?
-              </strong>
-              1. Trage den Schulnamen ein und klicke auf "Provisionieren".
-              <br />
-              2. Kopiere den <strong>Einladungs-Link</strong> für die neu erstellte Schule.
-              <br />
-              3. Sende diesen Link an den Lehrer der Schule.
-              <br />
-              4. Der Lehrer klickt darauf, registriert sich selbst und die App verknüpft sein Profil automatisch als Admin/Lehrer dieser Schule!
-            </div>
           </div>
 
-          {/* Master Admin Credentials Card */}
+          {/* Sidebar Footer (Profile / Logout) */}
           <div style={{
-            background: '#ffffff',
-            borderRadius: '28px',
-            padding: '32px',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
+            borderTop: '1px solid rgba(15, 23, 42, 0.06)',
+            paddingTop: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
           }}>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
-              <Shield size={22} color="#eab308" /> Master-Admin Zugang
-            </h2>
-
-            <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Benutzername
-                </label>
-                <input
-                  type={usernameFocused ? "text" : "password"}
-                  value={adminUsername}
-                  onChange={(e) => setAdminUsername(e.target.value)}
-                  placeholder="admin"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                    setUsernameFocused(true);
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = '#f5f5f7';
-                    e.currentTarget.style.borderColor = 'transparent';
-                    e.currentTarget.style.boxShadow = 'none';
-                    setUsernameFocused(false);
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Passwort
-                </label>
-                <input
-                  type={passwordFocused ? "text" : "password"}
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="groovelab2026"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.borderColor = '#eab308';
-                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(234, 179, 8, 0.12)';
-                    setPasswordFocused(true);
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = '#f5f5f7';
-                    e.currentTarget.style.borderColor = 'transparent';
-                    e.currentTarget.style.boxShadow = 'none';
-                    setPasswordFocused(false);
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={updatingAdmin}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '14px',
-                  background: '#1d1d1f', // iOS Solid Dark
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-                  transition: 'all 0.2s'
-                }}
-                className="hover-scale-mini"
-              >
-                {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
-              </button>
-            </form>
-
-            {adminUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px' }}>
               <div style={{
-                marginTop: '28px',
-                padding: '24px',
-                background: '#f5f5f7',
-                borderRadius: '20px',
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '16px',
-                border: '1px solid rgba(0,0,0,0.02)'
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontWeight: 900,
+                fontSize: '0.8rem',
+                boxShadow: '0 4px 10px rgba(15, 23, 42, 0.15)'
               }}>
-                <strong style={{ fontSize: '0.8rem', color: '#8e8e93', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Master-Admin QR-Code
-                </strong>
+                MA
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {adminUsername || 'Master Admin'}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                  System Root
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={onLogout}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                color: '#dc2626',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#dc2626';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                e.currentTarget.style.color = '#dc2626';
+              }}
+            >
+              <LogOut size={14} /> Abmelden
+            </button>
+          </div>
+        </div>
+
+        {/* Right Workspace Area */}
+        <div style={{
+          padding: '44px 54px',
+          overflowY: 'auto',
+          height: '100vh',
+          boxSizing: 'border-box'
+        }}>
+          {activePortalTab === 'billing' ? (
+            <div className="animate-fade-in" style={{ contentVisibility: 'auto' }}>
+              <BillingDashboard />
+            </div>
+          ) : activePortalTab === 'pricing' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              {/* Header */}
+              <div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                  System-Preise &amp; Tarife
+                </h2>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
+                  Konfiguriere hier die Standard-Gebühren sowie Sonderangebote und Rabattaktionen für Schulen.
+                </p>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '32px',
+                alignItems: 'start'
+              }}>
+                {/* Pricing Grid Inputs */}
                 <div style={{
                   background: '#ffffff',
-                  padding: '12px',
-                  borderRadius: '16px',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  borderRadius: '24px',
+                  padding: '36px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                 }}>
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${adminUser.qr_token}`}
-                    alt="Master Admin QR Badge"
-                    style={{ width: '150px', height: '150px', display: 'block' }}
-                  />
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <Tag size={20} color="#ca8a04" /> Standard-Lizenzpreise
+                  </h3>
+
+                  <form onSubmit={handleUpdatePricingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Campus Modul (€ / Monat)
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={priceCampus}
+                            onChange={(e) => setPriceCampus(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.92rem',
+                              fontWeight: 700,
+                              outline: 'none',
+                              transition: 'border-color 0.2s'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          groovelab Modul (€ / Monat)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={priceGroovelab}
+                          onChange={(e) => setPriceGroovelab(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Lehrer Lizenz (€ / Monat)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={priceTeacher}
+                          onChange={(e) => setPriceTeacher(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Schüler Lizenz (€ / Monat)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={priceStudent}
+                          onChange={(e) => setPriceStudent(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={updatingBilling}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 6px 20px rgba(217, 119, 6, 0.2)',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        marginTop: '10px'
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      {updatingBilling ? 'Speichern...' : 'Preise & Tarife speichern'}
+                    </button>
+                  </form>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#8e8e93', textAlign: 'center', lineHeight: '1.4', fontWeight: 600 }}>
-                  Scanne diesen Code am Kiosk-Eingang für den sofortigen Zugang.
+
+                {/* Sonderangebote & Kampagnen */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                  {/* Create offer form */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '36px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      <Percent size={20} color="#059669" /> Rabatt-Kampagne erstellen
+                    </h3>
+
+                    <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Aktionsname
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="z.B. Sommer-Special 2026"
+                            value={newOfferName}
+                            onChange={(e) => setNewOfferName(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Rabatt (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            required
+                            value={newOfferDiscount}
+                            onChange={(e) => setNewOfferDiscount(Number(e.target.value))}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', alignItems: 'center' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Aktionscode (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="z.B. SUMMER26"
+                            value={newOfferCode}
+                            onChange={(e) => setNewOfferCode(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', padding: '0 8px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Sofort Aktiv</span>
+                          <button
+                            type="button"
+                            onClick={() => setNewOfferActive(!newOfferActive)}
+                            style={{
+                              position: 'relative',
+                              width: '40px',
+                              height: '24px',
+                              borderRadius: '12px',
+                              background: newOfferActive ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '0',
+                              transition: 'all 0.25s',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <div style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: '#ffffff',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                              transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                              transform: newOfferActive ? 'translateX(19px)' : 'translateX(3px)'
+                            }} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        style={{
+                          padding: '12px',
+                          borderRadius: '12px',
+                          background: '#059669',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.88rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 15px rgba(5, 150, 105, 0.2)',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <Plus size={16} /> Kampagne hinzufügen
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Active offers list */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '36px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0 0 20px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      Aktive Aktionen ({specialOffers.length})
+                    </h3>
+
+                    {specialOffers.length === 0 ? (
+                      <div style={{ padding: '28px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed rgba(15, 23, 42, 0.1)', borderRadius: '16px' }}>
+                        Keine Sonderangebote vorhanden. Verwende das obige Formular zum Erstellen.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {specialOffers.map((offer) => (
+                          <div
+                            key={offer.id}
+                            style={{
+                              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                              border: '1px solid rgba(15, 23, 42, 0.04)',
+                              borderRadius: '16px',
+                              padding: '16px 20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                                {offer.name}
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ background: 'rgba(5, 150, 105, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
+                                  {offer.discount_percent}% Rabatt
+                                </span>
+                                {offer.code && (
+                                  <span style={{ color: '#475569', fontWeight: 600 }}>
+                                    Code: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{offer.code}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleOfferActive(offer.id)}
+                                style={{
+                                  position: 'relative',
+                                  width: '38px',
+                                  height: '22px',
+                                  borderRadius: '11px',
+                                  background: offer.is_active ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '0',
+                                  transition: 'all 0.25s',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  background: '#ffffff',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  transform: offer.is_active ? 'translateX(19px)' : 'translateX(3px)'
+                                }} />
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteSpecialOffer(offer.id)}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  borderRadius: '50%',
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  border: 'none',
+                                  color: '#dc2626',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activePortalTab === 'banking' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              {/* Header */}
+              <div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                  Adresse &amp; Banking
+                </h2>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
+                  Verwalte die globalen Zugangsdaten und die hinterlegte Rechnungsadresse für den Betreiber Simplified Work.
                 </p>
-                <div style={{ fontSize: '0.72rem', color: '#c7c7cc', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                  {adminUser.qr_token}
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1.1fr',
+                gap: '32px',
+                alignItems: 'start'
+              }}>
+                {/* Master Admin credentials card */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '36px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                    <Shield size={20} color="#d97706" /> Master-Admin Zugang
+                  </h3>
+
+                  <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Root-Benutzername
+                      </label>
+                      <input
+                        type={usernameFocused ? "text" : "password"}
+                        value={adminUsername}
+                        onChange={(e) => setAdminUsername(e.target.value)}
+                        placeholder="admin"
+                        required
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: '#f8fafc',
+                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          color: '#0f172a',
+                          fontSize: '0.92rem',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        onFocus={() => setUsernameFocused(true)}
+                        onBlur={() => setUsernameFocused(false)}
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Passwort
+                      </label>
+                      <input
+                        type={passwordFocused ? "text" : "password"}
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        placeholder="Passwort"
+                        required
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: '#f8fafc',
+                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          color: '#0f172a',
+                          fontSize: '0.92rem',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        onFocus={() => setPasswordFocused(true)}
+                        onBlur={() => setPasswordFocused(false)}
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={updatingAdmin}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '12px',
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
+                    </button>
+                  </form>
+
+                  {adminUser && (
+                    <div style={{
+                      marginTop: '28px',
+                      padding: '24px',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(15, 23, 42, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '14px'
+                    }}>
+                      <strong style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Kiosk Master QR-Badge
+                      </strong>
+                      <div style={{
+                        background: '#ffffff',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
+                        border: '1px solid rgba(0,0,0,0.02)'
+                      }}>
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${adminUser.qr_token}`}
+                          alt="Master Admin QR Badge"
+                          style={{ width: '120px', height: '120px', display: 'block' }}
+                        />
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textAlign: 'center', lineHeight: '1.5', fontWeight: 550 }}>
+                        Scanne diesen QR-Code am Kiosk-Tablet für schnellen Master-Admin-Zugang.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Form: Operator Billing Details */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '36px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                    <Settings size={20} color="#059669" /> Betreiber Rechnungsdaten
+                  </h3>
+
+                  <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Firma / Betreibergesellschaft
+                      </label>
+                      <input
+                        type="text"
+                        value={billingCompany}
+                        onChange={(e) => setBillingCompany(e.target.value)}
+                        placeholder="z.B. Simplified Work GbR"
+                        required
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: '#f8fafc',
+                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          color: '#0f172a',
+                          fontSize: '0.92rem',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          Ansprechpartner
+                        </label>
+                        <input
+                          type="text"
+                          value={billingContact}
+                          onChange={(e) => setBillingContact(e.target.value)}
+                          placeholder="Name"
+                          required
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          Straße
+                        </label>
+                        <input
+                          type="text"
+                          value={billingStreet}
+                          onChange={(e) => setBillingStreet(e.target.value)}
+                          placeholder="Straße & Nr."
+                          required
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          PLZ
+                        </label>
+                        <input
+                          type="text"
+                          value={billingZip}
+                          onChange={(e) => setBillingZip(e.target.value)}
+                          placeholder="79618"
+                          required
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          Ort
+                        </label>
+                        <input
+                          type="text"
+                          value={billingCity}
+                          onChange={(e) => setBillingCity(e.target.value)}
+                          placeholder="Ort"
+                          required
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.92rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginTop: '6px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>IBAN</label>
+                        <input
+                          type="text"
+                          value={billingIban}
+                          onChange={(e) => setBillingIban(e.target.value)}
+                          placeholder="DE00 0000 ..."
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.9rem',
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>BIC</label>
+                        <input
+                          type="text"
+                          value={billingBic}
+                          onChange={(e) => setBillingBic(e.target.value)}
+                          placeholder="BICXXX"
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.9rem',
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={updatingBilling}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '12px',
+                        background: 'rgba(5, 150, 105, 0.1)',
+                        border: '1px solid rgba(5, 150, 105, 0.25)',
+                        color: '#059669',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        marginTop: '12px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#059669';
+                        e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(5, 150, 105, 0.1)';
+                        e.currentTarget.style.color = '#059669';
+                      }}
+                    >
+                      {updatingBilling ? 'Speichern...' : 'Rechnungsdaten aktualisieren'}
+                    </button>
+                  </form>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Master Billing Settings Card */}
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '28px',
-            padding: '32px',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.015)'
-          }}>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#1d1d1f', letterSpacing: '-0.02em' }}>
-              <Settings size={22} color="#eab308" /> Rechnungsadresse &amp; Bankverbindung
-            </h2>
-
-            <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Firma / Name
-                </label>
-                <input
-                  type="text"
-                  value={billingCompany}
-                  onChange={(e) => setBillingCompany(e.target.value)}
-                  placeholder="Simplified Work GbR"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Ansprechpartner
-                </label>
-                <input
-                  type="text"
-                  value={billingContact}
-                  onChange={(e) => setBillingContact(e.target.value)}
-                  placeholder="Patrick Huber"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Straße &amp; Hausnummer
-                </label>
-                <input
-                  type="text"
-                  value={billingStreet}
-                  onChange={(e) => setBillingStreet(e.target.value)}
-                  placeholder="Karl-Fürstenberg-Str. 59"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }} className="animate-fade-in">
+              {/* Header Panel */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    PLZ
-                  </label>
-                  <input
-                    type="text"
-                    value={billingZip}
-                    onChange={(e) => setBillingZip(e.target.value)}
-                    placeholder="79618"
-                    required
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#f5f5f7',
-                      border: '1px solid transparent',
-                      color: '#1d1d1f',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                  />
+                  <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                    Dashboard Leitstand
+                  </h2>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
+                    Willkommen zurück in der zentralen Campus-Groovelab Schulsteuerung.
+                  </p>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Ort
-                  </label>
-                  <input
-                    type="text"
-                    value={billingCity}
-                    onChange={(e) => setBillingCity(e.target.value)}
-                    placeholder="Rheinfelden"
-                    required
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#f5f5f7',
-                      border: '1px solid transparent',
-                      color: '#1d1d1f',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s ease'
-                    }}
-                  />
+
+                <button
+                  onClick={fetchSchoolsAndStats}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1px solid rgba(15, 23, 42, 0.08)',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#0f172a';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              {/* KPI metrics cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                gap: '24px'
+              }}>
+                {[
+                  { title: 'Schulen & Tenants', value: stats.totalSchools, icon: <Layers size={20} />, color: '#d97706' },
+                  { title: 'Dozenten & Lehrer', value: stats.totalTeachers, icon: <Users size={20} />, color: '#3b82f6' },
+                  { title: 'Aktive Schüler', value: stats.totalStudents, icon: <GraduationCap size={20} />, color: '#059669' },
+                  { title: 'Lab Sitzungen', value: stats.totalSessions, icon: <Clock size={20} />, color: '#4f46e5' }
+                ].map((kpi, idx) => (
+                  <div key={idx} style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    padding: '24px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                  className="hover-scale-mini"
+                  >
+                    <div>
+                      <p style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>
+                        {kpi.title}
+                      </p>
+                      <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                        {kpi.value}
+                      </h3>
+                    </div>
+                    <div style={{
+                      background: `${kpi.color}12`,
+                      color: kpi.color,
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: `1px solid ${kpi.color}20`
+                    }}>
+                      {kpi.icon}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Layout split grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '7fr 4.8fr',
+                gap: '32px',
+                alignItems: 'start'
+              }}>
+                {/* Left Side: Schools list */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '36px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+                  minHeight: '450px',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                    <Layers size={20} color="#d97706" /> Registrierte Schul-Tenants
+                  </h3>
+
+                  {/* Search Input */}
+                  <div style={{ position: 'relative', marginBottom: '24px' }}>
+                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder="Suche nach Schulname, PLZ oder Ort..."
+                      value={schoolSearchQuery}
+                      onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '12px 16px 12px 44px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(15, 23, 42, 0.08)',
+                        background: '#f8fafc',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        outline: 'none',
+                        transition: 'all 0.25s ease'
+                      }}
+                      className="search-input-field"
+                    />
+                  </div>
+
+                  {loading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '16px' }}>
+                      <div className="loader" style={{
+                        border: '3px solid rgba(15,23,42,0.04)',
+                        borderLeftColor: '#d97706',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        animation: 'spin 0.8s linear infinite'
+                      }}></div>
+                      <p style={{ color: '#64748b', fontSize: '0.88rem', fontWeight: 600 }}>Lade Schulregister...</p>
+                    </div>
+                  ) : schools.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      Keine Schulen im System registriert.
+                    </div>
+                  ) : filteredSchools.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      Keine Suchergebnisse für "{schoolSearchQuery}"
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {filteredSchools.map((school) => {
+                        const teachers = schoolStats[school.id]?.teachers || 0;
+                        const students = schoolStats[school.id]?.students || 0;
+                        const bands = schoolStats[school.id]?.bands || 0;
+
+                        return (
+                          <div 
+                            key={school.id} 
+                            onClick={() => {
+                              setSelectedSchool(school);
+                              setEditName(school.name);
+                              setEditColor(school.primary_color || '#3b82f6');
+                              setEditLogo(school.logo_url || '');
+                              setEditStatus(school.status || 'active');
+                              setEditIsTrial(school.is_trial ?? true);
+                              setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+                              setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
+                              setEditMaxTeachers(school.max_teachers ?? 2);
+                              setEditMaxStudents(school.max_students ?? 6);
+                              setEditMaxSongs(school.max_songs ?? 5);
+                              setEditLimitsEnabled(school.limits_enabled ?? false);
+                              setEditTrialOption('custom');
+                              setEditZipCode(school.zip_code || '');
+                              setEditCity(school.city || '');
+                              setEditHasGroovelab(school.has_groovelab_subscription ?? false);
+                              setEditHasCampus(school.has_campus_subscription ?? false);
+                              setEditSubscriptionBypass(school.subscription_bypass ?? false);
+                            }}
+                            style={{ 
+                              borderRadius: '16px',
+                              padding: '16px 20px',
+                              border: '1px solid rgba(15, 23, 42, 0.05)',
+                              background: '#f8fafc',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              cursor: 'pointer',
+                              transition: 'all 0.25s ease',
+                              gap: '16px'
+                            }}
+                            className="school-list-card"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                              {/* Icon / Logo Badge */}
+                              <div style={{
+                                width: '46px',
+                                height: '46px',
+                                borderRadius: '12px',
+                                background: `linear-gradient(135deg, ${school.primary_color || '#3b82f6'} 0%, ${school.primary_color ? school.primary_color + 'cc' : '#1d4ed8'} 100%)`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 900,
+                                color: '#ffffff',
+                                fontSize: '1rem',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
+                                flexShrink: 0,
+                                overflow: 'hidden'
+                              }}>
+                                {school.logo_url ? (
+                                  <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                ) : (
+                                  school.name.substring(0, 2).toUpperCase()
+                                )}
+                              </div>
+
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {school.name}
+                                </div>
+                                
+                                {(school.zip_code || school.city) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+                                    <MapPin size={11} color="#64748b" />
+                                    <span>{school.zip_code || ''} {school.city || ''}</span>
+                                  </div>
+                                )}
+
+                                {/* Limits Micro progress indicators */}
+                                {school.limits_enabled ? (
+                                  <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '90px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                        <span>Lehrer</span>
+                                        <span>{teachers}/{school.max_teachers ?? 2}</span>
+                                      </div>
+                                      <div style={{ width: '100%', height: '4px', background: 'rgba(15,23,42,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
+                                        <div style={{ 
+                                          width: `${Math.min(100, (teachers / (school.max_teachers ?? 2)) * 100)}%`, 
+                                          height: '100%', 
+                                          background: school.primary_color || '#3b82f6', 
+                                          borderRadius: '10px' 
+                                        }} />
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '90px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                        <span>Schüler</span>
+                                        <span>{students}/{school.max_students ?? 6}</span>
+                                      </div>
+                                      <div style={{ width: '100%', height: '4px', background: 'rgba(15,23,42,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
+                                        <div style={{ 
+                                          width: `${Math.min(100, (students / (school.max_students ?? 6)) * 100)}%`, 
+                                          height: '100%', 
+                                          background: '#10b981', 
+                                          borderRadius: '10px' 
+                                        }} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginTop: '6px' }}>
+                                    {teachers} Lehrer • {students} Schüler • {bands} Ensembles
+                                  </div>
+                                )}
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                  {school.has_campus_subscription && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '100px' }}>
+                                      🎓 Campus
+                                    </span>
+                                  )}
+                                  {school.has_groovelab_subscription && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ea580c', background: 'rgba(251, 146, 60, 0.12)', padding: '2px 8px', borderRadius: '100px' }}>
+                                      🎸 GrooveLab
+                                    </span>
+                                  )}
+                                  {school.subscription_bypass && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#dc2626', background: 'rgba(248, 113, 113, 0.12)', padding: '2px 8px', borderRadius: '100px', border: '1px dashed rgba(248, 113, 113, 0.3)' }}>
+                                      ⚠️ Bypass
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Row Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSchoolPause(school.id, school.is_paused);
+                                }}
+                                style={{
+                                  position: 'relative',
+                                  width: '38px',
+                                  height: '22px',
+                                  borderRadius: '11px',
+                                  background: school.is_paused ? 'rgba(15, 23, 42, 0.08)' : '#10b981',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '0',
+                                  transition: 'background-color 0.25s',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
+                              >
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  background: '#ffffff',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  transform: school.is_paused ? 'translateX(3px)' : 'translateX(19px)'
+                                }} />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyInviteLink(school.id, school.name, school.secretary_onboarding_token);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '100px',
+                                  background: copiedId === school.id ? 'rgba(16, 185, 129, 0.1)' : '#ffffff',
+                                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                                  color: copiedId === school.id ? '#10b981' : '#4f46e5',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                {copiedId === school.id ? <Check size={11} /> : <Copy size={11} />}
+                                <span>{copiedId === school.id ? 'Kopiert' : 'Link'}</span>
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSchool(school.id, school.name);
+                                }}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  border: 'none',
+                                  color: '#dc2626',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                                className="hover-scale-mini"
+                                title="Löschen"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Side: Create School */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '36px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+                  }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 26px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                      <Plus size={20} color="#d97706" /> Schule provisionieren
+                    </h3>
+
+                    <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Name der Schule *
+                        </label>
+                        <input
+                          type="text"
+                          value={newSchoolName}
+                          onChange={(e) => setNewSchoolName(e.target.value)}
+                          placeholder="z.B. Groove Academy Munich"
+                          required
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: '#f8fafc',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            color: '#0f172a',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '14px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                            PLZ
+                          </label>
+                          <input
+                            type="text"
+                            value={newSchoolZip}
+                            onChange={(e) => setNewSchoolZip(e.target.value)}
+                            placeholder="z.B. 80331"
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Ort
+                          </label>
+                          <input
+                            type="text"
+                            value={newSchoolCity}
+                            onChange={(e) => setNewSchoolCity(e.target.value)}
+                            placeholder="z.B. München"
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.9rem',
+                              fontWeight: 600,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          Primäre Branding-Farbe
+                        </label>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <input
+                            type="color"
+                            value={newSchoolColor}
+                            onChange={(e) => setNewSchoolColor(e.target.value)}
+                            style={{
+                              border: 'none',
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '10px',
+                              cursor: 'pointer',
+                              background: 'transparent',
+                              padding: 0
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={newSchoolColor}
+                            onChange={(e) => setNewSchoolColor(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: '11px 12px',
+                              borderRadius: '12px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontFamily: 'monospace',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                            className="premium-input"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={creating}
+                        style={{
+                          marginTop: '8px',
+                          padding: '14px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 6px 20px rgba(217, 119, 6, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        {creating ? 'Wird provisioniert...' : (
+                          <>
+                            <Plus size={16} /> Schule anlegen
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  IBAN (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={billingIban}
-                  onChange={(e) => setBillingIban(e.target.value)}
-                  placeholder="z.B. DE89 3704 0044 ..."
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#8e8e93', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  BIC (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={billingBic}
-                  onChange={(e) => setBillingBic(e.target.value)}
-                  placeholder="z.B. WELADED1XYZ"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#f5f5f7',
-                    border: '1px solid transparent',
-                    color: '#1d1d1f',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={updatingBilling}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '14px',
-                  background: '#1d1d1f', // iOS Solid Dark
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-                  transition: 'all 0.2s'
-                }}
-                className="hover-scale-mini"
-              >
-                {updatingBilling ? 'Wird gespeichert...' : 'Rechnungsadresse speichern'}
-              </button>
-            </form>
-          </div>
+            </div>
+          )}
         </div>
       </div>
-    </>
-  )}
-      {/* School Edit Modal (Full-Screen Workspace - Light Mode) */}
+
+      {/* Modernised School Details Modal */}
       {selectedSchool && (
         <div 
           style={{
             position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: '#f8fafc',
-            color: '#0f172a',
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            color: '#1e293b',
             zIndex: 9999,
             display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
             fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
-            animation: 'fadeIn 0.25s ease-out forwards'
+            animation: 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
         >
           <style dangerouslySetInnerHTML={{__html: `
             @keyframes fadeIn {
-              from { opacity: 0; transform: scale(1.02); }
+              from { opacity: 0; transform: scale(1.01); }
               to { opacity: 1; transform: scale(1); }
             }
           `}} />
-          
-          {/* Subtle colored background glows */}
-          <div style={{
-            position: 'absolute',
-            top: '-20%',
-            left: '20%',
-            width: '600px',
-            height: '600px',
-            background: `radial-gradient(circle, ${editColor}08 0%, transparent 70%)`,
-            pointerEvents: 'none',
-            zIndex: 1
-          }} />
 
-          {/* Premium Glass Header - Light Mode */}
+          {/* Frosted Details Modal Frame */}
           <div style={{
-            position: 'relative',
-            zIndex: 10,
-            background: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid #e2e8f0',
-            padding: '20px 40px',
+            width: '100%',
+            maxWidth: '1150px',
+            height: '86vh',
+            background: '#ffffff',
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+            borderRadius: '28px',
+            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '16px',
-                background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 900,
-                color: '#ffffff',
-                fontSize: '1.25rem',
-                boxShadow: `0 8px 24px ${editColor ? editColor + '20' : 'rgba(59, 130, 246, 0.15)'}`,
-                overflow: 'hidden'
-              }}>
-                {editLogo ? (
-                  <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                ) : (
-                  editName.substring(0, 2).toUpperCase()
-                )}
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#0f172a' }}>
-                    {editName || selectedSchool.name}
-                  </h2>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '4px 10px',
-                    borderRadius: '100px',
-                    background: editStatus === 'active' ? '#d1fae5' : '#fee2e2',
-                    color: editStatus === 'active' ? '#065f46' : '#991b1b',
-                    border: `1px solid ${editStatus === 'active' ? '#a7f3d0' : '#fecaca'}`
-                  }}>
-                    {editStatus === 'active' ? 'Aktiv' : 'Gesperrt'}
-                  </span>
-                  {editIsTrial && (
-                    <span style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      padding: '4px 10px',
-                      borderRadius: '100px',
-                      background: '#fef3c7',
-                      color: '#92400e',
-                      border: '1px solid #fde68a'
-                    }}>
-                      Probezeit
-                    </span>
-                  )}
-                </div>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
-                  Tenant ID: <span style={{ fontFamily: 'monospace', color: '#334155' }}>{selectedSchool.id}</span>
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setSelectedSchool(null)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleSaveSchoolDetails}
-                style={{
-                  padding: '12px 32px',
-                  borderRadius: '12px',
-                  background: editColor || '#eab308',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  boxShadow: `0 8px 24px ${editColor ? editColor + '30' : 'rgba(234, 179, 8, 0.25)'}`,
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
-              >
-                Änderungen speichern
-              </button>
-            </div>
-          </div>
-
-          {/* Workspace Layout */}
-          <div style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: '380px 1fr',
+            flexDirection: 'column',
             overflow: 'hidden',
-            position: 'relative',
-            zIndex: 2
+            position: 'relative'
           }}>
-            
-            {/* Sidebar Control Panel - Light Mode */}
+            {/* Modal Header */}
             <div style={{
-              background: '#f1f5f9',
-              borderRight: '1px solid #e2e8f0',
-              padding: '40px 32px',
+              padding: '22px 36px',
+              borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '32px',
-              overflowY: 'auto'
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc'
             }}>
-              {/* Logo Brand Preview */}
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                padding: '24px',
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '16px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
-                  width: '100px',
-                  height: '100px',
-                  borderRadius: '24px',
-                  background: '#f8fafc',
-                  border: `3px solid ${editColor || '#3b82f6'}`,
-                  boxShadow: `0 8px 30px ${editColor ? editColor + '15' : 'rgba(0,0,0,0.05)'}`,
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '2.5rem',
-                  overflow: 'hidden'
+                  fontWeight: 900,
+                  color: '#ffffff',
+                  fontSize: '1rem',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
                 }}>
                   {editLogo ? (
-                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    '🏫'
+                    editName.substring(0, 2).toUpperCase()
                   )}
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Branding Vorschau</h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Wird in Apps & Portalen verwendet</p>
-                </div>
-              </div>
-
-              {/* Statistics Overview */}
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-              }}>
-                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Statistiken (Aktuell)
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  {[
-                    { label: 'Lehrer (Campus)', value: schoolStats[selectedSchool.id]?.teachersCampus || 0, color: '#22c55e', icon: <GraduationCap size={14} /> },
-                    { label: 'Lehrer (GrooveLab)', value: schoolStats[selectedSchool.id]?.teachersGroovelab || 0, color: '#eab308', icon: <Music size={14} /> },
-                    { label: 'Schüler (Campus)', value: schoolStats[selectedSchool.id]?.studentsCampus || 0, color: '#22c55e', icon: <GraduationCap size={14} /> },
-                    { label: 'Schüler (GrooveLab)', value: schoolStats[selectedSchool.id]?.studentsGroovelab || 0, color: '#eab308', icon: <Music size={14} /> }
-                  ].map((stat, i) => (
-                    <div key={i} style={{
-                      background: '#f8fafc',
-                      border: '1.5px solid #e2e8f0',
-                      borderLeft: `4px solid ${stat.color}`,
-                      borderRadius: '14px',
-                      padding: '12px 16px'
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      {editName || selectedSchool.name}
+                    </h3>
+                    <span style={{
+                      fontSize: '0.64rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      padding: '2px 8px',
+                      borderRadius: '100px',
+                      background: editStatus === 'active' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                      color: editStatus === 'active' ? '#10b981' : '#dc2626',
+                      border: `1px solid ${editStatus === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: stat.color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                          {stat.icon}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{stat.label}</span>
-                      </div>
-                      <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', display: 'block' }}>{stat.value}</span>
-                    </div>
-                  ))}
+                      {editStatus === 'active' ? 'Aktiv' : 'Inaktiv/Gesperrt'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+                    ID: {selectedSchool.id}
+                  </span>
                 </div>
               </div>
 
-              {/* School Status Settings */}
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-              }}>
-                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  System-Status
-                </h4>
-                
-                <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <button 
-                    type="button"
-                    onClick={() => setEditStatus('active')}
-                    style={{ 
-                      flex: 1, 
-                      padding: '10px', 
-                      borderRadius: '8px', 
-                      border: 'none', 
-                      fontSize: '0.85rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer', 
-                      transition: 'all 0.2s', 
-                      background: editStatus === 'active' ? '#ffffff' : 'transparent', 
-                      color: editStatus === 'active' ? '#10b981' : '#64748b',
-                      boxShadow: editStatus === 'active' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                    }}
-                  >
-                    Aktiviert
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setEditStatus('suspended')}
-                    style={{ 
-                      flex: 1, 
-                      padding: '10px', 
-                      borderRadius: '8px', 
-                      border: 'none', 
-                      fontSize: '0.85rem', 
-                      fontWeight: 800, 
-                      cursor: 'pointer', 
-                      transition: 'all 0.2s', 
-                      background: editStatus === 'suspended' ? '#ffffff' : 'transparent', 
-                      color: editStatus === 'suspended' ? '#ef4444' : '#64748b',
-                      boxShadow: editStatus === 'suspended' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                    }}
-                  >
-                    Gesperrt
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Probezeit Modus</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextTrial = !editIsTrial;
-                      setEditIsTrial(nextTrial);
-                      if (nextTrial && !editTrialEndsAt) {
-                        setEditTrialOption('14');
-                        setEditTrialEndsAt(getFutureDate(14));
-                      }
-                    }}
-                    style={{
-                      position: 'relative',
-                      width: '42px',
-                      height: '24px',
-                      borderRadius: '12px',
-                      background: editIsTrial ? '#eab308' : '#cbd5e1',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                      transition: 'transform 0.2s',
-                      transform: editIsTrial ? 'translateX(22px)' : 'translateX(2px)'
-                    }} />
-                  </button>
-                </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setSelectedSchool(null)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    background: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid rgba(15, 23, 42, 0.1)',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleSaveSchoolDetails}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '10px',
+                    background: editColor || '#d97706',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    boxShadow: `0 4px 15px ${editColor}30`,
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  Speichern
+                </button>
               </div>
-
             </div>
 
-            {/* Main Form Fields Grid Area */}
+            {/* Inner Content split */}
             <div style={{
-              padding: '40px 48px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '32px',
-              background: '#f8fafc'
+              flex: 1,
+              display: 'grid',
+              gridTemplateColumns: '320px 1fr',
+              overflow: 'hidden'
             }}>
-              
-              {/* Form Grid */}
+              {/* Left Column Preview */}
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-                gap: '28px',
-                alignItems: 'start'
+                background: '#f8fafc',
+                borderRight: '1px solid rgba(15, 23, 42, 0.06)',
+                padding: '32px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px',
+                overflowY: 'auto'
               }}>
-
-                {/* Box 1: Stammdaten & Brand */}
                 <div style={{
                   background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  border: '1px solid rgba(15, 23, 42, 0.05)',
+                  borderRadius: '16px',
+                  padding: '24px 20px',
+                  textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
                 }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Settings size={20} color={editColor || '#3b82f6'} /> Identität & Marke
-                  </h3>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '16px',
+                    background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2rem',
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    overflow: 'hidden',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+                  }}>
+                    {editLogo ? (
+                      <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      editName.substring(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Live-Vorschau</h4>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Subdomain Origin</label>
+                  <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#0284c7', wordBreak: 'break-all', fontWeight: 600 }}>
+                    {getSubdomainOrigin(editName)}
+                  </span>
+                </div>
+
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(15, 23, 42, 0.05)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>System-Status</h4>
                   
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Schulname
-                    </label>
-                    <input 
-                      type="text" 
-                      value={editName} 
-                      onChange={(e) => setEditName(e.target.value)} 
+                  <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                    <button
+                      onClick={() => setEditStatus('active')}
                       style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '14px 16px',
-                        borderRadius: '12px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#ffffff',
-                        fontSize: '0.95rem',
-                        fontWeight: 600,
-                        color: '#0f172a',
-                        outline: 'none',
+                        flex: 1,
+                        padding: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        background: editStatus === 'active' ? '#10b981' : 'transparent',
+                        color: editStatus === 'active' ? '#ffffff' : '#64748b',
                         transition: 'all 0.2s'
                       }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = editColor || '#3b82f6';
-                        e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
+                    >
+                      Aktiv
+                    </button>
+                    <button
+                      onClick={() => setEditStatus('suspended')}
+                      style={{
+                        flex: 1,
+                        padding: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        background: editStatus === 'suspended' ? '#ef4444' : 'transparent',
+                        color: editStatus === 'suspended' ? '#ffffff' : '#64748b',
+                        transition: 'all 0.2s'
                       }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#cbd5e1';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    />
+                    >
+                      Gesperrt
+                    </button>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Probezeit aktiv</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextTrial = !editIsTrial;
+                        setEditIsTrial(nextTrial);
+                        if (nextTrial && !editTrialEndsAt) {
+                          setEditTrialOption('14');
+                          setEditTrialEndsAt(getFutureDate(14));
+                        }
+                      }}
+                      style={{
+                        position: 'relative',
+                        width: '38px',
+                        height: '22px',
+                        borderRadius: '11px',
+                        background: editIsTrial ? '#eab308' : 'rgba(15, 23, 42, 0.08)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        transition: 'transform 0.2s',
+                        transform: editIsTrial ? 'translateX(19px)' : 'translateX(3px)'
+                      }} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column Workspace */}
+              <div style={{
+                padding: '32px 40px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '24px'
+                }}>
+                  {/* Branding Stammdaten Card */}
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    borderRadius: '20px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                      <Settings size={16} color="#d97706" /> Stammdaten &amp; Design
+                    </h4>
+
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        PLZ
-                      </label>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Schulname</label>
                       <input 
                         type="text" 
-                        value={editZipCode} 
-                        onChange={(e) => setEditZipCode(e.target.value)} 
+                        value={editName} 
+                        onChange={(e) => setEditName(e.target.value)} 
                         style={{
                           width: '100%',
                           boxSizing: 'border-box',
-                          padding: '14px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.95rem',
-                          fontWeight: 600,
-                          color: '#0f172a',
-                          outline: 'none',
-                          transition: 'all 0.2s'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
-                          e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Ort
-                      </label>
-                      <input 
-                        type="text" 
-                        value={editCity} 
-                        onChange={(e) => setEditCity(e.target.value)} 
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '14px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.95rem',
-                          fontWeight: 600,
-                          color: '#0f172a',
-                          outline: 'none',
-                          transition: 'all 0.2s'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
-                          e.currentTarget.style.boxShadow = `0 0 0 4px ${editColor}15`;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Branding Farbe
-                    </label>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <input 
-                        type="color" 
-                        value={editColor} 
-                        onChange={(e) => setEditColor(e.target.value)} 
-                        style={{ width: '48px', height: '48px', padding: '2px', border: '1px solid #cbd5e1', borderRadius: '12px', cursor: 'pointer', background: 'transparent' }} 
-                      />
-                      <input 
-                        type="text" 
-                        value={editColor} 
-                        onChange={(e) => setEditColor(e.target.value)} 
-                        style={{
-                          flex: 1,
-                          padding: '14px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.9rem',
-                          fontFamily: 'monospace',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(15,23,42,0.08)',
+                          background: '#f8fafc',
+                          fontSize: '0.88rem',
                           color: '#0f172a',
                           fontWeight: 700,
-                          outline: 'none',
-                          transition: 'all 0.2s'
+                          outline: 'none'
                         }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = editColor || '#3b82f6';
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>PLZ</label>
+                        <input 
+                          type="text" 
+                          value={editZipCode} 
+                          onChange={(e) => setEditZipCode(e.target.value)} 
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Ort</label>
+                        <input 
+                          type="text" 
+                          value={editCity} 
+                          onChange={(e) => setEditCity(e.target.value)} 
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Branding-Farbe</label>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input 
+                          type="color" 
+                          value={editColor} 
+                          onChange={(e) => setEditColor(e.target.value)} 
+                          style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', padding: 0 }} 
+                        />
+                        <input 
+                          type="text" 
+                          value={editColor} 
+                          onChange={(e) => setEditColor(e.target.value)} 
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            fontFamily: 'monospace',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Logo Bild-URL</label>
+                      <input 
+                        type="text" 
+                        value={editLogo} 
+                        onChange={(e) => setEditLogo(e.target.value)} 
+                        placeholder="https://domain.com/logo.png" 
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(15,23,42,0.08)',
+                          background: '#f8fafc',
+                          fontSize: '0.88rem',
+                          color: '#0f172a',
+                          outline: 'none'
                         }}
+                        className="premium-input"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Logo URL
-                    </label>
-                    <input 
-                      type="text" 
-                      value={editLogo} 
-                      onChange={(e) => setEditLogo(e.target.value)} 
-                      placeholder="https://..." 
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '14px 16px',
+                  {/* Card: Lizenzen & Abonnements */}
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    borderRadius: '20px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                      <Layers size={16} color="#4f46e5" /> Modul-Abonnements
+                    </h4>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
                         borderRadius: '12px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#ffffff',
-                        fontSize: '0.95rem',
-                        color: '#0f172a',
-                        outline: 'none',
+                        background: editHasCampus ? 'rgba(56, 189, 248, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editHasCampus ? 'rgba(56, 189, 248, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        cursor: 'pointer',
                         transition: 'all 0.2s'
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = editColor || '#3b82f6';
-                      }}
+                      }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#0284c7' : '#475569' }}>🎓 Campus Modul</span>
+                        <input
+                          type="checkbox"
+                          checked={editHasCampus}
+                          onChange={(e) => setEditHasCampus(e.target.checked)}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                      </label>
+
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        background: editHasGroovelab ? 'rgba(251, 146, 60, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editHasGroovelab ? 'rgba(251, 146, 60, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasGroovelab ? '#ea580c' : '#475569' }}>🎸 GrooveLab Modul</span>
+                        <input
+                          type="checkbox"
+                          checked={editHasGroovelab}
+                          onChange={(e) => setEditHasGroovelab(e.target.checked)}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                      </label>
+
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        background: editSubscriptionBypass ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editSubscriptionBypass ? 'rgba(239, 68, 68, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>⚙️ Freie Lizenz (Abo-Bypass)</span>
+                        <input
+                          type="checkbox"
+                          checked={editSubscriptionBypass}
+                          onChange={(e) => setEditSubscriptionBypass(e.target.checked)}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Limits & Trial End Section */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                    <Clock size={16} color="#d97706" /> Kapazitäten &amp; Limits
+                  </h4>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <input
+                      type="checkbox"
+                      id="editLimitsEnabled"
+                      checked={editLimitsEnabled}
+                      onChange={(e) => setEditLimitsEnabled(e.target.checked)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                     />
-                  </div>
-                </div>
-
-                {/* Box 2: Abonnements & Lizenzen */}
-                <div style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
-                }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Layers size={20} color="#eab308" /> Abonnements & Lizenzen
-                  </h3>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {/* Campus Abo */}
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '16px 20px',
-                      borderRadius: '16px',
-                      background: editHasCampus ? '#f0f9ff' : '#ffffff',
-                      border: `1.5px solid ${editHasCampus ? '#bae6fd' : '#e2e8f0'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editHasCampus ? '#0369a1' : '#0f172a' }}>🎓 Campus-Abonnement</span>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Zugang zur Campus-Plattform (Lehrer, Schüler, Klassen)</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={editHasCampus}
-                        onChange={(e) => setEditHasCampus(e.target.checked)}
-                        style={{ width: '20px', height: '20px', accentColor: '#0071e3', cursor: 'pointer' }}
-                      />
-                    </label>
-
-                    {/* GrooveLab Abo */}
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '16px 20px',
-                      borderRadius: '16px',
-                      background: editHasGroovelab ? '#fff7ed' : '#ffffff',
-                      border: `1.5px solid ${editHasGroovelab ? '#ffedd5' : '#e2e8f0'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editHasGroovelab ? '#c2410c' : '#0f172a' }}>🎸 GrooveLab-Abonnement</span>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Zugang zur Kiosk-Hardware & Proberaumsteuerung</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={editHasGroovelab}
-                        onChange={(e) => setEditHasGroovelab(e.target.checked)}
-                        style={{ width: '20px', height: '20px', accentColor: '#ff9500', cursor: 'pointer' }}
-                      />
-                    </label>
-
-                    {/* Bypass Switch */}
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '16px 20px',
-                      borderRadius: '16px',
-                      background: editSubscriptionBypass ? '#fef2f2' : '#ffffff',
-                      border: `1.5px solid ${editSubscriptionBypass ? '#fecaca' : '#e2e8f0'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#ef4444' }}>⚙️ Abo-Bypass aktivieren</span>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Schaltet alle Features bedingungslos für Testläufe frei</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={editSubscriptionBypass}
-                        onChange={(e) => setEditSubscriptionBypass(e.target.checked)}
-                        style={{ width: '20px', height: '20px', accentColor: '#ef4444', cursor: 'pointer' }}
-                      />
+                    <label htmlFor="editLimitsEnabled" style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', cursor: 'pointer' }}>
+                      Ressourcen-Limitierungen erzwingen
                     </label>
                   </div>
-                </div>
 
-                {/* Box 3: Zugang & Fristen */}
-                <div style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
-                }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Shield size={20} color="#10b981" /> Zugang & Fristen
-                  </h3>
+                  {editLimitsEnabled && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px', animation: 'fadeIn 0.2s' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Max Lehrer</label>
+                        <input
+                          type="number"
+                          value={editMaxTeachers}
+                          onChange={(e) => setEditMaxTeachers(Number(e.target.value))}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Max Schüler</label>
+                        <input
+                          type="number"
+                          value={editMaxStudents}
+                          onChange={(e) => setEditMaxStudents(Number(e.target.value))}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Max Songs</label>
+                        <input
+                          type="number"
+                          value={editMaxSongs}
+                          onChange={(e) => setEditMaxSongs(Number(e.target.value))}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {editIsTrial ? (
-                    <div style={{
-                      background: '#fffdf5',
-                      padding: '24px',
-                      borderRadius: '16px',
-                      border: '1px solid #fef3c7',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px'
-                    }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '16px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>
-                          ⏳ Probezeit Laufzeit
-                        </label>
-                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Probezeit Tage</label>
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
                           {[
                             { label: '14 Tage', value: '14' },
                             { label: '30 Tage', value: '30' },
@@ -2281,16 +2685,16 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                               }}
                               style={{
                                 flex: 1,
-                                padding: '8px 10px',
-                                borderRadius: '8px',
+                                padding: '6px 8px',
+                                borderRadius: '6px',
                                 border: 'none',
-                                fontSize: '0.8rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
-                                transition: 'all 0.2s',
                                 background: editTrialOption === opt.value ? '#ffffff' : 'transparent',
-                                color: editTrialOption === opt.value ? '#d97706' : '#64748b',
-                                boxShadow: editTrialOption === opt.value ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                color: editTrialOption === opt.value ? '#0f172a' : '#64748b',
+                                boxShadow: editTrialOption === opt.value ? '0 2px 5px rgba(0,0,0,0.05)' : 'none',
+                                transition: 'all 0.2s'
                               }}
                             >
                               {opt.label}
@@ -2300,51 +2704,31 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#b45309', fontWeight: 800, marginBottom: '8px' }}>
-                          Enddatum Probezeit
-                        </label>
-                        {editTrialOption === 'custom' ? (
-                          <input
-                            type="text"
-                            placeholder="TT.MM.JJJJ oder YYYY-MM-DD"
-                            value={editTrialEndsAt}
-                            onChange={(e) => setEditTrialEndsAt(e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '10px',
-                              border: '1.5px solid #fcd34d',
-                              outline: 'none',
-                              background: '#ffffff',
-                              fontSize: '0.9rem',
-                              fontWeight: 600,
-                              color: '#0f172a'
-                            }}
-                          />
-                        ) : (
-                          <div style={{
-                            padding: '12px 14px',
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Enddatum Probezeit</label>
+                        <input
+                          type="text"
+                          value={editTrialEndsAt}
+                          onChange={(e) => setEditTrialEndsAt(e.target.value)}
+                          placeholder="YYYY-MM-DD"
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
                             borderRadius: '10px',
-                            background: '#fdfbf7',
-                            border: '1px solid #fef3c7',
-                            fontSize: '0.9rem',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
                             fontWeight: 700,
-                            color: '#b45309'
-                          }}>
-                            {formatDateDisplay(editTrialEndsAt) || 'Kein Datum berechnet'}
-                          </div>
-                        )}
-                        <p style={{ margin: '6px 0 0 0', fontSize: '0.72rem', color: '#b45309', opacity: 0.8 }}>
-                          Der Systemzugang erlischt nach diesem Tag automatisch.
-                        </p>
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
                       </div>
                     </div>
                   ) : (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Vertragslaufzeit bis (Optional)
-                      </label>
+                    <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Vertragslaufzeit bis (Optional)</label>
                       <input 
                         type="text" 
                         placeholder="TT.MM.JJJJ oder YYYY-MM-DD" 
@@ -2353,238 +2737,255 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         style={{
                           width: '100%',
                           boxSizing: 'border-box',
-                          padding: '14px 16px',
-                          borderRadius: '12px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.95rem',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(15,23,42,0.08)',
+                          background: '#f8fafc',
+                          fontSize: '0.88rem',
                           color: '#0f172a',
+                          fontWeight: 700,
                           outline: 'none'
                         }} 
+                        className="premium-input"
                       />
                     </div>
                   )}
                 </div>
 
-              </div>
-
-              {/* QR Code & Share Links */}
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                padding: '32px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
-              }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  🔗 Schule einbinden & Direkt-Login
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                   {/* Link 1: Secretary Invitation Link */}
-                   <div>
-                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       1. Einladungslink für Schule/Verwaltung
-                     </label>
-                     <div style={{ display: 'flex', gap: '10px' }}>
-                       <input
-                         readOnly
-                         value={`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
-                         style={{
-                           flex: 1,
-                           padding: '12px 14px',
-                           borderRadius: '10px',
-                           border: '1px solid #cbd5e1',
-                           background: '#f8fafc',
-                           fontSize: '0.8rem',
-                           fontFamily: 'monospace',
-                           color: '#334155',
-                           outline: 'none'
-                         }}
-                         onClick={(e) => (e.target as HTMLInputElement).select()}
-                       />
-                       <button
-                         type="button"
-                         onClick={() => {
-                           navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
-                           alert('Einladungslink kopiert!');
-                         }}
-                         style={{
-                           background: '#f1f5f9',
-                           color: '#334155',
-                           border: '1px solid #cbd5e1',
-                           borderRadius: '10px',
-                           padding: '12px 16px',
-                           fontSize: '0.82rem',
-                           fontWeight: 800,
-                           cursor: 'pointer',
-                           transition: 'all 0.2s'
-                         }}
-                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                       >
-                         Kopieren
-                       </button>
-                     </div>
-                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
-                       Ermöglicht der Schule, das erste Administrator-Konto für die Verwaltung selbstständig zu registrieren.
-                     </p>
-                   </div>
-
-                   {/* Link 2: Combined Subdomain QR Scanner Link */}
-                   <div>
-                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       2. Campus & GrooveLab Direkt-Link (QR-Scanner & Direkt-Login)
-                     </label>
-                     <div style={{ display: 'flex', gap: '10px' }}>
-                       <input
-                         readOnly
-                         value={getSubdomainOrigin(selectedSchool.name)}
-                         style={{
-                           flex: 1,
-                           padding: '12px 14px',
-                           borderRadius: '10px',
-                           border: '1px solid #cbd5e1',
-                           background: '#f8fafc',
-                           fontSize: '0.8rem',
-                           fontFamily: 'monospace',
-                           color: '#334155',
-                           outline: 'none'
-                         }}
-                         onClick={(e) => (e.target as HTMLInputElement).select()}
-                       />
-                       <button
-                         type="button"
-                         onClick={() => {
-                           navigator.clipboard.writeText(getSubdomainOrigin(selectedSchool.name));
-                           alert('Direkt-Login Link kopiert!');
-                         }}
-                         style={{
-                           background: '#f1f5f9',
-                           color: '#334155',
-                           border: '1px solid #cbd5e1',
-                           borderRadius: '10px',
-                           padding: '12px 16px',
-                           fontSize: '0.82rem',
-                           fontWeight: 800,
-                           cursor: 'pointer',
-                           transition: 'all 0.2s'
-                         }}
-                         onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                         onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                       >
-                         Kopieren
-                       </button>
-                     </div>
-                     <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: '1.4' }}>
-                       Öffnet den Login-Scanner direkt über die individuelle Subdomain der Schule (sowohl für reguläre Geräte als auch für Kiosk-Terminals).
-                     </p>
-                   </div>
-                 </div>
-               </div>
-
-                {/* Verwaltungs-Admin User details card */}
+                {/* Direct links panel */}
                 <div style={{
                   background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  borderRadius: '20px',
+                  padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
+                  gap: '16px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                 }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    💼 Verwaltungs-Admin (Sekretariat / Schulleitung)
-                  </h3>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                    🔗 Direkt-Links &amp; Integration
+                  </h4>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Einladungslink (Sekretariat)</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          readOnly
+                          value={`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.78rem',
+                            fontFamily: 'monospace',
+                            color: '#64748b',
+                            outline: 'none'
+                          }}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
+                            alert('Einladungslink kopiert!');
+                          }}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid rgba(15,23,42,0.1)',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            color: '#4f46e5',
+                            cursor: 'pointer'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          Kopie
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Schul-Loginseite</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          readOnly
+                          value={getSubdomainOrigin(selectedSchool.name)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.78rem',
+                            fontFamily: 'monospace',
+                            color: '#64748b',
+                            outline: 'none'
+                          }}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(getSubdomainOrigin(selectedSchool.name));
+                            alert('Loginseite kopiert!');
+                          }}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid rgba(15,23,42,0.1)',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            color: '#4f46e5',
+                            cursor: 'pointer'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          Kopie
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admin Accounts List */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  borderRadius: '20px',
+                  padding: '24px'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                    💼 Hauptbenutzer / School Admins
+                  </h4>
+
                   {schoolStats[selectedSchool.id]?.adminUsers && schoolStats[selectedSchool.id]?.adminUsers.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                       {schoolStats[selectedSchool.id].adminUsers.map((admin: any) => (
                         <div key={admin.id} style={{
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '20px',
-                          padding: '24px',
+                          border: '1px solid rgba(15, 23, 42, 0.05)',
+                          borderRadius: '16px',
+                          padding: '16px',
                           display: 'flex',
-                          flexDirection: 'column',
                           alignItems: 'center',
+                          justifyContent: 'space-between',
                           gap: '16px'
                         }}>
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>
                               {admin.first_name || ''} {admin.last_name || ''}
                             </div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                              {admin.role === 'secretary' ? 'Sekretariat / Verwaltung' : 'Schulleitung / Admin'}
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 550 }}>
+                              {admin.role === 'secretary' ? 'Sekretariat / Verwaltung' : 'Admin'}
+                            </div>
+                            <div style={{ marginTop: '8px' }}>
+                              {admin.is_pin_activated ? (
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '100px' }}>
+                                  PIN Aktiviert
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#ca8a04', background: 'rgba(234, 179, 8, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
+                                  Ausweis: {admin.ausweis_nummer || '—'}
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          {admin.teacher_qr_token ? (
+                          {admin.teacher_qr_token && (
                             <div style={{
                               background: '#ffffff',
-                              padding: '12px',
-                              borderRadius: '16px',
-                              boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '1px solid #e2e8f0'
+                              padding: '6px',
+                              borderRadius: '10px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                              border: '1px solid rgba(0,0,0,0.02)'
                             }}>
                               <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${admin.teacher_qr_token}`}
-                                alt="Verwaltungs Admin QR Badge"
-                                style={{ width: '150px', height: '150px', display: 'block' }}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${admin.teacher_qr_token}`}
+                                alt="Admin QR Badge"
+                                style={{ width: '64px', height: '64px', display: 'block' }}
                               />
                             </div>
-                          ) : (
-                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                              Kein QR-Token generiert.
-                            </div>
                           )}
-
-                          <div style={{ width: '100%', background: '#ffffff', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Starter-PIN Status
-                            </span>
-                            {admin.is_pin_activated ? (
-                              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '4px 12px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <Check size={14} /> Aktiviert (Persönlicher PIN)
-                              </span>
-                            ) : (
-                              <div style={{ textAlign: 'center' }}>
-                                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
-                                  {admin.ausweis_nummer || '—'}
-                                </span>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>
-                                  Ausstehende Aktivierung
-                                </span>
-                              </div>
-                            )}
-                          </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ padding: '24px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '16px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
-                      Noch kein Verwaltungs-Admin registriert. Verwende den Einladungslink oben, um einen Account zu registrieren.
+                    <div style={{ padding: '24px', background: '#f8fafc', border: '1px dashed rgba(15,23,42,0.1)', borderRadius: '16px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                      Noch kein Administrator auf dieser Schule registriert.
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      {/* Global CSS injection for loading spinner */}
+      {/* CSS Utilities & Animations */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        
+        .hover-scale-mini {
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .hover-scale-mini:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .premium-input:focus {
+          border-color: #10b981 !important;
+          background: #ffffff !important;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+        }
+        
+        .search-input-field:focus {
+          border-color: #10b981 !important;
+          background: #ffffff !important;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+        }
+
+        .school-list-card:hover {
+          background: #ffffff !important;
+          border-color: rgba(15, 23, 42, 0.12) !important;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.03) !important;
+          transform: translateY(-1px);
+        }
+
+        .sidebar-nav-btn:hover {
+          background: rgba(15, 23, 42, 0.03) !important;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.01);
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(15, 23, 42, 0.08);
+          border-radius: 100px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(15, 23, 42, 0.15);
+        }
       `}} />
     </div>
   );
 }
+
+
+

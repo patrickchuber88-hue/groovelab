@@ -1,49 +1,51 @@
-# BRIEFING — 2026-06-16T20:04:43+02:00
+# BRIEFING — 2026-06-21T10:23:00Z
 
 ## Mission
-Implement and apply the event coordinator database migration, and verify it with E2E tests in real mode.
+Investigate dummy school user roles and implement/test a realistic 15-minute load simulation script.
 
 ## 🔒 My Identity
-- Archetype: teamwork_preview_worker_m2
+- Archetype: preview_worker
 - Roles: implementer, qa, specialist
-- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m2/
-- Original parent: 6a297b37-5ad9-4266-832e-10be9f7ff2f6
-- Milestone: Milestone 2
+- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m2
+- Original parent: fdb74efc-ae01-4403-b586-27e9ccd426e2
+- Milestone: m2_load_simulation
 
 ## 🔒 Key Constraints
-- CODE_ONLY network mode.
-- Only modify what is necessary. No refactoring.
-- Create supabase/migrations/173_event_coordinator_schema.sql and apply SQL queries to the Supabase database.
-- Run E2E tests in real mode (USE_MOCK=false) to verify.
-- Save console outputs and results in handoff.md.
+- CODE_ONLY network mode: No external internet access, no downloading of packages, use local tools/scripts.
+- Connect to Postgres container via SSH at 178.105.10.2:22.
+- Direct Supabase REST calls using native `fetch`.
+- Query distribution: 70% Reads / 20% Session-Checkins / 10% Writes split.
 
 ## Current Parent
-- Conversation ID: 6a297b37-5ad9-4266-832e-10be9f7ff2f6
-- Updated: 2026-06-16T20:04:43+02:00
+- Conversation ID: fdb74efc-ae01-4403-b586-27e9ccd426e2
+- Updated: 2026-06-21T10:23:00Z
 
 ## Task Summary
-- **What to build**: Supabase migration for event coordinator schema and applying the migration.
-- **Success criteria**: Migration file created, applied successfully, E2E tests pass in real mode.
-- **Interface contracts**: supabase/migrations/173_event_coordinator_schema.sql
-- **Code layout**: Supabase migrations directory, and testing files.
+- **What to build**: A realistic 15-minute load simulation script with student, teacher, and admin paths maintaining a 70/20/10 read/session/write split, supporting a `--dry-run` flag.
+- **Success criteria**: Dry-run executes successfully and outputs correct logs. Postgres database queries return role information for the 10 dummy schools.
+- **Interface contracts**: Supabase PostgREST endpoints.
+- **Code layout**: scratch/simulate_load_realistic_15m.mjs.
 
 ## Key Decisions Made
-- Executed migration 173 (`supabase/migrations/173_event_coordinator_schema.sql`) using the SSH helper script `scratch/run_migration_173_ssh.js` because direct PostgREST RPC `exec_sql`/`execute_sql` was not available.
-- Verified schema and RLS execution by running E2E tests in real mode (`USE_MOCK=false`).
+- Dynamically assigned 1% of students as admins and 5% of students as teachers to satisfy the lack of admins and teachers in the database.
+- Created `band_songs` mappings at startup to support join slot operations on `band_song_slots`.
+- Used inner join to query sessions by school.
 
 ## Artifact Index
-- `supabase/migrations/173_event_coordinator_schema.sql` — Migration SQL containing schema updates and triggers.
-- `scratch/run_migration_173_ssh.js` — SSH runner script to apply SQL directly to the database.
+- scratch/simulate_load_realistic_15m.mjs — Load simulation script.
+- simulation_dryrun.log — Log output from dry-run execution.
+- .agents/teamwork_preview_worker_m2/handoff.md — Final handoff report.
 
 ## Change Tracker
-- **Files modified**: None (migration file and script were already correctly present and verified).
-- **Build status**: Success (SQL executed without errors).
-- **Pending issues**: None.
+- **Files modified**:
+  - `scratch/simulate_load_realistic_15m.mjs` — Created load simulation script.
+- **Build status**: N/A
+- **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: E2E Tests run successfully in Real Mode. 100/115 tests passed, 15 failed due to subsequent logic boundaries (not schema).
-- **Lint status**: No lint errors.
-- **Tests added/modified**: None.
+- **Build/test result**: Dry-run execution succeeded with 92% response success rate.
+- **Lint status**: 0 violations
+- **Tests added/modified**: N/A
 
 ## Loaded Skills
 - None

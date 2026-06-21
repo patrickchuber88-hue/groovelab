@@ -1,46 +1,47 @@
-# BRIEFING — 2026-06-16T18:55:00Z
+# BRIEFING — 2026-06-21T12:21:23+02:00
 
 ## Mission
-Implement the UI changes in `apps/groovelab/src/components/CampusEventsBoard.tsx` based on `synthesis_m3.md` and verify them.
+Run a 15-minute realistic load simulation, monitor and document the progress, analyze metrics/errors, and hand off findings.
 
 ## 🔒 My Identity
-- Archetype: implementer
+- Archetype: teamwork_preview_worker_m3
 - Roles: implementer, qa, specialist
 - Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m3
-- Original parent: 6a297b37-5ad9-4266-832e-10be9f7ff2f6
-- Milestone: m3_ui_implementation
+- Original parent: fdb74efc-ae01-4403-b586-27e9ccd426e2
+- Milestone: load_simulation
 
 ## 🔒 Key Constraints
-- CODE_ONLY network mode: no external HTTP/curl/wget/lynx.
-- Do not cheat: genuine implementation, no dummy facades or hardcoded results.
-- Write only to my own folder for agent metadata (.agents/teamwork_preview_worker_m3/).
+- Network: CODE_ONLY mode (no external network requests).
+- Timeliness: Heartbeat via progress.md every 2-3 minutes during the 15-minute simulation run.
+- Integrity: No cheating, no hardcoded results.
 
 ## Current Parent
-- Conversation ID: 6a297b37-5ad9-4266-832e-10be9f7ff2f6
-- Updated: 2026-06-16T18:55:00Z
+- Conversation ID: fdb74efc-ae01-4403-b586-27e9ccd426e2
+- Updated: not yet
 
 ## Task Summary
-- **What to build**: UI changes in `apps/groovelab/src/components/CampusEventsBoard.tsx` as specified in `.agents/sub_orch_implementation/synthesis_m3.md`.
-- **Success criteria**: Code compiles, and E2E tests run with `USE_MOCK=true npx tsx apps/groovelab/src/tests/run_e2e_tests.ts` pass successfully.
-- **Interface contracts**: See synthesis_m3.md and CampusEventsBoard.tsx
-- **Code layout**: apps/groovelab/src/components/CampusEventsBoard.tsx
+- **What to build**: Executing a 15-minute realistic load simulation using node scratch/simulate_load_realistic_15m.mjs.
+- **Success criteria**: Simulation executes for 15 minutes, progress.md is updated every 2-3 minutes, log file simulation_realistic_15m.log contains the final metrics summary block, detailed handoff report handoff.md is produced, and results sent to parent agent.
+- **Interface contracts**: None (standard CLI execution and logging).
+- **Code layout**: scratch/simulate_load_realistic_15m.mjs.
 
 ## Key Decisions Made
-- Confirmed that UI changes for milestone M3 in `CampusEventsBoard.tsx` are already integrated and fully functional.
-- Verified compilation build and successfully ran all 115 E2E test cases in mock mode.
+- Use default_api:run_command to run the script in the background.
+- Monitor stdout/stderr logs from the background task and update progress.md.
 
 ## Artifact Index
-- `.agents/teamwork_preview_worker_m3/handoff.md` - Handoff report detailing observations, logic chain, caveats, and verification commands.
+- /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m3/progress.md - Heartbeat and status tracker.
+- /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m3/handoff.md - Handoff report summarizing metrics and analysis.
 
 ## Change Tracker
-- **Files modified**: `apps/groovelab/src/components/CampusEventsBoard.tsx` (verified changes match requirements)
-- **Build status**: Passed
+- **Files modified**: None (this task runs a simulation script without modifying code).
+- **Build status**: N/A
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Passed (115/115 tests passed)
-- **Lint status**: N/A (unconfigured eslint rules in subfolder)
-- **Tests added/modified**: None (E2E tests verify all coordinator behaviors)
+- **Build/test result**: N/A
+- **Lint status**: N/A
+- **Tests added/modified**: None
 
 ## Loaded Skills
 - None

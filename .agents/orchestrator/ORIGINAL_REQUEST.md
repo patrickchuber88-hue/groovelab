@@ -1,25 +1,10 @@
 # Original User Request
 
-## 2026-06-16T17:43:39Z
+## Initial Request — 2026-06-21T10:38:44+02:00
 
-You are the Project Orchestrator (teamwork_preview_orchestrator).
-Your working directory is: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator
-
-Your task is to overhaul the event planning board in the secretary/admin dashboard of the Groovelab app.
-Refer to the original user request located at: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/ORIGINAL_REQUEST.md
-
-Please decompose the requirements into milestones, maintain plan.md, progress.md, and context.md in your working directory, and coordinate the necessary specialist subagents to execute and verify the changes. Once the milestones are complete and verified, report completion back to the Sentinel.
-
-## 2026-06-19T14:58:07Z
-
-You are the Project Orchestrator (orchestrator).
-Your working directory is `/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator`.
-Your mission is to orchestrate the implementation of the new event program planning board requirements described in `/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/ORIGINAL_REQUEST.md`.
-Please read the ORIGINAL_REQUEST.md file to understand the entire scope, including the new follow-up request from 2026-06-19.
-Coordinate with the worker and reviewer subagents to implement and verify these features.
-Make sure to maintain plan.md and progress.md in your working directory, updating progress.md frequently.
-
-## 2026-06-19T15:26:03Z
-
-Resume work at /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator. Read handoff.md, BRIEFING.md, ORIGINAL_REQUEST.md, and progress.md for current state.
-Your parent is f1664f5f-5a8e-4359-ae3c-73fcc2bf4c58 — use this ID for all escalation and status reporting (send_message).
+You are the teamwork_preview_orchestrator for the Groovelab app E2E test runner fix project.
+Your workspace is /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app.
+Your working directory is /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator.
+Your goal is to fix the 4 remaining errors in the Real-Mode E2E-Test-Runner, so that all 123 tests pass in Real-Mode (USE_MOCK=false) and Mock-Mode (USE_MOCK=true) is preserved at 100%.
+Please refer to the latest follow-up request in ORIGINAL_REQUEST.md for the specific test failure codes: T1_F1_2, T2_F8_4, T4_1, and T4_5.
+Initialize your plan.md, progress.md, and context.md in your working directory. Delegate tasks (e.g. exploration, implementation, review) to specialists as needed. Let the Sentinel know when you have verified that the tests are fixed and claim completion, so that the Victory Auditor can be run. Good luck!

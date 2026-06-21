@@ -581,6 +581,155 @@ class MockSupabaseClient {
 // Instantiate database
 const mockDb = new MockDatabase();
 
+async function seedRealDatabase(serviceClient: any) {
+  console.log('Seeding remote Supabase database with test users and lessons...');
+
+  // 1. School
+  const { error: schoolError } = await serviceClient.from('schools').upsert([
+    { id: '11111111-1111-1111-1111-111111111111', name: 'Groove Academy' }
+  ]);
+  if (schoolError) {
+    console.error('Failed to seed schools:', schoolError);
+    throw schoolError;
+  }
+
+  // 2. Users
+  const usersToSeed = [
+    {
+      id: '22222222-2222-2222-2222-222222222221',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'teacher',
+      first_name: 'John',
+      last_name: 'Doe',
+      roles: ['teacher'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'teacher',
+      first_name: 'Alice',
+      last_name: 'Smith',
+      roles: ['teacher'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '33333333-3333-3333-3333-333333333331',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'student',
+      first_name: 'Jane',
+      last_name: 'Smith',
+      roles: ['student'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '33333333-3333-3333-3333-333333333332',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'student',
+      first_name: 'Bob',
+      last_name: 'Jones',
+      roles: ['student'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '44444444-4444-4444-4444-444444444441',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'admin',
+      first_name: 'Admin',
+      last_name: 'User',
+      roles: ['admin'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '44444444-4444-4444-4444-444444444442',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'secretary',
+      first_name: 'Sec',
+      last_name: 'Retary',
+      roles: ['secretary'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: false
+    },
+    {
+      id: '99999999-9999-9999-9999-999999999999',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      role: 'admin',
+      first_name: 'Master',
+      last_name: 'Admin',
+      roles: ['admin'],
+      is_active: true,
+      is_campus_active: true,
+      is_groovelab_active: true,
+      is_master_admin: true
+    }
+  ];
+
+  const { error: usersError } = await serviceClient.from('users_raw').upsert(usersToSeed);
+  if (usersError) {
+    console.error('Failed to seed users:', usersError);
+    throw usersError;
+  }
+
+  // 3. Lessons
+  const lessonsToSeed = [
+    {
+      id: '66666666-6666-6666-6666-666666666661',
+      teacher_id: '22222222-2222-2222-2222-222222222221',
+      student_id: '33333333-3333-3333-3333-333333333331',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      date: '2026-06-17',
+      start_time: '10:00',
+      duration: 45,
+      status: 'scheduled'
+    },
+    {
+      id: '66666666-6666-6666-6666-666666666662',
+      teacher_id: '22222222-2222-2222-2222-222222222221',
+      student_id: '33333333-3333-3333-3333-333333333332',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      date: '2026-06-18',
+      start_time: '11:00',
+      duration: 45,
+      status: 'scheduled'
+    },
+    {
+      id: '66666666-6666-6666-6666-666666666663',
+      teacher_id: '22222222-2222-2222-2222-222222222222',
+      student_id: '33333333-3333-3333-3333-333333333331',
+      school_id: '11111111-1111-1111-1111-111111111111',
+      date: '2026-06-17',
+      start_time: '14:00',
+      duration: 60,
+      status: 'scheduled'
+    }
+  ];
+
+  const { error: lessonsError } = await serviceClient.from('lessons').upsert(lessonsToSeed);
+  if (lessonsError) {
+    console.error('Failed to seed lessons:', lessonsError);
+    throw lessonsError;
+  }
+
+  console.log('Successfully completed real database seeding.');
+}
+
 // Main Execution
 async function main() {
   const useMock = process.env.USE_MOCK === 'true';
@@ -599,6 +748,10 @@ async function main() {
       console.error('Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required for real mode.');
       process.exit(1);
     }
+
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+    const serviceClient = createClient(supabaseUrl, serviceKey);
+    await seedRealDatabase(serviceClient);
 
     const idMap: Record<string, string> = {
       'school-1': '11111111-1111-1111-1111-111111111111',

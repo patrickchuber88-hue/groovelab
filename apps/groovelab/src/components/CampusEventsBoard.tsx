@@ -138,6 +138,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // --- M5 Drag-and-Drop Board & Conflict Prevention ---
   const [activeStage, setActiveStage] = useState<number>(1);
+  const [dbConflicts, setDbConflicts] = useState<{ program_point_id: string; conflict_type: string; conflict_message: string }[]>([]);
   const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
   const [manualEnsemble, setManualEnsemble] = useState('');
@@ -368,6 +369,32 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setActiveLivePointId(null);
     }
   }, [selectedEvent, secretaryPlanningEvent, teacherSubmissionEvent, activeStage]);
+
+  const fetchDbConflicts = async (eventId: string) => {
+    if (!eventId) return;
+    try {
+      const { data, error } = await supabase.rpc('get_schedule_conflicts', { 
+        p_event_id: eventId, 
+        p_transition_time: transitionTime 
+      });
+      if (error) {
+        console.error('Error fetching conflicts:', error);
+      } else if (data) {
+        setDbConflicts(data);
+      }
+    } catch (err) {
+      console.error('Exception in fetchDbConflicts:', err);
+    }
+  };
+
+  useEffect(() => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (activeEv?.id) {
+      fetchDbConflicts(activeEv.id);
+    } else {
+      setDbConflicts([]);
+    }
+  }, [programPoints, transitionTime, secretaryPlanningEvent?.id, selectedEvent?.id]);
   
   // Teacher program point form states
   const [newPpName, setNewPpName] = useState('');
@@ -792,10 +819,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return stageItem ? stageItem : p;
     });
 
-    const activeEv = secretaryPlanningEvent || selectedEvent;
-    const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
-    // Check conflicts for warning indication, but do not block scheduling
-    const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
+    // Check conflicts is managed asynchronously via database RPC get_schedule_conflicts triggered on programPoints state updates
 
     const pointsToUpdate = finalPoints.filter(p => {
       const original = programPoints.find(orig => orig.id === p.id);
@@ -832,10 +856,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     const finalPoints = programPoints.map(p => p.id === ppId ? { ...p, duration: newDuration } : p);
 
-    const activeEv = secretaryPlanningEvent || selectedEvent;
-    const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
-    // Check conflicts but do not block duration changes
-    const conflicts = getConflictsMap(finalPoints, eventDayLessons, activeEventStartTime);
+    // Check conflicts is managed asynchronously via database RPC get_schedule_conflicts triggered on programPoints state updates
 
     const { error } = await supabase
       .from('campus_event_program_points')
@@ -8178,11 +8199,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             // Compute conflicts and time map
             const activeEv = secretaryPlanningEvent || selectedEvent;
             const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
-            const conflicts = getConflictsMap(programPoints, eventDayLessons, activeEventStartTime);
+            const conflicts: Record<string, string> = {};
+            dbConflicts.forEach(c => {
+              conflicts[c.program_point_id] = c.conflict_message;
+            });
             const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {dbConflicts.length > 0 && (
+                  <div style={{
+                    background: '#fef2f2',
+                    border: '1.5px solid rgba(255, 59, 48, 0.15)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    color: '#ff3b30',
+                    fontSize: '0.82rem',
+                    fontWeight: 500
+                  }}>
+                    <AlertCircle size={18} style={{ color: '#ff3b30', flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ fontWeight: 700 }}>Ablaufplan-Konflikte erkannt!</strong> Es gibt {dbConflicts.length} Konflikt(e) im aktuellen Ablaufplan. Bitte überprüfen Sie die Details in der Konflikt-Leiste.
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
                   {/* Stage count switcher if stage_count > 1 */}
                   {stageCount > 1 && (
@@ -8854,6 +8897,52 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             );
                           })}
                         </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Conflict Sidebar Panel */}
+                  <div style={{
+                    width: '300px',
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    border: '1px solid #cbd5e1',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    boxSizing: 'border-box',
+                    overflowY: 'auto'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#1f1f1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircle size={16} style={{ color: dbConflicts.length > 0 ? '#ff3b30' : '#22c55e' }} />
+                      Konflikte ({dbConflicts.length})
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                      {dbConflicts.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 16px', fontSize: '0.78rem', color: '#86868b', lineHeight: 1.5 }}>
+                          Keine Konflikte im Ablaufplan vorhanden. Alles sieht gut aus!
+                        </div>
+                      ) : (
+                        dbConflicts.map((c, idx) => (
+                          <div key={idx} style={{
+                            padding: '12px',
+                            background: 'rgba(255, 59, 48, 0.02)',
+                            border: '1px solid rgba(255, 59, 48, 0.15)',
+                            borderRadius: '10px',
+                            fontSize: '0.76rem',
+                            color: '#ff3b30',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}>
+                            <div style={{ fontWeight: 700, color: '#ff3b30', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                              {c.conflict_type === 'lesson' ? 'Lehrer-Kollision' : 'Bühnen-Kollision'}
+                            </div>
+                            <div style={{ color: '#1f1f1f', fontWeight: 500 }}>{c.conflict_message}</div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>

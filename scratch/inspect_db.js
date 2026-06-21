@@ -1,21 +1,45 @@
-const { createClient } = require('@supabase/supabase-js');
+const { Client } = require('ssh2');
+const fs = require('fs');
 
-const supabaseUrl = 'https://supabase.178.105.10.2.sslip.io';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc5NTUzODQzLCJleHAiOjE5MzcyMzM4NDN9.NPFKhuj3WiiJ7pqG7w91QAEy1V696kfTcEunScUAAoI';
+const config = {
+  host: '178.105.10.2',
+  port: 22,
+  username: 'root',
+  privateKey: fs.readFileSync('/Users/patrickhuber/.ssh/id_ed25519'),
+  readyTimeout: 10000
+};
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const sqlQuery = `
+-- Verify school_user_statistics view columns
+SELECT table_name, column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'school_user_statistics'
+ORDER BY ordinal_position;
+`;
 
-async function inspect() {
-  const { data, error } = await supabase
-    .from('schedule_occurrences')
-    .select('*')
-    .limit(5);
+const conn = new Client();
 
-  if (error) {
-    console.error('Error fetching occurrences:', error);
-  } else {
-    console.log('Occurrences found:', data);
-  }
-}
+conn.on('ready', () => {
+  console.log('SSH connection established successfully.');
 
-inspect();
+  conn.exec('docker exec -i supabase-db psql -U postgres -d postgres', (err, stream) => {
+    if (err) throw err;
+    
+    let output = '';
+    stream.on('close', (code, signal) => {
+      console.log(`Query finished with code ${code}.`);
+      console.log('--- OUTPUT ---');
+      console.log(output);
+      conn.end();
+    }).on('data', (data) => {
+      output += data.toString();
+    }).stderr.on('data', (data) => {
+      console.log('STDERR:\n' + data);
+    });
+
+    stream.write(sqlQuery);
+    stream.end();
+  });
+}).on('error', (err) => {
+  console.error('SSH Connection Error:', err);
+}).connect(config);

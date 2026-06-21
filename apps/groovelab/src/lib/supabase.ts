@@ -33,14 +33,19 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     headers.set('x-qr-token', qrToken);
   }
   
-  // Extract invite school id from URL params if present
+  // Extract invite school id and token from URL params if present
   let inviteSchoolId = null;
+  let inviteToken = null;
   if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     inviteSchoolId = urlParams.get('invite_school_id');
+    inviteToken = urlParams.get('token');
   }
   if (inviteSchoolId) {
     headers.set('x-invite-school-id', inviteSchoolId);
+  }
+  if (inviteToken) {
+    headers.set('x-invite-token', inviteToken);
   }
   
   const newInit = {

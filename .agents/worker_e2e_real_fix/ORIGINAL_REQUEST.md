@@ -33,3 +33,22 @@ Verification:
 3. Verify all 115 test cases pass in Real Mode: `USE_MOCK=false npx tsx apps/groovelab/src/tests/run_e2e_tests.ts`
 
 Write a detailed handoff report to `handoff.md` in your directory, detailing modified files, build command outputs, and E2E test results.
+
+## 2026-06-21T10:45:59Z
+Implement the database seeding fix in `apps/groovelab/src/tests/run_e2e_tests.ts` to ensure that all required test users and lessons are present in the remote Supabase database before running the E2E tests under real mode (`USE_MOCK=false`).
+
+Specifically:
+1. Define a helper function `seedRealDatabase(serviceClient)` inside `apps/groovelab/src/tests/run_e2e_tests.ts` that inserts/upserts:
+   - The school `school-1` (UUID: `11111111-1111-1111-1111-111111111111`) into the `schools` table.
+   - All 7 test users (John Doe, Alice Smith, Jane Smith, Bob Jones, Admin User, Sec Retary, Master Admin) into the `users_raw` table (mapping their mock IDs to UUIDs using the `idMap` in `run_e2e_tests.ts`). Make sure the columns `id`, `school_id`, `role`, `first_name`, `last_name`, `roles`, `is_active`, `is_campus_active`, `is_groovelab_active`, and `is_master_admin` are populated correctly.
+   - The 3 test lessons (lesson-1, lesson-2, lesson-3) into the `lessons` table (mapping their mock IDs to UUIDs).
+2. Call `seedRealDatabase(serviceClient)` once at the start of `main()` when `useMock` is false, using a service role client created with the service key:
+   `const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';`
+3. Verify that the tests run and pass in BOTH mock mode and real mode:
+   - `USE_MOCK=true npx tsx apps/groovelab/src/tests/run_e2e_tests.ts`
+   - `USE_MOCK=false npx tsx apps/groovelab/src/tests/run_e2e_tests.ts`
+
+DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A Forensic Auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
+
+Write your changes and test results to a handoff file under your own folder. Report the path to this file back in your message.
+
