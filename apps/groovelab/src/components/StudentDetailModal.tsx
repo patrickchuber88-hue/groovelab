@@ -139,6 +139,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [studentStats, setStudentStats] = useState<any>(null);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+  const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
@@ -344,6 +345,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   useEffect(() => {
     setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
     setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+    setExemptFromDirectBilling(student.exempt_from_direct_billing ?? false);
     setLessonDuration(student.lesson_duration || 30);
     setCampusRequestSent(localStorage.getItem(`req_campus_${student.id}`) === 'true');
     setGroovelabRequestSent(localStorage.getItem(`req_groovelab_${student.id}`) === 'true');
@@ -518,6 +520,20 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       }
     } catch (err: any) {
       alert('Fehler beim Aktualisieren des Campus-Zugangs: ' + err.message);
+    }
+  };
+
+  const handleToggleExemption = async (newVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ exempt_from_direct_billing: newVal })
+        .eq('id', student.id);
+      if (error) throw error;
+      setExemptFromDirectBilling(newVal);
+      student.exempt_from_direct_billing = newVal;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Befreiungs-Status: ' + err.message);
     }
   };
 
@@ -713,12 +729,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // Fetch latest user details (e.g. is_campus_active, is_groovelab_active) directly to prevent stale dashboard props
       const { data: latestUser } = await supabase
         .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode')
+        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing')
         .eq('id', student.id)
         .single();
       if (latestUser) {
         setIsCampusActive(latestUser.is_campus_active ?? false);
         setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
+        setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
         setLessonDuration(latestUser.lesson_duration || 30);
         setAppUsageMode(latestUser.app_usage_mode || 'student_only');
       }
@@ -1686,6 +1703,72 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       </span>
                     )}
                   </div>
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* Härtefall / Geschwisterrabatt (Direct Billing Exemption) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Härtefall / Geschwisterrabatt</span>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Befreit diesen Schüler komplett von der Direktabrechnung.</span>
+                  </div>
+                  {activePlatform === 'secretary' ? (
+                    <div style={{ 
+                      background: '#f1f5f9', 
+                      padding: '2px', 
+                      borderRadius: '12px', 
+                      display: 'inline-flex', 
+                      border: 'none',
+                      alignItems: 'center'
+                    }}>
+                      <button
+                        onClick={() => handleToggleExemption(false)}
+                        style={{
+                          background: !exemptFromDirectBilling ? '#ffffff' : 'transparent',
+                          color: !exemptFromDirectBilling ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: !exemptFromDirectBilling ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: !exemptFromDirectBilling ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        Nein
+                      </button>
+                      <button
+                        onClick={() => handleToggleExemption(true)}
+                        style={{
+                          background: exemptFromDirectBilling ? '#ea4335' : 'transparent',
+                          color: exemptFromDirectBilling ? '#ffffff' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: exemptFromDirectBilling ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: exemptFromDirectBilling ? '0 1px 4px rgba(234, 67, 53, 0.3)' : 'none'
+                        }}
+                      >
+                        Ja
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ 
+                      background: exemptFromDirectBilling ? '#fee2e2' : '#f1f5f9', 
+                      color: exemptFromDirectBilling ? '#ea4335' : '#64748b', 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800 
+                    }}>
+                      {exemptFromDirectBilling ? 'Befreit' : 'Nein'}
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />

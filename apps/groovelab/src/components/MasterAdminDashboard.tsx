@@ -86,7 +86,13 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [newSchoolZip, setNewSchoolZip] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
-  const [activePortalTab, setActivePortalTab] = useState<'schools' | 'billing' | 'banking' | 'pricing'>('schools');
+  const [activePortalTab, setActivePortalTab] = useState<'schools' | 'briefing' | 'billing' | 'banking' | 'pricing'>('schools');
+  
+  // Briefing Board State
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [pendingSearchQuery, setPendingSearchQuery] = useState('');
+  const [activatingUserId, setActivatingUserId] = useState<string | null>(null);
   
   // Editing State
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
@@ -156,6 +162,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     fetchSchoolsAndStats();
     fetchAdminUser();
     fetchBillingSettings();
+    fetchPendingUsers();
   }, []);
 
   const fetchBillingSettings = async () => {
@@ -181,6 +188,51 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
       }
     } catch (err) {
       console.error('Error fetching billing settings:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activePortalTab === 'briefing') {
+      fetchPendingUsers();
+    }
+  }, [activePortalTab]);
+
+  const fetchPendingUsers = async () => {
+    try {
+      setLoadingPending(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, ausweis_nummer, student_billing_payment_method, created_at, school_id')
+        .eq('role', 'student')
+        .eq('is_campus_active', false)
+        .not('student_billing_payment_method', 'is', null);
+
+      if (error) throw error;
+      setPendingUsers(data || []);
+    } catch (err: any) {
+      console.error('Error loading pending users:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  };
+
+  const handleActivateUser = async (userId: string) => {
+    try {
+      setActivatingUserId(userId);
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          is_campus_active: true,
+          is_groovelab_active: true
+        })
+        .eq('id', userId);
+      if (error) throw error;
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      fetchSchoolsAndStats();
+    } catch (err: any) {
+      alert('Fehler bei der Freischaltung: ' + err.message);
+    } finally {
+      setActivatingUserId(null);
     }
   };
 
@@ -599,6 +651,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' },
                 { id: 'billing', label: 'Abrechnung & Lizenzen', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
                 { id: 'banking', label: 'Adresse & Banking', icon: <Settings size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
                 { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
@@ -623,14 +676,32 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.02)' : 'none'
+                      boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.02)' : 'none',
+                      justifyContent: 'space-between'
                     }}
                     className="sidebar-nav-btn"
                   >
-                    <span style={{ color: isActive ? tab.color : '#64748b', transition: 'color 0.2s' }}>
-                      {tab.icon}
-                    </span>
-                    <span>{tab.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ color: isActive ? tab.color : '#64748b', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}>
+                        {tab.icon}
+                      </span>
+                      <span>{tab.label}</span>
+                    </div>
+                    {tab.id === 'briefing' && pendingUsers.length > 0 && (
+                      <span style={{
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        fontSize: '0.72rem',
+                        fontWeight: 900,
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        minWidth: '16px',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.25)'
+                      }}>
+                        {pendingUsers.length}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -710,7 +781,331 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           height: '100vh',
           boxSizing: 'border-box'
         }}>
-          {activePortalTab === 'billing' ? (
+          {activePortalTab === 'briefing' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              {/* Header Panel */}
+              <div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                  Briefing Board &amp; Freischaltungen
+                </h2>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
+                  Prüfe hier eingehende Zahlungen von Schülern und schalte ihre Campus-Profile manuell frei.
+                </p>
+              </div>
+
+              {/* Stats Cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '24px'
+              }}>
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px'
+                }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '16px',
+                    background: 'rgba(2, 132, 199, 0.1)',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offene Freischaltungen</span>
+                    <strong style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>{pendingUsers.length}</strong>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px'
+                }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '16px',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Tag size={24} />
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verwendungszweck-Schlüssel</span>
+                    <strong style={{ fontSize: '1.15rem', fontWeight: 900, color: '#10b981', fontFamily: 'monospace' }}>CG-[Ausweis-Nr]</strong>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px'
+                }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '16px',
+                    background: 'rgba(234, 179, 8, 0.1)',
+                    color: '#ca8a04',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Shield size={24} />
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prüf-Modus</span>
+                    <strong style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ca8a04' }}>Manueller Abgleich</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Control Panel: Search & Refresh */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                padding: '20px 24px',
+                border: '1px solid rgba(15, 23, 42, 0.06)',
+                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}>
+                <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                  <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    value={pendingSearchQuery}
+                    onChange={(e) => setPendingSearchQuery(e.target.value)}
+                    placeholder="Suche nach Name, Schule oder Verwendungszweck (z.B. CG-10294)..."
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '12px 16px 12px 42px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(15, 23, 42, 0.08)',
+                      background: '#f8fafc',
+                      color: '#0f172a',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      outline: 'none'
+                    }}
+                    className="premium-input"
+                  />
+                </div>
+
+                <button
+                  onClick={fetchPendingUsers}
+                  disabled={loadingPending}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1px solid rgba(15, 23, 42, 0.08)',
+                    color: '#475569',
+                    fontSize: '0.88rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#0f172a';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  <RefreshCw size={14} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
+                </button>
+              </div>
+
+              {/* Table of pending users */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                border: '1px solid rgba(15, 23, 42, 0.06)',
+                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                overflow: 'hidden'
+              }}>
+                {loadingPending ? (
+                  <div style={{ padding: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ width: '32px', height: '32px', border: '3px solid rgba(2, 132, 199, 0.1)', borderTopColor: '#0284c7', borderRadius: '50%' }} className="animate-spin" />
+                    <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>Lade ausstehende Aktivierungen...</span>
+                  </div>
+                ) : (
+                  (() => {
+                    const filtered = pendingUsers.filter(u => {
+                      const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
+                      const schoolName = (schools.find(s => s.id === u.school_id)?.name || '').toLowerCase();
+                      const refCode = `CG-${u.ausweis_nummer || ''}`.toLowerCase();
+                      const query = pendingSearchQuery.toLowerCase();
+                      return name.includes(query) || schoolName.includes(query) || refCode.includes(query);
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ padding: '80px 40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                          <div style={{
+                            width: '64px',
+                            height: '64px',
+                            borderRadius: '50%',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Check size={32} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Keine offenen Freischaltungen</h3>
+                            <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
+                              {pendingSearchQuery ? 'Keine Übereinstimmung mit deinem Suchfilter gefunden.' : 'Alle Schüler-Zahlungen wurden abgeglichen und freigeschaltet!'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler / Ausweis-Nr</th>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Musikschule</th>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zahlungsweg</th>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Verwendungszweck (Bank)</th>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zahlbetrag</th>
+                            <th style={{ padding: '16px 24px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Aktionen</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map(u => {
+                            const schoolName = schools.find(s => s.id === u.school_id)?.name || 'Unbekannte Schule';
+                            const refCode = `CG-${u.ausweis_nummer || 'OHNE'}`;
+                            const isActivating = activatingUserId === u.id;
+                            
+                            return (
+                              <tr key={u.id} style={{ borderBottom: '1px solid rgba(15, 23, 42, 0.04)', transition: 'background 0.15s' }} className="hover-bg-slate">
+                                <td style={{ padding: '20px 24px' }}>
+                                  <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>{u.first_name} {u.last_name}</strong>
+                                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 550 }}>ID: {u.ausweis_nummer || 'Keine Nummer'}</span>
+                                </td>
+                                <td style={{ padding: '20px 24px', fontSize: '0.88rem', color: '#334155', fontWeight: 600 }}>
+                                  {schoolName}
+                                </td>
+                                <td style={{ padding: '20px 24px' }}>
+                                  <span style={{
+                                    background: 'rgba(2, 132, 199, 0.08)',
+                                    color: '#0284c7',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 800,
+                                    padding: '4px 10px',
+                                    borderRadius: '100px'
+                                  }}>
+                                    {u.student_billing_payment_method === 'bank_transfer' ? 'Direktüberweisung' : u.student_billing_payment_method}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '20px 24px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <code style={{
+                                      background: '#f1f5f9',
+                                      color: '#0f172a',
+                                      fontSize: '0.85rem',
+                                      fontWeight: 800,
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(15, 23, 42, 0.08)',
+                                      letterSpacing: '0.02em',
+                                      fontFamily: 'monospace'
+                                    }}>{refCode}</code>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(refCode);
+                                        alert(`Verwendungszweck "${refCode}" kopiert!`);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#64748b',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '4px'
+                                      }}
+                                      title="Kopieren"
+                                    >
+                                      <Copy size={12} />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '20px 24px', fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                                  4,80 €
+                                </td>
+                                <td style={{ padding: '20px 24px', textAlign: 'right' }}>
+                                  <button
+                                    onClick={() => handleActivateUser(u.id)}
+                                    disabled={isActivating}
+                                    style={{
+                                      background: '#10b981',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '10px',
+                                      padding: '8px 14px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s',
+                                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 12px rgba(16, 185, 129, 0.3)'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(16, 185, 129, 0.2)'; }}
+                                  >
+                                    {isActivating ? 'Wird aktiviert...' : 'Freischalten ✓'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+          ) : activePortalTab === 'billing' ? (
             <div className="animate-fade-in" style={{ contentVisibility: 'auto' }}>
               <BillingDashboard />
             </div>

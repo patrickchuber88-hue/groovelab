@@ -70,6 +70,7 @@ interface ProfileData {
   created_at?: string;
   is_trial?: boolean;
   trial_ends_at?: string | null;
+  exempt_from_direct_billing?: boolean;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -385,7 +386,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at')
+          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
           .eq('qr_token', token)
           .single();
 
@@ -446,7 +447,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           joker_used_at: userData.joker_used_at,
           created_at: userData.created_at,
           is_trial: userData.is_trial ?? false,
-          trial_ends_at: userData.trial_ends_at
+          trial_ends_at: userData.trial_ends_at,
+          exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false
         });
 
         if (isInactive) {
@@ -2717,7 +2719,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {!timerRunning && (
             <div style={{
               background: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
-              padding: '24px 20px',
+              padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 20px 24px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
