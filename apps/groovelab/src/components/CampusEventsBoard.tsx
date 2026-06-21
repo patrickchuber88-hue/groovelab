@@ -2974,35 +2974,51 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     let stagesContentHTML = '';
     const activeEventStartTime = activeEv.event_start_time || activeEv.start_time || '14:00';
     const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+    let isFirstStage = true;
 
     Object.keys(stagesMap).sort((a, b) => parseInt(a) - parseInt(b)).forEach(stageKey => {
       const stageNum = parseInt(stageKey);
       const points = stagesMap[stageNum];
 
       stagesContentHTML += `
-      <div class="stage-section">
-        <h2>Bühne ${stageNum}</h2>
+      <div class="stage-section" style="${!isFirstStage ? 'page-break-before: always; margin-top: 30px;' : ''}">
+        <div class="stage-header">Bühne ${stageNum}</div>
         <table>
           <thead>
             <tr>
-              <th style="width: 100px;">Zeit</th>
-              <th style="width: 240px;">Beitrag</th>
-              <th style="width: 240px;">Besetzung / Ensemble</th>
-              <th>Repertoire / Lieder</th>
+              <th style="width: 15%; text-align: left;">Zeit</th>
+              <th style="width: 45%; text-align: left;">Programm &amp; Besetzung</th>
+              <th style="width: 40%; text-align: left;">Repertoire / Lieder</th>
             </tr>
           </thead>
           <tbody>
             ${points.map(pp => {
               const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
               const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
-              const songsStr = songsList.map((song: any) => `<strong>${song.title}</strong>${song.artist ? ` <span style="font-weight:400; color:#86868b;">(${song.artist})</span>` : ''}`).join(', ');
+              
+              let songsHTML = '';
+              if (pp.is_pause) {
+                songsHTML = '<span class="pause-badge">Pause</span>';
+              } else if (songsList.length > 0) {
+                songsHTML = songsList.map((song: any) => `
+                  <div class="song-item">
+                    <span class="song-title">${song.title}</span>
+                    ${song.artist ? `<span class="song-artist">&middot; ${song.artist}</span>` : ''}
+                  </div>
+                `).join('');
+              } else {
+                songsHTML = `<span style="color:#8e8e93; font-style:italic; font-size:0.8rem;">${pp.instrument || '-'}</span>`;
+              }
 
               return `
               <tr class="${pp.is_pause ? 'row-pause' : ''}">
                 <td class="tabular-time">${timeInfo.start} &ndash; ${timeInfo.end}</td>
-                <td><span class="vertical-accent"></span><strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong></td>
-                <td>${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</td>
-                <td>${pp.is_pause ? '<span class="pause-badge">Pause</span>' : (songsStr || pp.instrument || '-')}</td>
+                <td>
+                  <span class="vertical-accent"></span>
+                  <div class="program-title">${pp.is_pause ? '☕ ' : ''}${pp.name}</div>
+                  ${!pp.is_pause ? `<div class="program-sub">${pp.ensemble_band || 'Einzelbeitrag'}</div>` : ''}
+                </td>
+                <td>${songsHTML}</td>
               </tr>
               `;
             }).join('')}
@@ -3010,6 +3026,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         </table>
       </div>
       `;
+      isFirstStage = false;
     });
 
     printWindow.document.write(`
@@ -3018,48 +3035,50 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <head>
         <title>${activeEv.title} - Programmheft</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
           body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
             color: #1d1d1f;
-            margin: 50px 60px;
+            margin: 40px 50px;
             background: #ffffff;
-            line-height: 1.6;
+            line-height: 1.5;
             -webkit-font-smoothing: antialiased;
           }
           .header {
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            padding-bottom: 24px;
-            margin-bottom: 40px;
+            border-bottom: 2px solid #1d1d1f;
+            padding-bottom: 20px;
+            margin-bottom: 35px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
           }
           .header h1 {
             margin: 0;
-            font-size: 2.6rem;
-            font-weight: 300;
-            letter-spacing: -0.04em;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
             color: #1d1d1f;
+            text-transform: uppercase;
           }
           .header-meta {
             text-align: right;
             font-size: 0.82rem;
-            color: #86868b;
+            color: #515154;
             font-weight: 500;
             line-height: 1.5;
           }
           .stage-section {
-            margin-bottom: 45px;
-            page-break-inside: avoid;
+            margin-bottom: 35px;
           }
-          .stage-section h2 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: #86868b;
+          .stage-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #1d1d1f;
+            border-bottom: 1px solid #1d1d1f;
+            padding-bottom: 6px;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.05em;
           }
           table {
             width: 100%;
@@ -3067,26 +3086,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             text-align: left;
           }
           th {
-            border-bottom: 1px solid rgba(0,0,0,0.06);
-            padding: 12px;
-            font-size: 0.68rem;
-            font-weight: 600;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding: 10px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: #86868b;
           }
           td {
-            padding: 14px 12px;
-            border-bottom: 1px solid rgba(0,0,0,0.04);
-            font-size: 0.84rem;
+            padding: 12px 8px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-size: 0.85rem;
             vertical-align: top;
             position: relative;
           }
           .vertical-accent {
             position: absolute;
             left: 0;
-            top: 14px;
-            bottom: 14px;
+            top: 12px;
+            bottom: 12px;
             width: 3px;
             background: #007aff;
             border-radius: 2px;
@@ -3096,28 +3115,55 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             font-variant-numeric: tabular-nums;
             font-weight: 600;
             color: #1d1d1f;
+            font-size: 0.85rem;
+          }
+          .program-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #1d1d1f;
+          }
+          .program-sub {
+            font-size: 0.78rem;
+            color: #86868b;
+            margin-top: 2px;
+          }
+          .song-item {
+            margin-bottom: 4px;
+            font-size: 0.82rem;
+            line-height: 1.4;
+          }
+          .song-title {
+            font-weight: 600;
+            color: #1c1c1e;
+          }
+          .song-artist {
+            color: #86868b;
+            margin-left: 4px;
+            font-size: 0.76rem;
+            font-weight: 400;
           }
           .row-pause {
-            background: #fffbeb;
+            background: #fbfbfd;
           }
           .row-pause td {
-            color: #b45309;
-            border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+            color: #86868b;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
           }
           .row-pause .vertical-accent {
             display: block;
-            background: #f59e0b;
+            background: #ff9500;
           }
           .pause-badge {
-            background: rgba(245, 158, 11, 0.1);
-            color: #d97706;
+            background: rgba(255, 149, 0, 0.08);
+            color: #ff9500;
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.68rem;
             font-weight: 700;
+            letter-spacing: 0.02em;
           }
           .footer {
-            margin-top: 60px;
+            margin-top: 50px;
             text-align: center;
             font-size: 0.72rem;
             color: #86868b;
@@ -3126,7 +3172,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             font-weight: 500;
           }
           @media print {
-            body { margin: 20px 30px; }
+            body { margin: 15px 20px; }
             .no-print { display: none; }
           }
         </style>
@@ -3135,7 +3181,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div class="header">
           <div>
             <h1>Programmheft</h1>
-            <div style="font-size: 1.15rem; font-weight: 600; margin-top: 4px; color: #1d1d1f;">${activeEv.title}</div>
+            <div style="font-size: 1.15rem; font-weight: 600; margin-top: 4px; color: #515154;">${activeEv.title}</div>
           </div>
           <div class="header-meta">
             <div>Datum: ${new Date(activeEv.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</div>
