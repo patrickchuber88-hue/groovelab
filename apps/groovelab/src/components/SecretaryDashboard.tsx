@@ -17603,7 +17603,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Die Eltern oder Schüler zahlen ihren Beitrag direkt an Campus-Groovelab. Die Plattform übernimmt die automatische Zahlungsabwicklung und zeigt in der Schülerliste an, wer bezahlt hat. Die Musikschule wird finanziell vollständig oder größtenteils entlastet.
+                                      Eltern und Schüler zahlen ihren Beitrag direkt an Campus-Groovelab. Die Plattform übernimmt die komplette Zahlungsabwicklung vollautomatisch im Hintergrund und zeigt dir in Echtzeit in der Schülerliste, wer bereits bezahlt hat. Deine Musikschule wird finanziell maximal entlastet – ohne jeglichen Verwaltungsaufwand.
                                     </span>
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#eab308', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
