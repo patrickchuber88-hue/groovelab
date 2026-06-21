@@ -2226,13 +2226,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                       {selectedStudentId && (() => {
-                        const blocks = [];
                         const blockCount = Math.floor((endMinutes - startMinutes) / 15);
+                        const matchedTypes: ('wunsch' | 'gesperrt' | null)[] = Array(blockCount).fill(null);
+                        
                         for (let i = 0; i < blockCount; i++) {
                           const blockStart = startMinutes + i * 15;
                           const blockEnd = blockStart + 15;
-                          
-                          let matchedPref: 'wunsch' | 'gesperrt' | null = null;
                           
                           selectedStudentPrefs.forEach(pref => {
                             if (pref.day_of_week === board.dayOfWeek) {
@@ -2241,43 +2240,79 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               const prefStart = ph * 60 + pm;
                               const prefEnd = peh * 60 + pem;
                               
-                              // Check if 15m block falls within this preference timeframe
                               if (blockStart < prefEnd && blockEnd > prefStart) {
                                 if (pref.preference_type === 'gesperrt') {
-                                  matchedPref = 'gesperrt';
-                                } else if (pref.preference_type === 'wunsch' && matchedPref !== 'gesperrt') {
-                                  matchedPref = 'wunsch';
+                                  matchedTypes[i] = 'gesperrt';
+                                } else if (pref.preference_type === 'wunsch' && matchedTypes[i] !== 'gesperrt') {
+                                  matchedTypes[i] = 'wunsch';
                                 }
                               }
                             }
                           });
-                          
-                          if (matchedPref) {
-                            const top = i * 15 * PX_PER_MIN;
-                            const height = 15 * PX_PER_MIN;
-                            const className = matchedPref === 'gesperrt' 
-                              ? 'roentgen-blocked opacity-40 pointer-events-none' 
-                              : 'roentgen-preferred';
-                            
-                            blocks.push(
-                              <div
-                                key={`pref-block-${board.id}-${i}`}
-                                className={className}
-                                style={{
-                                  position: 'absolute',
-                                  left: 0,
-                                  right: 0,
-                                  top: `${top}px`,
-                                  height: `${height}px`,
-                                  zIndex: 3,
-                                  boxSizing: 'border-box',
-                                  pointerEvents: 'none'
-                                }}
-                              />
-                            );
+                        }
+
+                        // Merge contiguous slots of the same preference type
+                        const mergedBlocks = [];
+                        let currentType: 'wunsch' | 'gesperrt' | null = null;
+                        let startIndex = -1;
+
+                        for (let i = 0; i < blockCount; i++) {
+                          const type = matchedTypes[i];
+                          if (type !== currentType) {
+                            if (currentType && startIndex !== -1) {
+                              const top = startIndex * 15 * PX_PER_MIN;
+                              const height = (i - startIndex) * 15 * PX_PER_MIN;
+                              const className = currentType === 'gesperrt' 
+                                ? 'roentgen-blocked opacity-40 pointer-events-none' 
+                                : 'roentgen-preferred';
+                              
+                              mergedBlocks.push(
+                                <div
+                                  key={`pref-block-${board.id}-${startIndex}-${i}`}
+                                  className={className}
+                                  style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    top: `${top}px`,
+                                    height: `${height}px`,
+                                    zIndex: 3,
+                                    boxSizing: 'border-box',
+                                    pointerEvents: 'none'
+                                  }}
+                                />
+                              );
+                            }
+                            currentType = type;
+                            startIndex = type ? i : -1;
                           }
                         }
-                        return blocks;
+
+                        if (currentType && startIndex !== -1) {
+                          const top = startIndex * 15 * PX_PER_MIN;
+                          const height = (blockCount - startIndex) * 15 * PX_PER_MIN;
+                          const className = currentType === 'gesperrt' 
+                            ? 'roentgen-blocked opacity-40 pointer-events-none' 
+                            : 'roentgen-preferred';
+                          
+                          mergedBlocks.push(
+                            <div
+                              key={`pref-block-${board.id}-${startIndex}-${blockCount}`}
+                              className={className}
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: `${top}px`,
+                                height: `${height}px`,
+                                zIndex: 3,
+                                boxSizing: 'border-box',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          );
+                        }
+                        return mergedBlocks;
                       })()}
 
                       {/* Empty drop hint */}
