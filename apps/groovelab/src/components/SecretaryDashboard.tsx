@@ -1469,6 +1469,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [checkoutStep, setCheckoutStep] = useState<number>(1);
   const [billingPayer, setBillingPayer] = useState<'school' | 'student'>('school');
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [customUmlageAmount, setCustomUmlageAmount] = useState<number>(0.49);
+  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false);
+  const [couponCode, setCouponCode] = useState<string>('');
+  const [isCouponApplied, setIsCouponApplied] = useState<boolean>(false);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
+  const [showCouponInput, setShowCouponInput] = useState<boolean>(false);
+  const [hasCustomBillingAddress, setHasCustomBillingAddress] = useState<boolean>(false);
+  const [customBillingName, setCustomBillingName] = useState<string>('');
+  const [customBillingStreet, setCustomBillingStreet] = useState<string>('');
+  const [customBillingZip, setCustomBillingZip] = useState<string>('');
+  const [customBillingCity, setCustomBillingCity] = useState<string>('');
+  const [customBillingEmail, setCustomBillingEmail] = useState<string>('');
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
@@ -17199,6 +17212,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </p>
                               </div>
 
+                              {/* Kombi-Vorteil Promo Banner */}
+                              <div style={{
+                                background: 'linear-gradient(135deg, #fef08a 0%, #fef9c3 100%)',
+                                border: '1.5px solid #eab308',
+                                borderRadius: '16px',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                fontSize: '0.74rem',
+                                color: '#854d0e',
+                                fontWeight: 700,
+                                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.08)'
+                              }}>
+                                <span style={{ fontSize: '1.2rem' }}>🎉</span>
+                                <div>
+                                  <span><strong>Kombi-Vorteil sichern:</strong> Campus (7,99 €) &amp; GrooveLab (4,99 €) im Bundle für nur <strong>9,99 € / Mo.</strong> statt 12,98 € / Mo. (du sparst dauerhaft 2,99 € jeden Monat)!</span>
+                                </div>
+                              </div>
+
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                 {/* Campus Card */}
                                 <div 
@@ -17241,9 +17274,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         {hasCampusSub && '✓'}
                                       </span>
                                     </div>
-                                    <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      All-in-One Operations-Center für Verwaltung, Lehrer &amp; Schüler: Stundenpläne, Hausaufgabenheft, Raumbelegungspläne, Krankheits-Cockpit, Messenger, Event-Planung, Campus Live-Feed, Übestreaks sowie Performance &amp; Highlights.
-                                    </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Stundenpläne &amp; Raumbelegungspläne</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Hausaufgabenheft &amp; Krankheits-Cockpit</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Messenger &amp; Campus Live-Feed</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Übestreaks sowie Performance &amp; Highlights</span>
+                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                                     <span style={{ fontWeight: 900, color: '#1e293b' }}>7,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
@@ -17292,9 +17328,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         {hasGroovelabSub && '✓'}
                                       </span>
                                     </div>
-                                    <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Interaktives Band-Modul: Live-Lab-Board, Songs zum Meistern, automatisiertes Band-Matching-System, Bandprofile, Avatare, Übestreaks sowie Performance &amp; Highlights.
-                                    </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Interaktives Live-Lab-Board</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Songs zum Meistern &amp; Übe-Tools</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Automatisiertes Band-Matching</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Bandprofile &amp; coole Musiker-Avatare</span>
+                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                                     <span style={{ fontWeight: 900, color: '#1e293b' }}>4,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
@@ -17373,7 +17412,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                       <strong style={{ fontSize: '0.88rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        🏫 Musikschule zahlt
+                                        🏫 Musikschule übernimmt alle Kosten (Sammelzahler)
                                       </strong>
                                       <span style={{
                                         width: '18px',
@@ -17392,7 +17431,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Die Musikschule übernimmt alle Gebühren gesammelt. Für Eltern und Schüler ist die Nutzung komplett kostenfrei.
+                                      Die Musikschule übernimmt alle Gebühren gesammelt. Für Eltern und Schüler ist die Nutzung komplett kostenfrei. Keine Umlage erforderlich.
                                     </span>
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
@@ -17425,7 +17464,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                       <strong style={{ fontSize: '0.88rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        👥 Schüler / Eltern zahlen
+                                        👥 Kosten an Schüler/Eltern umlagen (mit Zahlungsüberwachung)
                                       </strong>
                                       <span style={{
                                         width: '18px',
@@ -17444,7 +17483,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Kosten für aktive Profile (0,49 € / Monat) werden direkt auf Schüler/Eltern umgelegt. Die Musikschule spart die vollen Aktivierungskosten.
+                                      Die Schule zahlt, aber die App hilft beim Umlagesystem und zeigt in der Schülerliste genau an, wer bezahlt hat. Jedes aktive Schülerprofil wird als Umlage erfasst.
                                     </span>
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#eab308', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
@@ -17452,6 +17491,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Custom Umlage Input & Exemption Info */}
+                              {billingPayer === 'student' && (
+                                <div style={{
+                                  background: '#fffbeb',
+                                  border: '1.5px solid #f59e0b',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  marginTop: '8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px'
+                                }}>
+                                  <strong style={{ fontSize: '0.78rem', color: '#78350f' }}>Höhe der Umlage an Schüler/Eltern festlegen:</strong>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.00"
+                                      value={customUmlageAmount}
+                                      onChange={(e) => setCustomUmlageAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                                      style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #cbd5e1',
+                                        fontSize: '0.82rem',
+                                        width: '100px',
+                                        fontWeight: 800
+                                      }}
+                                    />
+                                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>€ / Schüler pro Monat (Jahresabrechnung: {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € pro Schüler)</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4' }}>
+                                    💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Umlage zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).
+                                  </span>
+                                </div>
+                              )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
@@ -17508,130 +17584,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
 
                               {billingPayer === 'school' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  {/* Option 2: PAYG */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('option2')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'option2' ? '#10b981' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'option2' ? '0 10px 25px rgba(16, 185, 129, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>📈 Flexible monatliche Abrechnung (Pay-as-you-go)</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'option2' ? '#10b981' : '#cbd5e1',
-                                        background: studentBillingOption === 'option2' ? '#10b981' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'option2' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Abrechnung erfolgt monatlich nach tatsächlich aktivierten Schülerkonten (0,49 € pro Schüler / Monat). Maximale Flexibilität für deine Musikschule.
-                                    </p>
-                                  </div>
-
-                                  {/* Option 3.2: Annual Prorated Active */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('option3_2')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'option3_2' ? '#10b981' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'option3_2' ? '0 10px 25px rgba(16, 185, 129, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>🛡️ Einmalige Jahressumme pro aktivem Schüler (10% Rabatt)</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'option3_2' ? '#10b981' : '#cbd5e1',
-                                        background: studentBillingOption === 'option3_2' ? '#10b981' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'option3_2' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Abrechnung erfolgt einmalig bei Aktivierung prorotiert für die Restmonate des aktuellen Schuljahres. Du sparst 10% gegenüber der monatlichen Einzelabrechnung.
-                                    </p>
-                                  </div>
-
-                                  {/* Option 3.3: Annual Prorated All */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('option3_3')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'option3_3' ? '#10b981' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'option3_3' ? '0 10px 25px rgba(16, 185, 129, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>🎁 Einmalige Schuljahres-Flatrate für alle angelegten Schüler (20% Rabatt)</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'option3_3' ? '#10b981' : '#cbd5e1',
-                                        background: studentBillingOption === 'option3_3' ? '#10b981' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'option3_3' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Abrechnung erfolgt einmalig für alle Schüler im Voraus. Du sparst 20% gegenüber der monatlichen Einzelabrechnung. Ideal für Planungssicherheit.
-                                    </p>
-                                  </div>
+                                <div style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  fontSize: '0.78rem',
+                                  color: '#475569',
+                                  lineHeight: '1.4'
+                                }}>
+                                  ℹ️ <strong>Rechnungsstellung für Grundgebühren (Fixkosten):</strong> Die monatliche Sammelrechnung für deine gewählten Module und Team-Lizenzen wird per E-Mail an die Musikschule gesendet (Zahlungsziel: 14 Tage). Es sind keine weiteren Einstellungen erforderlich.
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  {/* Option 1: Lastschrift & Barzahlung */}
+                                  {/* Option 1: Abbuchung über Monatsgebühr & Barzahlung */}
                                   <div 
                                     onClick={() => setStudentBillingOption('option1')}
                                     className="selectable-card"
@@ -17649,7 +17615,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     }}
                                   >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>💳 Schüler aktivieren per Lastschrift &amp; Barzahlung</strong>
+                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>💳 Abbuchung über Monatsgebühr &amp; Barzahlung</strong>
                                       <span style={{
                                         width: '18px',
                                         height: '18px',
@@ -17667,11 +17633,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Schüler/Eltern können bei der Registrierung wählen, ob sie per Lastschrift oder Barzahlung zahlen möchten. Beides ist für dich nutzbar.
+                                      Die Schüler-Umlage wird über die regulären Monatsgebühren der Musikschule eingezogen. Barzahlung an der Schule ist ebenfalls zulässig.
                                     </p>
                                   </div>
 
-                                  {/* Debit only */}
+                                  {/* Option 2: Nur Abbuchung über Monatsgebühr */}
                                   <div 
                                     onClick={() => setStudentBillingOption('debit')}
                                     className="selectable-card"
@@ -17689,7 +17655,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     }}
                                   >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>🏦 Nur Lastschriftmandat erlauben</strong>
+                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>🏦 Nur Abbuchung über Monatsgebühr</strong>
                                       <span style={{
                                         width: '18px',
                                         height: '18px',
@@ -17707,11 +17673,133 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Eltern müssen zwingend ein SEPA-Lastschriftmandat hinterlegen, um ihren Schüler-Account freizuschalten. Minimiert deinen Verwaltungsaufwand.
+                                      Die Schüler-Umlage wird ausschließlich per Lastschrift/Abbuchung zusammen mit der Monatsgebühr erhoben. Keine Barzahlung.
+                                    </p>
+                                  </div>
+
+                                  {/* Option 3: Nur Barzahlung / Überweisung an Musikschule */}
+                                  <div 
+                                    onClick={() => setStudentBillingOption('cash')}
+                                    className="selectable-card"
+                                    style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      padding: '20px',
+                                      borderRadius: '20px',
+                                      border: '2px solid',
+                                      background: '#ffffff',
+                                      borderColor: studentBillingOption === 'cash' ? '#eab308' : 'rgba(0,0,0,0.06)',
+                                      boxShadow: studentBillingOption === 'cash' ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>💶 Nur Barzahlung / Überweisung an Musikschule</strong>
+                                      <span style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        borderRadius: '50%',
+                                        border: '2px solid',
+                                        borderColor: studentBillingOption === 'cash' ? '#eab308' : '#cbd5e1',
+                                        background: studentBillingOption === 'cash' ? '#eab308' : 'transparent',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ffffff',
+                                        fontSize: '0.65rem'
+                                      }}>
+                                        {studentBillingOption === 'cash' && '✓'}
+                                      </span>
+                                    </div>
+                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
+                                      Eltern können den Betrag bar im Büro bezahlen oder direkt auf das Bankkonto der Musikschule bzw. des Fördervereins überweisen.
                                     </p>
                                   </div>
                                 </div>
                               )}
+
+                              {/* Custom Billing Address Form */}
+                              <div style={{
+                                borderTop: '1px solid #e2e8f0',
+                                paddingTop: '20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px'
+                              }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={hasCustomBillingAddress}
+                                    onChange={(e) => setHasCustomBillingAddress(e.target.checked)}
+                                    style={{ width: '15px', height: '15px', accentColor: '#10b981' }}
+                                  />
+                                  Abweichende Rechnungsadresse für {billingPayer === 'student' ? 'die Schüler-Aktivierungen (z.B. Förderverein / Stadtmusik)' : 'die GrooveLab-Rechnung'} hinterlegen
+                                </label>
+
+                                {hasCustomBillingAddress && (
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '12px',
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '16px',
+                                    padding: '16px'
+                                  }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Name / Institution des Empfängers:</span>
+                                      <input
+                                        type="text"
+                                        placeholder="z.B. Förderverein Musikschule Musterstadt e.V."
+                                        value={customBillingName}
+                                        onChange={(e) => setCustomBillingName(e.target.value)}
+                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Straße &amp; Hausnummer:</span>
+                                      <input
+                                        type="text"
+                                        placeholder="Musterstraße 12"
+                                        value={customBillingStreet}
+                                        onChange={(e) => setCustomBillingStreet(e.target.value)}
+                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>PLZ:</span>
+                                      <input
+                                        type="text"
+                                        placeholder="12345"
+                                        value={customBillingZip}
+                                        onChange={(e) => setCustomBillingZip(e.target.value)}
+                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Ort:</span>
+                                      <input
+                                        type="text"
+                                        placeholder="Musterstadt"
+                                        value={customBillingCity}
+                                        onChange={(e) => setCustomBillingCity(e.target.value)}
+                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>E-Mail-Adresse für Rechnungsversand:</span>
+                                      <input
+                                        type="email"
+                                        placeholder="buchhaltung@foerderverein.de"
+                                        value={customBillingEmail}
+                                        onChange={(e) => setCustomBillingEmail(e.target.value)}
+                                        style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
@@ -17757,131 +17845,332 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
                           )}
 
-                          {checkoutStep === 4 && (
-                            <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                              <div>
-                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
-                                <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestätige deine Buchung</h4>
-                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Überprüfe deine Module und Einstellungen ein letztes Mal, bevor du die Buchung verbindlich abschließt.
-                                </p>
-                              </div>
+                          {checkoutStep === 4 && (() => {
+                            const getRemainingMonths = () => {
+                              const currentMonth = new Date().getMonth();
+                              return currentMonth <= 7 ? (8 - currentMonth) : (20 - currentMonth);
+                            };
+                            const remainingMonths = getRemainingMonths();
 
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '0.74rem', color: '#475569' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                                  <span>Gebuchte Module:</span>
-                                  <strong style={{ color: '#1e293b' }}>
-                                    {[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' & ')}
-                                  </strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                                  <span>Kostenträger Schüler:</span>
-                                  <strong style={{ color: '#1e293b' }}>
-                                    {billingPayer === 'school' ? 'Musikschule (Sammelzahler)' : 'Eltern / Schüler (Selbstzahler)'}
-                                  </strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>Abrechnungsmethode:</span>
-                                  <strong style={{ color: '#1e293b' }}>
-                                    {studentBillingOption === 'option2' && 'Monatlich flexible Abrechnung'}
-                                    {studentBillingOption === 'option3_2' && 'Einmalig proritierte Jahressumme'}
-                                    {studentBillingOption === 'option3_3' && 'Einmalige Schuljahres-Flatrate'}
-                                    {studentBillingOption === 'option1' && 'Selbstzahler (Lastschrift & Bar)'}
-                                    {studentBillingOption === 'debit' && 'Selbstzahler (nur Lastschrift)'}
-                                    {studentBillingOption === 'cash' && 'Selbstzahler (nur Barzahlung / Rechnung)'}
-                                  </strong>
-                                </div>
-                              </div>
+                            // Calculations for Invoices A & B
+                            const selectedModulesCount = (hasCampusSub ? 1 : 0) + (hasGroovelabSub ? 1 : 0);
+                            const baseModuleCost = (hasCampusSub && hasGroovelabSub) ? 9.99 : ((hasCampusSub ? 7.99 : 0) + (hasGroovelabSub ? 4.99 : 0));
+                            
+                            // Passive student profiles (total students - active students)
+                            const activeStudents = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
+                            const passiveStudents = Math.max(0, students.length - activeStudents);
 
-                              {/* SEPA checkout authorization */}
-                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                                <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' }}>
-                                  <input 
-                                    type="checkbox"
-                                    checked={agreedToSepa}
-                                    onChange={(e) => setAgreedToSepa(e.target.checked)}
-                                    style={{ width: '16px', height: '16px', accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
-                                  />
-                                  <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                    Hiermit ermächtige ich GrooveLab, die fälligen Plattform- und Service-Gebühren monatlich oder einmalig im Voraus von unserem hinterlegten Bankkonto per SEPA-Lastschrift einzuziehen.
-                                  </span>
-                                </label>
-                              </div>
+                            // Invoice A: Fixkosten
+                            const adminCost = employees.length * 0.49;
+                            const teacherCost = allTeachers.length * 0.49;
+                            const passiveStudentCost = passiveStudents * 0.09;
+                            const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost;
+                            const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                                <button 
-                                  onClick={() => setCheckoutStep(3)}
-                                  style={{
-                                    padding: '12px 24px',
-                                    borderRadius: '12px',
-                                    border: '1.5px solid #cbd5e1',
-                                    background: '#ffffff',
-                                    color: '#475569',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
+                            // Invoice B: Variable active student profiles
+                            const studentRate = billingPayer === 'student' ? customUmlageAmount : 0.49;
+                            const totalInvoiceB_monthly = activeStudents * studentRate;
+                            const totalInvoiceB_restYear = totalInvoiceB_monthly * remainingMonths;
+
+                            const handleApplyCoupon = () => {
+                              if (couponCode.trim().toLowerCase() === 'groove20') {
+                                setIsCouponApplied(true);
+                                setCouponDiscount(20); // 20% off
+                              } else {
+                                alert("Ungültiger Gutscheincode");
+                              }
+                            };
+
+                            const finalInvoiceA_monthly = isCouponApplied ? (totalInvoiceA_monthly * (1 - couponDiscount / 100)) : totalInvoiceA_monthly;
+                            const finalInvoiceA_restYear = isCouponApplied ? (totalInvoiceA_restYear * (1 - couponDiscount / 100)) : totalInvoiceA_restYear;
+
+                            return (
+                              <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
+                                  <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestätige deine Buchung</h4>
+                                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
+                                    Die Abrechnung wird aus Transparenzgründen in zwei separate Ströme aufgeteilt. Bitte überprüfe die beiden Rechnungsvorschauen.
+                                  </p>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                  {/* Invoice A Block */}
+                                  <div style={{
+                                    border: '1.5px solid #10b981',
+                                    borderRadius: '16px',
+                                    background: '#f0fdf4',
+                                    padding: '16px',
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  <span>⇠</span> Zurück
-                                </button>
-                                <button 
-                                  onClick={async () => {
-                                    if (!agreedToSepa) {
-                                      alert("Bitte stimme dem SEPA-Lastschriftverfahren zu, um fortzufahren.");
-                                      return;
-                                    }
-                                    try {
-                                      const simulated = typeof window !== 'undefined' ? localStorage.getItem('simulatedContractStartDate') : null;
-                                      const todayStr = simulated || new Date().toISOString().split('T')[0];
+                                    flexDirection: 'column',
+                                    gap: '10px'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #d1fae5', paddingBottom: '6px' }}>
+                                      <strong style={{ fontSize: '0.78rem', color: '#065f46' }}>RECHNUNG A: System &amp; Infrastruktur (Fixkosten)</strong>
+                                      <span style={{ fontSize: '0.62rem', color: '#047857', background: '#d1fae5', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>14 Tage Zahlungsziel</span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Software-Plattform:</span>
+                                        <strong>Kostenlos</strong>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Zusatzmodule ({[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' + ')}):</span>
+                                        <strong>{baseModuleCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Verwaltung &amp; Lehrer ({employees.length + allTeachers.length} Profile):</span>
+                                        <strong>{((employees.length + allTeachers.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Passive Schüler-Datenbankprofile ({passiveStudents} Profile):</span>
+                                        <strong>{(passiveStudentCost).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                      </div>
+                                    </div>
+                                    <div style={{ borderTop: '1px dotted #10b981', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#065f46' }}>
+                                      <span>Monatlicher Betrag (Rechnung A):</span>
+                                      <strong>{finalInvoiceA_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#047857' }}>
+                                      <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
+                                      <strong>{finalInvoiceA_restYear.toFixed(2).replace('.', ',')} €</strong>
+                                    </div>
+                                    {hasCustomBillingAddress && billingPayer !== 'student' && (
+                                      <div style={{ fontSize: '0.62rem', color: '#047857', borderTop: '1px solid #d1fae5', paddingTop: '6px', marginTop: '4px' }}>
+                                        📍 Rechnungsadresse: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}
+                                      </div>
+                                    )}
+                                  </div>
 
-                                      const { error } = await supabase
-                                        .from('schools')
-                                        .update({
-                                          is_billing_booked: true,
-                                          has_campus_subscription: hasCampusSub,
-                                          has_groovelab_subscription: hasGroovelabSub,
-                                          student_billing_option: studentBillingOption,
-                                          contract_start_date: todayStr
-                                        })
-                                        .eq('id', schoolId);
-                                      if (error) throw error;
+                                  {/* Invoice B Block */}
+                                  <div style={{
+                                    border: '1.5px solid #3b82f6',
+                                    borderRadius: '16px',
+                                    background: '#eff6ff',
+                                    padding: '16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '10px'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #dbeafe', paddingBottom: '6px' }}>
+                                      <strong style={{ fontSize: '0.78rem', color: '#1d4ed8' }}>RECHNUNG B: Schüler-Aktivierungen &amp; Umlagen</strong>
+                                      <span style={{ fontSize: '0.62rem', color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>
+                                        {billingPayer === 'student' ? 'Über Eltern/Förderverein finanziert' : '14 Tage Zahlungsziel'}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Aktive Schülerprofile ({activeStudents} aktivierte Lizenzen):</span>
+                                        <strong>{studentRate.toFixed(2).replace('.', ',')} € / Schüler / Mo.</strong>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Kostenträger / Abrechnungsweg:</span>
+                                        <strong>
+                                          {billingPayer === 'school' ? 'Sammelrechnung an Musikschule' : ''}
+                                          {billingPayer === 'student' && studentBillingOption === 'option1' && 'Umlage über Schulgebühr + Bar'}
+                                          {billingPayer === 'student' && studentBillingOption === 'debit' && 'Umlage über Monatsgebühr'}
+                                          {billingPayer === 'student' && studentBillingOption === 'cash' && 'Barzahlung / Überweisung an Schule'}
+                                        </strong>
+                                      </div>
+                                    </div>
+                                    <div style={{ borderTop: '1px dotted #3b82f6', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#1d4ed8' }}>
+                                      <span>Monatlicher Betrag (Rechnung B):</span>
+                                      <strong>{totalInvoiceB_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
+                                      <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
+                                      <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
+                                    </div>
+                                    
+                                    {billingPayer === 'student' && (
+                                      <div style={{
+                                        background: '#dbeafe',
+                                        color: '#1e40af',
+                                        fontSize: '0.65rem',
+                                        padding: '6px 8px',
+                                        borderRadius: '8px',
+                                        fontWeight: 700,
+                                        marginTop: '4px',
+                                        textAlign: 'center'
+                                      }}>
+                                        💡 100% Umlage-finanziert – Netto-Effektivkosten für die Musikschule: 0,00 €!
+                                      </div>
+                                    )}
 
-                                      setIsBillingBooked(true);
-                                      if (typeof window !== 'undefined') {
-                                        localStorage.setItem('isBillingBooked', 'true');
+                                    {hasCustomBillingAddress && billingPayer === 'student' && (
+                                      <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #dbeafe', paddingTop: '6px', marginTop: '4px' }}>
+                                        📍 Rechnungsadresse Förderverein: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity} ({customBillingEmail})
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Collapsible Coupon Code Field */}
+                                <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+                                  <button
+                                    onClick={() => setShowCouponInput(!showCouponInput)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#3b82f6',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: 0
+                                    }}
+                                  >
+                                    <span>{showCouponInput ? '▼' : '▶'}</span> Haben Sie einen Gutscheincode?
+                                  </button>
+                                  
+                                  {showCouponInput && (
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="z.B. GROOVE20"
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value)}
+                                        style={{
+                                          padding: '6px 12px',
+                                          borderRadius: '8px',
+                                          border: '1px solid #cbd5e1',
+                                          fontSize: '0.74rem',
+                                          textTransform: 'uppercase'
+                                        }}
+                                      />
+                                      <button
+                                        onClick={handleApplyCoupon}
+                                        style={{
+                                          padding: '6px 12px',
+                                          borderRadius: '8px',
+                                          border: 'none',
+                                          background: '#3b82f6',
+                                          color: '#ffffff',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Einlösen
+                                      </button>
+                                    </div>
+                                  )}
+                                  
+                                  {isCouponApplied && (
+                                    <div style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: 700, marginTop: '6px' }}>
+                                      ✓ Gutscheincode active: {couponDiscount}% Rabatt auf Rechnung A (System &amp; Infrastruktur) angewendet!
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Checkbox GTC & Privacy */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' }}>
+                                    <input 
+                                      type="checkbox"
+                                      checked={agreedToTerms}
+                                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                      style={{ width: '16px', height: '16px', accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                      Ich akzeptiere die <strong>AGB</strong> und die <strong>Datenschutzerklärung für Musikschulen</strong>.
+                                    </span>
+                                  </label>
+
+                                  <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' }}>
+                                    <input 
+                                      type="checkbox"
+                                      checked={agreedToSepa}
+                                      onChange={(e) => setAgreedToSepa(e.target.checked)}
+                                      style={{ width: '16px', height: '16px', accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                      Hiermit bestätige ich die kostenpflichtige Buchung per Rechnung (Zahlungsziel: 14 Tage). Ich stimme zu, dass Rechnungen an die angegebene Rechnungsadresse gesendet werden.
+                                    </span>
+                                  </label>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                                  <button 
+                                    onClick={() => setCheckoutStep(3)}
+                                    style={{
+                                      padding: '12px 24px',
+                                      borderRadius: '12px',
+                                      border: '1.5px solid #cbd5e1',
+                                      background: '#ffffff',
+                                      color: '#475569',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    <span>⇠</span> Zurück
+                                  </button>
+                                  <button 
+                                    onClick={async () => {
+                                      if (!agreedToTerms) {
+                                        alert("Bitte stimme den AGB und den Datenschutzbestimmungen zu.");
+                                        return;
                                       }
-                                      alert("Abonnement erfolgreich eingerichtet und aktiv gebucht!");
-                                    } catch (err: any) {
-                                      console.error("Confirm billing booking error:", err);
-                                      alert("Fehler beim Abschließen der Buchung: " + err.message);
-                                    }
-                                  }}
-                                  disabled={!agreedToSepa}
-                                  style={{
-                                    padding: '12px 24px',
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    background: !agreedToSepa ? '#cbd5e1' : '#10b981',
-                                    color: '#ffffff',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 800,
-                                    cursor: !agreedToSepa ? 'not-allowed' : 'pointer',
-                                    boxShadow: !agreedToSepa ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.15)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  Verbindlich buchen &amp; Freischalten <span>➔</span>
-                                </button>
+                                      if (!agreedToSepa) {
+                                        alert("Bitte bestätige die kostenpflichtige Buchung.");
+                                        return;
+                                      }
+                                      try {
+                                        const simulated = typeof window !== 'undefined' ? localStorage.getItem('simulatedContractStartDate') : null;
+                                        const todayStr = simulated || new Date().toISOString().split('T')[0];
+
+                                        const { error } = await supabase
+                                          .from('schools')
+                                          .update({
+                                            is_billing_booked: true,
+                                            has_campus_subscription: hasCampusSub,
+                                            has_groovelab_subscription: hasGroovelabSub,
+                                            student_billing_option: studentBillingOption,
+                                            contract_start_date: todayStr
+                                          })
+                                          .eq('id', schoolId);
+                                        if (error) throw error;
+
+                                        setIsBillingBooked(true);
+                                        if (typeof window !== 'undefined') {
+                                          localStorage.setItem('isBillingBooked', 'true');
+                                        }
+                                        setShowSuccessModal(true);
+                                      } catch (err: any) {
+                                        console.error("Confirm billing booking error:", err);
+                                        alert("Fehler beim Abschließen der Buchung: " + err.message);
+                                      }
+                                    }}
+                                    disabled={!agreedToSepa || !agreedToTerms}
+                                    style={{
+                                      padding: '12px 24px',
+                                      borderRadius: '12px',
+                                      border: 'none',
+                                      background: (!agreedToSepa || !agreedToTerms) ? '#cbd5e1' : '#10b981',
+                                      color: '#ffffff',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 800,
+                                      cursor: (!agreedToSepa || !agreedToTerms) ? 'not-allowed' : 'pointer',
+                                      boxShadow: (!agreedToSepa || !agreedToTerms) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    Zahlungspflichtig buchen &amp; freischalten <span>➔</span>
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                         </div>
 
@@ -18062,6 +18351,81 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
                           )}
                          </div>
+
+                    {/* Success Modal Overlay */}
+                    {showSuccessModal && (
+                      <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 99999,
+                        padding: '20px'
+                      }}>
+                        <div className="glass-panel" style={{
+                          background: '#ffffff',
+                          border: '2px solid #10b981',
+                          borderRadius: '24px',
+                          padding: '40px 32px',
+                          maxWidth: '480px',
+                          width: '100%',
+                          textAlign: 'center',
+                          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '20px'
+                        }}>
+                          <div style={{
+                            width: '72px',
+                            height: '72px',
+                            borderRadius: '50%',
+                            background: '#d1fae5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#10b981',
+                            fontSize: '2.5rem',
+                            fontWeight: 900,
+                            boxShadow: '0 10px 20px rgba(16, 185, 129, 0.15)'
+                          }}>
+                            ✓
+                          </div>
+                          <div>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Buchung erfolgreich abgeschlossen!</h3>
+                            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                              Dein Abonnement wurde erfolgreich eingerichtet. Die Freischaltung aller Module und die Verbuchung sind abgeschlossen.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setShowSuccessModal(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '14px 24px',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: '#10b981',
+                              color: '#ffffff',
+                              fontSize: '0.86rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Zum Dashboard wechseln ➔
+                          </button>
+                        </div>
+                      </div>
+                    )}
                        </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontFamily: 'Inter', textAlign: 'left' }}>
