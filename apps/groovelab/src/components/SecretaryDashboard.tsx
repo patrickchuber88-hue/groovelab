@@ -18564,30 +18564,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
                           </div>
 
-                          {/* Price comparison anchor box below order summary widget */}
-                          {checkoutStep >= 2 && (
-                            <div style={{ 
-                              marginTop: '12px',
-                              background: '#ffffff', 
-                              border: '1.5px dashed #cbd5e1', 
-                              borderRadius: '16px', 
-                              padding: '12px 14px', 
-                              display: 'flex', 
-                              alignItems: 'flex-start', 
-                              gap: '8px',
-                              fontSize: '0.74rem', 
-                              color: '#475569',
-                              lineHeight: '1.35',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                            }}>
-                              <span style={{ fontSize: '1rem' }}>💡</span>
-                              <span>
-                                {(studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') && (
-                                  <>Die Gebührenpauschale (max. 5,88 € / Jahr) entspricht etwa dem Preis für <strong>ein Gitarren-Plektrum Set</strong>.</>
-                                )}
-                              </span>
-                            </div>
-                          )}
+                          {/* Price comparison anchor box removed */}
                          </div>
 
                     {/* Success Modal Overlay */}
