@@ -451,7 +451,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadQrCode = () => {
     if (!onboardCreatedUser) return;
-    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`https://campus-groovelab.de/qr/${onboardCreatedUser.qr_token}`)}`;
+    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`${window.location.origin}/qr/${onboardCreatedUser.qr_token}`)}`;
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -744,7 +744,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.1)'
                 }}>
                   <img 
-                    src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`https://campus-groovelab.de/qr/${onboardCreatedUser.qr_token}`)}`} 
+                    src={`https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`${window.location.origin}/qr/${onboardCreatedUser.qr_token}`)}`} 
                     alt="Admin QR Ausweis" 
                     style={{ width: '180px', height: '180px', display: 'block', borderRadius: '12px' }}
                   />
@@ -1850,7 +1850,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadParentQrCode = async () => {
     try {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails?.qr_token || verifiedStudentId}`)}`
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/qr/${verifiedStudentDetails?.qr_token || verifiedStudentId}`)}`;
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -2403,7 +2403,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${registeredUser.qr_token}`)}`} 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/qr/${registeredUser.qr_token}`)}`} 
                   alt="QR Code" 
                   style={{ width: '180px', height: '180px', display: 'block' }}
                 />
@@ -3330,8 +3330,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
       </div>
-      )
-}
+      )}
 
       {/* Passwort Anmeldung & Eltern-Onboarding buttons under the card if available */}
       {expandedSection === 'none' && !isGroovelabKiosk && (
@@ -3858,7 +3857,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Dein persönlicher Login-Code</span>
               <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
                   alt="Student Login QR Code"
                   style={{ width: '180px', height: '180px', display: 'block' }}
                 />
