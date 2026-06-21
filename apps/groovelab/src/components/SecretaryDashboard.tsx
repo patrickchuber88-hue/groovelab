@@ -17922,7 +17922,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Software-Plattform:</span>
-                                <strong style={{ color: '#10b981' }}>0,00 €</strong>
+                                <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
                               </div>
 
                               {hasCampusSub && (
@@ -17939,8 +17939,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>DB &amp; Service Team (0,49 € x {allTeachers.length + employees.length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                <span>DB &amp; Service Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(employees.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
@@ -18356,29 +18361,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                               <span>Software-Plattform:</span>
-                                              <strong style={{ color: '#10b981' }}>0,00 €</strong>
+                                              <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
                                             </div>
 
                                             {hasCampusSub && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                <span>Campus Grundgebühr:</span>
+                                                <span>Server &amp; Service Gebühren Campus:</span>
                                                 <strong>4,99 € / Mo.</strong>
                                               </div>
                                             )}
                                             {hasGroovelabSub && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                <span>GrooveLab Grundgebühr:</span>
+                                                <span>Server &amp; Service Gebühren Groovelab:</span>
                                                 <strong>4,99 € / Mo.</strong>
                                               </div>
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Verwalter &amp; Lehrer ({allTeachers.length + employees.length} Profile):</span>
-                                              <strong>{((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
+                                              <strong>{(employees.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Passive Schüler ({Math.max(0, students.length - activeStudents)} Profile):</span>
+                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
+                                              <strong>{(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                            </div>
+
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                              <span>DB &amp; Service Schüler (0,09 € x {Math.max(0, students.length - activeStudents)} passive Profile):</span>
                                               <strong>{(Math.max(0, students.length - activeStudents) * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
