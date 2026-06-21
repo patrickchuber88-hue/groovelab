@@ -18329,6 +18329,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         const simulated = typeof window !== 'undefined' ? localStorage.getItem('simulatedContractStartDate') : null;
                                         const todayStr = simulated || new Date().toISOString().split('T')[0];
 
+                                        if (simulatedToday) {
+                                          setIsBillingBooked(true);
+                                          if (typeof window !== 'undefined') {
+                                            localStorage.setItem('isBillingBooked', 'true');
+                                            localStorage.setItem('contractStartDate', todayStr);
+                                          }
+                                          setShowSuccessModal(true);
+                                          return;
+                                        }
+
                                         const { error } = await supabase
                                           .from('schools')
                                           .update({
