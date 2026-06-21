@@ -511,49 +511,55 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     try {
       const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
 
-      // 1. Wochenpläne holen
-      const { data: schData } = await supabase
-        .from('schedules')
-        .select(`
-          *,
-          teacher:teacher_id(first_name, last_name),
-          room:room_id(name)
-        `)
-        .eq('student_id', profile.id);
+      // Fetch all dashboard data in parallel for optimal performance
+      const [
+        schRes,
+        occRes,
+        statsRes,
+        avatarRes,
+        matrixRes
+      ] = await Promise.all([
+        supabase
+          .from('schedules')
+          .select(`
+            *,
+            teacher:teacher_id(first_name, last_name),
+            room:room_id(name)
+          `)
+          .eq('student_id', profile.id),
+        supabase
+          .from('schedule_occurrences')
+          .select(`
+            *,
+            teacher:teacher_id(first_name, last_name),
+            schedule:schedule_id(room:room_id(name))
+          `)
+          .eq('student_id', profile.id)
+          .gte('date', todayStr)
+          .order('date', { ascending: true })
+          .order('start_time', { ascending: true }),
+        supabase
+          .from('student_stats')
+          .select('*')
+          .eq('student_id', profile.id)
+          .maybeSingle(),
+        supabase
+          .from('avatars')
+          .select('*')
+          .eq('user_id', profile.id)
+          .maybeSingle(),
+        supabase
+          .from('progress_matrix')
+          .select('*')
+          .eq('student_id', profile.id)
+          .order('updated_at', { ascending: false })
+      ]);
 
-      // 2. Termine ab heute holen (um den nächsten Termin zu ermitteln)
-      const { data: occData } = await supabase
-        .from('schedule_occurrences')
-        .select(`
-          *,
-          teacher:teacher_id(first_name, last_name),
-          schedule:schedule_id(room:room_id(name))
-        `)
-        .eq('student_id', profile.id)
-        .gte('date', todayStr)
-        .order('date', { ascending: true })
-        .order('start_time', { ascending: true });
-
-      // 3. Statistiken holen
-      const { data: statsData } = await supabase
-        .from('student_stats')
-        .select('*')
-        .eq('student_id', profile.id)
-        .maybeSingle();
-
-      // 3b. Avatar holen
-      const { data: avatarData } = await supabase
-        .from('avatars')
-        .select('*')
-        .eq('user_id', profile.id)
-        .maybeSingle();
-
-      // 4. Hausaufgaben (progress_matrix) holen
-      const { data: matrixItems } = await supabase
-        .from('progress_matrix')
-        .select('*')
-        .eq('student_id', profile.id)
-        .order('updated_at', { ascending: false });
+      const schData = schRes.data;
+      const occData = occRes.data;
+      const statsData = statsRes.data;
+      const avatarData = avatarRes.data;
+      const matrixItems = matrixRes.data;
 
       // Deduplicate matrixItems by topic_name (latest wins)
       const uniqueMatrixItemsMap = new Map<string, any>();
