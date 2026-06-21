@@ -18352,7 +18352,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                               {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3') && (
                                 <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                  Kostenträger: <strong>Musikschule (Sammelzahler)</strong>. Schüler-Accounts werden kostenlos freigeschaltet. Abrechnung erfolgt: <strong>
+                                  Kostenträger: <strong>Musikschule (Sammelzahler)</strong>. Für Schüler werden die Accounts kostenlos freigeschaltet. Die Schule übernimmt die Kosten. Abrechnung erfolgt: <strong>
                                     {studentBillingOption === 'option2' && 'Monatlich (0,49 € / Schüler)'}
                                     {studentBillingOption === 'option3_2' && 'Einmalig pro Schuljahr (mit 10% Rabatt bei Aktivierung)'}
                                     {studentBillingOption === 'option3_3' && 'Einmalige Komplett-Aktivierung aller angelegten Schüler (mit 20% Rabatt)'}
