@@ -110,7 +110,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
     // Pricing States
   const [priceCampus, setPriceCampus] = useState<number | string>(7.99);
-  const [priceGroovelab, setPriceGroovelab] = useState<number | string>(2.49);
+  const [priceGroovelab, setPriceGroovelab] = useState<number | string>(4.99);
   const [priceTeacher, setPriceTeacher] = useState<number | string>(0.49);
   const [priceStudent, setPriceStudent] = useState<number | string>(0.49);
   const [specialOffers, setSpecialOffers] = useState<any[]>([]);
@@ -181,7 +181,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         setBillingIban(data.iban || '');
         setBillingBic(data.bic || '');
         setPriceCampus(data.price_module_campus ?? 7.99);
-        setPriceGroovelab(data.price_module_groovelab ?? 2.49);
+        setPriceGroovelab(data.price_module_groovelab ?? 4.99);
         setPriceTeacher(data.price_user_teacher ?? 0.49);
         setPriceStudent(data.price_user_student ?? 0.49);
         setSpecialOffers(data.special_offers ?? []);
@@ -652,7 +652,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               {[
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
                 { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' },
-                { id: 'billing', label: 'Abrechnung & Lizenzen', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
+                { id: 'billing', label: 'Abrechnung & Abonnements', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
                 { id: 'banking', label: 'Adresse & Banking', icon: <Settings size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
                 { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
               ].map((tab) => {
@@ -1136,7 +1136,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                 }}>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                    <Tag size={20} color="#ca8a04" /> Standard-Lizenzpreise
+                    <Tag size={20} color="#ca8a04" /> Standard-Abonnementpreise
                   </h3>
 
                   <form onSubmit={handleUpdatePricingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
@@ -1198,7 +1198,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Lehrer Lizenz (€ / Monat)
+                          Lehrer-Aktivierung (€ / Monat)
                         </label>
                         <input
                           type="number"
@@ -1223,7 +1223,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Schüler Lizenz (€ / Monat)
+                          Schüler-Aktivierung (€ / Monat)
                         </label>
                         <input
                           type="number"
@@ -2891,7 +2891,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     </div>
                   </div>
 
-                  {/* Card: Lizenzen & Abonnements */}
+                  {/* Card: Aktivierungen & Abonnements */}
                   <div style={{
                     background: '#ffffff',
                     border: '1px solid rgba(15, 23, 42, 0.06)',
@@ -2958,7 +2958,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>⚙️ Freie Lizenz (Abo-Bypass)</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>⚙️ Freie Aktivierung (Abo-Bypass)</span>
                         <input
                           type="checkbox"
                           checked={editSubscriptionBypass}
