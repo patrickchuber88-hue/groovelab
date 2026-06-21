@@ -31,6 +31,7 @@ interface Student {
   assignedTime?: string; // e.g. "14:30"
   isBreak?: boolean;
   customStartTime?: string;
+  status?: 'ausstehend' | 'verplant' | 'aktiv' | 'in_bearbeitung';
 }
 
 interface DayBoard {
@@ -269,14 +270,44 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('role', 'student')
         .eq('teacher_id', selectedTeacherId)
         ;
+
+      // Fetch pending students from pending_students_decrypted view
+      const { data: pendingData } = await supabase
+        .from('pending_students_decrypted')
+        .select('id, first_name, last_name, instrument')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', selectedTeacherId);
+
+      // Fetch statuses and parent notes for all teacher's students
+      const { data: allStudentsDb } = await supabase
+        .from('students')
+        .select('id, status')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', selectedTeacherId);
+
+      const statusMap: Record<string, string> = {};
+      allStudentsDb?.forEach(st => {
+        statusMap[st.id] = st.status;
+      });
       
-      const loadedStudents: Student[] = (sData || []).map(s => ({
-        id: s.id,
-        first_name: s.first_name,
-        last_name: s.last_name,
-        instrument: s.instrument || 'Musiker',
-        duration: s.lesson_duration || 45 // Load lesson_duration from DB
-      }));
+      const loadedStudents: Student[] = [
+        ...(sData || []).map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument || 'Musiker',
+          duration: s.lesson_duration || 45, // Load lesson_duration from DB
+          status: (statusMap[s.id] || 'verplant') as any
+        })),
+        ...(pendingData || []).map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument || 'Musiker',
+          duration: 45, // default duration
+          status: 'ausstehend' as const
+        }))
+      ];
 
       // 3. Fetch teacher profile for planned boards (checking new platform-specific column and fallback planned_boards)
       const { data: teacherProfile } = await supabase
@@ -707,6 +738,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setSelectedStudentPrefs([]);
         setSelectedStudentNote(null);
       }
+    }
+  };
+
+  const handleResetPreferences = async (studentId: string) => {
+    if (!confirm("Möchtest du die Stundenplan-Präferenzen und das Onboarding für diesen Schüler wirklich zurücksetzen? Der Schüler muss das Onboarding dann erneut durchlaufen.")) {
+      return;
+    }
+    try {
+      setLoading(true);
+      // 1. Delete user record if exists
+      const { error: userErr } = await supabase.from('users').delete().eq('id', studentId);
+      if (userErr) console.error("Error deleting user during reset:", userErr);
+      
+      // 2. Clear student schedule preferences
+      const { error: prefErr } = await supabase.from('student_schedule_preferences').delete().eq('student_id', studentId);
+      if (prefErr) console.error("Error deleting preferences during reset:", prefErr);
+      
+      // 3. Reset student status to 'ausstehend' and clear parent notes
+      const { error: studentErr } = await supabase.from('students').update({ status: 'ausstehend', parent_notes: null }).eq('id', studentId);
+      if (studentErr) console.error("Error updating student during reset:", studentErr);
+
+      alert("Onboarding erfolgreich zurückgesetzt.");
+      loadInitialData();
+    } catch (err) {
+      console.error("Error resetting student onboarding:", err);
+      alert("Fehler beim Zurücksetzen.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2199,7 +2258,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
                           {s.first_name} {s.last_name}
                         </span>
-                        <span style={{ height: '5px', width: '5px', borderRadius: '50%', background: isAssigned ? '#34d399' : '#d1d1d6', flexShrink: 0 }}></span>
+                        {s.status === 'ausstehend' ? (
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
+                        ) : (
+                          <span style={{ height: '5px', width: '5px', borderRadius: '50%', background: isAssigned ? '#34d399' : '#d1d1d6', flexShrink: 0 }}></span>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2214,21 +2277,52 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         )}
                       </div>
 
-                      {isSelected && selectedStudentNote && (
-                        <div style={{
-                          marginTop: '6px',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          background: '#fffbeb',
-                          border: '1px solid #fde68a',
-                          color: '#b45309',
-                          fontSize: '0.62rem',
-                          fontWeight: 650,
-                          lineHeight: '1.3',
-                          textAlign: 'left',
-                          wordBreak: 'break-word'
-                        }}>
-                          💬 <strong>Eltern-Notiz:</strong> {selectedStudentNote}
+                      {isSelected && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                          {selectedStudentNote && (
+                            <div style={{
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              background: '#fffbeb',
+                              border: '1px solid #fde68a',
+                              color: '#b45309',
+                              fontSize: '0.62rem',
+                              fontWeight: 650,
+                              lineHeight: '1.3',
+                              textAlign: 'left',
+                              wordBreak: 'break-word'
+                            }}>
+                              💬 <strong>Eltern-Notiz:</strong> {selectedStudentNote}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                            {s.status === 'ausstehend' ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const inviteLink = window.location.origin + "?onboarding=parent";
+                                  navigator.clipboard.writeText(inviteLink);
+                                  alert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
+                                }}
+                                style={{ flex: 1, padding: '4px 8px', background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                              >
+                                Onboarding-Link kopieren
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResetPreferences(s.id);
+                                }}
+                                style={{ flex: 1, padding: '4px 8px', background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                              >
+                                Onboarding zurücksetzen
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
