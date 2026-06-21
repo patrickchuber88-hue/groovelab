@@ -18204,23 +18204,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                             )}
                               <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Vorschau der Buchung</h4>
-                            {hasCampusSub && hasGroovelabSub && (
-                              <div style={{
-                                background: '#eff6ff',
-                                border: '1px solid #3b82f6',
-                                borderRadius: '12px',
-                                padding: '10px 12px',
-                                fontSize: '0.7rem',
-                                color: '#1d4ed8',
-                                fontWeight: 700,
-                                margin: '8px 0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                <span>🎉 Kombi-Vorteil aktiv: Campus &amp; GrooveLab zusammen für nur 9,99 €/Mo. statt 12,98 €/Mo. (2,99 € gespart)!</span>
-                              </div>
-                            )}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
