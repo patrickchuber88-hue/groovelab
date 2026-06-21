@@ -17242,7 +17242,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      All-in-One Operations-Center für Verwaltung, Lehrer &amp; Schüler: Stundenpläne, Hausaufgabenheft, Raumbelegungspläne, Krankheits-Cockpit.
+                                      All-in-One Operations-Center für Verwaltung, Lehrer &amp; Schüler: Stundenpläne, Hausaufgabenheft, Raumbelegungspläne, Krankheits-Cockpit, Messenger, Event-Planung &amp; Campus Live-Feed.
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
