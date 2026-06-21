@@ -126,6 +126,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   // Tabs for Column 1 (My Lessons)
   const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
 
+  // Tabs for Column 3 (Event-Planung)
+  const [planningEventTab, setPlanningEventTab] = useState<'upcoming' | 'past'>('upcoming');
+
   // Expanded/Collapsed months state for Column 1
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
 
@@ -4429,9 +4432,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const renderTeacherEventPlanningColumn = () => {
-    const activePlanningEvents = customEvents.filter(ev => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const allPlanningEvents = customEvents.filter(ev => {
       if (ev.is_subscribed) return false;
       return ev.is_planning_active;
+    });
+
+    const filteredPlanningEvents = allPlanningEvents.filter(ev => {
+      const end = ev.event_end_date || ev.event_date;
+      if (planningEventTab === 'upcoming') {
+        return end >= todayStr;
+      } else {
+        return end < todayStr;
+      }
     });
 
     return (
@@ -4464,13 +4477,59 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </p>
         </div>
 
+        {/* Tab Switcher */}
+        <div style={{
+          display: 'flex',
+          background: '#f1f5f9',
+          padding: '4px',
+          borderRadius: '12px',
+          gap: '4px'
+        }}>
+          <button
+            onClick={() => setPlanningEventTab('upcoming')}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: planningEventTab === 'upcoming' ? '#ffffff' : 'transparent',
+              color: planningEventTab === 'upcoming' ? '#0f172a' : '#64748b',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: planningEventTab === 'upcoming' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+            }}
+          >
+            Aktuelle
+          </button>
+          <button
+            onClick={() => setPlanningEventTab('past')}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: planningEventTab === 'past' ? '#ffffff' : 'transparent',
+              color: planningEventTab === 'past' ? '#0f172a' : '#64748b',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: planningEventTab === 'past' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+            }}
+          >
+            Vergangene
+          </button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {activePlanningEvents.length === 0 ? (
+          {filteredPlanningEvents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 16px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Keine aktiven Planungsveranstaltungen.
+              {planningEventTab === 'upcoming' ? 'Keine aktuellen Planungsveranstaltungen.' : 'Keine vergangenen Planungsveranstaltungen.'}
             </div>
           ) : (
-            activePlanningEvents.map(ev => {
+            filteredPlanningEvents.map(ev => {
               const dateStr = formatDateGerman(ev.event_date);
               return (
                 <div
