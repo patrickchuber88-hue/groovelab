@@ -6065,7 +6065,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <button
                           onClick={async () => {
                             if (student.isPendingOnboarding) {
-                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Barzahlung/Rechnung als Zahlungsart hinterlegt.`)) {
+                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) als Zahlungsart hinterlegt.`)) {
                                 return;
                               }
                               try {
@@ -6124,7 +6124,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <button
                           onClick={async () => {
                             if (student.isPendingOnboarding) {
-                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Barzahlung/Rechnung hinterlegt.`)) {
+                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) hinterlegt.`)) {
                                 return;
                               }
                               try {
@@ -17596,125 +17596,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   ℹ️ <strong>Rechnungsstellung für Grundgebühren (Fixkosten):</strong> Die monatliche Sammelrechnung für deine gewählten Module und Team-Lizenzen wird per E-Mail an die Musikschule gesendet (Zahlungsziel: 14 Tage). Es sind keine weiteren Einstellungen erforderlich.
                                 </div>
                               ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  {/* Option 1: Abbuchung über Monatsgebühr & Barzahlung */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('option1')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'option1' ? '#eab308' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'option1' ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>💳 Abbuchung über Monatsgebühr &amp; Barzahlung</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'option1' ? '#eab308' : '#cbd5e1',
-                                        background: studentBillingOption === 'option1' ? '#eab308' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'option1' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Die Schüler-Umlage wird über die regulären Monatsgebühren der Musikschule eingezogen. Barzahlung an der Schule ist ebenfalls zulässig.
-                                    </p>
+                                <div style={{
+                                  background: '#eff6ff',
+                                  border: '1.5px solid #3b82f6',
+                                  borderRadius: '16px',
+                                  padding: '20px',
+                                  fontSize: '0.78rem',
+                                  color: '#1e40af',
+                                  lineHeight: '1.4',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px'
+                                }}>
+                                  <div>
+                                    <strong style={{ fontSize: '0.88rem', color: '#1d4ed8', display: 'block', marginBottom: '4px' }}>ℹ️ Zahlungsweg der Schüler-Aktivierungen</strong>
+                                    <span>Da die Aktivierung der Schülerprofile direkt über uns (GrooveLab) abgewickelt wird, zahlen die Eltern/Schüler ihre Gebühren per <strong>Direktüberweisung (Jahresbetrag)</strong> an GrooveLab. Es ist keine Barzahlung möglich. Die Musikschule hat dadurch keinerlei Zahlungs- oder Inkassoaufwand.</span>
                                   </div>
-
-                                  {/* Option 2: Nur Abbuchung über Monatsgebühr */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('debit')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'debit' ? '#eab308' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'debit' ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>🏦 Nur Abbuchung über Monatsgebühr</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'debit' ? '#eab308' : '#cbd5e1',
-                                        background: studentBillingOption === 'debit' ? '#eab308' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'debit' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Die Schüler-Umlage wird ausschließlich per Lastschrift/Abbuchung zusammen mit der Monatsgebühr erhoben. Keine Barzahlung.
-                                    </p>
-                                  </div>
-
-                                  {/* Option 3: Nur Barzahlung / Überweisung an Musikschule */}
-                                  <div 
-                                    onClick={() => setStudentBillingOption('cash')}
-                                    className="selectable-card"
-                                    style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: '20px',
-                                      borderRadius: '20px',
-                                      border: '2px solid',
-                                      background: '#ffffff',
-                                      borderColor: studentBillingOption === 'cash' ? '#eab308' : 'rgba(0,0,0,0.06)',
-                                      boxShadow: studentBillingOption === 'cash' ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>💶 Nur Barzahlung / Überweisung an Musikschule</strong>
-                                      <span style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        border: '2px solid',
-                                        borderColor: studentBillingOption === 'cash' ? '#eab308' : '#cbd5e1',
-                                        background: studentBillingOption === 'cash' ? '#eab308' : 'transparent',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem'
-                                      }}>
-                                        {studentBillingOption === 'cash' && '✓'}
-                                      </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, lineHeight: '1.35' }}>
-                                      Eltern können den Betrag bar im Büro bezahlen oder direkt auf das Bankkonto der Musikschule bzw. des Fördervereins überweisen.
-                                    </p>
+                                  <div style={{ background: '#dbeafe', padding: '10px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700, color: '#1d4ed8' }}>
+                                    💡 Nach Abschluss erhalten die Eltern bei der Registrierung in der App ihren persönlichen Aktivierungscode und die Kontoverbindung von GrooveLab.
                                   </div>
                                 </div>
                               )}
@@ -17734,7 +17633,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     onChange={(e) => setHasCustomBillingAddress(e.target.checked)}
                                     style={{ width: '15px', height: '15px', accentColor: '#10b981' }}
                                   />
-                                  Abweichende Rechnungsadresse für {billingPayer === 'student' ? 'die Schüler-Aktivierungen (z.B. Förderverein / Stadtmusik)' : 'die GrooveLab-Rechnung'} hinterlegen
+                                  Abweichende Rechnungsadresse für die GrooveLab-Rechnung (Fixkosten) hinterlegen
                                 </label>
 
                                 {hasCustomBillingAddress && (
@@ -17751,7 +17650,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Name / Institution des Empfängers:</span>
                                       <input
                                         type="text"
-                                        placeholder="z.B. Förderverein Musikschule Musterstadt e.V."
+                                        placeholder="z.B. Kulturamt Musterstadt"
                                         value={customBillingName}
                                         onChange={(e) => setCustomBillingName(e.target.value)}
                                         style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
@@ -17867,9 +17766,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost;
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
-                            // Invoice B: Variable active student profiles
-                            const studentRate = billingPayer === 'student' ? customUmlageAmount : 0.49;
-                            const totalInvoiceB_monthly = activeStudents * studentRate;
+                            // Invoice B: Variable active student profiles (from school's perspective)
+                            const totalInvoiceB_monthly = billingPayer === 'school' ? (activeStudents * 0.49) : 0;
                             const totalInvoiceB_restYear = totalInvoiceB_monthly * remainingMonths;
 
                             const handleApplyCoupon = () => {
@@ -17953,53 +17851,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     gap: '10px'
                                   }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #dbeafe', paddingBottom: '6px' }}>
-                                      <strong style={{ fontSize: '0.78rem', color: '#1d4ed8' }}>RECHNUNG B: Schüler-Aktivierungen &amp; Umlagen</strong>
+                                      <strong style={{ fontSize: '0.78rem', color: '#1d4ed8' }}>RECHNUNG B: Schüler-Aktivierungen</strong>
                                       <span style={{ fontSize: '0.62rem', color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>
-                                        {billingPayer === 'student' ? 'Über Eltern/Förderverein finanziert' : '14 Tage Zahlungsziel'}
+                                        {billingPayer === 'student' ? 'Zahlung direkt durch Eltern' : '14 Tage Zahlungsziel an Musikschule'}
                                       </span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Aktive Schülerprofile ({activeStudents} aktivierte Lizenzen):</span>
-                                        <strong>{studentRate.toFixed(2).replace('.', ',')} € / Schüler / Mo.</strong>
+                                        <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : '0,49 € / Schüler / Mo.'}</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Kostenträger / Abrechnungsweg:</span>
-                                        <strong>
-                                          {billingPayer === 'school' ? 'Sammelrechnung an Musikschule' : ''}
-                                          {billingPayer === 'student' && studentBillingOption === 'option1' && 'Umlage über Schulgebühr + Bar'}
-                                          {billingPayer === 'student' && studentBillingOption === 'debit' && 'Umlage über Monatsgebühr'}
-                                          {billingPayer === 'student' && studentBillingOption === 'cash' && 'Barzahlung / Überweisung an Schule'}
-                                        </strong>
+                                        <strong>{billingPayer === 'student' ? 'Direktüberweisung der Eltern an GrooveLab' : 'Musikschule (Sammelrechnung)'}</strong>
                                       </div>
                                     </div>
                                     <div style={{ borderTop: '1px dotted #3b82f6', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#1d4ed8' }}>
-                                      <span>Monatlicher Betrag (Rechnung B):</span>
+                                      <span>Kosten für die Musikschule (Rechnung B):</span>
                                       <strong>{totalInvoiceB_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
-                                      <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
-                                      <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
-                                    </div>
                                     
-                                    {billingPayer === 'student' && (
+                                    {billingPayer === 'student' ? (
                                       <div style={{
                                         background: '#dbeafe',
                                         color: '#1e40af',
                                         fontSize: '0.65rem',
-                                        padding: '6px 8px',
+                                        padding: '8px 10px',
                                         borderRadius: '8px',
                                         fontWeight: 700,
                                         marginTop: '4px',
-                                        textAlign: 'center'
+                                        lineHeight: '1.35'
                                       }}>
-                                        💡 100% Umlage-finanziert – Netto-Effektivkosten für die Musikschule: 0,00 €!
+                                        💡 <strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an GrooveLab. Die Musikschule hat dadurch **0,00 € Kosten** und keinen Verwaltungsaufwand.
                                       </div>
-                                    )}
-
-                                    {hasCustomBillingAddress && billingPayer === 'student' && (
-                                      <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #dbeafe', paddingTop: '6px', marginTop: '4px' }}>
-                                        📍 Rechnungsadresse Förderverein: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity} ({customBillingEmail})
+                                    ) : (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
+                                        <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
+                                        <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
                                       </div>
                                     )}
                                   </div>
