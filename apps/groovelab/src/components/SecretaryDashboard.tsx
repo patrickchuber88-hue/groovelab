@@ -2560,7 +2560,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           if (hasGroove) setHasGroovelabSub(true);
           const billingOpt = schoolData.student_billing_option || 'option2';
           setStudentBillingOption(billingOpt);
-          setBillingPayer((billingOpt === 'option2' || billingOpt === 'option3_2') ? 'school' : 'student');
+          setBillingPayer((billingOpt === 'option2' || billingOpt === 'option3_2' || billingOpt === 'option3_3') ? 'school' : 'student');
         }
         
         setPendingUserQuota(schoolData.pending_user_quota);
@@ -18531,6 +18531,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   {isStarterFlat ? '69,00 € / Mo.' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
                                 </strong>
                               </div>
+                              {checkoutStep >= 2 && billingPayer === 'school' && studentBillingOption === 'option2' && activeStudentsCount_global > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
+                                  <span>Schüler-Umlage ({activeStudentsCount_global} aktiv):</span>
+                                  <strong style={{ fontWeight: 800 }}>{(activeStudentsCount_global * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                </div>
+                              )}
                               <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
                                 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
                               </span>
@@ -19061,6 +19067,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               <span style={{ fontWeight: 900 }}>Gesamtrate:</span>
                                               <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>{totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
+                                            {billingPayer === 'school' && studentBillingOption === 'option2' && activeStudents > 0 && (
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
+                                                <span>Schüler-Umlage ({activeStudents} aktiv):</span>
+                                                <strong style={{ fontWeight: 800 }}>{(activeStudents * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              </div>
+                                            )}
                                             
                                             {showOneTime && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#6d28d9', borderTop: '1px dashed #cbd5e1', paddingTop: '10px', marginTop: '4px' }}>
