@@ -1637,7 +1637,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
   const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
   const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
-  const moduleCost_global = (billedCampus_global ? 4.99 : 0) + (billedGroovelab_global ? 4.99 : 0);
+  const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? 9.99 : ((billedCampus_global ? 7.99 : 0) + (billedGroovelab_global ? 4.99 : 0));
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const studentLevyMonthly_global = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
@@ -17093,7 +17093,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
-                const moduleCost = (billedCampus ? 4.99 : 0) + (billedGroovelab ? 4.99 : 0);
+                const moduleCost = (billedCampus && billedGroovelab) ? 9.99 : ((billedCampus ? 7.99 : 0) + (billedGroovelab ? 4.99 : 0));
                 const studentLevyMonthly = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
                 const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
 
@@ -17246,7 +17246,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
-                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>4,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
+                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>7,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
                                     <span style={{ color: hasCampusSub ? '#047857' : '#94a3b8', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
@@ -17917,6 +17917,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                             )}
                               <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Vorschau der Buchung</h4>
+                            {hasCampusSub && hasGroovelabSub && (
+                              <div style={{
+                                background: '#eff6ff',
+                                border: '1px solid #3b82f6',
+                                borderRadius: '12px',
+                                padding: '10px 12px',
+                                fontSize: '0.7rem',
+                                color: '#1d4ed8',
+                                fontWeight: 700,
+                                margin: '8px 0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <span>🎉 Kombi-Vorteil aktiv: Campus &amp; GrooveLab zusammen für nur 9,99 €/Mo. statt 12,98 €/Mo. (2,99 € gespart)!</span>
+                              </div>
+                            )}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
@@ -17928,7 +17945,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                   <span>Server &amp; Service Gebühren Campus:</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
+                                  <strong>{isStarterFlat ? 'Inklusive' : '7,99 € / Mo.'}</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
@@ -18405,7 +18422,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             {hasCampusSub && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                                 <span>Server &amp; Service Gebühren Campus:</span>
-                                                <strong>4,99 € / Mo.</strong>
+                                                <strong>7,99 € / Mo.</strong>
                                               </div>
                                             )}
                                             {hasGroovelabSub && (
@@ -22621,7 +22638,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         const isAkt = selectedInvoice.type === 'AKT';
         const billedCampus = hasCampusSub || campusActivatedThisMonth;
         const billedGroovelab = hasGroovelabSub || groovelabActivatedThisMonth;
-        const campusCost = billedCampus ? 4.99 : 0;
+        const campusCost = billedCampus ? 7.99 : 0;
         const groovelabCost = billedGroovelab ? 4.99 : 0;
         const mCost = campusCost + groovelabCost;
 

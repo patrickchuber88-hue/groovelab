@@ -169,7 +169,7 @@ export function BillingDashboard() {
 
       if (settingsErr) console.warn('Could not load master pricing settings:', settingsErr);
       
-      const rateCampus = billingSettings?.price_module_campus ?? 4.99;
+      const rateCampus = billingSettings?.price_module_campus ?? 7.99;
       const rateGroovelab = billingSettings?.price_module_groovelab ?? 2.49;
       const rateTeacher = billingSettings?.price_user_teacher ?? 0.49;
       const rateStudent = billingSettings?.price_user_student ?? 0.49;

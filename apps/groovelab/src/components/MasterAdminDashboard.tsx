@@ -103,7 +103,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
     // Pricing States
-  const [priceCampus, setPriceCampus] = useState<number | string>(4.99);
+  const [priceCampus, setPriceCampus] = useState<number | string>(7.99);
   const [priceGroovelab, setPriceGroovelab] = useState<number | string>(2.49);
   const [priceTeacher, setPriceTeacher] = useState<number | string>(0.49);
   const [priceStudent, setPriceStudent] = useState<number | string>(0.49);
@@ -173,7 +173,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
         setBillingCity(data.city || '');
         setBillingIban(data.iban || '');
         setBillingBic(data.bic || '');
-        setPriceCampus(data.price_module_campus ?? 4.99);
+        setPriceCampus(data.price_module_campus ?? 7.99);
         setPriceGroovelab(data.price_module_groovelab ?? 2.49);
         setPriceTeacher(data.price_user_teacher ?? 0.49);
         setPriceStudent(data.price_user_student ?? 0.49);
