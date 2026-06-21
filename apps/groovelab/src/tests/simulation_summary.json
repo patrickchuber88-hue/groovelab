@@ -1,0 +1,17 @@
+{
+  "totalRequests": 40,
+  "successCount": 40,
+  "errorCount": 0,
+  "throughput": 1.29,
+  "averageLatencyMs": 28.2,
+  "p50LatencyMs": 26,
+  "p95LatencyMs": 71,
+  "p99LatencyMs": 84,
+  "errorBreakdown": {
+    "databaseExceptions": 0,
+    "rlsViolations": 0,
+    "validationFailures": 0
+  },
+  "logicConflicts": 0,
+  "errorsByType": {}
+}

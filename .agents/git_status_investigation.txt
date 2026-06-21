@@ -1,0 +1,89 @@
+Git Status Investigation Report
+Date: 2026-06-19T17:58:00+02:00
+Repository: Groovelab App
+
+1. Git Branch and Status
+The repository is currently on branch 'main'.
+The branch is ahead of 'origin/main' by 1 commit.
+The HEAD is not detached.
+
+There are uncommitted changes in the workspace.
+Here is the verbatim output of `git status`:
+--------------------------------------------------------------------------------
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .agents/BRIEFING.md
+	modified:   .agents/ORIGINAL_REQUEST.md
+	modified:   .agents/handoff.md
+	modified:   .agents/orchestrator/BRIEFING.md
+	modified:   .agents/orchestrator/ORIGINAL_REQUEST.md
+	modified:   .agents/orchestrator/handoff.md
+	modified:   .agents/orchestrator/plan.md
+	modified:   .agents/orchestrator/progress.md
+	modified:   .agents/victory_auditor/BRIEFING.md
+	modified:   .agents/victory_auditor/ORIGINAL_REQUEST.md
+	modified:   .agents/victory_auditor/handoff.md
+	modified:   .agents/victory_auditor/progress.md
+	modified:   apps/groovelab/src/components/CampusEventsBoard.tsx
+	modified:   apps/groovelab/src/components/LoginScreen.tsx
+	modified:   apps/groovelab/src/components/TeacherDashboard.tsx
+	modified:   apps/groovelab/src/tests/e2e_test_cases.ts
+	modified:   apps/groovelab/src/tests/run_e2e_tests.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.agents/implementer_m5_final_correction/
+	.agents/orchestrator/synthesis_m5.md
+	.agents/teamwork_preview_auditor_m5_1/
+	.agents/teamwork_preview_challenger_m5_1/
+	.agents/teamwork_preview_challenger_m5_2/
+	.agents/teamwork_preview_challenger_m5_3/
+	.agents/teamwork_preview_challenger_m5_final/
+	.agents/teamwork_preview_explorer_m5_1/
+	.agents/teamwork_preview_explorer_m5_2/
+	.agents/teamwork_preview_explorer_m5_3/
+	.agents/teamwork_preview_reviewer_m5_1/
+	.agents/teamwork_preview_reviewer_m5_2/
+	.agents/teamwork_preview_reviewer_m5_3/
+	.agents/teamwork_preview_reviewer_m5_final/
+	.agents/teamwork_preview_worker_m5_1/
+	.agents/victory_auditor/plan.md
+	apps/groovelab/src/tests/inspect_db.ts
+	apps/groovelab/src/tests/test_trigger.ts
+	e2e_real_output.txt
+	scratch/add_planning_active_col.mjs
+	scratch/get_users_with_service_key.mjs
+	scratch/inspect_campus_events.mjs
+	scratch/test_insert_status.mjs
+	scratch_cleanup.ts
+	supabase/migrations/174_add_instrument_and_is_scheduled_to_program_points.sql
+
+no changes added to commit (use "git add" and/or "git commit -a")
+--------------------------------------------------------------------------------
+
+2. Git Stash List
+There are stashed changes in the repository.
+Here is the verbatim output of `git stash list`:
+--------------------------------------------------------------------------------
+stash@{0}: WIP on main: e75a1f4 feat(campus): enhance event planning activation, drag-and-drop support, visibility indicators, and layout styling
+stash@{1}: WIP on main: 48a4572 16.06.26 v6
+stash@{2}: WIP on main: f04cd2e feat: add stop button to retro cassette play-along players
+--------------------------------------------------------------------------------
+
+3. State of CampusEventsBoard.tsx
+- Line count: The active file `apps/groovelab/src/components/CampusEventsBoard.tsx` contains 5069 lines of code.
+- Milestone 5 features:
+  - getConflictsMap: NOT present in the active file.
+  - drag-and-drop code: Partial/basic drag-and-drop code is present in the active file (e.g. handleDragStart, handleDrop, draggable attribute).
+  - manual entry modal: NOT present in the active file (no references to "manual" or "isManualEntryModalOpen").
+  
+- Location of Milestone 5 changes:
+  - The complete Milestone 5 changes (including `getConflictsMap` conflict checking, full drag-and-drop integration, and the manual entry modal `isManualEntryModalOpen`) are stashed in stash@{0}.
+  - A `git grep` on `stash@{0}` confirmed:
+    * `getConflictsMap` is defined and used in `stash@{0}:apps/groovelab/src/components/CampusEventsBoard.tsx`.
+    * `isManualEntryModalOpen` and related manual entry modal UI/logic are defined and implemented in `stash@{0}:apps/groovelab/src/components/CampusEventsBoard.tsx`.
