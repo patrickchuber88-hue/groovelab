@@ -18030,8 +18030,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           )}
 
                           {checkoutStep === 4 && (() => {
+                            const effectiveContractStartDateStr = isBillingBooked
+                              ? contractStartDate
+                              : (simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString());
+
                             const getRemainingMonths = () => {
-                              const currentMonth = new Date().getMonth();
+                              const refDate = effectiveContractStartDateStr ? new Date(effectiveContractStartDateStr) : new Date();
+                              const currentMonth = refDate.getMonth();
                               return currentMonth <= 7 ? (8 - currentMonth) : (20 - currentMonth);
                             };
                             const remainingMonths = getRemainingMonths();
@@ -18057,7 +18062,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             const isSchoolOneTime = billingPayer === 'school' && (studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3');
                             const schoolOneTimeDiscount = studentBillingOption === 'option3_3' ? 20 : 10;
                             const schoolOneTimeCount = studentBillingOption === 'option3_3' ? students.length : activeStudents;
-                            const schoolOneTimeSinglePrice = getDynamicAnnualPrice(contractStartDate, schoolOneTimeDiscount);
+                            const schoolOneTimeSinglePrice = getDynamicAnnualPrice(effectiveContractStartDateStr, schoolOneTimeDiscount);
                             const schoolOneTimeTotal = schoolOneTimeCount * schoolOneTimeSinglePrice;
 
                             const totalInvoiceB_monthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? (activeStudents * 0.49) : 0;
