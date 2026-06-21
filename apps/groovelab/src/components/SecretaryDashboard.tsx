@@ -1508,6 +1508,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [customBillingZip, setCustomBillingZip] = useState<string>('');
   const [customBillingCity, setCustomBillingCity] = useState<string>('');
   const [customBillingEmail, setCustomBillingEmail] = useState<string>('');
+  const [hasCustomActivationBillingAddress, setHasCustomActivationBillingAddress] = useState<boolean>(false);
+  const [customActivationBillingName, setCustomActivationBillingName] = useState<string>('');
+  const [customActivationBillingStreet, setCustomActivationBillingStreet] = useState<string>('');
+  const [customActivationBillingZip, setCustomActivationBillingZip] = useState<string>('');
+  const [customActivationBillingCity, setCustomActivationBillingCity] = useState<string>('');
+  const [customActivationBillingEmail, setCustomActivationBillingEmail] = useState<string>('');
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
@@ -17694,16 +17700,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
 
                               {billingPayer === 'school' ? (
-                                <div style={{
-                                  background: '#f8fafc',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: '16px',
-                                  padding: '16px',
-                                  fontSize: '0.78rem',
-                                  color: '#475569',
-                                  lineHeight: '1.4'
-                                }}>
-                                  ℹ️ <strong>Rechnungsstellung für Grundgebühren (Fixkosten):</strong> Die monatliche Sammelrechnung für deine gewählten Module und Team-Lizenzen wird per E-Mail an die Musikschule gesendet (Zahlungsziel: 14 Tage). Es sind keine weiteren Einstellungen erforderlich.
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  <div style={{
+                                    background: '#f8fafc',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '16px',
+                                    padding: '16px',
+                                    fontSize: '0.78rem',
+                                    color: '#475569',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    ℹ️ <strong>Rechnungsstellung für Grundgebühren (Fixkosten):</strong> Die monatliche Sammelrechnung für deine gewählten Module und Team-Lizenzen wird per E-Mail an die Musikschule gesendet (Zahlungsziel: 14 Tage). Es sind keine weiteren Einstellungen erforderlich.
+                                  </div>
+                                  
+                                  <div style={{
+                                    background: '#fffbeb',
+                                    border: '1px solid #d97706',
+                                    borderRadius: '16px',
+                                    padding: '16px',
+                                    fontSize: '0.78rem',
+                                    color: '#b45309',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    ⚠️ <strong>Rechnungsstellung für Schüler-Aktivierungen (Variable Kosten):</strong> Du hast festgelegt, dass die Musikschule die Aktivierungsgebühren übernimmt. Bitte beachte, dass hierfür eine <strong>separate Abrechnung / Rechnung</strong> ausgestellt wird. Standardmäßig wird die gleiche Adresse wie für den monatlichen Grundpreis genutzt.
+                                  </div>
                                 </div>
                               ) : (
                                 <div style={{
@@ -17720,10 +17740,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 }}>
                                   <div>
                                     <strong style={{ fontSize: '0.88rem', color: '#1d4ed8', display: 'block', marginBottom: '4px' }}>ℹ️ Zahlungsweg der Schüler-Aktivierungen</strong>
-                                    <span>Da die Aktivierung der Schülerprofile direkt über uns (GrooveLab) abgewickelt wird, zahlen die Eltern/Schüler ihre Gebühren per <strong>Direktüberweisung (Jahresbetrag)</strong> an GrooveLab. Es ist keine Barzahlung möglich. Die Musikschule hat dadurch keinerlei Zahlungs- oder Inkassoaufwand.</span>
+                                    <span>Da die Aktivierung der Schülerprofile direkt über uns (Campus-Groovelab) abgewickelt wird, zahlen die Eltern/Schüler ihre Gebühren per <strong>Direktüberweisung (Jahresbetrag)</strong> an Campus-Groovelab. Es ist keine Barzahlung möglich. Die Musikschule hat dadurch keinerlei Zahlungs- oder Inkassoaufwand.</span>
                                   </div>
                                   <div style={{ background: '#dbeafe', padding: '10px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700, color: '#1d4ed8' }}>
-                                    💡 Nach Abschluss erhalten die Eltern bei der Registrierung in der App ihren persönlichen Aktivierungscode und die Kontoverbindung von GrooveLab.
+                                    💡 Nach Abschluss erhalten die Eltern bei der Registrierung in der App ihren persönlichen Aktivierungscode und die Kontoverbindung von Campus-Groovelab.
                                   </div>
                                 </div>
                               )}
@@ -17743,7 +17763,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     onChange={(e) => setHasCustomBillingAddress(e.target.checked)}
                                     style={{ width: '15px', height: '15px', accentColor: '#10b981' }}
                                   />
-                                  Abweichende Rechnungsadresse für die GrooveLab-Rechnung (Fixkosten) hinterlegen
+                                  Abweichende Rechnungsadresse für die Campus-Groovelab-Rechnung (Fixkosten) hinterlegen
                                 </label>
 
                                 {hasCustomBillingAddress && (
@@ -17807,6 +17827,84 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       />
                                     </div>
                                   </div>
+                                )}
+
+                                {billingPayer === 'school' && (
+                                  <>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', marginTop: '4px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={hasCustomActivationBillingAddress}
+                                        onChange={(e) => setHasCustomActivationBillingAddress(e.target.checked)}
+                                        style={{ width: '15px', height: '15px', accentColor: '#10b981' }}
+                                      />
+                                      Abweichende Rechnungsadresse für Schüler-Aktivierungen (Variable Kosten) hinterlegen
+                                    </label>
+
+                                    {hasCustomActivationBillingAddress && (
+                                      <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '12px',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '16px',
+                                        padding: '16px',
+                                        marginTop: '4px'
+                                      }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Name / Institution des Empfängers (Aktivierungen):</span>
+                                          <input
+                                            type="text"
+                                            placeholder="z.B. Schulverband Musterstadt"
+                                            value={customActivationBillingName}
+                                            onChange={(e) => setCustomActivationBillingName(e.target.value)}
+                                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                          />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Straße &amp; Hausnummer:</span>
+                                          <input
+                                            type="text"
+                                            placeholder="Musterstraße 12"
+                                            value={customActivationBillingStreet}
+                                            onChange={(e) => setCustomActivationBillingStreet(e.target.value)}
+                                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                          />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>PLZ:</span>
+                                          <input
+                                            type="text"
+                                            placeholder="12345"
+                                            value={customActivationBillingZip}
+                                            onChange={(e) => setCustomActivationBillingZip(e.target.value)}
+                                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                          />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Ort:</span>
+                                          <input
+                                            type="text"
+                                            placeholder="Musterstadt"
+                                            value={customActivationBillingCity}
+                                            onChange={(e) => setCustomActivationBillingCity(e.target.value)}
+                                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                          />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>E-Mail-Adresse für Rechnungsversand:</span>
+                                          <input
+                                            type="email"
+                                            placeholder="aktivierungen@schulverband.de"
+                                            value={customActivationBillingEmail}
+                                            onChange={(e) => setCustomActivationBillingEmail(e.target.value)}
+                                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.76rem' }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
 
@@ -17973,7 +18071,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Kostenträger / Abrechnungsweg:</span>
-                                        <strong>{billingPayer === 'student' ? 'Direktüberweisung der Eltern an GrooveLab' : 'Musikschule (Sammelrechnung)'}</strong>
+                                        <strong>{billingPayer === 'student' ? 'Direktüberweisung der Eltern an Campus-Groovelab' : 'Musikschule (Sammelrechnung)'}</strong>
                                       </div>
                                     </div>
                                     <div style={{ borderTop: '1px dotted #3b82f6', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#1d4ed8' }}>
@@ -17992,13 +18090,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         marginTop: '4px',
                                         lineHeight: '1.35'
                                       }}>
-                                        💡 <strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an GrooveLab. Die Musikschule hat dadurch **0,00 € Kosten** und keinen Verwaltungsaufwand.
+                                        💡 <strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an Campus-Groovelab. Die Musikschule hat dadurch **0,00 € Kosten** und keinen Verwaltungsaufwand.
                                       </div>
                                     ) : (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
-                                        <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
-                                        <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
-                                      </div>
+                                      <>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
+                                          <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
+                                          <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
+                                        </div>
+                                        {hasCustomActivationBillingAddress && (
+                                          <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #bfdbfe', paddingTop: '6px', marginTop: '6px' }}>
+                                            📍 Rechnungsadresse für Aktivierungen: {customActivationBillingName}, {customActivationBillingStreet}, {customActivationBillingZip} {customActivationBillingCity}
+                                          </div>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 </div>
