@@ -1,36 +1,63 @@
-const https = require('https');
+import { createClient } from '@supabase/supabase-js';
 
-const url = 'https://outlook.office365.com/owa/calendar/45e6a16199ae444e974cf3734124f5ca%40musaek.de/3c834c12f39d4812acfa86e46117472e6747636308118952542/calendar.ics';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+const supabase = createClient('https://supabase.campus-groovelab.de', SERVICE_KEY);
 
-https.get(url, (res) => {
-  let data = '';
-  res.on('data', (chunk) => {
-    data += chunk;
-  });
-  res.on('end', () => {
-    const lines = data.split(/\r?\n/);
-    let insideVEvent = false;
-    let currentEventLines = [];
+const SILAS_ID = 'f7f83cc3-6900-4388-8290-a4d99a9fb383';
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.trim() === 'BEGIN:VEVENT') {
-        insideVEvent = true;
-        currentEventLines = [line];
-      } else if (line.trim() === 'END:VEVENT') {
-        currentEventLines.push(line);
-        const eventText = currentEventLines.join('\n');
-        if (eventText.includes('20260619') || eventText.includes('20260620') || eventText.includes('20260621')) {
-          console.log("=== Found Event near June 20, 2026 ===");
-          console.log(eventText);
-          console.log("===================\n");
+async function run() {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('qr_token')
+    .eq('id', SILAS_ID)
+    .single();
+  
+  if (error || !user) {
+    console.error("Error finding Silas:", error);
+    return;
+  }
+
+  const token = user.qr_token;
+  console.log(`Silas's QR token: ${token}`);
+
+  const feedUrl = `https://supabase.campus-groovelab.de/functions/v1/ical-feed?token=${token}`;
+  console.log(`Fetching feed from: ${feedUrl}`);
+
+  try {
+    const res = await fetch(feedUrl);
+    const text = await res.text();
+    console.log("=== FEED RESPONSE ===");
+    console.log(text.substring(0, 1500)); // Print first 1500 chars
+    
+    // Check if Musikschulfest is in the response text
+    if (text.includes("Musikschulfest")) {
+      console.log("\n✅ SUCCESS: 'Musikschulfest' IS present in the ICS feed response!");
+      // Find the VEVENT block containing Musikschulfest
+      const lines = text.split("\r\n");
+      let inEvent = false;
+      let eventBlock = [];
+      for (const line of lines) {
+        if (line === "BEGIN:VEVENT") {
+          inEvent = true;
+          eventBlock = [];
         }
-        insideVEvent = false;
-      } else if (insideVEvent) {
-        currentEventLines.push(line);
+        if (inEvent) {
+          eventBlock.push(line);
+        }
+        if (line === "END:VEVENT") {
+          inEvent = false;
+          if (eventBlock.join("\n").includes("Musikschulfest")) {
+            console.log("\n--- Musikschulfest Event Block ---");
+            console.log(eventBlock.join("\n"));
+          }
+        }
       }
+    } else {
+      console.log("\n❌ FAILED: 'Musikschulfest' is NOT present in the ICS feed response.");
     }
-  });
-}).on('error', (err) => {
-  console.error("HTTP Error:", err);
-});
+  } catch (err) {
+    console.error("Error fetching feed:", err);
+  }
+}
+
+run();
