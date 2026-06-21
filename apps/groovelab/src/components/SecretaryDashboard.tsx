@@ -17740,6 +17740,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <strong style={{ fontSize: '0.82rem', color: '#78350f', fontFamily: 'Urbanist' }}>
                                     Abrechnungsmodell für Schüler-Aktivierungen wählen:
                                   </strong>
+                                  <span style={{ fontSize: '0.72rem', color: '#78350f', opacity: 0.85, lineHeight: '1.4', marginTop: '-4px' }}>
+                                    Die Schule zahlt nur den monatlichen Grundpreis für die schulseitige Infrastruktur. Schüler und Eltern übernehmen die Aktivierung ihres persönlichen Profils selbst.
+                                  </span>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     
                                     {/* Option 1: Vollständige Umlage (student_full) */}
