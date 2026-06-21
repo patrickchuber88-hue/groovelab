@@ -77,7 +77,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('all');
+  const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('unassigned');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
   // Teacher selector states
@@ -764,6 +764,302 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     } catch (err) {
       console.error("Error resetting student onboarding:", err);
       alert("Fehler beim Zurücksetzen.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAutoAssign = async () => {
+    // 1. Find all unassigned students for this teacher
+    const unassignedStudents = students.filter(s => !s.assignedDay && !s.isBreak);
+    if (unassignedStudents.length === 0) {
+      setToast({
+        message: "Alle Schüler sind bereits eingeteilt!",
+        type: 'success'
+      });
+      return;
+    }
+
+    if (boards.length === 0) {
+      setToast({
+        message: "Bitte lege zuerst mindestens einen Unterrichtstag (Board) an.",
+        type: 'warning'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const studentIds = unassignedStudents.map(s => s.id);
+      
+      // 2. Fetch preferences for all unassigned students
+      const { data: prefs, error } = await supabase
+        .from('student_schedule_preferences')
+        .select('*')
+        .in('student_id', studentIds);
+
+      if (error) throw error;
+
+      const prefsByStudentId: Record<string, any[]> = {};
+      studentIds.forEach(id => {
+        prefsByStudentId[id] = [];
+      });
+      prefs?.forEach(p => {
+        if (p.student_id) {
+          prefsByStudentId[p.student_id].push(p);
+        }
+      });
+
+      // 3. Sort students by constraints: number of 'gesperrt' preferences descending
+      // If equal, sort by number of 'wunsch' preferences descending.
+      const sortedUnassigned = [...unassignedStudents].sort((a, b) => {
+        const aPrefs = prefsByStudentId[a.id] || [];
+        const bPrefs = prefsByStudentId[b.id] || [];
+        const aBlocked = aPrefs.filter(p => p.preference_type === 'gesperrt').length;
+        const bBlocked = bPrefs.filter(p => p.preference_type === 'gesperrt').length;
+        if (aBlocked !== bBlocked) {
+          return bBlocked - aBlocked; // More blocked slots = higher priority
+        }
+        const aWunsch = aPrefs.filter(p => p.preference_type === 'wunsch').length;
+        const bWunsch = bPrefs.filter(p => p.preference_type === 'wunsch').length;
+        return bWunsch - aWunsch;
+      });
+
+      // 4. Local copy of boards during allocation
+      let currentBoards = [...boards];
+      const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
+
+      for (const student of sortedUnassigned) {
+        let bestBoardId: string | null = null;
+        let highestScore = -Infinity;
+
+        // Try placing on each active board
+        for (const board of currentBoards) {
+          // Determine the start time for the student on this board
+          // The student would be appended to the end of the board's students list
+          let startAnchorTime = board.startAnchor;
+          let currentMinutes = 0;
+          if (board.students.length > 0) {
+            // Find the last student's end time
+            const lastStudent = board.students[board.students.length - 1];
+            if (lastStudent.assignedTime) {
+              const [h, m] = lastStudent.assignedTime.split(':').map(Number);
+              currentMinutes = h * 60 + m + lastStudent.duration;
+            } else {
+              const [h, m] = startAnchorTime.split(':').map(Number);
+              currentMinutes = h * 60 + m;
+            }
+          } else {
+            const [h, m] = startAnchorTime.split(':').map(Number);
+            currentMinutes = h * 60 + m;
+          }
+
+          const startMin = currentMinutes;
+          const endMin = startMin + student.duration;
+
+          // Check if this slot overlaps with any 'gesperrt' preferences of the student
+          const studentPrefs = prefsByStudentId[student.id] || [];
+          const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && Number(p.day_of_week) === Number(board.dayOfWeek));
+          
+          let isBlocked = false;
+          for (const pref of blockedPrefs) {
+            const [psh, psm] = pref.start_time.split(':').map(Number);
+            const [peh, pem] = pref.end_time.split(':').map(Number);
+            const prefStart = psh * 60 + psm;
+            const prefEnd = peh * 60 + pem;
+
+            if (startMin < prefEnd && endMin > prefStart) {
+              isBlocked = true;
+              break;
+            }
+          }
+
+          if (isBlocked) continue; // Skip this board/day since it's blocked
+
+          // Calculate score
+          let score = 1000;
+
+          // Add points for preferred time ('wunsch') overlap
+          const preferredPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
+          let hasWunschOverlap = false;
+          for (const pref of preferredPrefs) {
+            const [psh, psm] = pref.start_time.split(':').map(Number);
+            const [peh, pem] = pref.end_time.split(':').map(Number);
+            const prefStart = psh * 60 + psm;
+            const prefEnd = peh * 60 + pem;
+
+            if (startMin < prefEnd && endMin > prefStart) {
+              hasWunschOverlap = true;
+              break;
+            }
+          }
+
+          if (hasWunschOverlap) {
+            score += 10000;
+          }
+
+          // Load balancing: subtract total duration of students on board to prefer less busy boards
+          const boardLoad = board.students.reduce((acc, s) => acc + s.duration, 0);
+          score -= boardLoad;
+
+          if (score > highestScore) {
+            highestScore = score;
+            bestBoardId = board.id;
+          }
+        }
+
+        if (bestBoardId) {
+          // Perform the assignment
+          currentBoards = currentBoards.map(b => {
+            if (b.id !== bestBoardId) return b;
+            const studentToAssign = { ...student, assignedDay: b.dayOfWeek };
+            const nextStudents = [...b.students, studentToAssign];
+            const updatedBoard = recalculateBoardTimes({ ...b, students: nextStudents });
+            
+            // Extract the recalculated start time for this student
+            const assignedTime = updatedBoard.students[updatedBoard.students.length - 1].assignedTime || '';
+            newlyAssignedStudentIds[student.id] = { day: b.dayOfWeek, time: assignedTime };
+            
+            return updatedBoard;
+          });
+        }
+      }
+
+      // Update boards and student states
+      setBoards(currentBoards);
+      setStudents(currentStudents => currentStudents.map(s => {
+        if (newlyAssignedStudentIds[s.id]) {
+          return {
+            ...s,
+            assignedDay: newlyAssignedStudentIds[s.id].day,
+            assignedTime: newlyAssignedStudentIds[s.id].time
+          };
+        }
+        return s;
+      }));
+
+      const assignedCount = Object.keys(newlyAssignedStudentIds).length;
+      const unassignedCount = unassignedStudents.length - assignedCount;
+
+      if (assignedCount > 0) {
+        setToast({
+          message: `${assignedCount} Schüler wurden automatisch zugeteilt! ${unassignedCount > 0 ? `(${unassignedCount} nicht zuteilbar aufgrund von Konflikten)` : ''}`,
+          type: unassignedCount > 0 ? 'warning' : 'success'
+        });
+      } else {
+        setToast({
+          message: "Keine Schüler konnten automatisch zugeteilt werden (Präferenz-Konflikte auf allen Tagen).",
+          type: 'warning'
+        });
+      }
+
+    } catch (err: any) {
+      console.error("Error during auto assign:", err);
+      setToast({
+        message: "Fehler bei der automatischen Zuteilung: " + err.message,
+        type: 'warning'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetAllAssignments = () => {
+    if (!window.confirm("Möchtest du wirklich alle zugeteilten Schüler dieses Entwurfs zurücksetzen? Alle Schüler werden wieder in den Schüler-Pool (Offen) gelegt.")) {
+      return;
+    }
+    setBoards(currentBoards => currentBoards.map(b => {
+      const nextStudents = b.students.filter(s => s.isBreak); // Keep only breaks
+      return recalculateBoardTimes({ ...b, students: nextStudents });
+    }));
+
+    setStudents(currentStudents => currentStudents.map(s => ({
+      ...s,
+      assignedDay: undefined,
+      assignedTime: undefined
+    })));
+
+    setToast({
+      message: "Alle Zuteilungen wurden erfolgreich zurückgesetzt.",
+      type: 'success'
+    });
+  };
+
+  const handleGenerateMockPreferences = async () => {
+    try {
+      setLoading(true);
+      const teacherStudentIds = students.map(s => s.id);
+      if (teacherStudentIds.length === 0) {
+        setToast({
+          message: "Keine Schüler vorhanden, für die Präferenzen generiert werden können.",
+          type: 'warning'
+        });
+        return;
+      }
+
+      await supabase
+        .from('student_schedule_preferences')
+        .delete()
+        .in('student_id', teacherStudentIds);
+
+      const newPrefs: any[] = [];
+      const days = [1, 2, 3, 4, 5];
+      const times = [
+        { start: '14:00', end: '16:00' },
+        { start: '15:00', end: '17:00' },
+        { start: '16:00', end: '18:00' },
+        { start: '17:00', end: '19:00' }
+      ];
+
+      teacherStudentIds.forEach((studentId, idx) => {
+        const wunschDay = days[idx % days.length];
+        const wunschTime = times[idx % times.length];
+        
+        const gesperrtDay = days[(idx + 2) % days.length];
+        const gesperrtTime = times[(idx + 1) % times.length];
+
+        newPrefs.push({
+          student_id: studentId,
+          day_of_week: wunschDay,
+          start_time: wunschTime.start,
+          end_time: wunschTime.end,
+          preference_type: 'wunsch'
+        });
+
+        newPrefs.push({
+          student_id: studentId,
+          day_of_week: gesperrtDay,
+          start_time: gesperrtTime.start,
+          end_time: gesperrtTime.end,
+          preference_type: 'gesperrt'
+        });
+      });
+
+      const { error } = await supabase
+        .from('student_schedule_preferences')
+        .insert(newPrefs);
+
+      if (error) throw error;
+
+      if (selectedStudentId) {
+        const { data } = await supabase
+          .from('student_schedule_preferences')
+          .select('*')
+          .eq('student_id', selectedStudentId);
+        setSelectedStudentPrefs(data || []);
+      }
+
+      setToast({
+        message: "Erfundene Wunsch- und Sperrzeiten wurden erfolgreich generiert!",
+        type: 'success'
+      });
+
+    } catch (err: any) {
+      console.error("Error generating mock preferences:", err);
+      setToast({
+        message: "Fehler beim Generieren der Präferenzen: " + err.message,
+        type: 'warning'
+      });
     } finally {
       setLoading(false);
     }
@@ -1671,6 +1967,58 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
+                onClick={handleAutoAssign}
+                disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.15)',
+                  fontWeight: 600,
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                  opacity: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 0.5 : 1,
+                  pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+              >
+                <Sparkles size={12} />
+                Automatisch zuteilen
+              </button>
+              <button
+                type="button"
+                onClick={handleResetAllAssignments}
+                disabled={students.filter(s => !!s.assignedDay).length === 0}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.15)',
+                  fontWeight: 600,
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                  opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.5 : 1,
+                  pointerEvents: students.filter(s => !!s.assignedDay).length === 0 ? 'none' : 'auto'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+              >
+                <Trash2 size={12} />
+                Zuteilung zurücksetzen
+              </button>
+              <button
+                type="button"
                 onClick={() => handleCreateDraft()}
                 style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
                 onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
@@ -1912,7 +2260,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   right: 0,
                                   top: `${top}px`,
                                   height: `${height}px`,
-                                  zIndex: 1,
+                                  zIndex: 3,
                                   boxSizing: 'border-box',
                                   pointerEvents: 'none'
                                 }}
@@ -1954,7 +2302,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 borderLeft: '4px solid #f59e0b',
                                 borderRadius: '8px', padding: '4px 8px', boxSizing: 'border-box',
                                 cursor: 'grab', display: 'flex', alignItems: 'center',
-                                justifyContent: 'space-between', gap: '4px', zIndex: 2, overflow: 'hidden',
+                                justifyContent: 'space-between', gap: '4px',
+                                zIndex: selectedStudentId !== null ? 1 : 2,
+                                opacity: selectedStudentId !== null ? 0.8 : 1,
+                                filter: 'none',
+                                pointerEvents: 'auto',
+                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                overflow: 'hidden',
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
@@ -2005,30 +2359,71 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const isSubmitted = hasSubmittedSchedule && activeDraftId === submittedDraftId;
                         const isSelected = selectedStudentId === bs.id;
                         const isShaking = shakingStudentId === bs.id;
+
+                        // Check if student is scheduled within a preferred ('wunsch') slot
+                        let isInsideWunsch = false;
+                        if (selectedStudentId === bs.id && selectedStudentPrefs.length > 0) {
+                          const [sh, sm] = (bs.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          const startMin = sh * 60 + sm;
+                          const endMin = startMin + bs.duration;
+
+                          const wunschPrefs = selectedStudentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
+                          for (const pref of wunschPrefs) {
+                            const [psh, psm] = pref.start_time.split(':').map(Number);
+                            const [peh, pem] = pref.end_time.split(':').map(Number);
+                            const prefStart = psh * 60 + psm;
+                            const prefEnd = peh * 60 + pem;
+
+                            if (startMin < prefEnd && endMin > prefStart) {
+                              isInsideWunsch = true;
+                              break;
+                            }
+                          }
+                        }
                         
-                        const cardBg = isSelected 
-                          ? 'rgba(0, 122, 255, 0.08)' 
-                          : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)');
-                        const cardBorder = isSelected 
-                          ? '1.5px solid #007aff' 
-                          : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)');
-                        const cardBorderLeft = isSelected 
-                          ? '4px solid #007aff' 
-                          : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6');
-                        const textColor = isSelected 
-                          ? '#007aff' 
-                          : (isSubmitted ? '#065f46' : '#1e3a8a');
-                        const badgeBg = isSelected 
-                          ? 'rgba(0, 122, 255, 0.08)' 
-                          : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)');
-                        const badgeColor = isSelected 
-                          ? '#007aff' 
-                          : (isSubmitted ? '#047857' : '#1d4ed8');
+                        const cardBg = isInsideWunsch
+                          ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)'
+                          : (isSelected 
+                              ? 'rgba(0, 122, 255, 0.08)' 
+                              : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)'));
+
+                        const cardBorder = isInsideWunsch
+                          ? '1px solid rgba(16, 185, 129, 0.3)'
+                          : (isSelected 
+                              ? '1.5px solid #007aff' 
+                              : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)'));
+
+                        const cardBorderLeft = isInsideWunsch
+                          ? '4px solid #064e3b'
+                          : (isSelected 
+                              ? '4px solid #007aff' 
+                              : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6'));
+
+                        const textColor = isInsideWunsch
+                          ? '#ffffff'
+                          : (isSelected 
+                              ? '#007aff' 
+                              : (isSubmitted ? '#065f46' : '#1e3a8a'));
+
+                        const badgeBg = isInsideWunsch
+                          ? 'rgba(255, 255, 255, 0.2)'
+                          : (isSelected 
+                              ? 'rgba(0, 122, 255, 0.08)' 
+                              : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)'));
+
+                        const badgeColor = isInsideWunsch
+                          ? '#ffffff'
+                          : (isSelected 
+                              ? '#007aff' 
+                              : (isSubmitted ? '#047857' : '#1d4ed8'));
+
                         const shadowColor = isSubmitted ? 'rgba(16,185,129,0.06)' : 'rgba(59,130,246,0.06)';
                         const shadowHoverColor = isSubmitted ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)';
-                        const cardShadow = isSelected 
-                          ? '0 0 10px rgba(0, 122, 255, 0.25)' 
-                          : `0 2px 6px ${shadowColor}`;
+                        const cardShadow = isInsideWunsch
+                          ? '0 6px 16px rgba(16, 185, 129, 0.25)'
+                          : (isSelected 
+                              ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                              : `0 2px 6px ${shadowColor}`);
 
                         return (
                           <div
@@ -2040,17 +2435,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             onClick={(e) => { e.stopPropagation(); handleSelectStudent(bs.id); }}
                             className={isShaking ? 'card-shake' : ''}
                             style={{
-                            position: 'absolute', left: 0, right: 0,
-                            top: `${Math.max(cardTopPx, 0)}px`,
-                            height: `${Math.max(cardHeightPx, 32)}px`,
-                            background: cardBg,
-                            border: cardBorder,
-                            borderLeft: cardBorderLeft,
-                            borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
-                            cursor: 'grab', display: 'flex', flexDirection: 'column',
-                            justifyContent: 'center', gap: '2px', zIndex: 2, overflow: 'hidden',
-                            boxShadow: cardShadow, transition: 'all 0.2s ease',
-                          }}
+                              position: 'absolute', left: 0, right: 0,
+                              top: `${Math.max(cardTopPx, 0)}px`,
+                              height: `${Math.max(cardHeightPx, 32)}px`,
+                              background: cardBg,
+                              border: cardBorder,
+                              borderLeft: cardBorderLeft,
+                              borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
+                              cursor: 'grab', display: 'flex', flexDirection: 'column',
+                              justifyContent: 'center', gap: '2px',
+                              zIndex: selectedStudentId !== null ? (isSelected ? 4 : 1) : 2,
+                              opacity: selectedStudentId !== null ? (isSelected ? 1 : 0.8) : 1,
+                              filter: 'none',
+                              pointerEvents: 'auto',
+                              transform: isSelected ? 'scale(1.02)' : 'none',
+                              overflow: 'hidden',
+                              boxShadow: cardShadow,
+                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                            }}
                           onMouseOver={e => {
                             if (!isSelected) {
                               e.currentTarget.style.boxShadow = `0 4px 14px ${shadowHoverColor}`;
@@ -2077,7 +2479,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {bs.first_name} {bs.last_name}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isSubmitted ? '#047857' : '#2563eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (isSubmitted ? '#047857' : '#2563eb'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
                           </div>
                         );
