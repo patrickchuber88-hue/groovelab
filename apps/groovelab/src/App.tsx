@@ -11987,13 +11987,13 @@ function App() {
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Anbieter der Plattform & technischer Dienstleister</h4>
                 <p style={{ margin: 0 }}>
-                  Manuel Wagner<br/>
-                  Friedrichstr. 33<br/>
-                  79713 Bad Säckingen
+                  Simplified Work GbR<br/>
+                  Karl-Fürstenberg-Str. 59<br/>
+                  79618 Rheinfelden
                 </p>
                 <p style={{ margin: '6px 0 0 0' }}>
-                  Telefon: 07761 – 2416<br/>
-                  E-Mail: <a href="mailto:info@musaek.de" style={{ color: '#eab308', textDecoration: 'underline' }}>info@musaek.de</a>
+                  Vertreten durch: Patrick Huber<br/>
+                  E-Mail: <a href="mailto:patrick.c.huber88@gmail.com" style={{ color: '#eab308', textDecoration: 'underline' }}>patrick.c.huber88@gmail.com</a>
                 </p>
               </div>
 
