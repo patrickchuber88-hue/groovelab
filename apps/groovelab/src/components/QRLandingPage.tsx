@@ -1912,7 +1912,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
             {profile && (
               <h2 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 800, color: '#137333' }}>
-                Hallo {profile.first_name} {profile.last_name}!
+                Hallo {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}!
               </h2>
             )}
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
@@ -2227,7 +2227,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column'}}>
                   <h2 style={{margin: 0, fontSize: '1.25rem', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}>
-                    {profile.first_name} {profile.last_name}
+                    {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}
                   </h2>
                   <span style={{fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600}}>
                     {profile.instrument || 'Schüler'} · {profile.school_name}
@@ -2736,7 +2736,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   Groovelab Campus
                 </span>
                 <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-                  {profile.first_name} {profile.last_name}
+                  {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}
                 </h1>
               </div>
               <div style={{
