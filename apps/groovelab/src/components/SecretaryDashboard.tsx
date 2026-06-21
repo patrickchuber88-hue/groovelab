@@ -18040,19 +18040,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Software-Plattform:</span>
+                                        <span>Software-Lizenz (Grundgebühr):</span>
                                         <strong>Kostenlos</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Zusatzmodule ({[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' + ')}):</span>
+                                        <span>Server- &amp; Cloud-Infrastruktur ({[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' + ')}):</span>
                                         <strong>{baseModuleCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Verwaltung &amp; Lehrer ({employees.length + allTeachers.length} Profile):</span>
+                                        <span>Cloud-Datenbank &amp; Support (Verwaltung &amp; Lehrer):</span>
                                         <strong>{((employees.length + allTeachers.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Passive Schüler-Datenbankprofile ({passiveStudents} Profile):</span>
+                                        <span>Cloud-Datenbank &amp; Support (Schüler-Datenbankprofile):</span>
                                         <strong>{(passiveStudentCost).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </div>
@@ -18351,40 +18351,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Software-Plattform:</span>
+                                <span>Software-Lizenz:</span>
                                 <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
                               </div>
 
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Server &amp; Service Gebühren Campus:</span>
+                                  <span>Server- &amp; Cloud-Infrastruktur Campus:</span>
                                   <strong>{isStarterFlat ? 'Inklusive' : '7,99 € / Mo.'}</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Server &amp; Service Gebühren Groovelab:</span>
+                                  <span>Server- &amp; Cloud-Infrastruktur Groovelab:</span>
                                   <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>DB &amp; Service Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
+                                <span>Cloud-Datenbank &amp; Support Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${(employees.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
+                                <span>Cloud-Datenbank &amp; Support Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>DB &amp; Service Schüler (0,09 € x {Math.max(0, students.length - activeStudentsCount_global)} passive Profile):</span>
+                                <span>Cloud-Datenbank &amp; Support Schüler (0,09 € x {Math.max(0, students.length - activeStudentsCount_global)} passive Profile):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${(Math.max(0, students.length - activeStudentsCount_global) * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                <span>Server- &amp; Service-Gebühr (Zwischensumme):</span>
+                                <span>Server- &amp; Infrastruktur-Gebühr (Zwischensumme):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
