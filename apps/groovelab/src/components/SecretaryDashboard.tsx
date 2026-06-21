@@ -3579,12 +3579,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           name: schoolName,
           primary_color: editColor,
           logo_url: logoUrl || null,
-          calendar_url: calendarUrl || null
+          calendar_url: calendarUrl || null,
+          street: schoolStreet || null,
+          zip_code: schoolZipCode || null,
+          city: schoolCity || null
         })
         .eq('id', schoolId);
 
       if (error) throw error;
-      alert('Branding- und Kalendereinstellungen erfolgreich gespeichert! 🎨🔗');
+      alert('Schul- und Kalendereinstellungen erfolgreich gespeichert! 🎨🔗');
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
@@ -21304,6 +21307,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           onChange={(e) => setSchoolName(e.target.value)}
                           style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
                         />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße & Hausnummer</label>
+                        <input
+                          type="text"
+                          placeholder="Friedrichstraße 33"
+                          value={schoolStreet}
+                          onChange={(e) => setSchoolStreet(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ</label>
+                          <input
+                            type="text"
+                            placeholder="79713"
+                            value={schoolZipCode}
+                            onChange={(e) => setSchoolZipCode(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Ort</label>
+                          <input
+                            type="text"
+                            placeholder="Bad Säckingen"
+                            value={schoolCity}
+                            onChange={(e) => setSchoolCity(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                          />
+                        </div>
                       </div>
 
                       <div>
