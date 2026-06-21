@@ -38,6 +38,20 @@ const normalizeTime = (t: string) => {
   return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
 };
 
+const parseTimeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(':');
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return hours * 60 + minutes;
+};
+
+const formatMinutesToTime = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 // Parse ICS dates in Deno
 const parseICSDate = (icsDateStr: string): Date => {
   const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
@@ -269,32 +283,112 @@ Deno.serve(async (req) => {
     let campusEvents: any[] = [];
     let allSchoolCampusEvents: any[] = [];
     if (schoolId) {
-      const { data: campusData, error: campusErr } = await supabase
-        .from('campus_events')
-        .select('*, room:room_id(name)')
-        .eq('school_id', schoolId);
+      if (role === 'teacher') {
+        // Query approved program points of this teacher
+        const { data: progPoints, error: ppErr } = await supabase
+          .from('campus_event_program_points')
+          .select('*, event:event_id(*)')
+          .eq('teacher_id', userId)
+          .eq('status', 'approved');
 
-      if (!campusErr && campusData) {
-        allSchoolCampusEvents = campusData;
-        campusEvents = [...campusData];
-        // Filter based on roles and visibility settings
-        if (role === 'student') {
-          campusEvents = campusEvents.filter((ev: any) => {
-            const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
-            return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
-          });
-        } else if (role === 'teacher') {
-          campusEvents = campusEvents.filter((ev: any) => {
-            return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'teachers' || ev.visibility === 'students';
-          });
+        if (!ppErr && progPoints && progPoints.length > 0) {
+          const eventIds = [...new Set(progPoints.map((pp: any) => pp.event_id))];
+          
+          // Load the corresponding events
+          const { data: eventsData, error: evErr } = await supabase
+            .from('campus_events')
+            .select('*, room:room_id(name)')
+            .in('id', eventIds);
+
+          if (!evErr && eventsData) {
+            allSchoolCampusEvents = eventsData;
+
+            // For each event, load all its program points to compute timeline start times
+            const { data: allEventPoints, error: aepErr } = await supabase
+              .from('campus_event_program_points')
+              .select('*')
+              .in('event_id', eventIds)
+              .or('is_scheduled.eq.true,is_pause.eq.true')
+              .eq('status', 'approved');
+
+            const defaultTransitionTime = 10;
+
+            campusEvents = eventsData.map((ev: any) => {
+              const pointsForEvent = (allEventPoints || []).filter((p: any) => p.event_id === ev.id);
+              
+              // Sort by stage, then sort_order
+              const sortedPoints = pointsForEvent.sort((a: any, b: any) => {
+                const stageA = a.stage_number || 1;
+                const stageB = b.stage_number || 1;
+                if (stageA !== stageB) return stageA - stageB;
+                return a.sort_order - b.sort_order;
+              });
+
+              // Calculate start times
+              const startMin = parseTimeToMinutes(ev.event_start_time || ev.start_time || '14:00');
+              const timeMap: Record<string, { start: string; end: string }> = {};
+              
+              const stages: Record<number, any[]> = {};
+              sortedPoints.forEach((p: any) => {
+                const stage = p.stage_number || 1;
+                if (!stages[stage]) stages[stage] = [];
+                stages[stage].push(p);
+              });
+
+              Object.keys(stages).forEach((stageStr) => {
+                const stNum = parseInt(stageStr, 10);
+                const stPoints = stages[stNum];
+                let currentMin = startMin;
+                stPoints.forEach((p: any, idx: number) => {
+                  const duration = p.duration || 0;
+                  if (idx > 0 && !p.is_pause && !stPoints[idx - 1].is_pause) {
+                    currentMin += defaultTransitionTime;
+                  }
+                  timeMap[p.id] = {
+                    start: formatMinutesToTime(currentMin),
+                    end: formatMinutesToTime(currentMin + duration)
+                  };
+                  currentMin += duration;
+                });
+              });
+
+              // Find teacher's points in this event
+              const teacherPointsInEvent = progPoints.filter((p: any) => p.event_id === ev.id);
+              const performanceNotes = teacherPointsInEvent.map((p: any) => {
+                const time = timeMap[p.id] ? `${timeMap[p.id].start} - ${timeMap[p.id].end}` : 'unbekannt';
+                return `Auftrittszeit: ${time} Uhr (Bühne ${p.stage_number || 1}) - Beitrag: ${p.name}`;
+              }).join('\n');
+
+              return {
+                ...ev,
+                description: `${ev.description || ''}\n\n--- MEINE AUFTRITTE ---\n${performanceNotes}`.trim()
+              };
+            });
+          }
         }
-        // Admins and Secretaries can see all events
+      } else {
+        // Students and admins/secretaries get campus events normally
+        const { data: campusData, error: campusErr } = await supabase
+          .from('campus_events')
+          .select('*, room:room_id(name)')
+          .eq('school_id', schoolId);
+
+        if (!campusErr && campusData) {
+          allSchoolCampusEvents = campusData;
+          campusEvents = [...campusData];
+          if (role === 'student') {
+            campusEvents = campusEvents.filter((ev: any) => {
+              const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
+              return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
+            });
+          }
+        }
       }
     }
 
-    // 6. Query and fetch school's subscribed external iCal feed if exists
+    // 6. Query and fetch school's subscribed external iCal feed if exists (skipped for teachers)
     let subscribedEvents: any[] = [];
-    if (schoolId) {
+    if (schoolId && role !== 'teacher') {
       const { data: schoolData } = await supabase
         .from('schools')
         .select('calendar_url')

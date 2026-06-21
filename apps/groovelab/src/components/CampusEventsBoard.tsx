@@ -299,8 +299,49 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   });
 
+  const [transitionTime, setTransitionTime] = useState<number>(10);
   const [activeLivePointId, setActiveLivePointId] = useState<string | null>(null);
   const [techCheckTrigger, setTechCheckTrigger] = useState<number>(0);
+
+  // Customizable Instrument Patch Configuration (schulweit)
+  const [techConfig, setTechConfig] = useState<{
+    keyboardMode: 'mono' | 'stereo';
+    epianoMode: 'mono' | 'stereo';
+    drumsMode: '4mic' | 'standard' | 'edrum';
+  }>(() => {
+    try {
+      const saved = localStorage.getItem(`groovelab_tech_config_${schoolId}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {}
+    return {
+      keyboardMode: 'mono',
+      epianoMode: 'mono',
+      drumsMode: '4mic'
+    };
+  });
+
+  const saveTechConfig = (newConfig: typeof techConfig) => {
+    setTechConfig(newConfig);
+    try {
+      localStorage.setItem(`groovelab_tech_config_${schoolId}`, JSON.stringify(newConfig));
+    } catch (e) {}
+  };
+
+  const [showTechSettings, setShowTechSettings] = useState<boolean>(false);
+
+  useEffect(() => {
+    const activeEv = selectedEvent || secretaryPlanningEvent || teacherSubmissionEvent;
+    if (activeEv) {
+      const saved = localStorage.getItem(`groovelab_event_transition_time_${activeEv.id}`);
+      if (saved !== null) {
+        setTransitionTime(parseInt(saved, 10));
+      } else {
+        setTransitionTime(10);
+      }
+    }
+  }, [selectedEvent?.id, secretaryPlanningEvent?.id, teacherSubmissionEvent?.id]);
 
   useEffect(() => {
     try {
@@ -597,8 +638,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       const stageNum = parseInt(stageStr, 10);
       const stagePoints = stages[stageNum].sort((a, b) => a.sort_order - b.sort_order);
       let currentMin = startMin;
-      stagePoints.forEach(pp => {
+      stagePoints.forEach((pp, idx) => {
         const duration = pp.duration || 0;
+        
+        // Add transition buffer between non-pause consecutive program points
+        if (idx > 0 && !pp.is_pause && !stagePoints[idx - 1].is_pause) {
+          currentMin += transitionTime;
+        }
+
         timeMap[pp.id] = {
           startMin: currentMin,
           endMin: currentMin + duration,
@@ -2711,9 +2758,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       // Admins and Secretaries can see everything
       if (role === 'admin' || role === 'secretary') return true;
 
-      // Teachers see events created by themselves, public events, or events specifically visible to teachers (or students)
+      // Teachers see events created by themselves, public events, or events specifically visible to teachers (or students), or events that are active for planning
       if (role === 'teacher') {
-        return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'teachers' || ev.visibility === 'students';
+        return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'teachers' || ev.visibility === 'students' || ev.is_planning_active;
       }
 
       // Students see events created by themselves, public events, events specifically visible to students, OR if they are explicitly assigned to it
@@ -3193,7 +3240,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         ${stagesContentHTML}
 
         <div class="footer">
-          Erstellt mit Groovelab &middot; &copy; ${new Date().getFullYear()} All Rights Reserved.
+          Erstellt von Campus-Groovelab &middot; &copy; ${new Date().getFullYear()}
         </div>
 
         <script>
@@ -3236,10 +3283,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       if (t.includes('gesang') || t.includes('vocal') || t.includes('mikrofon') || t === 'mic' || t === 'mikro') return 'Mikrofon (Gesang/Amp)';
       if (t.includes('di-box') || t.includes('di box') || t.includes('d.i. box') || t.includes('direct box') || t === 'di') return 'D.I. Box';
       if (t.includes('e-bass') || t === 'bass') return 'E-Bass';
-      if (t.includes('e-piano') || t.includes('keyboard') || t === 'piano') return 'E-Piano / Keyboard';
+      if (t.includes('keyboard')) return 'Keyboard';
+      if (t.includes('e-piano') || t === 'piano' || t === 'klavier') return 'E-Piano';
       if (t.includes('a-gitarre') || t.includes('akustik')) return 'A-Gitarre';
       if (t.includes('e-gitarre') || t === 'gitarre') return 'E-Gitarre';
-      if (t.includes('schlagzeug') || t.includes('drumset') || t.includes('e-drum')) return 'Schlagzeug-Set';
+      if (t.includes('schlagzeug') || t.includes('drumset') || t.includes('e-drum') || t.includes('drums')) return 'Schlagzeug-Set';
       if (t.includes('trompete')) return 'Trompete';
       return type.trim();
     };
@@ -3269,7 +3317,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           actSetup[typeName] = (actSetup[typeName] || 0) + 1;
         }
         Object.entries(actSetup).forEach(([type, count]) => {
-          audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+          if (type === 'Schlagzeug-Set') {
+            if (techConfig.drumsMode === '4mic') {
+              audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+              audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+              audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+              audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+            } else if (techConfig.drumsMode === 'edrum') {
+              audioSetup['Schlagzeug (E-Drums, 2x DI)'] = Math.max(audioSetup['Schlagzeug (E-Drums, 2x DI)'] || 0, 1);
+            } else {
+              // Standard / 7 channels
+              audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+              audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+              audioSetup['Schlagzeug (HiHat)'] = Math.max(audioSetup['Schlagzeug (HiHat)'] || 0, 1);
+              audioSetup['Schlagzeug (Tom 1)'] = Math.max(audioSetup['Schlagzeug (Tom 1)'] || 0, 1);
+              audioSetup['Schlagzeug (Tom 2)'] = Math.max(audioSetup['Schlagzeug (Tom 2)'] || 0, 1);
+              audioSetup['Schlagzeug (Tom 3)'] = Math.max(audioSetup['Schlagzeug (Tom 3)'] || 0, 1);
+              audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+              audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+            }
+          } else if (type === 'Keyboard') {
+            if (techConfig.keyboardMode === 'stereo') {
+              audioSetup['Keyboard (Stereo, 2x DI)'] = Math.max(audioSetup['Keyboard (Stereo, 2x DI)'] || 0, count * 2);
+            } else {
+              audioSetup['Keyboard (Mono, 1x DI)'] = Math.max(audioSetup['Keyboard (Mono, 1x DI)'] || 0, count);
+            }
+          } else if (type === 'E-Piano') {
+            if (techConfig.epianoMode === 'stereo') {
+              audioSetup['E-Piano (Stereo, 2x DI)'] = Math.max(audioSetup['E-Piano (Stereo, 2x DI)'] || 0, count * 2);
+            } else {
+              audioSetup['E-Piano (Mono, 1x DI)'] = Math.max(audioSetup['E-Piano (Mono, 1x DI)'] || 0, count);
+            }
+          } else {
+            audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+          }
         });
       }
     });
@@ -3553,6 +3634,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             ${rowsHTML}
           </tbody>
         </table>
+
+        <div style="margin-top: 50px; text-align: center; font-size: 0.72rem; color: #86868b; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 20px; font-weight: 500;">
+          Erstellt von Campus-Groovelab &middot; &copy; ${new Date().getFullYear()}
+        </div>
 
         <script>
           window.addEventListener('load', () => {
@@ -7557,6 +7642,48 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     </select>
                   </div>
 
+                  {/* Umbau-Puffer segmented control */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#384a3c', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Umbau-Puffer:
+                    </label>
+                    <div style={{ 
+                      display: 'flex', 
+                      background: 'rgba(120, 120, 128, 0.06)', 
+                      padding: '3px', 
+                      borderRadius: '8px', 
+                      gap: '2px'
+                    }}>
+                      {[0, 5, 10, 15].map(min => (
+                        <button
+                          key={min}
+                          type="button"
+                          onClick={() => {
+                            setTransitionTime(min);
+                            const activeEv = secretaryPlanningEvent || selectedEvent;
+                            if (activeEv) {
+                              localStorage.setItem(`groovelab_event_transition_time_${activeEv.id}`, String(min));
+                            }
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: transitionTime === min ? '#ffffff' : 'transparent',
+                            color: transitionTime === min ? '#1f1f1f' : '#6e6e73',
+                            fontWeight: 'bold',
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            boxShadow: transitionTime === min ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {min} Min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Start time editor */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#384a3c', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -8263,8 +8390,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               if (t.includes('e-bass') || t === 'bass' || t === 'bassgitarre') {
                 return 'E-Bass';
               }
-              if (t.includes('e-piano') || t.includes('keyboard') || t === 'piano' || t === 'klavier') {
-                return 'E-Piano / Keyboard';
+              if (t.includes('keyboard')) {
+                return 'Keyboard';
+              }
+              if (t.includes('e-piano') || t === 'piano' || t === 'klavier') {
+                return 'E-Piano';
               }
               if (t.includes('a-gitarre') || t.includes('akustik') || t === 'akustikgitarre' || t === 'akustik-gitarre') {
                 return 'A-Gitarre';
@@ -8308,7 +8438,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                 // Update peak for each normalized type
                 Object.entries(actSetup).forEach(([type, count]) => {
-                  audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+                  if (type === 'Schlagzeug-Set') {
+                    if (techConfig.drumsMode === '4mic') {
+                      audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+                      audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+                      audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+                      audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+                    } else if (techConfig.drumsMode === 'edrum') {
+                      audioSetup['Schlagzeug (E-Drums, 2x DI)'] = Math.max(audioSetup['Schlagzeug (E-Drums, 2x DI)'] || 0, 1);
+                    } else {
+                      // Standard / 7 channels
+                      audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+                      audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+                      audioSetup['Schlagzeug (HiHat)'] = Math.max(audioSetup['Schlagzeug (HiHat)'] || 0, 1);
+                      audioSetup['Schlagzeug (Tom 1)'] = Math.max(audioSetup['Schlagzeug (Tom 1)'] || 0, 1);
+                      audioSetup['Schlagzeug (Tom 2)'] = Math.max(audioSetup['Schlagzeug (Tom 2)'] || 0, 1);
+                      audioSetup['Schlagzeug (Tom 3)'] = Math.max(audioSetup['Schlagzeug (Tom 3)'] || 0, 1);
+                      audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+                      audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+                    }
+                  } else if (type === 'Keyboard') {
+                    if (techConfig.keyboardMode === 'stereo') {
+                      audioSetup['Keyboard (Stereo, 2x DI)'] = Math.max(audioSetup['Keyboard (Stereo, 2x DI)'] || 0, count * 2);
+                    } else {
+                      audioSetup['Keyboard (Mono, 1x DI)'] = Math.max(audioSetup['Keyboard (Mono, 1x DI)'] || 0, count);
+                    }
+                  } else if (type === 'E-Piano') {
+                    if (techConfig.epianoMode === 'stereo') {
+                      audioSetup['E-Piano (Stereo, 2x DI)'] = Math.max(audioSetup['E-Piano (Stereo, 2x DI)'] || 0, count * 2);
+                    } else {
+                      audioSetup['E-Piano (Mono, 1x DI)'] = Math.max(audioSetup['E-Piano (Mono, 1x DI)'] || 0, count);
+                    }
+                  } else {
+                    audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+                  }
                 });
               }
             });
@@ -8465,6 +8628,200 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       )}
                     </div>
                   </div>
+                </div>
+
+                {/* ⚙️ Abnahme-Optionen toggle & panel */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    onClick={() => setShowTechSettings(!showTechSettings)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      alignSelf: 'flex-start',
+                      gap: '6px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: isNight ? '#ff9f0a' : brandColor,
+                      cursor: 'pointer',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      padding: '4px 0',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <span>⚙️</span>
+                    <span>{showTechSettings ? 'Standard-Bühnenabnahme ausblenden' : 'Standard-Bühnenabnahme konfigurieren (schulweit)'}</span>
+                  </button>
+
+                  {showTechSettings && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                      gap: '16px',
+                      background: theme.cardBg,
+                      border: theme.cardBorder,
+                      borderRadius: '14px',
+                      padding: '16px',
+                      boxShadow: isNight ? 'none' : '0 2px 8px rgba(0,0,0,0.02)'
+                    }}>
+                      {/* Keyboard Mode */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Keyboard-Abnahme</label>
+                        <div style={{ display: 'flex', background: isNight ? '#1e1e24' : '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, keyboardMode: 'mono' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 10px',
+                              borderRadius: '7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.keyboardMode === 'mono' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.keyboardMode === 'mono' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.keyboardMode === 'mono' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Mono (1x DI)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, keyboardMode: 'stereo' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 10px',
+                              borderRadius: '7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.keyboardMode === 'stereo' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.keyboardMode === 'stereo' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.keyboardMode === 'stereo' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Stereo (2x DI)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* E-Piano Mode */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>E-Piano-Abnahme</label>
+                        <div style={{ display: 'flex', background: isNight ? '#1e1e24' : '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, epianoMode: 'mono' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 10px',
+                              borderRadius: '7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.epianoMode === 'mono' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.epianoMode === 'mono' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.epianoMode === 'mono' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Mono (1x DI)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, epianoMode: 'stereo' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 10px',
+                              borderRadius: '7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.epianoMode === 'stereo' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.epianoMode === 'stereo' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.epianoMode === 'stereo' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Stereo (2x DI)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Drums Mode */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schlagzeug-Abnahme</label>
+                        <div style={{ display: 'flex', background: isNight ? '#1e1e24' : '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, drumsMode: '4mic' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 6px',
+                              borderRadius: '7px',
+                              fontSize: '0.66rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.drumsMode === '4mic' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.drumsMode === '4mic' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.drumsMode === '4mic' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            title="Kick, Snare, Overhead L, Overhead R"
+                          >
+                            4 Mics
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, drumsMode: 'standard' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 6px',
+                              borderRadius: '7px',
+                              fontSize: '0.66rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.drumsMode === 'standard' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.drumsMode === 'standard' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.drumsMode === 'standard' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            title="Kick, Snare, HiHat, 3x Tom, 2x OH (7 Kanäle)"
+                          >
+                            Standard (7 Ch)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, drumsMode: 'edrum' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 6px',
+                              borderRadius: '7px',
+                              fontSize: '0.66rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.drumsMode === 'edrum' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.drumsMode === 'edrum' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.drumsMode === 'edrum' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            title="E-Drums / Stereo Line-In (2x DI)"
+                          >
+                            E-Drums
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Changeover rundown timeline */}
