@@ -7787,7 +7787,7 @@ function App() {
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                   </div>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus App © {new Date().getFullYear()}</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus-Groovelab © {new Date().getFullYear()}</span>
                 </div>
               </div>
             ) : (
@@ -8754,7 +8754,7 @@ function App() {
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                       </div>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{activePlatform === 'campus' ? 'Campus App' : 'GrooveLab App'} © {new Date().getFullYear()}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus-Groovelab © {new Date().getFullYear()}</span>
                     </div>
                   </div>
                 </>
