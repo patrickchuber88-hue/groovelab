@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import jsQR from 'jsqr';
 
@@ -382,9 +382,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('email') || '';
   });
-  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'payment_selection' | 'preferences' | 'success'>('verify');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'preferences' | 'success'>('verify');
   const [studentPaymentMethod, setStudentPaymentMethod] = useState<'debit' | 'cash'>('debit');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [parentNotes, setParentNotes] = useState('');
 
   const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
@@ -914,16 +915,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
 
-  useEffect(() => {
-    if (parentOnboardingStep === 'payment_selection') {
-      const allowed = schoolData?.student_billing_option;
-      if (allowed === 'debit') {
-        setStudentPaymentMethod('debit');
-      } else if (allowed === 'cash') {
-        setStudentPaymentMethod('cash');
-      }
-    }
-  }, [parentOnboardingStep, schoolData?.student_billing_option]);
+
 
   useEffect(() => {
     if (!schoolData?.logo_url) return;
@@ -1246,7 +1238,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 user.day_of_birth = actDay?.day_of_birth || null;
               }
               setParentDayOfBirth(String(user.day_of_birth || ''));
-              setParentOnboardingStep('payment_selection');
+              setParentOnboardingStep('email');
               setExpandedSection('parentOnboarding');
               setLoading(false);
               return;
@@ -1700,7 +1692,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       setVerifiedStudentDetails(studentUser);
-      setParentOnboardingStep('payment_selection');
+      setParentOnboardingStep('preferences');
     } catch (err: any) {
       console.error('Email submission error:', err);
       setParentOnboardingError(err.message || 'Aktivierung konnte nicht abgeschlossen werden.');
@@ -1793,6 +1785,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const result = Array.isArray(data) ? data[0] : data;
 
       if (result && result.success) {
+        if (parentNotes.trim()) {
+          const { error: notesError } = await supabase
+            .from('students')
+            .update({ parent_notes: parentNotes.trim() })
+            .eq('id', verifiedStudentId);
+          if (notesError) console.error("Error saving parent notes:", notesError);
+        }
         setParentOnboardingStep('success');
       } else {
         setParentOnboardingError(result?.message || 'Fehler beim Speichern der Präferenzen.');
@@ -3423,130 +3422,124 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {expandedSection === 'parentOnboarding' && (
       <div style={{
         width: '100%',
-        maxWidth: '420px',
-        background: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: '40px',
-        padding: '28px',
-        boxShadow: '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        maxWidth: '520px',
+        background: '#ffffff',
+        borderRadius: '32px',
+        padding: '36px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+        border: '1px solid #e2e8f0',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
-        backdropFilter: 'blur(30px)',
-        WebkitBackdropFilter: 'blur(30px)'
+        gap: '24px',
+        boxSizing: 'border-box',
+        color: '#1e293b',
+        fontFamily: "'Inter', 'Outfit', sans-serif"
       }}>
-        <div style={{ fontSize: '12px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShieldCheck size={14} style={{ color: '#a7f3d0' }} /> Eltern-Onboarding & Aktivierung
+        {/* Progress Bar & Steps */}
+        <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+              <Calendar size={20} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>Stundenplan einrichten</span>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab</span>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 850, background: '#f1f5f9', color: '#475569', padding: '5px 12px', borderRadius: '100px', fontFamily: 'Urbanist' }}>
+            {parentOnboardingStep === 'verify' && 'Schritt 1 von 4'}
+            {parentOnboardingStep === 'email' && 'Schritt 2 von 4'}
+            {parentOnboardingStep === 'preferences' && 'Schritt 3 von 4'}
+            {parentOnboardingStep === 'success' && 'Fertig! 🎉'}
+          </span>
         </div>
 
         {parentOnboardingError && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '12px 16px', borderRadius: '16px', color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>
-            ⚠️ {parentOnboardingError}
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '12px 16px', borderRadius: '16px', color: '#991b1b', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+            <AlertCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} /> 
+            <span>{parentOnboardingError}</span>
           </div>
         )}
 
         {parentOnboardingStep === 'verify' && (
-          <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '16px',
-              padding: '16px',
-              color: '#ffffff',
-              fontSize: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <span style={{ fontSize: '10px', color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-VORSCHAU / AKTIVIERUNG</span>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '6px' }}>
-                <span style={{ fontWeight: 700 }}>GrooveLab Schüler-Account:</span>
-                <strong style={{ color: '#4ade80' }}>
-                  {getDynamicAnnualPriceLocal(schoolData?.contract_start_date, false).toFixed(2).replace('.', ',')} € (einmalig)
-                </strong>
-              </div>
-              <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>
-                Schüler können ihren Account selbst über den QR-Code aktivieren.<br />
-                Erlaubte Bezahlmethode: <strong>
-                  {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) && 'Lastschrift & Barzahlung'}
-                  {schoolData?.student_billing_option === 'debit' && 'Lastschrift'}
-                  {schoolData?.student_billing_option === 'cash' && 'Barzahlung'}
-                  {schoolData?.student_billing_option === 'option1' && 'Lastschrift & Barzahlung'}
-                </strong>
-              </div>
+          <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ textAlign: 'left' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Willkommen bei Campus-Groovelab!
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                Lass uns zuerst die Daten deines Kindes verifizieren, damit wir die Wunschzeiten richtig zuordnen können. Bitte gib die Daten exakt so ein, wie sie auf der Anmeldung stehen.
+              </p>
             </div>
-
-            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
-              Bitte gib die Daten deines Kindes exakt so ein, wie sie auf der Anmeldung stehen.
-            </p>
             
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vorname des Kindes *</label>
-              <input
-                type="text"
-                required
-                value={parentFirstName}
-                onChange={(e) => setParentFirstName(e.target.value)}
-                placeholder="z.B. Max"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
-              />
-            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Vorname des Kindes *</label>
+                <input
+                  type="text"
+                  required
+                  value={parentFirstName}
+                  onChange={(e) => setParentFirstName(e.target.value)}
+                  placeholder="z.B. Max"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+                />
+              </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Nachname des Kindes *</label>
-              <input
-                type="text"
-                required
-                value={parentLastName}
-                onChange={(e) => setParentLastName(e.target.value)}
-                placeholder="z.B. Mustermann"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
-              />
-            </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Nachname des Kindes *</label>
+                <input
+                  type="text"
+                  required
+                  value={parentLastName}
+                  onChange={(e) => setParentLastName(e.target.value)}
+                  placeholder="z.B. Mustermann"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+                />
+              </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Instrument *</label>
-              <select
-                required
-                value={parentInstrument}
-                onChange={(e) => setParentInstrument(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(15, 87, 46, 0.9)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <option value="">-- Instrument wählen --</option>
-                {availableInstruments.map(inst => (
-                  <option key={inst} value={inst}>{inst}</option>
-                ))}
-                {/* Fallback in case loading is not complete or empty */}
-                {availableInstruments.length === 0 && (
-                  <>
-                    <option value="ohne Zuweisung">ohne Zuweisung</option>
-                    <option value="Klavier">Klavier</option>
-                    <option value="E-Gitarre">E-Gitarre</option>
-                    <option value="Akustikgitarre">Akustikgitarre</option>
-                    <option value="Schlagzeug">Schlagzeug</option>
-                    <option value="Bass">Bass</option>
-                    <option value="Gesang">Gesang</option>
-                    <option value="Keyboard">Keyboard</option>
-                  </>
-                )}
-              </select>
-            </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Instrument *</label>
+                <select
+                  required
+                  value={parentInstrument}
+                  onChange={(e) => setParentInstrument(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <option value="">-- Instrument wählen --</option>
+                  {availableInstruments.map(inst => (
+                    <option key={inst} value={inst}>{inst}</option>
+                  ))}
+                  {availableInstruments.length === 0 && (
+                    <>
+                      <option value="ohne Zuweisung">ohne Zuweisung</option>
+                      <option value="Klavier">Klavier</option>
+                      <option value="E-Gitarre">E-Gitarre</option>
+                      <option value="Akustikgitarre">Akustikgitarre</option>
+                      <option value="Schlagzeug">Schlagzeug</option>
+                      <option value="Bass">Bass</option>
+                      <option value="Gesang">Gesang</option>
+                      <option value="Keyboard">Keyboard</option>
+                    </>
+                  )}
+                </select>
+              </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Geburtstagstag (Zahl 1-31) *</label>
-              <input
-                type="number"
-                required
-                min={1}
-                max={31}
-                value={parentDayOfBirth}
-                onChange={(e) => setParentDayOfBirth(e.target.value)}
-                placeholder="Nur den Tag eintragen, z.B. 15"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
-              />
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px', display: 'block' }}>
-                Monat & Jahr werden aus Datenschutzgründen im System nicht erfasst.
-              </span>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Geburtstagstag (Zahl 1-31) *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={31}
+                  value={parentDayOfBirth}
+                  onChange={(e) => setParentDayOfBirth(e.target.value)}
+                  placeholder="Nur den Tag eintragen, z.B. 15"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
+                  🔒 Monat & Jahr werden aus Datenschutzgründen im System nicht erfasst.
+                </span>
+              </div>
             </div>
 
             <button
@@ -3554,77 +3547,81 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={parentOnboardingLoading}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: schoolData?.primary_color || '#a7f3d0',
-                color: schoolData?.primary_color ? '#ffffff' : '#062413',
-                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px'
+                background: '#10b981',
+                color: '#ffffff',
+                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
               }}
             >
-              {parentOnboardingLoading ? 'Prüfe Daten...' : 'Daten verifizieren'}
+              {parentOnboardingLoading ? 'Prüfe Daten...' : 'Schüler verifizieren & fortfahren'}
             </button>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '12px' }}>
-              
-              <button 
-                type="button"
-                onClick={() => setExpandedSection('none')} 
-                style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer' }}
-              >
-                Abbrechen
-              </button>
-            </div>
+            <button 
+              type="button"
+              onClick={() => setExpandedSection('none')} 
+              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center' }}
+            >
+              Abbrechen
+            </button>
           </form>
         )}
 
         {parentOnboardingStep === 'email' && (
-          <form onSubmit={(e) => handleParentEmailSubmission(e)} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
-              <strong>Datensatz gefunden!</strong> Bitte gib jetzt die E-Mail-Adresse der Eltern an, um das Profil abzusichern.
-            </p>
+          <form onSubmit={(e) => handleParentEmailSubmission(e)} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+            <div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#10b981', background: '#ecfdf5', padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Erfolgreich gefunden</span>
+              <h3 style={{ margin: '8px 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Kontaktdaten für Updates
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                Bitte gib deine E-Mail-Adresse an. Damit bleibst du immer informiert und kannst den Stundenplan abrufen.
+              </p>
+            </div>
 
-            <div style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: '1.5', background: 'rgba(52, 168, 83, 0.06)', padding: '16px', borderRadius: '14px', border: '1px solid rgba(52, 168, 83, 0.2)' }}>
-              <div style={{ fontWeight: 900, color: '#4ade80', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            <div style={{ fontSize: '12.5px', color: '#0f172a', lineHeight: '1.5', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 900, color: '#059669', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 ✨ Deine Vorteile mit E-Mail-Adresse:
               </div>
-              <ul style={{ margin: 0, paddingLeft: '18px', color: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <ul style={{ margin: 0, paddingLeft: '18px', color: '#334155', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <li>
-                  📅 <strong>Automatischer Kalender-Abgleich:</strong> Nie wieder Unterrichtstermine vergessen!
+                  📅 <strong>Kalender-Abgleich:</strong> Unterrichtstermine direkt im Handy-Kalender.
                 </li>
                 <li>
-                  🔔 <strong>Sorglos-Garantie bei Ausfall:</strong> Benachrichtigungen bei Unterrichtsänderungen oder Ausfällen direkt in Echtzeit.
+                  🔔 <strong>Ausfall-Schutz:</strong> Automatische Echtzeit-Infos bei Unterrichtsausfällen.
                 </li>
                 <li>
-                  🔒 <strong>Backup &amp; Login:</strong> Passwortloser Login via Magic Link und einfache Wiederherstellung bei Verlust des Passes.
+                  🔒 <strong>Einfacher Login:</strong> Bequemer Zugriff ohne Passwort über einen Magic Link.
                 </li>
               </ul>
             </div>
 
-            <div style={{ background: 'rgba(167, 243, 208, 0.08)', border: '1px solid rgba(167, 243, 208, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '11.5px', color: '#a7f3d0', lineHeight: '1.4' }}>
-              🔒 <strong>Datenschutz-Info:</strong> Die E-Mail-Adresse wird sofort beim Speichern in Präfix und Suffix zerlegt und in zwei getrennten Tabellen abgelegt. Niemand kann deine vollständige E-Mail-Adresse direkt in einer Tabelle auslesen.
-            </div>
-
             <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>E-Mail-Adresse der Eltern (Optional)</label>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>E-Mail-Adresse der Eltern (Optional)</label>
               <input
                 type="email"
                 value={parentEmail}
                 onChange={(e) => setParentEmail(e.target.value)}
                 placeholder="eltern@beispiel.de"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#ffffff', outline: 'none', fontSize: '14px', fontWeight: 700 }}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '14px', fontWeight: 700 }}
               />
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
+                🔒 <strong>Datenschutz:</strong> Deine E-Mail wird beim Speichern sofort zerlegt und verschlüsselt abgelegt.
+              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
               <button
                 type="submit"
                 disabled={parentOnboardingLoading}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#34a853',
+                  background: '#10b981',
                   color: '#ffffff',
-                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s'
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
                 }}
               >
-                {parentOnboardingLoading ? 'Speichere E-Mail...' : 'Aktivierung abschließen'}
+                {parentOnboardingLoading ? 'Speichere...' : 'E-Mail speichern & weiter'}
               </button>
 
               <button
@@ -3632,9 +3629,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 onClick={(e) => handleParentEmailSubmission(e, true)}
                 disabled={parentOnboardingLoading}
                 style={{
-                  width: '100%', padding: '12px', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.25)',
+                  width: '100%', padding: '12px', borderRadius: '16px', border: '1.5px dashed #cbd5e1',
                   background: 'none',
-                  color: 'rgba(255,255,255,0.85)',
+                  color: '#475569',
                   fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
                 }}
               >
@@ -3645,159 +3642,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button
               type="button"
               onClick={() => setParentOnboardingStep('verify')}
-              style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '8px' }}
-            >
-              Zurück
-            </button>
-          </form>
-        )}
-
-        {parentOnboardingStep === 'payment_selection' && (
-          <form onSubmit={handleSavePaymentSelection} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 500 }}>
-              <strong>Abrechnung der Schüler-Gebühr</strong>
-            </p>
-
-            <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.85)', lineHeight: '1.5', background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
-              <div style={{ marginTop: '10px', fontWeight: 800, color: '#4ade80', fontSize: '14px' }}>
-                Betrag: {(() => {
-                  const price = getDynamicAnnualPriceLocal(schoolData?.contract_start_date, false);
-                  return `${price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)`;
-                })()}
-              </div>
-              <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', display: 'block', marginTop: '6px' }}>
-                * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
-              </span>
-            </div>
-
-            {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <label style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase' }}>Zahlungsmethode wählen *</label>
-                
-                {/* Option 1: Abbuchung */}
-                <div 
-                  onClick={() => setStudentPaymentMethod('debit')}
-                  style={{
-                    padding: '14px',
-                    borderRadius: '14px',
-                    border: studentPaymentMethod === 'debit' ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.15)',
-                    background: studentPaymentMethod === 'debit' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    border: '2px solid #ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    {studentPaymentMethod === 'debit' && (
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                    <strong style={{ color: '#ffffff', fontSize: '13px' }}>Mit der nächsten Unterrichtsgebühr abbuchen</strong>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '2px', lineHeight: '1.3' }}>
-                      Die Gebühr wird bequem über deine bestehende Bankverbindung der Musikschule eingezogen.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Option 2: Barzahlung */}
-                <div 
-                  onClick={() => setStudentPaymentMethod('cash')}
-                  style={{
-                    padding: '14px',
-                    borderRadius: '14px',
-                    border: studentPaymentMethod === 'cash' ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.15)',
-                    background: studentPaymentMethod === 'cash' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    border: '2px solid #ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    {studentPaymentMethod === 'cash' && (
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                    <strong style={{ color: '#ffffff', fontSize: '13px' }}>Geld in bar mitbringen</strong>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginTop: '2px', lineHeight: '1.3' }}>
-                      Bitte bringe den Betrag passend mit in den nächsten Unterricht und gib ihn der Lehrkraft oder Verwaltung.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
-                <strong style={{ display: 'block', fontSize: '13px', color: '#ffffff', marginBottom: '4px' }}>
-                  {schoolData.student_billing_option === 'debit' ? '💳 Abbuchung vereinbart' : '💵 Barzahlung vereinbart'}
-                </strong>
-                <span style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.4' }}>
-                  {schoolData.student_billing_option === 'debit' 
-                    ? 'Diese Gebühr wird automatisch mit deiner nächsten monatlichen Unterrichtsgebühr über die Musikschule abgebucht.'
-                    : 'Bitte bringe den Betrag passend bar zum nächsten Unterricht mit und gib ihn der Lehrkraft oder im Sekretariat ab.'}
-                </span>
-              </div>
-            )}
-
-            <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '4px', textAlign: 'left' }}>
-              <input 
-                type="checkbox" 
-                required
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                style={{ accentColor: '#22c55e', marginTop: '3px', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)', lineHeight: '1.4' }}>
-                Ich bestätige, dass ich volljährig bin bzw. als Erziehungsberechtigter des Schülers handle, stimme den{' '}
-                <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} style={{ textDecoration: 'underline', color: '#4ade80', cursor: 'pointer', fontWeight: 700 }}>AGB</span>{' '}
-                sowie der{' '}
-                <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ textDecoration: 'underline', color: '#4ade80', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span>{' '}
-                zu und willige in die zahlungspflichtige Aktivierung für das laufende Schuljahr über {
-                  studentPaymentMethod === 'debit' ? 'Abbuchung' : 'Barzahlung'
-                } ein.
-              </span>
-            </label>
-
-            <button
-              type="submit"
-              disabled={parentOnboardingLoading || !agreedToTerms}
-              style={{
-                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: agreedToTerms ? '#34a853' : '#7f8c8d',
-                color: '#ffffff',
-                fontWeight: 800, fontSize: '14px', cursor: agreedToTerms ? 'pointer' : 'not-allowed', transition: 'all 0.2s', marginTop: '8px'
-              }}
-            >
-              {parentOnboardingLoading ? 'Speichere...' : 'Kostenpflichtig aktivieren'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setParentOnboardingStep('email')}
-              style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '4px' }}
+              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center' }}
             >
               Zurück
             </button>
@@ -3805,95 +3650,107 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
 
         {parentOnboardingStep === 'preferences' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-            <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px', lineHeight: '1.5', fontWeight: 650, textAlign: 'center' }}>
-              Wann möchtest du kommen? (Wunschtermine) und Wann geht es absolut gar nicht? (Sperrzeiten)
-            </p>
-
-            {/* Apple style segmented control */}
-            <div style={{
-              display: 'flex',
-              background: 'rgba(255, 255, 255, 0.06)',
-              padding: '3px',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              position: 'relative'
-            }}>
-              <button
-                type="button"
-                onClick={() => setPreferenceMode('wunsch')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: '11px',
-                  border: 'none',
-                  background: preferenceMode === 'wunsch' ? '#22c55e' : 'transparent',
-                  color: preferenceMode === 'wunsch' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                Wunschzeit 🟢
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreferenceMode('gesperrt')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: '11px',
-                  border: 'none',
-                  background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
-                  color: preferenceMode === 'gesperrt' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                Sperrzeit 🔴
-              </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+            <div style={{ textAlign: 'left' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Terminwünsche angeben
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                Wähle deine bevorzugten Unterrichtszeiten und sperre Zeiten, die absolut unmöglich sind.
+              </p>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
-              <button
-                type="button"
-                onClick={() => setShowSaturday(!showSaturday)}
-                style={{
-                  background: showSaturday ? '#34a853' : 'rgba(255,255,255,0.1)',
-                  border: 'none',
-                  padding: '6px 14px',
-                  borderRadius: '100px',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {showSaturday ? 'Ja' : 'Nein'}
-              </button>
+            {/* Legend & Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '12px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 700, color: '#475569' }}>Klick-Modus wählen:</span>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
+              </div>
+
+              {/* Apple style segmented control */}
+              <div style={{
+                display: 'flex',
+                background: '#e2e8f0',
+                padding: '3px',
+                borderRadius: '12px',
+                position: 'relative'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setPreferenceMode('wunsch')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '9px',
+                    border: 'none',
+                    background: preferenceMode === 'wunsch' ? '#10b981' : 'transparent',
+                    color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
+                    fontWeight: 800,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                  Wunschzeit 🟢
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreferenceMode('gesperrt')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '9px',
+                    border: 'none',
+                    background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
+                    color: preferenceMode === 'gesperrt' ? '#ffffff' : '#475569',
+                    fontWeight: 800,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                  Sperrzeit 🔴
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                <span style={{ color: '#475569', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
+                <button
+                  type="button"
+                  onClick={() => setShowSaturday(!showSaturday)}
+                  style={{
+                    background: showSaturday ? '#10b981' : '#cbd5e1',
+                    border: 'none',
+                    padding: '4px 12px',
+                    borderRadius: '100px',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {showSaturday ? 'Ja' : 'Nein'}
+                </button>
+              </div>
             </div>
 
             {/* Visual Calendar Grid Weekspective */}
             <div style={{
-              background: 'rgba(0,0,0,0.25)',
+              background: '#f8fafc',
               borderRadius: '20px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              padding: '10px',
+              border: '1px solid #e2e8f0',
+              padding: '12px',
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
@@ -3908,12 +3765,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 textAlign: 'center',
                 fontWeight: 800,
                 fontSize: '10px',
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: '#64748b',
                 paddingBottom: '6px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                borderBottom: '1px solid #e2e8f0',
                 position: 'sticky',
                 top: 0,
-                background: 'rgba(24, 24, 27, 0.95)',
+                background: '#f8fafc',
                 zIndex: 2
               }}>
                 <div>Zeit</div>
@@ -3934,35 +3791,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     gap: '3px',
                     alignItems: 'center'
                   }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'right', paddingRight: '4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
                       {time}
                     </div>
                     {[1, 2, 3, 4, 5, 6].slice(0, showSaturday ? 6 : 5).map(dayNum => {
                       const cellKey = `${dayNum}-${time}`;
                       const selection = selectedSlots[cellKey];
-                      let bg = 'rgba(255, 255, 255, 0.03)';
-                      let border = '1px solid rgba(255, 255, 255, 0.06)';
+                      let bg = '#ffffff';
+                      let border = '1px solid #e2e8f0';
+                      let labelColor = 'transparent';
+                      
                       if (selection === 'wunsch') {
-                        bg = 'rgba(34, 197, 94, 0.85)';
-                        border = '1px solid #22c55e';
+                        bg = '#10b981';
+                        border = '1px solid #059669';
+                        labelColor = '#ffffff';
                       } else if (selection === 'gesperrt') {
-                        bg = 'rgba(239, 68, 68, 0.85)';
-                        border = '1px solid #ef4444';
+                        bg = '#ef4444';
+                        border = '1px solid #dc2626';
+                        labelColor = '#ffffff';
                       }
-
+                      
                       return (
-                        <button
-                          key={dayNum}
-                          type="button"
+                        <div
+                          key={cellKey}
                           onClick={() => {
                             setSelectedSlots(prev => {
                               const copy = { ...prev };
-                              if (copy[cellKey]) {
-                                if (copy[cellKey] === preferenceMode) {
-                                  delete copy[cellKey];
-                                } else {
-                                  copy[cellKey] = preferenceMode;
-                                }
+                              if (copy[cellKey] === preferenceMode) {
+                                delete copy[cellKey];
                               } else {
                                 copy[cellKey] = preferenceMode;
                               }
@@ -3970,15 +3826,24 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                             });
                           }}
                           style={{
-                            height: '24px',
-                            borderRadius: '5px',
                             background: bg,
                             border: border,
+                            borderRadius: '6px',
+                            height: '24px',
                             cursor: 'pointer',
                             transition: 'all 0.1s ease',
-                            outline: 'none'
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '9px',
+                            color: labelColor,
+                            fontWeight: 900
                           }}
-                        />
+                          className="hover-scale-mini"
+                        >
+                          {selection === 'wunsch' && '✓'}
+                          {selection === 'gesperrt' && '✗'}
+                        </div>
                       );
                     })}
                   </div>
@@ -3986,88 +3851,100 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             </div>
 
-            {/* Validation & Stats Summary Card */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              fontSize: '11.5px',
-              color: 'rgba(255,255,270,0.7)',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              padding: '10px 14px',
-              borderRadius: '14px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🟢 Wunschzeit (mind. 2 Stunden):</span>
-                <strong style={{ color: Object.values(selectedSlots).filter(v => v === 'wunsch').length >= 4 ? '#4ade80' : '#fca5a5' }}>
-                  {Object.values(selectedSlots).filter(v => v === 'wunsch').length * 30 / 60} Std.
-                </strong>
+            {/* Live Progress Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#065f46', textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} />
+                <span>
+                  Ausgewählte Wunschzeit: <strong>{((Object.values(selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🔴 Sperrzeit blockiert:</span>
-                <strong style={{ color: '#ef4444' }}>
-                  {Object.values(selectedSlots).filter(v => v === 'gesperrt').length * 30 / 60} Std.
-                </strong>
-              </div>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857' }}>
+                (mind. 2,0 Std. benötigt)
+              </span>
             </div>
 
-            {parentOnboardingError && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', padding: '12px 16px', borderRadius: '16px', color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>
-                ⚠️ {parentOnboardingError}
-              </div>
-            )}
+            {/* Free text note */}
+            <div style={{ textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Zusätzliche Notizen an die Musikschule / Lehrkraft</label>
+              <textarea
+                value={parentNotes}
+                onChange={(e) => setParentNotes(e.target.value)}
+                placeholder="z.B. Geschwisterkind hat am selben Nachmittag Unterricht; bitte möglichst nacheinander legen; Mitfahrgelegenheiten berücksichtigen..."
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '13px', fontWeight: 500, minHeight: '80px', fontFamily: 'inherit', resize: 'vertical' }}
+              />
+            </div>
 
-            <button
-              onClick={handleSavePreferences}
-              disabled={parentOnboardingLoading}
-              style={{
-                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#34a853',
-                color: '#ffffff',
-                fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '4px'
-              }}
-            >
-              {parentOnboardingLoading ? 'Speichere Präferenzen...' : 'Wunschtermine speichern'}
-            </button>
+            {/* Action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleSavePreferences}
+                disabled={parentOnboardingLoading}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                  background: '#10b981',
+                  color: '#ffffff',
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                {parentOnboardingLoading ? 'Speichere Präferenzen...' : 'Wunschtermine speichern'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setParentOnboardingStep('email')}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center' }}
+              >
+                Zurück
+              </button>
+            </div>
           </div>
         )}
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(52, 168, 83, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
-              <Check size={32} strokeWidth={3} />
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.15)' }}>
+              <Check size={36} strokeWidth={3} />
             </div>
 
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#22c55e', textAlign: 'center', letterSpacing: '-0.02em' }}>
-              Profil erfolgreich aktiviert!
-            </h3>
-
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '13px', textAlign: 'center', lineHeight: '1.4' }}>
-              Hier ist dein persönlicher QR-Code zum Login. Mache einen Screenshot oder lade ihn herunter!
-            </p>
-
-            {/* QR CODE DISPLAY */}
-            <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
-                alt="Student Login QR Code"
-                style={{ width: '180px', height: '180px', display: 'block' }}
-              />
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Stundenplan eingerichtet!
+              </h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem', lineHeight: '1.45' }}>
+                Deine Terminwünsche wurden erfolgreich gespeichert. Die Musikschule meldet sich in Kürze mit dem finalen Stundenplan bei dir!
+              </p>
             </div>
 
-            <div style={{ width: '100%', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '14px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* QR CODE DISPLAY CARD */}
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Dein persönlicher Login-Code</span>
+              <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://campus-groovelab.de/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
+                  alt="Student Login QR Code"
+                  style={{ width: '180px', height: '180px', display: 'block' }}
+                />
+              </div>
+              <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: '#64748b', lineHeight: '1.3' }}>
+                💡 Mach einen Screenshot von diesem Code. Er dient als Schülerausweis zum schnellen Einloggen in die App.
+              </p>
+            </div>
+
+            <div style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Schüler:</span>
-                <strong style={{ color: '#ffffff', fontWeight: 800 }}>{verifiedStudentDetails.first_name} {verifiedStudentDetails.last_name}</strong>
+                <span style={{ color: '#64748b', fontWeight: 700 }}>Schüler:</span>
+                <strong style={{ color: '#0f172a', fontWeight: 800 }}>{verifiedStudentDetails.first_name} {verifiedStudentDetails.last_name}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Instrument:</span>
-                <strong style={{ color: '#ffffff', fontWeight: 800 }}>{verifiedStudentDetails.instrument}</strong>
+                <span style={{ color: '#64748b', fontWeight: 700 }}>Instrument:</span>
+                <strong style={{ color: '#0f172a', fontWeight: 800 }}>{verifiedStudentDetails.instrument}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Ausweis-Nr:</span>
-                <strong style={{ color: '#a7f3d0', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
+                <span style={{ color: '#64748b', fontWeight: 700 }}>Ausweis-Nr:</span>
+                <strong style={{ color: '#059669', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
               </div>
             </div>
 
@@ -4076,8 +3953,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <button
                 onClick={downloadWalletPass}
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontWeight: 800, fontSize: '13px',
+                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '13px',
                   cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                 }}
               >
@@ -4087,8 +3964,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <button
                 onClick={downloadParentQrCode}
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.05)', color: '#ffffff', fontWeight: 800, fontSize: '13px',
+                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '13px',
                   cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                 }}
               >
@@ -4096,17 +3973,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </button>
             </div>
 
-            <div style={{ background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '12px', borderRadius: '12px', fontSize: '11px', color: '#fef08a', lineHeight: '1.4', width: '100%', boxSizing: 'border-box', textAlign: 'center' }}>
-              💡 <strong>Tipp:</strong> Mach einfach einen schnellen Screenshot von diesem QR-Code mit deinem Handy!
-            </div>
-
             <button
               onClick={() => onLogin(verifiedStudentDetails.id, false)}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#0b57d0',
+                background: '#3b82f6',
                 color: '#ffffff',
-                fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 24px rgba(11, 87, 208, 0.3)'
+                fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
               }}
             >
               Direkt zum Profil einloggen

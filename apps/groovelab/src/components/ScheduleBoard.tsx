@@ -102,6 +102,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // RoentgenMatrixView interactive behavior states
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedStudentPrefs, setSelectedStudentPrefs] = useState<any[]>([]);
+  const [selectedStudentNote, setSelectedStudentNote] = useState<string | null>(null);
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
@@ -676,9 +677,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     if (selectedStudentId === studentId) {
       setSelectedStudentId(null);
       setSelectedStudentPrefs([]);
+      setSelectedStudentNote(null);
     } else {
       setSelectedStudentId(studentId);
+      setSelectedStudentNote(null);
       try {
+        // Load preferences
         const { data, error } = await supabase
           .from('student_schedule_preferences')
           .select('*')
@@ -688,9 +692,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         } else {
           setSelectedStudentPrefs([]);
         }
+
+        // Load parent notes from students table
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('parent_notes')
+          .eq('id', studentId)
+          .maybeSingle();
+        if (!studentError && studentData) {
+          setSelectedStudentNote(studentData.parent_notes || null);
+        }
       } catch (err) {
-        console.error("Error loading student preferences:", err);
+        console.error("Error loading student preferences or notes:", err);
         setSelectedStudentPrefs([]);
+        setSelectedStudentNote(null);
       }
     }
   };
@@ -2198,6 +2213,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </span>
                         )}
                       </div>
+
+                      {isSelected && selectedStudentNote && (
+                        <div style={{
+                          marginTop: '6px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          color: '#b45309',
+                          fontSize: '0.62rem',
+                          fontWeight: 650,
+                          lineHeight: '1.3',
+                          textAlign: 'left',
+                          wordBreak: 'break-word'
+                        }}>
+                          💬 <strong>Eltern-Notiz:</strong> {selectedStudentNote}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
