@@ -4054,114 +4054,120 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Manuel Wagner Bypass */}
-          <button
-            onClick={async () => {
-              try {
-                console.log('[Bypass] Attempting Manuel Wagner login...');
-                // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
-                sessionStorage.setItem('groovelab_qr_token', '897ed2f0-d0e6-47e8-b799-a09efe9e51e5');
-                
-                const { data: user, error } = await supabase
-                  .from('users')
-                  .select('id, role')
-                  .eq('qr_token', '897ed2f0-d0e6-47e8-b799-a09efe9e51e5')
-                  .maybeSingle();
+          {import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN && (
+            <button
+              onClick={async () => {
+                try {
+                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN;
+                  console.log('[Bypass] Attempting Manuel Wagner login...');
+                  // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
+                  sessionStorage.setItem('groovelab_qr_token', token);
+                  
+                  const { data: user, error } = await supabase
+                    .from('users')
+                    .select('id, role')
+                    .eq('qr_token', token)
+                    .maybeSingle();
 
-                if (error) {
-                  console.error('[Bypass] Supabase Error:', error);
-                  alert('Datenbank-Fehler: ' + error.message);
-                  return;
-                }
+                  if (error) {
+                    console.error('[Bypass] Supabase Error:', error);
+                    alert('Datenbank-Fehler: ' + error.message);
+                    return;
+                  }
 
-                if (user) {
-                  console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
-                  onLogin(user.id, true);
-                } else {
-                  console.warn('[Bypass] No user found with Manuel Wagner token.');
-                  alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
+                  if (user) {
+                    console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
+                    onLogin(user.id, true);
+                  } else {
+                    console.warn('[Bypass] No user found with Manuel Wagner token.');
+                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
+                  }
+                } catch (err: any) {
+                  console.error('[Bypass] Runtime Error:', err);
+                  alert('Ein Fehler ist aufgetreten: ' + err.message);
                 }
-              } catch (err: any) {
-                console.error('[Bypass] Runtime Error:', err);
-                alert('Ein Fehler ist aufgetreten: ' + err.message);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '16px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '2px solid rgba(59, 130, 246, 0.25)',
-              borderRadius: '24px',
-              color: '#93c5fd',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(59,130,246,0.1)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
-          >
-            🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
-          </button>
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '2px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '24px',
+                color: '#93c5fd',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(59,130,246,0.1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
+            >
+              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
+            </button>
+          )}
 
           {/* Master Admin Bypass */}
-          <button
-            onClick={async () => {
-              try {
-                console.log('[Bypass] Attempting Admin login...');
-                // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
-                sessionStorage.setItem('groovelab_qr_token', '2e2e7ec2-46b0-4ab6-9805-284e66186ab1');
+          {import.meta.env.VITE_BYPASS_ADMIN_TOKEN && (
+            <button
+              onClick={async () => {
+                try {
+                  const token = import.meta.env.VITE_BYPASS_ADMIN_TOKEN;
+                  console.log('[Bypass] Attempting Admin login...');
+                  // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
+                  sessionStorage.setItem('groovelab_qr_token', token);
 
-                const { data: user, error } = await supabase
-                  .from('users')
-                  .select('id, role')
-                  .eq('qr_token', '2e2e7ec2-46b0-4ab6-9805-284e66186ab1')
-                  .maybeSingle();
+                  const { data: user, error } = await supabase
+                    .from('users')
+                    .select('id, role')
+                    .eq('qr_token', token)
+                    .maybeSingle();
 
-                if (error) {
-                  console.error('[Bypass] Supabase Error:', error);
-                  alert('Datenbank-Fehler: ' + error.message);
-                  return;
+                  if (error) {
+                    console.error('[Bypass] Supabase Error:', error);
+                    alert('Datenbank-Fehler: ' + error.message);
+                    return;
+                  }
+
+                  if (user) {
+                    console.log('[Bypass] Admin found, logging in:', user.id);
+                    onLogin(user.id, true);
+                  } else {
+                    console.warn('[Bypass] No user found with Admin token.');
+                    alert('Admin wurde in der Datenbank nicht gefunden.');
+                  }
+                } catch (err: any) {
+                  console.error('[Bypass] Runtime Error:', err);
+                  alert('Ein Fehler ist aufgetreten: ' + err.message);
                 }
-
-                if (user) {
-                  console.log('[Bypass] Admin found, logging in:', user.id);
-                  onLogin(user.id, true);
-                } else {
-                  console.warn('[Bypass] No user found with Admin token.');
-                  alert('Admin wurde in der Datenbank nicht gefunden.');
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Runtime Error:', err);
-                alert('Ein Fehler ist aufgetreten: ' + err.message);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '16px',
-              background: 'rgba(254, 249, 195, 0.08)',
-              border: '2px solid rgba(253, 224, 71, 0.25)',
-              borderRadius: '24px',
-              color: '#fef9c3',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.08)'; }}
-          >
-            🔓 BYPASS: ADMIN (MASTER ADMIN)
-          </button>
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'rgba(254, 249, 195, 0.08)',
+                border: '2px solid rgba(253, 224, 71, 0.25)',
+                borderRadius: '24px',
+                color: '#fef9c3',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.08)'; }}
+            >
+              🔓 BYPASS: ADMIN (MASTER ADMIN)
+            </button>
+          )}
         </div>
       )}
 

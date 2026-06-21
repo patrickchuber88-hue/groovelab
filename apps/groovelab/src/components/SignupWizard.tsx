@@ -20,7 +20,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [subdomain, setSubdomain] = useState('');
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
   const [checkingSubdomain, setCheckingSubdomain] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState('#3b82f6');
+  const primaryColor = '#16a34a';
   const [street, setStreet] = useState('');
   const [houseNumber, setHouseNumber] = useState('');
   const [zipCode, setZipCode] = useState('');
@@ -215,6 +215,12 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     '#f97316'  // Orange
   ];
 
+  const inputFocusStyle = {
+    borderColor: '#10b981',
+    boxShadow: '0 0 0 4px rgba(16, 185, 129, 0.15)',
+    background: 'rgba(255, 255, 255, 0.08)'
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -239,6 +245,34 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         pointerEvents: 'none',
         backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
       }} />
+
+      <style>{`
+        .signup-input {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .signup-input:focus {
+          border-color: #10b981 !important;
+          background: rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+        }
+        .signup-btn-next {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .signup-btn-next:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 24px rgba(16, 185, 129, 0.25) !important;
+          filter: brightness(1.05);
+        }
+        .signup-btn-next:active:not(:disabled) {
+          transform: translateY(0);
+        }
+        .signup-btn-back {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .signup-btn-back:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.12) !important;
+        }
+      `}</style>
 
       <div style={{
         width: '100%',
@@ -293,6 +327,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 onChange={(e) => setSchoolName(e.target.value)}
                 placeholder="z.B. Groove Academy Berlin"
                 style={inputStyle}
+                className="signup-input"
               />
             </div>
 
@@ -306,6 +341,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="groove-academy"
                   style={{ ...inputStyle, paddingRight: '160px' }}
+                  className="signup-input"
                 />
                 <span style={{ position: 'absolute', right: '16px', fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', pointerEvents: 'none' }}>
                   .campus-groovelab.de
@@ -333,6 +369,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setStreet(e.target.value)}
                   placeholder="Karl-Fürstenberg-Str."
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
               <div>
@@ -344,6 +381,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setHouseNumber(e.target.value)}
                   placeholder="59"
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
             </div>
@@ -358,6 +396,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setZipCode(e.target.value)}
                   placeholder="79618"
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
               <div>
@@ -369,64 +408,27 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Rheinfelden"
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Telefonnummer *</label>
-                <input
-                  type="tel"
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+49 (0) 7623..."
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Primäre Branding-Farbe</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', height: '46px' }}>
-                  {presetColors.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setPrimaryColor(c)}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: c,
-                        border: primaryColor === c ? '2px solid #ffffff' : 'none',
-                        cursor: 'pointer',
-                        transform: primaryColor === c ? 'scale(1.15)' : 'none',
-                        transition: 'transform 0.15s ease'
-                      }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer'
-                    }}
-                  />
-                </div>
-              </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Telefonnummer *</label>
+              <input
+                type="tel"
+                required
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+49 (0) 7623..."
+                style={inputStyle}
+                className="signup-input"
+              />
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={onBackToLogin} style={backButtonStyle}>Zurück</button>
-              <button type="submit" style={nextButtonStyle}>
+              <button type="button" onClick={onBackToLogin} style={backButtonStyle} className="signup-btn-back">Zurück</button>
+              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
                 Weiter zu Account-Details <ArrowRight size={16} />
               </button>
             </div>
@@ -446,6 +448,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setAdminFirstName(e.target.value)}
                   placeholder="z.B. Patrick"
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
               <div>
@@ -457,6 +460,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   onChange={(e) => setAdminLastName(e.target.value)}
                   placeholder="z.B. Huber"
                   style={inputStyle}
+                  className="signup-input"
                 />
               </div>
             </div>
@@ -489,8 +493,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={() => setStep(1)} style={backButtonStyle}>Zurück</button>
-              <button type="submit" style={nextButtonStyle}>
+              <button type="button" onClick={() => setStep(1)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
+              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
                 Weiter zur Verifizierung <ArrowRight size={16} />
               </button>
             </div>
@@ -541,6 +545,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                 placeholder="000000"
                 style={{ ...inputStyle, textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.1em', fontFamily: 'monospace' }}
+                className="signup-input"
               />
               {otpError && (
                 <div style={{ color: '#f87171', fontSize: '12px', fontWeight: 700, marginTop: '6px', textAlign: 'center' }}>
@@ -550,8 +555,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={() => setStep(2)} style={backButtonStyle}>Zurück</button>
-              <button type="submit" style={nextButtonStyle}>
+              <button type="button" onClick={() => setStep(2)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
+              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
                 Code verifizieren <ShieldCheck size={16} />
               </button>
             </div>

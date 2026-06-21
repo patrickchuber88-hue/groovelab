@@ -18313,13 +18313,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         {isSchoolOneTime ? (
                                           <>
                                             <span>
-                                              {studentBillingOption === 'option3_3' ? `Komplett-Aktivierung aller Schüler (${schoolOneTimeCount} Profile):` : `Aktivierte Schülerprofile (${schoolOneTimeCount} Lizenzen):`}
+                                              {studentBillingOption === 'option3_3' ? `Komplett-Aktivierung aller Schüler (${schoolOneTimeCount} Profile):` : `Aktivierte Schülerprofile (${schoolOneTimeCount} Aktivierungen):`}
                                             </span>
                                             <strong>{schoolOneTimeSinglePrice.toFixed(2).replace('.', ',')} € / Schüler (Jahresbeitrag)</strong>
                                           </>
                                         ) : (
                                           <>
-                                            <span>Aktive Schülerprofile ({activeStudents} aktivierte Lizenzen):</span>
+                                            <span>Aktive Schülerprofile ({activeStudents} aktivierte Aktivierungen):</span>
                                             <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : '0,49 € / Schüler / Mo.'}</strong>
                                           </>
                                         )}
@@ -18940,23 +18940,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   >
                                     📊 Übersicht
                                   </button>
-                                  <button
-                                    onClick={() => setActiveBillingSubTab('matching')}
-                                    style={{
-                                      background: activeBillingSubTab === 'matching' ? '#ffffff' : 'transparent',
-                                      border: 'none',
-                                      borderRadius: '10px',
-                                      padding: '8px 20px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: activeBillingSubTab === 'matching' ? 800 : 600,
-                                      color: activeBillingSubTab === 'matching' ? '#1e293b' : '#64748b',
-                                      cursor: 'pointer',
-                                      boxShadow: activeBillingSubTab === 'matching' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    💵 Zahlungsabgleich
-                                  </button>
+                                  
                                   <button
                                     onClick={() => setActiveBillingSubTab('history')}
                                     style={{
@@ -19011,7 +18995,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         </span>
                                       </div>
                                       <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.4' }}>
-                                        Die Plattform-Nutzung ist für das Schuljahr 2026/2027 vollständig registriert. Du profitierst vom B2B Kombi-Discount bundle.
+                                        Die System-Nutzung ist für das Schuljahr 2026/2027 vollständig registriert. Du profitierst vom B2B Kombi-Discount bundle.
                                       </p>
                                     </div>
 
@@ -19087,7 +19071,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <div>
                                           <strong style={{ display: 'block', fontSize: '0.78rem', color: '#1e293b', marginBottom: '4px' }}>Neue Schüler hinzufügen &amp; aktivieren</strong>
                                           <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: '1.4' }}>
-                                            Schülerlizenzen werden nicht manuell vorgebucht. Du kannst neue Schüler einfach über deine Schülerverwaltung anlegen. Sobald diese aktiv geschaltet werden (z. B. durch Freischaltung für Campus oder GrooveLab), wird die Umlage vollautomatisch im Hintergrund angepasst (0,49 € für aktive Profile bzw. 0,09 € für passive Profile).
+                                            Schüleraktivierungen werden nicht manuell vorgebucht. Du kannst neue Schüler einfach über deine Schülerverwaltung anlegen. Sobald diese aktiv geschaltet werden (z. B. durch Freischaltung für Campus oder GrooveLab), wird die Umlage vollautomatisch im Hintergrund angepasst (0,49 € für aktive Profile bzw. 0,09 € für passive Profile).
                                           </p>
                                         </div>
                                       </div>
@@ -19127,7 +19111,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Software-Plattform:</span>
+                                              <span>Software-Infrastruktur:</span>
                                               <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
                                             </div>
 
@@ -19898,8 +19882,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     9: 12, 10: 11, 11: 10, 12: 9, 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1
                                   };
                                   const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
-                                  const studentFee = 0.40 * restmonate;
-                                  const aktAmount = monthActivationsCount * studentFee;
+                                  // Dynamic student fee depending on billing options (monthly vs annual packages)
+                                  let studentFee = 0.49;
+                                  if (studentBillingOption === 'option2') {
+                                    studentFee = 0.40;
+                                  } else if (studentBillingOption === 'option3_2') {
+                                    studentFee = getDynamicAnnualPrice(contractStartDate, 10);
+                                  } else if (studentBillingOption === 'option3_3') {
+                                    studentFee = getDynamicAnnualPrice(contractStartDate, 20);
+                                  }
+                                  const aktAmount = studentBillingOption === 'option3_3'
+                                    ? students.length * studentFee
+                                    : monthActivationsCount * studentFee;
 
                                   // 1. Infrastruktur-Rechnung (INF)
                                   invoicesData.push({
@@ -19924,8 +19918,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     creationTime: creationTime
                                   });
 
-                                  // 2. Sammelrechnung Schüleraktivierungen (AKT)
-                                  if (aktAmount > 0) {
+                                  // 2. Sammelrechnung Schüleraktivierungen (AKT) - Only shown if school is the payer
+                                  if (aktAmount > 0 && billingPayer === 'school') {
                                     invoicesData.push({
                                       id: `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`,
                                       type: 'AKT',
@@ -20003,24 +19997,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               <div>
                                                 <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
                                                 <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'block', fontWeight: 700 }}>
-                                                  {inv.type === 'INF' ? '💳 Infrastruktur-Rechnung' : '👥 Sammelrechnung Schüleraktivierungen'}
-                                                </span>
-                                                <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
-                                                  Erstellt: {getLastDayOfMonth(inv.monthName, inv.year)}
-                                                </span>
-                                                <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
-                                                  Fällig am: {inv.dueDateStr}
-                                                </span>
+                                                   {inv.type === 'INF' ? '💳 Service- & Infrastrukturgebühren' : (billingPayer === 'student' ? '👥 Direktabrechnung Schüleraktivierungen' : '👥 Sammelabrechnung Schüleraktivierungen')}
+                                                 </span>
+                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
+                                                   Rechnungsdatum: {getLastDayOfMonth(inv.monthName, inv.year)}
+                                                 </span>
+                                                 <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 600 }}>
+                                                   Zahlbar bis: {inv.dueDateStr}
+                                                 </span>
                                               </div>
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
                                                 <div style={{ color: inv.type === 'INF' ? '#0369a1' : '#16a34a', fontWeight: 800 }}>
                                                   Betrag: {inv.amount.toFixed(2).replace('.', ',')} €
                                                 </div>
                                                 {inv.type === 'AKT' && (
-                                                  <div style={{ fontSize: '0.58rem', color: '#16a34a', background: '#d1fae5', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
-                                                    Durchlaufender Posten
-                                                  </div>
-                                                )}
+                                                   <div style={{ 
+                                                     fontSize: '0.58rem', 
+                                                     color: billingPayer === 'student' ? '#16a34a' : '#ea580c', 
+                                                     background: billingPayer === 'student' ? '#d1fae5' : '#ffedd5', 
+                                                     border: billingPayer === 'student' ? '1px solid #bbf7d0' : '1px solid #fed7aa',
+                                                     padding: '4px 8px', 
+                                                     borderRadius: '6px', 
+                                                     fontWeight: 800 
+                                                   }}>
+                                                     {billingPayer === 'student' ? 'Direktabrechnung (keine Kosten für Schule)' : 'Sammelabrechnung (Kosten trägt Musikschule)'}
+                                                   </div>
+                                                 )}
                                               </div>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <span style={{ 
@@ -20050,39 +20052,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </div>
                           </div>
 
-                          {/* SEPA Transaktionshistorie */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                            <h4 style={{ margin: '0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#1e293b' }}>SEPA-Lastschrift &amp; Transaktionsstatus</h4>
-                            <div style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px', background: '#ffffff', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
-                              <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748b' }}>
-                                Der Einzug der Beträge erfolgt automatisch über das hinterlegte SEPA-Lastschriftmandat (IBAN: DE89 •••• 1234, BIC: WELADED1XXX).
-                              </p>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {[
-                                  { id: 'TX-202606-001', type: 'B2B Infrastruktur & Lizenzen', date: '05. Juni 2026', amount: currentTotalB2B, status: 'Erfolgreich', desc: 'Monatlicher Lastschrifteinzug' },
-                                  activeStudentsCount_global > 0 && studentBillingOption === 'option2' && { id: 'TX-202606-002', type: 'B2C Umlage (Sammellastschrift)', date: '10. Juni 2026', amount: activeStudentsCount_global * 0.40, status: 'In Bearbeitung', desc: 'Monatsabrechnung Schülerumlage' }
-                                ].filter((x): x is any => !!x).map((tx: any) => (
-                                  <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '14px', background: '#f8fafc' }}>
-                                    <div>
-                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b', display: 'block' }}>{tx.type}</span>
-                                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Referenz: {tx.id} · Einzug am: {tx.date}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>{tx.amount.toFixed(2).replace('.', ',')} €</span>
-                                      <span style={{
-                                        fontSize: '0.62rem',
-                                        fontWeight: 800,
-                                        padding: '4px 8px',
-                                        borderRadius: '6px',
-                                        background: tx.status === 'Erfolgreich' ? '#d1fae5' : '#fff9db',
-                                        color: tx.status === 'Erfolgreich' ? '#065f46' : '#b45309'
-                                      }}>{tx.status}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                          
                         </div>
                       )}
                     </div>
@@ -23531,8 +23501,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
                     <strong style={{ display: 'block', fontSize: '0.92rem', color: selectedInvoice.status === 'Vorschau' ? '#d97706' : '#0f172a' }}>
                       {selectedInvoice.status === 'Vorschau' 
-                        ? (isInf ? 'VORSCHAU: INFRASTRUKTUR-RECHNUNG' : 'VORSCHAU: SAMMELRECHNUNG') 
-                        : (isInf ? 'INFRASTRUKTUR-RECHNUNG' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')}
+                        ? (isInf ? 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')) 
+                        : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))}
                     </strong>
                     <span style={{ color: '#64748b', fontWeight: 700 }}>Nr. {selectedInvoice.id}</span>
                   </div>
@@ -23595,7 +23565,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: dynamicTdPadding }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Plattform-Lizenz 100% kostenlos</span>
+                            <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
                           </td>
                           <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                             {selectedInvoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
@@ -23686,6 +23656,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
                             <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                               Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = 0,40 € / Mo. für {selectedInvoice.restmonate || 12} Restmonate)
+                              {studentBillingOption === 'option3_2' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
+                              {studentBillingOption === 'option3_3' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
                             </span>
                           </td>
                           <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
@@ -23715,8 +23687,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       )}
                       {isAkt && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                          <span>• Durchlaufender Posten (Umlage an Schüler):</span>
-                          <span style={{ fontWeight: 650, color: '#16a34a' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                          <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Aktivierungen (Träger):'}</span>
+                          <span style={{ fontWeight: 650, color: billingPayer === 'student' ? '#16a34a' : '#ea580c' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
                         </div>
                       )}
                       <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
@@ -23725,9 +23697,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
                       </div>
                     </div>
-                    {isAkt && (
+                    {isAkt && billingPayer === 'student' && (
                       <div style={{ fontSize: '0.64rem', color: '#16a34a', background: '#d1fae5', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
                         💡 <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Aktivierungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
+                      </div>
+                    )}
+                    {isAkt && billingPayer === 'school' && (
+                      <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                        💡 <strong>Sammelabrechnung:</strong> Diese Aktivierungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
                       </div>
                     )}
                     <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>

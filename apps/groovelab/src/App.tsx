@@ -148,28 +148,30 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
 
   let displaySrc = src;
   const targetUser = user;
+  const role = (targetUser?.role || '').toLowerCase();
   
-  if (activePlat === 'campus') {
+  if (role === 'admin' || role === 'secretary') {
+    displaySrc = '/campus_login_hero.png';
+  } else if (activePlat === 'campus') {
     if (targetUser) {
-      const role = (targetUser.role || '').toLowerCase();
       if (role === 'student') {
-        if (targetUser.photo_url && targetUser.photo_url.includes('_avatar')) {
+        if (targetUser.photo_url && !targetUser.photo_url.includes('_avatar') && !targetUser.photo_url.includes('/avatars/')) {
           displaySrc = targetUser.photo_url;
         } else {
-          displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
+          displaySrc = '/avatar_ghost.jpg';
         }
-      } else if (role === 'teacher' || role === 'admin') {
-        displaySrc = getInstrumentAvatarUrl(targetUser.instrument);
+      } else if (role === 'teacher') {
+        if (targetUser.photo_url && !targetUser.photo_url.includes('_avatar') && !targetUser.photo_url.includes('/avatars/')) {
+          displaySrc = targetUser.photo_url;
+        } else {
+          displaySrc = '/avatar_ghost.jpg';
+        }
       }
     } else {
-      if (src && src.includes('_avatar')) {
-        displaySrc = src;
-      } else {
-        displaySrc = '/avatars/gitarre_avatar_new.png';
-      }
+      displaySrc = '/avatar_ghost.jpg';
     }
   } else {
-    // GrooveLab platform: strictly block instrument avatars and fall back to musician avatars
+    // GrooveLab platform: strictly block instrument avatars and fall back to student/musician avatars
     const isStudentAvatar = src && (
       src.includes('student_') ||
       src.includes('bandstyle_') ||

@@ -2096,6 +2096,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       schoolData.student_billing_option === 'both' ||
       schoolData.student_billing_option === 'debit' ||
       schoolData.student_billing_option === 'cash' ||
+      schoolData.student_billing_option === 'student_full' ||
+      schoolData.student_billing_option === 'student_partial' ||
       !schoolData.student_billing_option
     );
 

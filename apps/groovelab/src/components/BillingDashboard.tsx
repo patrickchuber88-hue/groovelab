@@ -59,6 +59,7 @@ interface PlatformSummary {
 
 export function BillingDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [dbInvoices, setDbInvoices] = useState<any[]>([]);
   const [summary, setSummary] = useState<PlatformSummary>({
     totalSchools: 0,
     totalActiveCampusUsers: 0,
@@ -154,6 +155,66 @@ export function BillingDashboard() {
   useEffect(() => {
     fetchBillingData();
   }, []);
+
+  const updateInvoiceStatus = async (invoiceId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status: newStatus })
+        .eq('id', invoiceId);
+      
+      if (error) throw error;
+      fetchBillingData();
+    } catch (err: any) {
+      alert("Fehler beim Aktualisieren des Status: " + err.message);
+    }
+  };
+
+  const createManualInvoice = async (schoolId: string) => {
+    const amountStr = prompt("Geben Sie den Rechnungsbetrag ein (z.B. 49,90):");
+    if (!amountStr) return;
+    const amount = parseFloat(amountStr.replace(',', '.'));
+    if (isNaN(amount)) return alert("Ungültiger Betrag!");
+
+    const title = prompt("Verwendungszweck / Name der Position:", "Manuelle Abrechnung / Korrektur");
+    if (!title) return;
+
+    try {
+      const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
+      const nextSeq = String((count || 0) + 1).padStart(4, '0');
+      const invoiceId = `INV-${new Date().getFullYear()}-${nextSeq}`;
+
+      const today = new Date().toISOString().split('T')[0];
+      const due = new Date();
+      due.setDate(due.getDate() + 14);
+      const dueDate = due.toISOString().split('T')[0];
+
+      const { error } = await supabase.from('invoices').insert({
+        id: invoiceId,
+        school_id: schoolId,
+        type: 'INF',
+        amount: amount,
+        status: 'open',
+        billing_date: today,
+        due_date: dueDate,
+        items: [
+          {
+            name: title,
+            quantity: 1,
+            unit: 'Pauschale',
+            unitPrice: amount,
+            amount: amount
+          }
+        ]
+      });
+
+      if (error) throw error;
+      alert("Rechnung erfolgreich angelegt: " + invoiceId);
+      fetchBillingData();
+    } catch (err: any) {
+      alert("Fehler beim Erstellen der Rechnung: " + err.message);
+    }
+  };
 
   const fetchBillingData = async () => {
     try {
@@ -315,6 +376,18 @@ export function BillingDashboard() {
       const totalB2CRevenue = calculatedInvoices.reduce((sum, inv) => sum + inv.b2cRevenue, 0);
       const totalTeachers = calculatedInvoices.reduce((sum, inv) => sum + inv.totalTeachers, 0);
       const totalStudents = calculatedInvoices.reduce((sum, inv) => sum + inv.totalStudents, 0);
+
+      // Fetch real invoices from DB
+      const { data: allInvoices, error: invoicesErr } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('billing_date', { ascending: false });
+      
+      if (!invoicesErr && allInvoices) {
+        setDbInvoices(allInvoices);
+      } else {
+        setDbInvoices([]);
+      }
 
       setInvoices(calculatedInvoices);
       setSummary({
@@ -526,7 +599,7 @@ export function BillingDashboard() {
       }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CreditCard style={{ color: '#10b981' }} size={32} /> Partner-Abrechnung &amp; Lizenzen
+            <CreditCard style={{ color: '#10b981' }} size={32} /> Partner-Abrechnung &amp; Aktivierungen
           </h2>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
             Globale Übersicht über alle B2B Schullizenz-Einnahmen und B2C Premium-Upgrades.
@@ -747,7 +820,7 @@ export function BillingDashboard() {
               <th style={{ width: '12%' }}>Abo-Status</th>
               <th style={{ width: '12%', textAlign: 'center' }}>Schüler (Gesamt)</th>
               <th style={{ width: '12%', textAlign: 'center' }}>Campus aktive User</th>
-              <th style={{ width: '12%', textAlign: 'right' }}>B2B Module + Lizenzen</th>
+              <th style={{ width: '12%', textAlign: 'right' }}>B2B Module + Aktivierungen</th>
               <th style={{ width: '12%', textAlign: 'right' }}>B2C App-Upgrades</th>
               <th style={{ width: '10%', textAlign: 'center' }}>Kontingent</th>
               <th style={{ width: '14%', textAlign: 'right', color: '#1e293b' }}>Gesamtbetrag (B2B)</th>
@@ -781,7 +854,7 @@ export function BillingDashboard() {
             ) : (
               filteredInvoices.map((inv) => {
                 const isExpanded = expandedSchoolId === inv.schoolId;
-                const schoolInvoices = getSchoolInvoices(inv.schoolId, inv.total);
+                const schoolInvoices = dbInvoices.filter(i => i.school_id === inv.schoolId);
                 
                 return (
                   <React.Fragment key={inv.schoolId}>
@@ -901,89 +974,84 @@ export function BillingDashboard() {
                               </h4>
                             </div>
                             
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              {schoolInvoices.map(invoice => (
-                                <div 
-                                  key={invoice.id} 
-                                  style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'space-between', 
-                                    padding: '12px 18px', 
-                                    backgroundColor: '#ffffff', 
-                                    borderRadius: '12px',
-                                    border: '1px solid rgba(15, 23, 42, 0.03)',
-                                    flexWrap: 'wrap',
-                                    gap: '12px'
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0f172a' }}>{invoice.id}</span>
-                                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{invoice.date}</span>
-                                    <span style={{ fontFamily: 'monospace', fontWeight: 850, color: '#334155' }}>
-                                      {invoice.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                    </span>
-                                  </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                              <button
+                                onClick={() => createManualInvoice(inv.schoolId)}
+                                style={{
+                                  backgroundColor: '#10b981',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '8px 16px',
+                                  borderRadius: '10px',
+                                  fontWeight: 800,
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.2s'
+                                }}
+                              >
+                                ➕ Manuelle Rechnung erstellen
+                              </button>
+                            </div>
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    {invoice.status === 'Vorschau' && (
-                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#d97706', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '4px 10px', borderRadius: '20px' }}>
-                                        Vorschau (fällig am Monatsende)
-                                      </span>
-                                    )}
-                                    {invoice.status === 'Versendet' && (
-                                      <>
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', padding: '4px 10px', borderRadius: '20px' }}>
-                                          Versendet (Offen)
-                                        </span>
-                                        <button
-                                          onClick={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
-                                          style={{
-                                            backgroundColor: '#10b981',
-                                            border: 'none',
-                                            color: '#ffffff',
-                                            borderRadius: '8px',
-                                            padding: '6px 12px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            transition: 'background 0.2s'
-                                          }}
-                                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                                        >
-                                          ✓ Bezahlt
-                                        </button>
-                                      </>
-                                    )}
-                                    {invoice.status === 'Bezahlt' && (
-                                      <>
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', backgroundColor: '#ecfdf5', border: '1px solid #d1fae5', padding: '4px 10px', borderRadius: '20px' }}>
-                                          Bezahlt
-                                        </span>
-                                        <button
-                                          onClick={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
-                                          style={{
-                                            backgroundColor: '#f1f5f9',
-                                            border: 'none',
-                                            color: '#475569',
-                                            borderRadius: '8px',
-                                            padding: '6px 12px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            transition: 'background 0.2s'
-                                          }}
-                                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                                        >
-                                          Auf Offen setzen
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {schoolInvoices.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.8rem', padding: '16px 0' }}>
+                                  Keine Rechnungen in der Datenbank vorhanden.
                                 </div>
-                              ))}
+                              ) : schoolInvoices.map(invoice => {
+                                const statusMapLabel = {
+                                  'open': 'Offen',
+                                  'paid': 'Bezahlt',
+                                  'overdue': 'Überfällig',
+                                  'cancelled': 'Storniert'
+                                };
+                                return (
+                                  <div 
+                                    key={invoice.id} 
+                                    style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'space-between', 
+                                      padding: '12px 18px', 
+                                      backgroundColor: '#ffffff', 
+                                      borderRadius: '12px',
+                                      border: '1px solid rgba(15, 23, 42, 0.03)',
+                                      flexWrap: 'wrap',
+                                      gap: '12px',
+                                      opacity: invoice.status === 'cancelled' ? 0.6 : 1
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+                                      <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0f172a' }}>{invoice.id}</span>
+                                      <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{invoice.billing_date}</span>
+                                      <span style={{ fontFamily: 'monospace', fontWeight: 850, color: '#334155' }}>
+                                        {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <select
+                                        value={invoice.status}
+                                        onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
+                                        style={{
+                                          padding: '4px 10px',
+                                          borderRadius: '20px',
+                                          border: '1px solid #cbd5e1',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          background: '#ffffff',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        <option value="open">Offen</option>
+                                        <option value="paid">Bezahlt</option>
+                                        <option value="overdue">Überfällig</option>
+                                        <option value="cancelled">Storniert</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </td>
