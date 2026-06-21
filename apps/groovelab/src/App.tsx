@@ -11,14 +11,15 @@ import { StudentDetailModal } from './components/StudentDetailModal';
 import { ContractEndPrompt } from './components/ContractEndPrompt';
 import { subscribeUserToPush } from './utils/webPush';
 
-import { TeacherDashboard } from './components/TeacherDashboard';
-import { AdminDashboard } from './components/AdminDashboard';
-import { MasterAdminDashboard } from './components/MasterAdminDashboard';
-import { SecretaryDashboard } from './components/SecretaryDashboard';
-import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
-import { EnsembleDashboard } from './components/EnsembleDashboard';
-import BandProfileContent from './components/BandProfileContent';
-import { ArtistGateway } from './components/ArtistGateway';
+const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const MasterAdminDashboard = lazy(() => import('./components/MasterAdminDashboard').then(module => ({ default: module.MasterAdminDashboard })));
+const SecretaryDashboard = lazy(() => import('./components/SecretaryDashboard').then(module => ({ default: module.SecretaryDashboard })));
+const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDashboard').then(module => ({ default: module.StudentAvatarDashboard })));
+const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').then(module => ({ default: module.EnsembleDashboard })));
+const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
+const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(module => ({ default: module.ArtistGateway })));
+
 import StudentRadarChart from './components/StudentRadarChart';
 import ConfettiModal from './components/ConfettiModal';
 import CampusDirectMessages from './components/CampusDirectMessages';
@@ -1551,6 +1552,29 @@ function getInitials(name: string): string {
     .join('')
     .toUpperCase();
 }
+
+const DashboardLoader = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '200px',
+    padding: '40px',
+    flexDirection: 'column',
+    gap: '16px'
+  }}>
+    <div className="animate-spin" style={{
+      width: '40px',
+      height: '40px',
+      border: '3px solid rgba(245, 158, 11, 0.1)',
+      borderTopColor: '#f59e0b',
+      borderRadius: '50%'
+    }}></div>
+    <div style={{ fontSize: '14px', fontWeight: 600, color: '#94a3b8', letterSpacing: '0.05em' }}>
+      Bereich wird geladen...
+    </div>
+  </div>
+);
 
 function App() {
   // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
@@ -5707,7 +5731,11 @@ function App() {
 
   // 2.5 MASTER ADMIN PORTAL BYPASS
   if (user.is_master_admin) {
-    return <MasterAdminDashboard onLogout={handleLogout} />;
+    return (
+      <Suspense fallback={<DashboardLoader />}>
+        <MasterAdminDashboard onLogout={handleLogout} />
+      </Suspense>
+    );
   }
 
   const handleSwitchActiveRole = async (newRole: string) => {
@@ -5727,12 +5755,14 @@ function App() {
   if (user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') {
     return (
       <ErrorBoundary>
-        <SecretaryDashboard 
-          schoolId={user.school_id} 
-          userId={user.id} 
-          onLogout={handleLogout} 
-          onRoleSwitched={handleSwitchActiveRole}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <SecretaryDashboard 
+            schoolId={user.school_id} 
+            userId={user.id} 
+            onLogout={handleLogout} 
+            onRoleSwitched={handleSwitchActiveRole}
+          />
+        </Suspense>
       </ErrorBoundary>
     );
   }
@@ -7432,11 +7462,13 @@ function App() {
         {/* Ensemble & Bands Platform View */}
         {activePlatform === 'ensembles' && (
           <ErrorBoundary>
-            <EnsembleDashboard 
-              user={user}
-              schoolId={user.school_id}
-              supabase={supabase}
-            />
+            <Suspense fallback={<DashboardLoader />}>
+              <EnsembleDashboard 
+                user={user}
+                schoolId={user.school_id}
+                supabase={supabase}
+              />
+            </Suspense>
           </ErrorBoundary>
         )}
 
@@ -7451,41 +7483,43 @@ function App() {
           }}>
             <ErrorBoundary>
               <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
-                <TeacherDashboard 
-                  key="student-live-dashboard"
-                  userId={user.id} 
-                  hideHeader={true} 
-                  viewMode="student" 
-                  onTabChange={setActiveStudentTab}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  setIsSidebarCollapsed={setIsSidebarCollapsed}
-                  onSidebarNotificationsChange={setSidebarNotificationsCount}
-                  activePlatform="groovelab"
-                  session={session}
-                  onSessionChange={setSession}
-                  locationMode={locationMode}
-                  onLocationModeChange={(mode) => {
-                    setLocationMode(mode);
-                    sessionStorage.setItem('groovelab_location_mode', mode);
-                  }}
-                  onSwitchPlatform={(newPlatform) => {
-                    setActivePlatform(newPlatform);
-                    setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
-                  }}
-                  onFoundBand={(form, mySlot) => {
-                    console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
-                    setSuggestingSkill({
-                      ...mySlot,
-                      isLeader: true,
-                      leaderName: 'Du',
-                      song_id: form.song?.id || form.song_id,
-                      songs: { id: form.song?.id || form.song_id, title: form.song?.title },
-                      formation_group: form.groupKey || form.id,
-                      members: form.members
-                    });
-                    setFoundingName(generateRandomBandName());
-                  }}
-                />
+                <Suspense fallback={<DashboardLoader />}>
+                  <TeacherDashboard 
+                    key="student-live-dashboard"
+                    userId={user.id} 
+                    hideHeader={true} 
+                    viewMode="student" 
+                    onTabChange={setActiveStudentTab}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    setIsSidebarCollapsed={setIsSidebarCollapsed}
+                    onSidebarNotificationsChange={setSidebarNotificationsCount}
+                    activePlatform="groovelab"
+                    session={session}
+                    onSessionChange={setSession}
+                    locationMode={locationMode}
+                    onLocationModeChange={(mode) => {
+                      setLocationMode(mode);
+                      sessionStorage.setItem('groovelab_location_mode', mode);
+                    }}
+                    onSwitchPlatform={(newPlatform) => {
+                      setActivePlatform(newPlatform);
+                      setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
+                    }}
+                    onFoundBand={(form, mySlot) => {
+                      console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
+                      setSuggestingSkill({
+                        ...mySlot,
+                        isLeader: true,
+                        leaderName: 'Du',
+                        song_id: form.song?.id || form.song_id,
+                        songs: { id: form.song?.id || form.song_id, title: form.song?.title },
+                        formation_group: form.groupKey || form.id,
+                        members: form.members
+                      });
+                      setFoundingName(generateRandomBandName());
+                    }}
+                  />
+                </Suspense>
               </div>
             </ErrorBoundary>
           </div>
@@ -7498,14 +7532,16 @@ function App() {
             width: '100%'
           }}>
             <ErrorBoundary>
-              <StudentAvatarDashboard 
-                studentId={user.id} 
-                parentActiveTab={activeStudentTab}
-                onTabChange={(tab) => setActiveStudentTab(tab)}
-                onProfileUpdate={(updatedFields: any) => {
-                  setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
-                }}
-              />
+              <Suspense fallback={<DashboardLoader />}>
+                <StudentAvatarDashboard 
+                  studentId={user.id} 
+                  parentActiveTab={activeStudentTab}
+                  onTabChange={(tab) => setActiveStudentTab(tab)}
+                  onProfileUpdate={(updatedFields: any) => {
+                    setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
+                  }}
+                />
+              </Suspense>
             </ErrorBoundary>
           </div>
         )}
@@ -12957,25 +12993,27 @@ function App() {
         </div>
       )}
       {/* Artist Gateway Modal */}
-      <ArtistGateway 
-        show={!!selectedBandForGateway || !!pendingFounding} 
-        onClose={() => {
-gatewayJustClosed.current = true;
-          setSelectedBandForGateway(null);
-          setPendingFounding(null);
-          clearConfetti();
-          if (user) {
-            fetchDashboardData(user.id, false);
-          }
-          setTimeout(() => {
-            gatewayJustClosed.current = false;
-          }, 3000);
-        }}
-        user={user}
-        pendingFounding={pendingFounding}
-        selectedBandForGateway={selectedBandForGateway}
-        APP_INSTRUMENT_ICONS={APP_INSTRUMENT_ICONS}
-      />
+      <Suspense fallback={null}>
+        <ArtistGateway 
+          show={!!selectedBandForGateway || !!pendingFounding} 
+          onClose={() => {
+  gatewayJustClosed.current = true;
+            setSelectedBandForGateway(null);
+            setPendingFounding(null);
+            clearConfetti();
+            if (user) {
+              fetchDashboardData(user.id, false);
+            }
+            setTimeout(() => {
+              gatewayJustClosed.current = false;
+            }, 3000);
+          }}
+          user={user}
+          pendingFounding={pendingFounding}
+          selectedBandForGateway={selectedBandForGateway}
+          APP_INSTRUMENT_ICONS={APP_INSTRUMENT_ICONS}
+        />
+      </Suspense>
     </div>
   </div>
 );

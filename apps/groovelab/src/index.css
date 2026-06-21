@@ -1081,6 +1081,36 @@ button, a, [role="button"], [onClick] {
   opacity: 0.95 !important;
 }
 
+/* ── Premium Micro-Animations & Skeleton Loaders ── */
+.hover-scale {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease-in-out !important;
+}
+.hover-scale:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+}
+
+.hover-scale-mini {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.hover-scale-mini:hover {
+  transform: scale(1.03) !important;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    background-color: rgba(241, 245, 249, 0.6);
+  }
+  50% {
+    background-color: rgba(226, 232, 240, 0.8);
+  }
+}
+
+.skeleton-loading {
+  animation: skeleton-pulse 1.5s infinite ease-in-out;
+  border-radius: 4px;
+}
+
 /* Player Seek Slider touch target optimization */
 .player-seek-slider {
   -webkit-appearance: none;

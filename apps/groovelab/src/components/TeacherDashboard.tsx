@@ -1719,7 +1719,7 @@ export function TeacherDashboard({
       if (occurrenceIdsToCancel.size > 0) {
         await supabase
           .from('schedule_occurrences')
-          .update({ status: 'canceled_by_teacher_sick' })
+          .update({ status: 'cancelled' })
           .in('id', Array.from(occurrenceIdsToCancel));
       }
 
@@ -1738,7 +1738,7 @@ export function TeacherDashboard({
           .from('schedule_occurrences')
           .update({ status: 'rescheduled_confirmed' })
           .in('id', Array.from(occurrenceIdsToRestore))
-          .eq('status', 'canceled_by_teacher_sick');
+          .eq('status', 'cancelled');
       }
 
       // Insert new crisis notifications
@@ -1918,7 +1918,7 @@ export function TeacherDashboard({
           .from('schedule_occurrences')
           .update({ status: 'rescheduled_confirmed' })
           .in('id', Array.from(occurrenceIdsToRestore))
-          .eq('status', 'canceled_by_teacher_sick');
+          .eq('status', 'cancelled');
       }
 
       // Instead of deleting future notifications, mark them as reinstated so students get notified

@@ -106,6 +106,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [selectedStudentNote, setSelectedStudentNote] = useState<string | null>(null);
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+  const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
 
   useEffect(() => {
     if (toast) {
@@ -379,6 +380,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .from('schedules')
         .select('*, student:users!schedules_student_id_fkey(*)')
         .eq('teacher_id', selectedTeacherId);
+
+      // Fetch other teachers' schedules for room conflict checking
+      const { data: otherSchedData } = await supabase
+        .from('schedules')
+        .select('*, student:users!schedules_student_id_fkey(first_name, last_name), teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+        .eq('school_id', schoolId)
+        .neq('teacher_id', selectedTeacherId);
+      setOtherTeachersSchedules(otherSchedData || []);
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
@@ -2381,49 +2390,119 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
                         
-                        const cardBg = isInsideWunsch
-                          ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)'
-                          : (isSelected 
-                              ? 'rgba(0, 122, 255, 0.08)' 
-                              : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)'));
+                        // Check teacher double booking:
+                        // Does this teacher teach another student at the same time in another room on the same day?
+                        let teacherConflictStudentName = '';
+                        let teacherConflictRoomName = '';
+                        if (bs.assignedTime) {
+                          const [sh, sm] = bs.assignedTime.split(':').map(Number);
+                          const startMin = sh * 60 + sm;
+                          const endMin = startMin + bs.duration;
 
-                        const cardBorder = isInsideWunsch
-                          ? '1px solid rgba(16, 185, 129, 0.3)'
-                          : (isSelected 
-                              ? '1.5px solid #007aff' 
-                              : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)'));
+                          boards.forEach(ob => {
+                            if (ob.dayOfWeek === board.dayOfWeek && ob.id !== board.id) {
+                              ob.students.forEach(obs => {
+                                if (!obs.isBreak && obs.assignedTime) {
+                                  const [osh, osm] = obs.assignedTime.split(':').map(Number);
+                                  const oStart = osh * 60 + osm;
+                                  const oEnd = oStart + obs.duration;
+                                  if (startMin < oEnd && endMin > oStart) {
+                                    teacherConflictStudentName = `${obs.first_name} ${obs.last_name}`;
+                                    const r = rooms.find(room => room.id === ob.roomId);
+                                    teacherConflictRoomName = r ? r.name : 'Anderer Raum';
+                                  }
+                                }
+                              });
+                            }
+                          });
+                        }
 
-                        const cardBorderLeft = isInsideWunsch
-                          ? '4px solid #064e3b'
-                          : (isSelected 
-                              ? '4px solid #007aff' 
-                              : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6'));
+                        // Check room conflict with OTHER teachers:
+                        // Does another teacher have a scheduled lesson in this room at this time on this day?
+                        let roomConflictTeacherName = '';
+                        let roomConflictStudentName = '';
+                        if (board.roomId && bs.assignedTime && otherTeachersSchedules.length > 0) {
+                          const [sh, sm] = bs.assignedTime.split(':').map(Number);
+                          const startMin = sh * 60 + sm;
+                          const endMin = startMin + bs.duration;
 
-                        const textColor = isInsideWunsch
-                          ? '#ffffff'
-                          : (isSelected 
-                              ? '#007aff' 
-                              : (isSubmitted ? '#065f46' : '#1e3a8a'));
+                          otherTeachersSchedules.forEach(os => {
+                            if (os.day_of_week === board.dayOfWeek && os.room_id === board.roomId && os.time_slot) {
+                              const [osh, osm] = os.time_slot.split(':').map(Number);
+                              const oStart = osh * 60 + osm;
+                              const oEnd = oStart + (os.duration || 45);
+                              if (startMin < oEnd && endMin > oStart) {
+                                roomConflictTeacherName = os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer';
+                                roomConflictStudentName = os.student ? `${os.student.first_name} ${os.student.last_name}` : 'Schüler';
+                              }
+                            }
+                          });
+                        }
 
-                        const badgeBg = isInsideWunsch
-                          ? 'rgba(255, 255, 255, 0.2)'
-                          : (isSelected 
-                              ? 'rgba(0, 122, 255, 0.08)' 
-                              : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)'));
+                        const isTeacherConflict = teacherConflictStudentName !== '';
+                        const isRoomConflict = roomConflictTeacherName !== '';
+                        const hasConflict = isTeacherConflict || isRoomConflict;
+                        const conflictMsg = isTeacherConflict
+                          ? `Doppelbelegung Lehrkraft: Zeitgleich mit ${teacherConflictStudentName} in ${teacherConflictRoomName}`
+                          : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`;
 
-                        const badgeColor = isInsideWunsch
-                          ? '#ffffff'
-                          : (isSelected 
-                              ? '#007aff' 
-                              : (isSubmitted ? '#047857' : '#1d4ed8'));
+                        const cardBg = hasConflict
+                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                          : (isInsideWunsch
+                              ? '#064e3b'
+                              : (isSelected 
+                                  ? 'rgba(0, 122, 255, 0.08)' 
+                                  : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)')));
+
+                        const cardBorder = hasConflict
+                          ? '1.5px solid #ef4444'
+                          : (isInsideWunsch
+                              ? '1px solid #047857'
+                              : (isSelected 
+                                  ? '1.5px solid #007aff' 
+                                  : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)')));
+
+                        const cardBorderLeft = hasConflict
+                          ? '4px solid #dc2626'
+                          : (isInsideWunsch
+                              ? '4px solid #10b981'
+                              : (isSelected 
+                                  ? '4px solid #007aff' 
+                                  : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6')));
+
+                        const textColor = hasConflict
+                          ? '#991b1b'
+                          : (isInsideWunsch
+                              ? '#ffffff'
+                              : (isSelected 
+                                  ? '#007aff' 
+                                  : (isSubmitted ? '#065f46' : '#1e3a8a')));
+
+                        const badgeBg = hasConflict
+                          ? 'rgba(239, 68, 68, 0.1)'
+                          : (isInsideWunsch
+                              ? 'rgba(255, 255, 255, 0.2)'
+                              : (isSelected 
+                                  ? 'rgba(0, 122, 255, 0.08)' 
+                                  : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)')));
+
+                        const badgeColor = hasConflict
+                          ? '#ef4444'
+                          : (isInsideWunsch
+                              ? '#ffffff'
+                              : (isSelected 
+                                  ? '#007aff' 
+                                  : (isSubmitted ? '#047857' : '#1d4ed8')));
 
                         const shadowColor = isSubmitted ? 'rgba(16,185,129,0.06)' : 'rgba(59,130,246,0.06)';
                         const shadowHoverColor = isSubmitted ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)';
-                        const cardShadow = isInsideWunsch
-                          ? '0 6px 16px rgba(16, 185, 129, 0.25)'
-                          : (isSelected 
-                              ? '0 0 10px rgba(0, 122, 255, 0.25)' 
-                              : `0 2px 6px ${shadowColor}`);
+                        const cardShadow = hasConflict
+                          ? '0 4px 10px rgba(239, 68, 68, 0.15)'
+                          : (isInsideWunsch
+                              ? '0 6px 16px rgba(16, 185, 129, 0.25)'
+                              : (isSelected 
+                                  ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                                  : `0 2px 6px ${shadowColor}`));
 
                         return (
                           <div
@@ -2444,7 +2523,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
-                              zIndex: selectedStudentId !== null ? (isSelected ? 4 : 1) : 2,
+                              zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
                               opacity: selectedStudentId !== null ? (isSelected ? 1 : 0.8) : 1,
                               filter: 'none',
                               pointerEvents: 'auto',
@@ -2455,23 +2534,28 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           onMouseOver={e => {
                             if (!isSelected) {
-                              e.currentTarget.style.boxShadow = `0 4px 14px ${shadowHoverColor}`;
+                              e.currentTarget.style.boxShadow = hasConflict ? '0 4px 14px rgba(239,68,68,0.25)' : `0 4px 14px ${shadowHoverColor}`;
                             }
                           }}
                           onMouseOut={e => {
                             if (!isSelected) {
-                              e.currentTarget.style.boxShadow = `0 2px 6px ${shadowColor}`;
+                              e.currentTarget.style.boxShadow = cardShadow;
                             }
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor }}>{bs.assignedTime}</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              {hasConflict && (
+                                <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
+                              )}
+                              {bs.assignedTime}
+                            </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
                               <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
                                 style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = textColor; }}
+                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
                                 title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
                             </div>
                           </div>
@@ -2479,11 +2563,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {bs.first_name} {bs.last_name}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (isSubmitted ? '#047857' : '#2563eb'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#047857' : '#2563eb')), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
-                          </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
                     </div>
 
                     {/* Column summary */}

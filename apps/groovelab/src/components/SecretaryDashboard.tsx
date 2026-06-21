@@ -2541,6 +2541,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
       if (usersErr) throw usersErr;
 
+      // Fetch contract statuses for all students
+      const { data: studentsDb } = await supabase
+        .from('students')
+        .select('id, status')
+        .eq('school_id', schoolId);
+
+      const statusMap: Record<string, string> = {};
+      studentsDb?.forEach(st => {
+        statusMap[st.id] = st.status;
+      });
+
       // Fetch pending students (only in anonymized tables)
       const { data: pendingStudents } = await supabase
         .from('pending_students_decrypted')
@@ -2601,7 +2612,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         if (u.role === 'student') {
           studentsList.push({
             ...u,
-            day_of_birth: activationDaysMap[u.id] || null
+            day_of_birth: activationDaysMap[u.id] || null,
+            status: statusMap[u.id] || 'aktiv'
           });
         }
 
@@ -3147,6 +3159,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
+  const handleArchiveAllResolvedTickets = async (ticketIds: string[]) => {
+    // Optimistic UI update
+    setCrisisNotifications(prev =>
+      prev.map(n => ticketIds.includes(n.id) ? { ...n, status: 'ARCHIVED' } : n)
+    );
+    try {
+      await supabase
+        .from('crisis_notifications')
+        .update({ status: 'ARCHIVED' })
+        .in('id', ticketIds);
+    } catch (err: any) {
+      console.error('Error bulk archiving resolved tickets:', err);
+    }
+  };
+
   const handleEndSickOnBehalf = async (teacherId: string, teacherName: string) => {
     try {
       const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich gesund melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
@@ -3241,14 +3268,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           .from('schedule_occurrences')
           .update({ status: 'rescheduled_confirmed' })
           .in('id', Array.from(occurrenceIdsToRestore))
-          .eq('status', 'canceled_by_teacher_sick');
+          .eq('status', 'cancelled');
       }
 
-      // Delete future notifications
+      // Re-enable and mark future notifications as reinstated for students instead of deleting them
       if (datesToDeleteNotifs.length > 0) {
         await supabase
           .from('crisis_notifications')
-          .delete()
+          .update({ is_reinstated: true, status: 'UNREAD' })
           .eq('teacher_id', teacherId)
           .in('slot_start_datetime', datesToDeleteNotifs);
       }
@@ -6200,12 +6227,67 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             </span>
                           )}
                         </div>
-                        <div style={{ width: '65px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                          {(student.is_campus_active || student.is_groovelab_active) ? (
-                            <span title="Aktiv"><CheckCircle size={18} style={{ color: '#34a853' }} /></span>
-                          ) : (
-                            <span title="Inaktiv"><Clock size={18} style={{ color: '#86868b' }} /></span>
-                          )}
+                        <div style={{ width: '90px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                          {(() => {
+                            const status = student.isPendingOnboarding ? 'ausstehend' : (student.status || 'aktiv');
+                            if (status === 'aktiv') {
+                              return (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  background: '#e2f6ea',
+                                  color: '#137333',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>Aktiv</span>
+                              );
+                            } else if (status === 'pausiert') {
+                              return (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  background: '#fff3e0',
+                                  color: '#e65100',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>Pausiert</span>
+                              );
+                            } else if (status === 'passiv') {
+                              return (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  background: '#f1f5f9',
+                                  color: '#475569',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>Passiv</span>
+                              );
+                            } else {
+                              return (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>Ausstehend</span>
+                              );
+                            }
+                          })()}
                         </div>
                         <span style={{
                           fontSize: '0.74rem',
@@ -9115,7 +9197,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         </div>
 
         {/* Profile Info at bottom of sidebar */}
-        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #d1fae5' : '1px solid #fef3c7', paddingTop: '20px' }}>
+        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #d1fae5' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
           <div 
             onClick={() => {
               if (activeTab === 'secretary') setSecretarySubTab('briefing');
@@ -9130,7 +9212,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               borderRadius: '16px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#ecfdf5' : '#fffbeb') : 'transparent',
+              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#ecfdf5' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : 'transparent',
               marginBottom: '8px'
             }}
           >
@@ -10987,26 +11069,49 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       </div>
                     </div>
 
-                    {/* Live / Archiv toggle */}
-                    <div style={{
-                      display: 'flex', background: 'rgba(15, 23, 42, 0.04)', borderRadius: '14px',
-                      padding: '4px', gap: '4px', border: '1px solid rgba(0, 0, 0, 0.03)',
-                      backdropFilter: 'blur(8px)'
-                    }}>
-                      {([['live', 'Aktive Fälle'], ['history', 'Historie & Archiv']] as const).map(([mode, label]) => (
+                    {/* Tab Controls and Actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {crisisTabMode === 'live' && liveTickets.filter(n => getUrgency(n) === 'GREEN').length > 0 && (
                         <button
-                          key={mode}
-                          onClick={() => setCrisisTabMode(mode)}
-                          style={{
-                            padding: '8px 18px', borderRadius: '10px', border: 'none',
-                            fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                            fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            background: crisisTabMode === mode ? 'white' : 'transparent',
-                            color: crisisTabMode === mode ? '#0f172a' : '#64748b',
-                            boxShadow: crisisTabMode === mode ? '0 4px 12px rgba(15, 23, 42, 0.08)' : 'none',
+                          onClick={() => {
+                            const greenIds = liveTickets.filter(n => getUrgency(n) === 'GREEN').map(t => t.id);
+                            handleArchiveAllResolvedTickets(greenIds);
                           }}
-                        >{label}</button>
-                      ))}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            background: 'rgba(16, 185, 129, 0.08)', border: '1.5px solid rgba(16, 185, 129, 0.25)',
+                            color: '#10b981', borderRadius: '14px', padding: '8px 16px',
+                            fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                            fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'; }}
+                        >
+                          🧹 {liveTickets.filter(n => getUrgency(n) === 'GREEN').length} erledigte Ausfälle archivieren
+                        </button>
+                      )}
+
+                      {/* Live / Archiv toggle */}
+                      <div style={{
+                        display: 'flex', background: 'rgba(15, 23, 42, 0.04)', borderRadius: '14px',
+                        padding: '4px', gap: '4px', border: '1px solid rgba(0, 0, 0, 0.03)',
+                        backdropFilter: 'blur(8px)'
+                      }}>
+                        {([['live', 'Aktive Fälle'], ['history', 'Historie & Archiv']] as const).map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            onClick={() => setCrisisTabMode(mode)}
+                            style={{
+                              padding: '8px 18px', borderRadius: '10px', border: 'none',
+                              fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                              fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              background: crisisTabMode === mode ? 'white' : 'transparent',
+                              color: crisisTabMode === mode ? '#0f172a' : '#64748b',
+                              boxShadow: crisisTabMode === mode ? '0 4px 12px rgba(15, 23, 42, 0.08)' : 'none',
+                            }}
+                          >{label}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -19581,6 +19686,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </div>
                                 );
                               })()}
+                            </div>
+                          </div>
+
+                          {/* SEPA Transaktionshistorie */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                            <h4 style={{ margin: '0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#1e293b' }}>SEPA-Lastschrift &amp; Transaktionsstatus</h4>
+                            <div style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px', background: '#ffffff', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)' }}>
+                              <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748b' }}>
+                                Der Einzug der Beträge erfolgt automatisch über das hinterlegte SEPA-Lastschriftmandat (IBAN: DE89 •••• 1234, BIC: WELADED1XXX).
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {[
+                                  { id: 'TX-202606-001', type: 'B2B Infrastruktur & Lizenzen', date: '05. Juni 2026', amount: currentTotalB2B, status: 'Erfolgreich', desc: 'Monatlicher Lastschrifteinzug' },
+                                  activeStudentsCount_global > 0 && studentBillingOption === 'option2' && { id: 'TX-202606-002', type: 'B2C Umlage (Sammellastschrift)', date: '10. Juni 2026', amount: activeStudentsCount_global * 0.40, status: 'In Bearbeitung', desc: 'Monatsabrechnung Schülerumlage' }
+                                ].filter((x): x is any => !!x).map((tx: any) => (
+                                  <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '14px', background: '#f8fafc' }}>
+                                    <div>
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b', display: 'block' }}>{tx.type}</span>
+                                      <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Referenz: {tx.id} · Einzug am: {tx.date}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>{tx.amount.toFixed(2).replace('.', ',')} €</span>
+                                      <span style={{
+                                        fontSize: '0.62rem',
+                                        fontWeight: 800,
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        background: tx.status === 'Erfolgreich' ? '#d1fae5' : '#fff9db',
+                                        color: tx.status === 'Erfolgreich' ? '#065f46' : '#b45309'
+                                      }}>{tx.status}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>

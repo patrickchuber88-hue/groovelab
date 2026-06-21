@@ -2,7 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import jsQR from 'jsqr';
+
+let jsQRInstance: any = null;
+async function loadJSQR() {
+  if (!jsQRInstance) {
+    const mod = await import('jsqr');
+    jsQRInstance = mod.default || mod;
+  }
+  return jsQRInstance;
+}
 
 interface LoginScreenProps {
   onLogin: (userId: string, isHome?: boolean) => void;
@@ -24,6 +32,7 @@ function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScanne
 
   useEffect(() => {
     let active = true;
+    loadJSQR(); // Start loading/getting jsQR in background when scanner mounts
 
     async function startCamera() {
       try {
@@ -108,11 +117,13 @@ function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScanne
             canvas.height = 320;
             ctx.drawImage(video, 0, 0, 320, 320);
             const imageData = ctx.getImageData(0, 0, 320, 320);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: 'dontInvert'
-            });
-            if (code && code.data) {
-              onScan(code.data);
+            if (jsQRInstance) {
+              const code = jsQRInstance(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+              });
+              if (code && code.data) {
+                onScan(code.data);
+              }
             }
           }
         }
@@ -2080,7 +2091,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -2092,11 +2103,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
         ctx.drawImage(img, 0, 0, img.width, img.height);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        if (code) {
-          handleScan(code.data);
-        } else {
-          setError('Kein QR-Code im Bild gefunden. Bitte lade ein schärferes Foto hoch.');
+        
+        try {
+          const jsqrLib = await loadJSQR();
+          const code = jsqrLib(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            handleScan(code.data);
+          } else {
+            setError('Kein QR-Code im Bild gefunden. Bitte lade ein schärferes Foto hoch.');
+            setLoading(false);
+          }
+        } catch (err) {
+          setError('QR-Code-Bibliothek konnte nicht geladen werden.');
           setLoading(false);
         }
       };
@@ -2725,6 +2743,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src="/campus_login_hero.png" 
               alt="Campus Chalk Illustration"
+              fetchPriority="high"
               style={{
                 width: '100%',
                 height: '100%',
@@ -2795,6 +2814,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src={schoolData.logo_url} 
               alt="Logo" 
+              fetchPriority="high"
               style={{ 
                 maxHeight: '60px',
                 maxWidth: '100%',
