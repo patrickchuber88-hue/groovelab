@@ -1684,9 +1684,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
   const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? 9.99 : ((billedCampus_global ? 7.99 : 0) + (billedGroovelab_global ? 4.99 : 0));
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-  const studentLevyMonthly_global = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
+  const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.40 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
-  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49 + students.length * 0.09;
+  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
@@ -17223,12 +17223,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
                 const moduleCost = (billedCampus && billedGroovelab) ? 9.99 : ((billedCampus ? 7.99 : 0) + (billedGroovelab ? 4.99 : 0));
-                const studentLevyMonthly = studentBillingOption === 'option2' ? activeStudentsCount_global * 0.40 : 0;
+                const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.40 : 0;
                 const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
 
-                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + students.length * 0.09;
+                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
                 const studentSharePreview = 0;
-                const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
+                const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial';
                 
                 // Slider prospective change variables (Real-time preview)
                 const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.40 : 0);
@@ -17559,7 +17559,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <div 
                                   onClick={() => {
                                     setBillingPayer('student');
-                                    setStudentBillingOption('option1');
+                                    setStudentBillingOption('student_full');
+                                    setCustomUmlageAmount(0.49);
                                   }}
                                   className="selectable-card"
                                   style={{
@@ -17726,33 +17727,88 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <div style={{
                                   background: '#fffbeb',
                                   border: '1.5px solid #f59e0b',
-                                  borderRadius: '16px',
-                                  padding: '16px',
+                                  borderRadius: '20px',
+                                  padding: '20px',
                                   marginTop: '8px',
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  gap: '8px'
+                                  gap: '12px'
                                 }}>
-                                  <strong style={{ fontSize: '0.78rem', color: '#78350f' }}>Höhe der Umlage an Schüler/Eltern festlegen:</strong>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0.00"
-                                      value={customUmlageAmount}
-                                      onChange={(e) => setCustomUmlageAmount(Math.max(0, parseFloat(e.target.value) || 0))}
-                                      style={{
-                                        padding: '8px 12px',
-                                        borderRadius: '8px',
-                                        border: '1px solid #cbd5e1',
-                                        fontSize: '0.82rem',
-                                        width: '100px',
-                                        fontWeight: 800
-                                      }}
-                                    />
-                                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>€ / Schüler pro Monat (Jahresabrechnung: {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € pro Schüler)</span>
+                                  <strong style={{ fontSize: '0.82rem', color: '#78350f', fontFamily: 'Urbanist' }}>
+                                    Abrechnungsmodell für Schüler-Aktivierungen wählen:
+                                  </strong>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    
+                                    {/* Option 1: Vollständige Umlage (student_full) */}
+                                    <label style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '10px',
+                                      cursor: 'pointer',
+                                      background: '#ffffff',
+                                      border: '1.5px solid',
+                                      borderColor: studentBillingOption === 'student_full' ? '#f59e0b' : '#e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: studentBillingOption === 'student_full' ? '0 4px 12px rgba(245, 158, 11, 0.04)' : 'none'
+                                    }}>
+                                      <input
+                                        type="radio"
+                                        name="studentCampusBillingOption"
+                                        checked={studentBillingOption === 'student_full'}
+                                        onChange={() => {
+                                          setStudentBillingOption('student_full');
+                                          setCustomUmlageAmount(0.49);
+                                        }}
+                                        style={{ marginTop: '3px', accentColor: '#f59e0b' }}
+                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
+                                          1. Vollständige Umlage (Schüler zahlt 0,49 € / Monat)
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
+                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: 5,88 €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
+                                        </span>
+                                      </div>
+                                    </label>
+
+                                    {/* Option 2: Teilweise Umlage (student_partial) */}
+                                    <label style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '10px',
+                                      cursor: 'pointer',
+                                      background: '#ffffff',
+                                      border: '1.5px solid',
+                                      borderColor: studentBillingOption === 'student_partial' ? '#f59e0b' : '#e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: studentBillingOption === 'student_partial' ? '0 4px 12px rgba(245, 158, 11, 0.04)' : 'none'
+                                    }}>
+                                      <input
+                                        type="radio"
+                                        name="studentCampusBillingOption"
+                                        checked={studentBillingOption === 'student_partial'}
+                                        onChange={() => {
+                                          setStudentBillingOption('student_partial');
+                                          setCustomUmlageAmount(0.40);
+                                        }}
+                                        style={{ marginTop: '3px', accentColor: '#f59e0b' }}
+                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
+                                          2. Teilweise Umlage (Schüler zahlt 0,40 € / Monat, Schule zahlt 0,09 €)
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
+                                          Der Schüler/Eltern zahlen 0,40 € pro Monat (Jahresbeitrag: 4,80 €). Die Schule trägt weiterhin die passive Datenbankgebühr von 0,09 € pro Monat für diesen Schüler.
+                                        </span>
+                                      </div>
+                                    </label>
+
                                   </div>
-                                  <span style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4' }}>
+                                  <span style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px' }}>
                                     💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Umlage zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).
                                   </span>
                                 </div>
@@ -17987,7 +18043,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             // Invoice A: Fixkosten
                             const adminCost = employees.length * 0.49;
                             const teacherCost = allTeachers.length * 0.49;
-                            const passiveStudentCost = passiveStudents * 0.09;
+                            const passiveStudentCost = (billingPayer === 'student' && studentBillingOption === 'student_partial')
+                              ? (students.length * 0.09)
+                              : (passiveStudents * 0.09);
                             const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost;
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
@@ -18329,7 +18387,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           }}>
                             <div style={{ borderBottom: '1px solid #e9d5ff', paddingBottom: '12px' }}>
                               <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-ZUSAMMENFASSUNG</span>
-                            {activeStudentsCount_global > 0 && (
+                            {activeStudentsCount_global > 0 && billingPayer === 'student' && studentBillingOption === 'student_full' && (
                               <div style={{
                                 background: '#f0fdf4',
                                 border: '1px solid #10b981',
@@ -18379,8 +18437,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Schüler (0,09 € x {Math.max(0, students.length - activeStudentsCount_global)} passive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(Math.max(0, students.length - activeStudentsCount_global) * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                <span>Cloud-Datenbank &amp; Support Schüler (0,09 € x {(billingPayer === 'student' && studentBillingOption === 'student_partial') ? `${students.length} Profil(e)` : `${Math.max(0, students.length - activeStudentsCount_global)} passive Profile`}):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
