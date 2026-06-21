@@ -3986,63 +3986,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </p>
         </div>
 
-        {/* Filter Switcher */}
-        <div style={{
-          display: 'flex',
-          background: '#f1f5f9',
-          padding: '4px',
-          borderRadius: '12px',
-          gap: '4px'
-        }}>
-          <button
-            onClick={() => setEventFilter('all')}
-            style={{
-              flex: 1.2,
-              border: 'none',
-              background: eventFilter === 'all' ? '#ffffff' : 'transparent',
-              color: eventFilter === 'all' ? '#0f172a' : '#64748b',
-              padding: '8px 8px',
-              borderRadius: '8px',
-              fontWeight: 800,
-              fontSize: '0.72rem',
-              cursor: 'pointer'
-            }}
-          >
-            Alle Termine
-          </button>
-          <button
-            onClick={() => setEventFilter('subscribed')}
-            style={{
-              flex: 1.5,
-              border: 'none',
-              background: eventFilter === 'subscribed' ? '#ffffff' : 'transparent',
-              color: eventFilter === 'subscribed' ? '#0f172a' : '#64748b',
-              padding: '8px 8px',
-              borderRadius: '8px',
-              fontWeight: 800,
-              fontSize: '0.72rem',
-              cursor: 'pointer'
-            }}
-          >
-            Abonnierte Termine
-          </button>
-          <button
-            onClick={() => setEventFilter('custom')}
-            style={{
-              flex: 1.3,
-              border: 'none',
-              background: eventFilter === 'custom' ? '#ffffff' : 'transparent',
-              color: eventFilter === 'custom' ? '#0f172a' : '#64748b',
-              padding: '8px 8px',
-              borderRadius: '8px',
-              fontWeight: 800,
-              fontSize: '0.72rem',
-              cursor: 'pointer'
-            }}
-          >
-            Eigene Termine
-          </button>
-        </div>
+
 
         {/* Unified Timeline List */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '2px' }}>
