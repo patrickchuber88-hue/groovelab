@@ -17293,7 +17293,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Interaktives Band-Modul: Live-Lab-Board, Songs zum Meistern, automatisiertes Band-Matching-System, Bandprofile und Avatare.
+                                      Interaktives Band-Modul: Live-Lab-Board, Songs zum Meistern, automatisiertes Band-Matching-System, Bandprofile, Avatare, Übestreaks sowie Performance &amp; Highlights.
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
