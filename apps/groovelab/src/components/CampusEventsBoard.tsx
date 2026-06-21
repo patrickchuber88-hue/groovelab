@@ -2803,10 +2803,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return true;
     });
 
-    // Only show upcoming events including today or events whose period extends to/beyond today
+    // Only show upcoming events including today or events whose period extends to/beyond today, or if planning is active
     const upcomingEventsOnly = filteredByCategory.filter(ev => {
       const end = ev.event_end_date || ev.event_date;
-      return end >= todayStr;
+      return end >= todayStr || ev.is_planning_active;
     });
 
     // Only show future/recent events (sort chronologically)
