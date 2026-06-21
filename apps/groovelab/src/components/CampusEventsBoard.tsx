@@ -5764,15 +5764,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const renderTeacherPacklistTab = () => {
     const myPps = programPoints.filter(pp => pp.teacher_id === userId);
-    let totalChairs = 0;
-    let totalStands = 0;
-    const requirements: string[] = [];
+    const ownTechItems: { name: string; count: number; contributionName: string; notes?: string }[] = [];
 
     myPps.forEach(pp => {
-      totalChairs += pp.chairs_needed || 0;
-      totalStands += pp.music_stands_needed || 0;
       if (pp.tech_requirements) {
-        requirements.push(`${pp.name}: ${pp.tech_requirements}`);
+        try {
+          const cleaned = pp.tech_requirements.trim();
+          if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+            const items = JSON.parse(cleaned);
+            if (Array.isArray(items)) {
+              items.forEach((item: any) => {
+                if (item.source === 'own') {
+                  ownTechItems.push({
+                    name: item.type || 'Sonstiges',
+                    count: parseInt(item.count, 10) || 1,
+                    contributionName: pp.name,
+                    notes: item.notes
+                  });
+                }
+              });
+            }
+          } else if (cleaned) {
+            ownTechItems.push({
+              name: cleaned,
+              count: 1,
+              contributionName: pp.name
+            });
+          }
+        } catch (e) {
+          ownTechItems.push({
+            name: pp.tech_requirements,
+            count: 1,
+            contributionName: pp.name
+          });
+        }
       }
     });
 
@@ -5782,44 +5807,128 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           Persönliche Packliste
         </h3>
         <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
-          Zusammenfassung der benötigten Utensilien für deine Beiträge:
+          Hier siehst du, welches Equipment du für deine Beiträge selbst mitbringen musst:
         </p>
 
-        <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '18px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>🪑 Stühle gesamt</span>
-            <span style={{ fontWeight: 900, color: brandColor }}>{totalChairs} Stück</span>
+        <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '18px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Info Banner */}
+          <div style={{ display: 'flex', gap: '10px', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed rgba(59, 130, 246, 0.2)', padding: '12px 16px', borderRadius: '12px', fontSize: '0.78rem', color: '#1e3a8a', lineHeight: 1.4 }}>
+            <span>ℹ️</span>
+            <span>
+              <strong>Bereitgestellt vor Ort:</strong> Stühle, Notenständer, Standard-Mikrofone, Gesangsanlage (PA) sowie Standard-Bühnenverkabelung werden von der Musikschule bereitgestellt und müssen nicht mitgebracht werden.
+            </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>🎼 Notenständer gesamt</span>
-            <span style={{ fontWeight: 900, color: brandColor }}>{totalStands} Stück</span>
-          </div>
-          {requirements.length > 0 && (
-            <div>
-              <span style={{ fontWeight: 700, fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>🎸 Technisches Equipment</span>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {requirements.map((req, i) => <li key={i}>{req}</li>)}
+
+          <div>
+            <span style={{ fontWeight: 800, fontSize: '0.85rem', display: 'block', marginBottom: '8px', color: '#1e293b' }}>
+              🎸 Eigene Instrumente &amp; Zubehör (selbst mitzubringen):
+            </span>
+            {ownTechItems.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                Keine selbst mitzubringenden Instrumente oder Zubehörteile in den Beiträgen eingetragen.
+              </p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.82rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {ownTechItems.map((item, idx) => (
+                  <li key={idx} style={{ textAlign: 'left' }}>
+                    <strong>{item.count}x {item.name}</strong> für den Beitrag <em>{item.contributionName}</em>
+                    {item.notes ? ` (Hinweis: ${item.notes})` : ''}
+                  </li>
+                ))}
               </ul>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
   const renderTeacherSummaryTab = () => {
+    const activeEv = teacherSubmissionEvent;
+    if (!activeEv) return null;
+
+    const activeEventStartTime = activeEv.event_start_time || activeEv.start_time || '14:00';
+    const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+    const myPps = programPoints.filter(pp => pp.teacher_id === userId);
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
           Auftritts-Zusammenfassung
         </h3>
+        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+          Hier findest du deine eingereichten Beiträge und deren geplante Auftrittszeiten:
+        </p>
         
-        <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #cbd5e1' }}>
-          <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 12px 0' }}>{teacherSubmissionEvent.title}</h4>
-          <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-            📅 Datum: {formatDateGerman(teacherSubmissionEvent.event_date)}<br />
-            🕒 Startzeit: {teacherSubmissionEvent.start_time?.substring(0, 5) || '18:00'} Uhr<br />
-            🎭 Bühnen: {teacherSubmissionEvent.stage_count || 1} Bühnen
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {myPps.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', background: '#f8fafc', borderRadius: '18px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.8rem' }}>
+              Du hast noch keine Beiträge für dieses Event eingereicht.
+            </div>
+          ) : (
+            myPps.map(pp => {
+              const isScheduled = pp.is_scheduled;
+              const timeInfo = timeMap[pp.id];
+
+              return (
+                <div
+                  key={pp.id}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                      {pp.name}
+                    </h4>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: isScheduled ? '#dcfce7' : '#fef3c7',
+                      color: isScheduled ? '#15803d' : '#b45309'
+                    }}>
+                      {isScheduled ? 'Eingeteilt' : 'Wartet auf Einteilung'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '0.78rem', color: '#475569', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                    <div>
+                      <strong>⏱️ Dauer:</strong> {pp.duration || 0} Minuten
+                    </div>
+                    <div>
+                      <strong>🎭 Bühne:</strong> {isScheduled ? `Bühne ${pp.stage_number || 1}` : '—'}
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <strong>🕒 Auftrittszeit:</strong> {isScheduled && timeInfo ? (
+                        <span style={{ fontWeight: 800, color: brandColor, background: `${brandColor}08`, padding: '2px 6px', borderRadius: '4px' }}>
+                          {timeInfo.start} - {timeInfo.end} Uhr
+                        </span>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>Noch nicht im Zeitplan eingeteilt</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #cbd5e1', marginTop: '10px' }}>
+          <h4 style={{ fontSize: '0.88rem', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>Über das Event: {activeEv.title}</h4>
+          <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+            📅 Datum: {formatDateGerman(activeEv.event_date)}<br />
+            🕒 Startzeit: {activeEv.start_time?.substring(0, 5) || '18:00'} Uhr<br />
+            🎭 Bühnen gesamt: {activeEv.stage_count || 1}
           </p>
 
           <button
@@ -5832,8 +5941,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               borderRadius: '10px',
               fontWeight: 800,
               fontSize: '0.78rem',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#0f172a'; }}
           >
             🖨️ Programmübersicht drucken
           </button>

@@ -20,7 +20,7 @@ conn.on('ready', () => {
   // Create remote directory first
   conn.exec('mkdir -p /root/supabase-project/volumes/functions/ical-feed', (err, stream) => {
     if (err) throw err;
-
+    stream.resume();
     stream.on('close', (code) => {
       if (code !== 0) {
         console.error('Failed to create remote directory, exit code:', code);
