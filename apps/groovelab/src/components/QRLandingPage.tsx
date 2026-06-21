@@ -2869,79 +2869,81 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                  WEG 2: STUDENT_ONLY (Selbstnutzer)
                  ============================================================== */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {renderLessonInfoCard(lessonToday, isLessonDay)}
-                {renderSegmentedControl()}
+                {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay)}
+                {!timerRunning && renderSegmentedControl()}
                 {activeTab === 'action' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     
                     {/* Gamification Streak/XP Row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      {/* Streak flame */}
-                      <div style={{
-                        background: '#ffffff',
-                        border: '1px solid #e5e5ea',
-                        borderRadius: '20px',
-                        padding: '16px 14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                      }}>
+                    {!timerRunning && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        {/* Streak flame */}
                         <div style={{
+                          background: '#ffffff',
+                          border: '1px solid #e5e5ea',
+                          borderRadius: '20px',
+                          padding: '16px 14px',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: '#fff3cd'
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                         }}>
-                          <Flame size={18} color="#ff9500" fill="#ff9500" />
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: '#fff3cd'
+                          }}>
+                            <Flame size={18} color="#ff9500" fill="#ff9500" />
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
+                              {stats?.streak_flame || avatar?.streak_flame || 0} Tage
+                            </span>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                              Übungs-Streak
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
-                            {stats?.streak_flame || avatar?.streak_flame || 0} Tage
-                          </span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                            Übungs-Streak
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* XP points */}
-                      <div style={{
-                        background: '#ffffff',
-                        border: '1px solid #e5e5ea',
-                        borderRadius: '20px',
-                        padding: '16px 14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                      }}>
+                        {/* XP points */}
                         <div style={{
+                          background: '#ffffff',
+                          border: '1px solid #e5e5ea',
+                          borderRadius: '20px',
+                          padding: '16px 14px',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: '#e8f5e9'
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                         }}>
-                          <Sparkles size={18} color="#34c759" fill="#34c759" />
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
-                            {stats?.current_xp || 0} XP
-                          </span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                            Erfahrungspunkte
-                          </span>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: '#e8f5e9'
+                          }}>
+                            <Sparkles size={18} color="#34c759" fill="#34c759" />
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
+                              {stats?.current_xp || 0} XP
+                            </span>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                              Erfahrungspunkte
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Focus Timer Session UI */}
                     {practiceLoggedToday ? (
