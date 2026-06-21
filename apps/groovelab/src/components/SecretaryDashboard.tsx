@@ -17550,7 +17550,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', lineHeight: '1.35' }}>
-                                      Die Musikschule übernimmt alle Gebühren gesammelt. Für Eltern und Schüler ist die Nutzung komplett kostenfrei. Keine Umlage erforderlich.
+                                      Die Musikschule übernimmt alle Gebühren gesammelt. Für Eltern und Schüler ist die Nutzung komplett kostenfrei. Keine Direktabrechnung erforderlich.
                                     </span>
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
@@ -17584,7 +17584,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                       <strong style={{ fontSize: '0.88rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        👥 Kosten an Schüler/Eltern umlagen (mit Zahlungsüberwachung)
+                                        👥 Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)
                                       </strong>
                                       <span style={{
                                         width: '18px',
@@ -17768,7 +17768,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          1. Vollständige Umlage (Schüler zahlt 0,49 € / Monat)
+                                          1. Vollständige Direktabrechnung (Schüler zahlt 0,49 € / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
                                           Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: 5,88 €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
@@ -17802,7 +17802,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          2. Teilweise Umlage (Schüler zahlt 0,40 € / Monat, Schule zahlt 0,09 €)
+                                          2. Teilweise Direktabrechnung (Schüler zahlt 0,40 € / Monat, Schule zahlt 0,09 €)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
                                           Der Schüler/Eltern zahlen 0,40 € pro Monat (Jahresbeitrag: 4,80 €). Die Schule trägt weiterhin die passive Datenbankgebühr von 0,09 € pro Monat für diesen Schüler.
@@ -17812,8 +17812,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                                   </div>
                                   <div style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <span>💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Umlage zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).</span>
-                                    <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht auf Schüler/Eltern umgelegt werden können (Umlagen sind nur für das Campus-Modul möglich).</span>
+                                    <span>💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Direktabrechnung zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).</span>
+                                    <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
                                   </div>
                                 </div>
                               )}
@@ -18650,7 +18650,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <span style={{ fontSize: '0.74rem', color: isCancelled ? '#b45309' : '#15803d', fontWeight: 600 }}>
                                 {isCancelled 
                                   ? 'Dein Zugang bleibt bis zum Ende des Schuljahres am 31. August 2026 aktiv. Es erfolgen danach keine weiteren Abbuchungen.'
-                                  : 'Alle Module und Schüler-Umlagen sind verbindlich eingerichtet und aktiv gebucht.'}
+                                  : 'Alle Module und gewählten Abrechnungsarten sind verbindlich eingerichtet und aktiv gebucht.'}
                               </span>
                             </div>
                           </div>
