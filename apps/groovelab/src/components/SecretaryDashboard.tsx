@@ -17500,7 +17500,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Die Abrechnung läuft grundsätzlich über die Musikschule. Entscheide hier, wer die Kosten für die Schüleraktivierungen übernimmt.
                                   <span style={{ display: 'block', fontSize: '0.7rem', color: '#b45309', marginTop: '4px', fontWeight: 600 }}>
-                                    ⚠️ Hinweis: Umlagen betreffen nur die Basis-Profile. Aktivierungen für das Lernportal von <strong>Campus-Groovelab</strong> werden immer vollständig von der Musikschule getragen.
+                                    ⚠️ Hinweis: Aktivierungen können nur für das Campus-Modul auf Schüler/Eltern umgelegt werden. GrooveLab-Aktivierungen werden immer von der Schule getragen.
                                   </span>
                                 </p>
                               </div>
@@ -17813,7 +17813,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </div>
                                   <div style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <span>💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Umlage zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).</span>
-                                    <span>💡 <strong>Lernportal-Aktivierungen:</strong> Bitte beachte, dass zusätzliche Aktivierungen für das Lernportal von <strong>Campus-Groovelab</strong> immer vollständig von der Musikschule getragen werden und nicht auf die Schüler umgelegt werden können.</span>
+                                    <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht auf Schüler/Eltern umgelegt werden können (Umlagen sind nur für das Campus-Modul möglich).</span>
                                   </div>
                                 </div>
                               )}
