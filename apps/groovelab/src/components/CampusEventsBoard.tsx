@@ -2865,7 +2865,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     document.body.removeChild(link);
   };
 
-  // Export Excel (.xls XML with Style Metadata)
+  // Export Excel (.xls XML with Style Metadata in Apple style)
   const handleExportExcel = () => {
     const activeEv = secretaryPlanningEvent || selectedEvent;
     if (!activeEv) return;
@@ -2895,62 +2895,62 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
  xmlns:html="http://www.w3.org/TR/REC-html40">
  <Styles>
   <Style ss:ID="Default" ss:Name="Normal">
-   <Alignment ss:Vertical="Bottom"/>
+   <Alignment ss:Vertical="Center"/>
    <Borders/>
-   <Font ss:FontName="Segoe UI" x:CharSet="1" x:Family="Swiss" ss:Size="11" ss:Color="#1e293b"/>
+   <Font ss:FontName="-apple-system, Segoe UI" x:CharSet="1" x:Family="Swiss" ss:Size="10" ss:Color="#1d1d1f"/>
    <Interior/>
    <NumberFormat/>
    <Protection/>
   </Style>
   <Style ss:ID="Title">
    <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
-   <Font ss:FontName="Segoe UI" ss:Size="16" ss:Bold="1" ss:Color="#0F172A"/>
+   <Font ss:FontName="-apple-system, Segoe UI" ss:Size="15" ss:Bold="1" ss:Color="#1d1d1f"/>
   </Style>
   <Style ss:ID="Header">
    <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
    <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#cbd5e1"/>
    </Borders>
-   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
-   <Interior ss:Color="#0F172A" ss:Pattern="Solid"/>
+   <Font ss:FontName="-apple-system, Segoe UI" ss:Size="10" ss:Color="#1d1d1f" ss:Bold="1"/>
+   <Interior ss:Color="#f5f5f7" ss:Pattern="Solid"/>
   </Style>
   <Style ss:ID="RowEven">
    <Alignment ss:Vertical="Center" ss:WrapText="1"/>
    <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
    </Borders>
-   <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+   <Interior ss:Color="#ffffff" ss:Pattern="Solid"/>
   </Style>
   <Style ss:ID="RowOdd">
    <Alignment ss:Vertical="Center" ss:WrapText="1"/>
    <Borders>
-    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
-    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3e3e8"/>
    </Borders>
-   <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
+   <Interior ss:Color="#fbfbfc" ss:Pattern="Solid"/>
   </Style>
  </Styles>
  <Worksheet ss:Name="Programmablauf">
   <Table>
-   <Column ss:Width="140"/>
-   <Column ss:Width="140"/>
-   <Column ss:Width="200"/>
-   <Column ss:Width="80"/>
+   <Column ss:Width="150"/>
+   <Column ss:Width="150"/>
+   <Column ss:Width="210"/>
+   <Column ss:Width="75"/>
    <Column ss:Width="60"/>
-   <Column ss:Width="90"/>
+   <Column ss:Width="85"/>
    <Column ss:Width="220"/>
-   <Row ss:Height="35">
+   <Row ss:Height="30">
     <Cell ss:StyleID="Title" ss:MergeAcross="6"><Data ss:Type="String">${escapeXmlForExcel(activeEv.title)} - Programmliste</Data></Cell>
    </Row>
-   <Row ss:Height="26">
+   <Row ss:Height="24">
     <Cell ss:StyleID="Header"><Data ss:Type="String">Beitrag / Schüler</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Ensemble / Band</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Repertoire</Data></Cell>
@@ -3018,9 +3018,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <table>
           <thead>
             <tr>
-              <th style="width: 80px;">Zeit</th>
-              <th style="width: 220px;">Beitrag</th>
-              <th style="width: 220px;">Besetzung / Ensemble</th>
+              <th style="width: 100px;">Zeit</th>
+              <th style="width: 240px;">Beitrag</th>
+              <th style="width: 240px;">Besetzung / Ensemble</th>
               <th>Repertoire / Lieder</th>
             </tr>
           </thead>
@@ -3028,14 +3028,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             ${points.map(pp => {
               const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
               const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
-              const songsStr = songsList.map((song: any) => `<strong>${song.title}</strong>${song.artist ? ` (von ${song.artist})` : ''}`).join(', ');
+              const songsStr = songsList.map((song: any) => `<strong>${song.title}</strong>${song.artist ? ` <span style="font-weight:400; color:#86868b;">(${song.artist})</span>` : ''}`).join(', ');
 
               return `
               <tr class="${pp.is_pause ? 'row-pause' : ''}">
-                <td class="tabular-time">${timeInfo.start} - ${timeInfo.end}</td>
-                <td><strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong></td>
+                <td class="tabular-time">${timeInfo.start} &ndash; ${timeInfo.end}</td>
+                <td><span class="vertical-accent"></span><strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong></td>
                 <td>${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</td>
-                <td>${pp.is_pause ? 'Pause' : (songsStr || pp.instrument || '-')}</td>
+                <td>${pp.is_pause ? '<span class="pause-badge">Pause</span>' : (songsStr || pp.instrument || '-')}</td>
               </tr>
               `;
             }).join('')}
@@ -3053,89 +3053,113 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
           body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #0f172a;
-            margin: 40px;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            color: #1d1d1f;
+            margin: 50px 60px;
             background: #ffffff;
-            line-height: 1.5;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
           }
           .header {
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding-bottom: 24px;
+            margin-bottom: 40px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
           }
           .header h1 {
             margin: 0;
-            font-size: 2.2rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+            font-size: 2.6rem;
+            font-weight: 300;
+            letter-spacing: -0.04em;
+            color: #1d1d1f;
           }
           .header-meta {
             text-align: right;
-            font-size: 0.9rem;
-            color: #475569;
+            font-size: 0.82rem;
+            color: #86868b;
+            font-weight: 500;
+            line-height: 1.5;
           }
           .stage-section {
-            margin-bottom: 40px;
+            margin-bottom: 45px;
             page-break-inside: avoid;
           }
           .stage-section h2 {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #0f172a;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #86868b;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-left: 4px solid #0f172a;
-            padding-left: 10px;
+            letter-spacing: 0.08em;
           }
           table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
-            margin-top: 10px;
           }
           th {
-            background: #f8fafc;
-            border-bottom: 2px solid #cbd5e1;
-            padding: 10px 12px;
-            font-size: 0.72rem;
-            font-weight: 700;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 12px;
+            font-size: 0.68rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #475569;
+            color: #86868b;
           }
           td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #e2e8f0;
-            font-size: 0.85rem;
+            padding: 14px 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+            font-size: 0.84rem;
             vertical-align: top;
+            position: relative;
+          }
+          .vertical-accent {
+            position: absolute;
+            left: 0;
+            top: 14px;
+            bottom: 14px;
+            width: 3px;
+            background: #007aff;
+            border-radius: 2px;
+            display: none;
           }
           .tabular-time {
             font-variant-numeric: tabular-nums;
             font-weight: 600;
-            color: #0f172a;
+            color: #1d1d1f;
           }
           .row-pause {
-            background: #f8fafc;
+            background: #fffbeb;
           }
           .row-pause td {
-            color: #64748b;
-            font-style: italic;
+            color: #b45309;
+            border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+          }
+          .row-pause .vertical-accent {
+            display: block;
+            background: #f59e0b;
+          }
+          .pause-badge {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-weight: 700;
           }
           .footer {
-            margin-top: 50px;
+            margin-top: 60px;
             text-align: center;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 15px;
+            font-size: 0.72rem;
+            color: #86868b;
+            border-top: 1px solid rgba(0,0,0,0.06);
+            padding-top: 20px;
+            font-weight: 500;
           }
           @media print {
-            body { margin: 20px; }
+            body { margin: 20px 30px; }
             .no-print { display: none; }
           }
         </style>
@@ -3144,7 +3168,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div class="header">
           <div>
             <h1>Programmheft</h1>
-            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 5px; color: #475569;">${activeEv.title}</div>
+            <div style="font-size: 1.15rem; font-weight: 600; margin-top: 4px; color: #1d1d1f;">${activeEv.title}</div>
           </div>
           <div class="header-meta">
             <div>Datum: ${new Date(activeEv.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</div>
@@ -3172,7 +3196,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     printWindow.document.close();
   };
 
-  // Export Stage & Technical Rider PDF/Print
+  // Export Stage & Technical Rider PDF/Print (Apple-style iOS widgets and clean table)
   const handleExportTechRiderPDF = () => {
     const activeEv = secretaryPlanningEvent || selectedEvent;
     if (!activeEv) return;
@@ -3202,7 +3226,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       if (t.includes('e-piano') || t.includes('keyboard') || t === 'piano') return 'E-Piano / Keyboard';
       if (t.includes('a-gitarre') || t.includes('akustik')) return 'A-Gitarre';
       if (t.includes('e-gitarre') || t === 'gitarre') return 'E-Gitarre';
-      if (t.includes('schlagzeug') || t.includes('drumset')) return 'Schlagzeug-Set';
+      if (t.includes('schlagzeug') || t.includes('drumset') || t.includes('e-drum')) return 'Schlagzeug-Set';
       if (t.includes('trompete')) return 'Trompete';
       return type.trim();
     };
@@ -3254,39 +3278,59 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         } catch (e) {}
       }
 
-      const signalStr = techItems.length > 0 
-        ? techItems.map((item: any) => `${item.count}x ${item.type} (${item.connection})`).join('<br/>') 
-        : pp.tech_requirements || 'Kein spezieller Audiobedarf';
+      let signalHTML = '';
+      if (!pp.is_pause) {
+        if (techItems.length > 0) {
+          signalHTML = techItems.map((item: any) => {
+            const needsPhantom = item.connection?.toLowerCase().includes('+48') || item.type?.toLowerCase().includes('kondensator');
+            return `
+            <div class="tech-item-row">
+              <span class="tech-check-circle"></span>
+              <span style="font-weight: 550;">${item.count}x ${item.type}</span>
+              <span class="tech-conn-label">(${item.connection})</span>
+              ${needsPhantom ? '<span class="tech-p48-badge">+48V</span>' : ''}
+            </div>
+            `;
+          }).join('');
+        } else if (pp.tech_requirements) {
+          signalHTML = `<div class="tech-item-row"><span class="tech-check-circle"></span><span>${pp.tech_requirements}</span></div>`;
+        } else {
+          signalHTML = '<span style="color:#86868b; font-style:italic;">Kein spezieller Audiobedarf</span>';
+        }
+      } else {
+        signalHTML = '-';
+      }
 
       let changeoverHTML = '';
       if (deltaChairs !== 0 || deltaStands !== 0) {
         if (deltaChairs !== 0) changeoverHTML += `<span class="delta-pill ${deltaChairs > 0 ? 'pos' : 'neg'}">${deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} 🪑</span> `;
         if (deltaStands !== 0) changeoverHTML += `<span class="delta-pill ${deltaStands > 0 ? 'pos' : 'neg'}">${deltaStands > 0 ? `+${deltaStands}` : deltaStands} 🎼</span> `;
       } else {
-        changeoverHTML = '<span style="color:#94a3b8">-</span>';
+        changeoverHTML = '<span style="color:#86868b; font-size:0.75rem;">-</span>';
       }
 
       return `
       <tr class="${pp.is_pause ? 'row-pause' : ''}">
-        <td class="tabular-time">${timeInfo.start}<br/><span style="font-size:0.68rem; color:#64748b;">${timeInfo.end}</span></td>
+        <td class="tabular-time">${timeInfo.start}<br/><span style="font-size:0.68rem; color:#86868b; font-weight:400;">${timeInfo.end}</span></td>
         <td>
+          <span class="vertical-accent"></span>
           <strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong><br/>
-          <span style="font-size: 0.72rem; color: #64748b;">${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</span>
+          <span style="font-size: 0.72rem; color: #86868b;">${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</span>
         </td>
-        <td style="font-size: 0.75rem;">${pp.is_pause ? '-' : signalStr}</td>
-        <td style="font-size: 0.78rem;">
+        <td>${signalHTML}</td>
+        <td>
           <div style="font-weight: 600;">🪑 ${pp.chairs_needed || 0} &nbsp; 🎼 ${pp.music_stands_needed || 0}</div>
           <div style="margin-top: 4px;">${pp.is_pause ? '-' : changeoverHTML}</div>
         </td>
-        <td style="font-size:0.75rem; color:#475569;">${pp.remarks || '-'}</td>
+        <td style="font-size:0.75rem; color:#475569; font-weight:500;">${pp.remarks || '-'}</td>
       </tr>
       `;
     }).join('');
 
-    // Generate Audio Patch list HTML
+    // Generate Audio Patch list HTML (pill style)
     const audioPatchHTML = Object.entries(audioSetup).map(([name, count]) => `
       <span class="tech-patch-badge">🎙️ ${count}x ${name}</span>
-    `).join('') || '<span style="color:#64748b; font-style:italic;">Keine Audiobelegungen</span>';
+    `).join('') || '<span style="color:#86868b; font-style:italic;">Keine Audiobelegungen</span>';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -3296,61 +3340,66 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
           body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-            color: #0f172a;
-            margin: 30px;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            color: #1d1d1f;
+            margin: 40px;
             background: #ffffff;
             line-height: 1.4;
+            -webkit-font-smoothing: antialiased;
           }
           .header {
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 16px;
-            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
           }
           .header h1 {
             margin: 0;
-            font-size: 1.6rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: -0.03em;
+            color: #1d1d1f;
           }
           .header-meta {
             text-align: right;
-            font-size: 0.85rem;
-            color: #475569;
+            font-size: 0.82rem;
+            color: #86868b;
+            font-weight: 500;
           }
           .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
-            margin-bottom: 24px;
+            margin-bottom: 30px;
           }
           .stats-card {
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            padding: 14px;
-            background: #f8fafc;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 16px;
+            padding: 16px;
+            background: #f5f5f7;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.01);
           }
           .stats-card-title {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             font-weight: 700;
-            color: #64748b;
+            color: #86868b;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 6px;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
           }
           .tech-patch-badge {
             display: inline-block;
-            background: #dbeafe;
-            color: #1e4ed8;
+            background: rgba(0, 122, 255, 0.08);
+            color: #007aff;
             font-weight: 600;
             font-size: 0.72rem;
             padding: 4px 8px;
             border-radius: 6px;
             margin-right: 6px;
             margin-bottom: 6px;
+            border: 1px solid rgba(0, 122, 255, 0.05);
           }
           table {
             width: 100%;
@@ -3358,48 +3407,94 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             text-align: left;
           }
           th {
-            background: #0f172a;
-            color: #ffffff;
-            padding: 8px 12px;
-            font-size: 0.7rem;
-            font-weight: 700;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            padding: 10px 12px;
+            font-size: 0.68rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
           }
           td {
-            padding: 8px 12px;
-            border-bottom: 1px solid #cbd5e1;
+            padding: 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
             font-size: 0.8rem;
             vertical-align: top;
+            position: relative;
+          }
+          .vertical-accent {
+            position: absolute;
+            left: 0;
+            top: 12px;
+            bottom: 12px;
+            width: 3px;
+            background: #007aff;
+            border-radius: 2px;
+            display: none;
           }
           .tabular-time {
             font-variant-numeric: tabular-nums;
             font-weight: 600;
+          }
+          .tech-item-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+          }
+          .tech-check-circle {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #86868b;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+          }
+          .tech-conn-label {
+            color: #86868b;
+            font-size: 0.72rem;
+          }
+          .tech-p48-badge {
+            font-size: 0.55rem;
+            font-weight: 700;
+            background: rgba(255, 149, 0, 0.08);
+            color: #ff9500;
+            padding: 0 4px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 149, 0, 0.05);
           }
           .delta-pill {
             font-size: 0.6rem;
             font-weight: 700;
             padding: 1px 5px;
             border-radius: 4px;
+            display: inline-block;
           }
           .delta-pill.pos {
-            background: #dcfce7;
-            color: #15803d;
+            background: rgba(52, 199, 89, 0.08);
+            color: #34c759;
           }
           .delta-pill.neg {
-            background: #fee2e2;
-            color: #b91c1c;
+            background: rgba(255, 59, 48, 0.08);
+            color: #ff3b30;
           }
           .row-pause {
-            background: #f8fafc;
+            background: #fffbeb;
           }
           .row-pause td {
-            color: #64748b;
+            color: #b45309;
+            border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+          }
+          .row-pause .vertical-accent {
+            display: block;
+            background: #f59e0b;
           }
           @media print {
             body { margin: 15px; }
-            th { background: #000000 !important; color: #ffffff !important; }
-            .tech-patch-badge { border: 1px solid #cbd5e1; background: transparent !important; color: #000000 !important; }
+            th { background: #f5f5f7 !important; color: #1d1d1f !important; }
+            .tech-patch-badge { border: 1px solid rgba(0, 0, 0, 0.08); background: transparent !important; color: #1d1d1f !important; }
+            .stats-card { border: 1px solid rgba(0, 0, 0, 0.08); background: transparent !important; }
           }
         </style>
       </head>
@@ -3407,7 +3502,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div class="header">
           <div>
             <h1>Bühnen- &amp; Technik-Rider (Bühne ${activeStage})</h1>
-            <div style="font-weight: 600; color: #475569; margin-top: 4px;">${activeEv.title}</div>
+            <div style="font-size: 1.05rem; font-weight: 600; color: #475569; margin-top: 4px;">${activeEv.title}</div>
           </div>
           <div class="header-meta">
             <div>Datum: ${new Date(activeEv.event_date).toLocaleDateString('de-DE')}</div>
@@ -3419,8 +3514,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           <div class="stats-card">
             <div class="stats-card-title">Bühnen-Logistik (Maximalbedarf)</div>
             <div style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
-              <div><span style="font-size:1.3rem;">🪑</span> <strong style="font-size:1.15rem;">${peakChairs}</strong> <span style="font-size:0.75rem; color:#64748b;">Stühle Peak (Gesamt: ${totalChairs})</span></div>
-              <div><span style="font-size:1.3rem;">🎼</span> <strong style="font-size:1.15rem;">${peakStands}</strong> <span style="font-size:0.75rem; color:#64748b;">Ständer Peak (Gesamt: ${totalStands})</span></div>
+              <div><span style="font-size:1.3rem;">🪑</span> <strong style="font-size:1.15rem;">${peakChairs}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Stühle Peak (Gesamt: ${totalChairs})</span></div>
+              <div><span style="font-size:1.3rem;">🎼</span> <strong style="font-size:1.15rem;">${peakStands}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Ständer Peak (Gesamt: ${totalStands})</span></div>
             </div>
           </div>
           <div class="stats-card">
@@ -3436,7 +3531,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             <tr>
               <th style="width: 80px;">Zeit</th>
               <th style="width: 220px;">Beitrag &amp; Besetzung</th>
-              <th style="width: 240px;">Signal / Patch (FOH)</th>
+              <th style="width: 260px;">Signal / Patch (FOH)</th>
               <th style="width: 140px;">Setup &amp; Umbau</th>
               <th>Notizen / Rider</th>
             </tr>
