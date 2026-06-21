@@ -18060,10 +18060,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       <span>Monatlicher Betrag (Rechnung A):</span>
                                       <strong>{finalInvoiceA_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#047857' }}>
-                                      <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
-                                      <strong>{finalInvoiceA_restYear.toFixed(2).replace('.', ',')} €</strong>
-                                    </div>
                                     {hasCustomBillingAddress && billingPayer !== 'student' && (
                                       <div style={{ fontSize: '0.62rem', color: '#047857', borderTop: '1px solid #d1fae5', paddingTop: '6px', marginTop: '4px' }}>
                                         📍 Rechnungsadresse: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}
@@ -18140,14 +18136,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </div>
                                     ) : (
                                       <>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
-                                          <span>
-                                            {isSchoolOneTime 
-                                              ? `Berechnet zum Schuljahresstart / bei Aktivierung:` 
-                                              : `Restliches Schuljahr (${remainingMonths} Monate hochgerechnet):`}
-                                          </span>
-                                          <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
-                                        </div>
                                         {hasCustomActivationBillingAddress && (
                                           <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #bfdbfe', paddingTop: '6px', marginTop: '6px' }}>
                                             📍 Rechnungsadresse für Aktivierungen: {customActivationBillingName}, {customActivationBillingStreet}, {customActivationBillingZip} {customActivationBillingCity}
