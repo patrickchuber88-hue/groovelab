@@ -422,6 +422,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
   const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
   const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
+  const [isAlreadyOnboarded, setIsAlreadyOnboarded] = useState(false);
 
   useEffect(() => {
     if (!kioskMapRef.current) return;
@@ -1612,13 +1613,54 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (result && result.success) {
         setVerifiedStudentId(result.student_id);
+        
+        // Check student status and pre-load entries if already onboarded
+        const { data: studentRow } = await supabase
+          .from('students')
+          .select('status, parent_notes')
+          .eq('id', result.student_id)
+          .single();
+
+        const isAlreadyDone = studentRow ? studentRow.status !== 'ausstehend' : false;
+        setIsAlreadyOnboarded(isAlreadyDone);
+
+        if (studentRow?.parent_notes) {
+          setParentNotes(studentRow.parent_notes);
+        } else {
+          setParentNotes('');
+        }
+
+        // Fetch existing schedule preferences if any
+        const { data: prefSlots } = await supabase
+          .from('student_schedule_preferences')
+          .select('day_of_week, start_time, end_time, preference_type')
+          .eq('student_id', result.student_id);
+
+        if (prefSlots && prefSlots.length > 0) {
+          const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
+          prefSlots.forEach(slot => {
+            const startTimeClean = slot.start_time.substring(0, 5);
+            const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+            loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+          });
+          setSelectedSlots(loadedSlots);
+        } else {
+          setSelectedSlots({});
+        }
+
         setVerifiedStudentDetails({
           first_name: parentFirstName.trim(),
           last_name: parentLastName.trim(),
           instrument: parentInstrument.trim(),
           id: result.student_id
         });
-        setParentOnboardingStep('email');
+
+        if (isAlreadyDone) {
+          // Skip email collection step since they are already onboarded/registered
+          setParentOnboardingStep('preferences');
+        } else {
+          setParentOnboardingStep('email');
+        }
       } else {
         setParentOnboardingError(result?.message || 'Eingabe überprüfen.');
       }
@@ -3617,6 +3659,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         {parentOnboardingStep === 'preferences' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+            {isAlreadyOnboarded && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '12px 16px', borderRadius: '16px', color: '#b45309', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+                <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
+                <span>Du hast deinen Stundenplan bereits eingerichtet. Wenn du fortfährst, werden deine bisherigen Wunschzeiten und Notizen überschrieben.</span>
+              </div>
+            )}
             <div style={{ textAlign: 'left' }}>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
                 Terminwünsche angeben
