@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Calendar, 
@@ -107,6 +107,59 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
+
+  // ── Optimized Conflict Detection Caching (Map Lookups) ──
+  const teacherBusyIntervals = useMemo(() => {
+    const map: Record<number, { start: number; end: number; studentName: string; roomName: string; boardId: string }[]> = {};
+    boards.forEach(ob => {
+      const [anchorH, anchorM] = (ob.startAnchor || '14:00').split(':').map(Number);
+      const startMinutes = anchorH * 60 + anchorM;
+      
+      let currentStart = startMinutes;
+      ob.students.forEach(obs => {
+        const start = currentStart;
+        const end = currentStart + obs.duration;
+        currentStart = end;
+
+        if (!obs.isBreak) {
+          if (!map[ob.dayOfWeek]) {
+            map[ob.dayOfWeek] = [];
+          }
+          const r = rooms.find(room => room.id === ob.roomId);
+          map[ob.dayOfWeek].push({
+            start,
+            end,
+            studentName: `${obs.first_name} ${obs.last_name}`,
+            roomName: r ? r.name : 'Anderer Raum',
+            boardId: ob.id
+          });
+        }
+      });
+    });
+    return map;
+  }, [boards, rooms]);
+
+  const otherTeachersRoomsIntervals = useMemo(() => {
+    const map: Record<string, { start: number; end: number; teacherName: string; studentName: string }[]> = {};
+    otherTeachersSchedules.forEach(os => {
+      if (os.day_of_week !== undefined && os.room_id && os.time_slot) {
+        const key = `${os.day_of_week}_${os.room_id}`;
+        const [osh, osm] = os.time_slot.split(':').map(Number);
+        const start = osh * 60 + osm;
+        const end = start + (os.duration || 45);
+        if (!map[key]) {
+          map[key] = [];
+        }
+        map[key].push({
+          start,
+          end,
+          teacherName: os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer',
+          studentName: os.student ? `${os.student.first_name} ${os.student.last_name}` : 'Schüler'
+        });
+      }
+    });
+    return map;
+  }, [otherTeachersSchedules]);
 
   useEffect(() => {
     if (toast) {
@@ -2212,17 +2265,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       onDrop={() => handleDropOnBoard(board.id)}
                       style={{ position: 'relative', height: `${columnHeightPx}px`, flexShrink: 0, marginTop: '4px' }}
                     >
-                      {/* Hour marker lines */}
-                      {hourMarkers.map(m => (
-                        <div
-                          key={m.hour}
-                          style={{ position: 'absolute', left: 0, right: 0, top: `${m.top}px`, borderTop: '1px dashed rgba(0,0,0,0.08)', pointerEvents: 'none', zIndex: 0 }}
-                        >
-                          <span style={{ position: 'absolute', left: '2px', top: '-8px', fontSize: '0.58rem', color: 'rgba(0,0,0,0.25)', fontWeight: 700, userSelect: 'none' }}>
-                            {String(m.hour).padStart(2, '0')}:00
-                          </span>
-                        </div>
-                      ))}
+                       {/* Hour marker & 15-minute subdivision lines */}
+                      {hourMarkers.map(m => {
+                        const subMarkers = [];
+                        for (let minOffset of [15, 30, 45]) {
+                          const subTop = m.top + minOffset * PX_PER_MIN;
+                          if (subTop <= columnHeightPx) {
+                            subMarkers.push(
+                              <div
+                                key={`sub-${m.hour}-${minOffset}`}
+                                style={{ 
+                                  position: 'absolute', 
+                                  left: 0, 
+                                  right: 0, 
+                                  top: `${subTop}px`, 
+                                  borderTop: '1px dotted rgba(0,0,0,0.05)', 
+                                  pointerEvents: 'none', 
+                                  zIndex: 0 
+                                }}
+                              />
+                            );
+                          }
+                        }
+                        return (
+                          <React.Fragment key={m.hour}>
+                            <div
+                              style={{ position: 'absolute', left: 0, right: 0, top: `${m.top}px`, borderTop: '1px dashed rgba(0,0,0,0.08)', pointerEvents: 'none', zIndex: 0 }}
+                            >
+                              <span style={{ position: 'absolute', left: '2px', top: '-8px', fontSize: '0.58rem', color: 'rgba(0,0,0,0.25)', fontWeight: 700, userSelect: 'none' }}>
+                                {String(m.hour).padStart(2, '0')}:00
+                              </span>
+                            </div>
+                            {subMarkers}
+                          </React.Fragment>
+                        );
+                      })}
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                       {selectedStudentId && (() => {
@@ -2434,44 +2511,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
-                          boards.forEach(ob => {
-                            if (ob.dayOfWeek === board.dayOfWeek && ob.id !== board.id) {
-                              ob.students.forEach(obs => {
-                                if (!obs.isBreak && obs.assignedTime) {
-                                  const [osh, osm] = obs.assignedTime.split(':').map(Number);
-                                  const oStart = osh * 60 + osm;
-                                  const oEnd = oStart + obs.duration;
-                                  if (startMin < oEnd && endMin > oStart) {
-                                    teacherConflictStudentName = `${obs.first_name} ${obs.last_name}`;
-                                    const r = rooms.find(room => room.id === ob.roomId);
-                                    teacherConflictRoomName = r ? r.name : 'Anderer Raum';
-                                  }
-                                }
-                              });
-                            }
-                          });
+                          const sameDayIntervals = teacherBusyIntervals[board.dayOfWeek] || [];
+                          const matched = sameDayIntervals.find((item: any) => 
+                            item.boardId !== board.id && startMin < item.end && endMin > item.start
+                          );
+                          if (matched) {
+                            teacherConflictStudentName = matched.studentName;
+                            teacherConflictRoomName = matched.roomName;
+                          }
                         }
 
                         // Check room conflict with OTHER teachers:
                         // Does another teacher have a scheduled lesson in this room at this time on this day?
                         let roomConflictTeacherName = '';
                         let roomConflictStudentName = '';
-                        if (board.roomId && bs.assignedTime && otherTeachersSchedules.length > 0) {
+                        if (board.roomId && bs.assignedTime) {
                           const [sh, sm] = bs.assignedTime.split(':').map(Number);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
-                          otherTeachersSchedules.forEach(os => {
-                            if (os.day_of_week === board.dayOfWeek && os.room_id === board.roomId && os.time_slot) {
-                              const [osh, osm] = os.time_slot.split(':').map(Number);
-                              const oStart = osh * 60 + osm;
-                              const oEnd = oStart + (os.duration || 45);
-                              if (startMin < oEnd && endMin > oStart) {
-                                roomConflictTeacherName = os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer';
-                                roomConflictStudentName = os.student ? `${os.student.first_name} ${os.student.last_name}` : 'Schüler';
-                              }
-                            }
-                          });
+                          const key = `${board.dayOfWeek}_${board.roomId}`;
+                          const roomIntervals = otherTeachersRoomsIntervals[key] || [];
+                          const matched = roomIntervals.find((item: any) => 
+                            startMin < item.end && endMin > item.start
+                          );
+                          if (matched) {
+                            roomConflictTeacherName = matched.teacherName;
+                            roomConflictStudentName = matched.studentName;
+                          }
                         }
 
                         const isTeacherConflict = teacherConflictStudentName !== '';

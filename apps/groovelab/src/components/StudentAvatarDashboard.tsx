@@ -180,6 +180,44 @@ const LEVEL_NAMES: Record<string, Record<number, string>> = {
   }
 };
 
+interface LevelProgress {
+  levelTitle: string;
+  prevThreshold: number;
+  nextThreshold: number;
+  xpInCurrentLevel: number;
+  totalXpInLevel: number;
+  xpPercentage: number;
+}
+
+const getLevelProgress = (level: number, xp: number, instrumentType: string): LevelProgress => {
+  const currentLevel = level || 1;
+  const currentXp = xp || 0;
+  const levelTitle = LEVEL_NAMES[instrumentType]?.[currentLevel] || `Stufe ${currentLevel}`;
+
+  let nextThreshold = 100;
+  let prevThreshold = 0;
+  if (currentLevel === 2) {
+    prevThreshold = 100;
+    nextThreshold = 300;
+  } else if (currentLevel === 3) {
+    prevThreshold = 300;
+    nextThreshold = 9999;
+  }
+
+  const xpInCurrentLevel = Math.max(0, currentXp - prevThreshold);
+  const totalXpInLevel = nextThreshold - prevThreshold;
+  const xpPercentage = currentLevel === 3 ? 100 : Math.min(100, (xpInCurrentLevel / totalXpInLevel) * 100);
+
+  return {
+    levelTitle,
+    prevThreshold,
+    nextThreshold,
+    xpInCurrentLevel,
+    totalXpInLevel,
+    xpPercentage
+  };
+};
+
 const HERO_CLASSES = [
   { id: 'guitarist', name: 'Gitarren-Held', icon: '🎸', desc: 'Melodien und Soli rocken' },
   { id: 'drummer', name: 'Beat-Master', icon: '🥁', desc: 'Den Groove und Takt angeben' },
@@ -2185,6 +2223,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (initial === 'termine' || initial === 'all_appointments') initial = 'events';
     return (initial as any) || 'briefing';
   });
+
+  // ── Asset Preloading Hook (3.2) ──
+  useEffect(() => {
+    const imagesToPreload = [
+      '/avatars/gitarre_avatar_new.png',
+      '/avatars/egitarre_avatar.png',
+      '/avatars/ebass_avatar.png',
+      '/avatars/kontrabass_avatar.png',
+      '/avatars/bass_avatar.png',
+      '/avatars/schlagzeug_avatar.png',
+      '/avatars/klavier_avatar_new.png',
+      '/avatars/gesang_avatar.png',
+      '/avatars/trompete_avatar_new.png',
+      '/avatars/posaune_avatar.png',
+      '/avatars/horn_avatar_new.png',
+      '/avatars/cello_avatar_new.png',
+      '/avatars/violine_avatar_new.png'
+    ];
+    imagesToPreload.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
 
   useEffect(() => {
     if (parentActiveTab) {
@@ -4585,22 +4646,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const currentLevel = avatar.evolution_level || 1;
   const currentXp = avatar.xp || 0;
-  const levelTitle = LEVEL_NAMES[avatar.instrument_type]?.[currentLevel] || `Stufe ${currentLevel}`;
-
-  // XP calculation
-  let nextThreshold = 100;
-  let prevThreshold = 0;
-  if (currentLevel === 2) {
-    prevThreshold = 100;
-    nextThreshold = 300;
-  } else if (currentLevel === 3) {
-    prevThreshold = 300;
-    nextThreshold = 9999;
-  }
-
-  const xpInCurrentLevel = Math.max(0, currentXp - prevThreshold);
-  const totalXpInLevel = nextThreshold - prevThreshold;
-  const xpPercentage = currentLevel === 3 ? 100 : Math.min(100, (xpInCurrentLevel / totalXpInLevel) * 100);
+  const { levelTitle, prevThreshold, nextThreshold, xpPercentage } = getLevelProgress(currentLevel, currentXp, avatar.instrument_type);
 
   // Circular progress calculations for fit style ring
   const circleRadius = 70;

@@ -1378,6 +1378,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
   const [studentPageSize, setStudentPageSize] = useState<number>(50);
 
+  // ── 1.1: Memoized Student Filtering ──
+  const filteredStudents = useMemo(() => {
+    return students.filter((s: any) => {
+      const firstName = (s.first_name || '').toLowerCase();
+      const lastName = (s.last_name || '').toLowerCase();
+      const nickname = (s.nickname || '').toLowerCase();
+      const query = studentSearchQuery.toLowerCase().trim();
+      
+      const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
+      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
+      const matchesTeacher = studentFilterTeacher === 'All' || 
+        (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
+      
+      let matchesStatus = true;
+      if (studentFilterStatus === 'campus') matchesStatus = s.is_campus_active;
+      else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
+      else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
+
+      return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
+    }).sort((a: any, b: any) => {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
+      return nameA.localeCompare(nameB, 'de');
+    });
+  }, [students, studentSearchQuery, studentFilterInstrument, studentFilterTeacher, studentFilterStatus]);
+
   // Overhauled Room Board States
   const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
   const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
@@ -5482,28 +5508,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       return acc;
     }, []);
 
-    const filteredStudents = campusStudentsOnly.filter((s: any) => {
-      const firstName = (s.first_name || '').toLowerCase();
-      const lastName = (s.last_name || '').toLowerCase();
-      const nickname = (s.nickname || '').toLowerCase();
-      const query = studentSearchQuery.toLowerCase().trim();
-      
-      const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
-      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
-      const matchesTeacher = studentFilterTeacher === 'All' || 
-        (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
-      
-      let matchesStatus = true;
-      if (studentFilterStatus === 'campus') matchesStatus = s.is_campus_active;
-      else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
-      else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
-
-      return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
-    }).sort((a: any, b: any) => {
-      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
-      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
-      return nameA.localeCompare(nameB, 'de');
-    });
+    // Memoized filteredStudents is used directly from outer component scope
 
     // Pagination calculation
     const totalCount = filteredStudents.length;
