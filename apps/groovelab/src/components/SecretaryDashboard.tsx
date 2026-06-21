@@ -17608,6 +17608,119 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </div>
                               </div>
 
+                              {billingPayer === 'school' && (
+                                <div style={{
+                                  background: '#f0fdf4',
+                                  border: '1.5px solid #10b981',
+                                  borderRadius: '20px',
+                                  padding: '20px',
+                                  marginTop: '8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '12px'
+                                }}>
+                                  <strong style={{ fontSize: '0.82rem', color: '#065f46', fontFamily: 'Urbanist' }}>
+                                    Abrechnungsmodell für Schüler-Aktivierungen wählen:
+                                  </strong>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    
+                                    {/* Option 1: Variable monatliche Abrechnung (option2) */}
+                                    <label style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '10px',
+                                      cursor: 'pointer',
+                                      background: '#ffffff',
+                                      border: '1.5px solid',
+                                      borderColor: studentBillingOption === 'option2' ? '#10b981' : '#e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: studentBillingOption === 'option2' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                    }}>
+                                      <input
+                                        type="radio"
+                                        name="schoolStudentBillingOption"
+                                        checked={studentBillingOption === 'option2'}
+                                        onChange={() => setStudentBillingOption('option2')}
+                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
+                                          1. Variable monatliche Abrechnung
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
+                                          Grundpreis bleibt gleich. Zweite separate Rechnung mit monatlichen Schüler-Aktivierungskosten verändert sich variabel (0,49 € / Schüler / Mo.).
+                                        </span>
+                                      </div>
+                                    </label>
+
+                                    {/* Option 2: Jahresbeitrag bei Aktivierung (option3_2) */}
+                                    <label style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '10px',
+                                      cursor: 'pointer',
+                                      background: '#ffffff',
+                                      border: '1.5px solid',
+                                      borderColor: studentBillingOption === 'option3_2' ? '#10b981' : '#e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: studentBillingOption === 'option3_2' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                    }}>
+                                      <input
+                                        type="radio"
+                                        name="schoolStudentBillingOption"
+                                        checked={studentBillingOption === 'option3_2'}
+                                        onChange={() => setStudentBillingOption('option3_2')}
+                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          2. Jahresbeitrag bei Aktivierung <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>10% Rabatt</span>
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
+                                          Der Grundpreis bleibt gleich. Aktivierungen werden als Jahresbeitrag in einer separaten monatlichen Rechnung voll abgerechnet (inkl. 10% Rabatt).
+                                        </span>
+                                      </div>
+                                    </label>
+
+                                    {/* Option 3: Einmalige Komplett-Aktivierung zum Schuljahresstart (option3_3) */}
+                                    <label style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '10px',
+                                      cursor: 'pointer',
+                                      background: '#ffffff',
+                                      border: '1.5px solid',
+                                      borderColor: studentBillingOption === 'option3_3' ? '#10b981' : '#e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: studentBillingOption === 'option3_3' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                    }}>
+                                      <input
+                                        type="radio"
+                                        name="schoolStudentBillingOption"
+                                        checked={studentBillingOption === 'option3_3'}
+                                        onChange={() => setStudentBillingOption('option3_3')}
+                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          3. Einmalige Komplett-Aktivierung zum Schuljahresstart <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>20% Rabatt</span>
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
+                                          Der Grundpreis bleibt monatlich gleich. Zum Schuljahresstart aktiviert die Schule alle Schüler. Einmalig für das komplette Schuljahr für alle Schüler eine separate Aktivierungsrechnung (inkl. 20% Rabatt).
+                                        </span>
+                                      </div>
+                                    </label>
+
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Custom Umlage Input & Exemption Info */}
                               {billingPayer === 'student' && (
                                 <div style={{
@@ -17975,8 +18088,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
                             // Invoice B: Variable active student profiles (from school's perspective)
-                            const totalInvoiceB_monthly = billingPayer === 'school' ? (activeStudents * 0.49) : 0;
-                            const totalInvoiceB_restYear = totalInvoiceB_monthly * remainingMonths;
+                            const isSchoolOneTime = billingPayer === 'school' && (studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3');
+                            const schoolOneTimeDiscount = studentBillingOption === 'option3_3' ? 20 : 10;
+                            const schoolOneTimeCount = studentBillingOption === 'option3_3' ? students.length : activeStudents;
+                            const schoolOneTimeSinglePrice = getDynamicAnnualPrice(contractStartDate, schoolOneTimeDiscount);
+                            const schoolOneTimeTotal = schoolOneTimeCount * schoolOneTimeSinglePrice;
+
+                            const totalInvoiceB_monthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? (activeStudents * 0.49) : 0;
+                            const totalInvoiceB_restYear = isSchoolOneTime ? schoolOneTimeTotal : (totalInvoiceB_monthly * remainingMonths);
 
                             const handleApplyCoupon = () => {
                               if (couponCode.trim().toLowerCase() === 'groove20') {
@@ -18066,17 +18185,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Aktive Schülerprofile ({activeStudents} aktivierte Lizenzen):</span>
-                                        <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : '0,49 € / Schüler / Mo.'}</strong>
+                                        {isSchoolOneTime ? (
+                                          <>
+                                            <span>
+                                              {studentBillingOption === 'option3_3' ? `Komplett-Aktivierung aller Schüler (${schoolOneTimeCount} Profile):` : `Aktivierte Schülerprofile (${schoolOneTimeCount} Lizenzen):`}
+                                            </span>
+                                            <strong>{schoolOneTimeSinglePrice.toFixed(2).replace('.', ',')} € / Schüler (Jahresbeitrag)</strong>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span>Aktive Schülerprofile ({activeStudents} aktivierte Lizenzen):</span>
+                                            <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : '0,49 € / Schüler / Mo.'}</strong>
+                                          </>
+                                        )}
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Kostenträger / Abrechnungsweg:</span>
-                                        <strong>{billingPayer === 'student' ? 'Direktüberweisung der Eltern an Campus-Groovelab' : 'Musikschule (Sammelrechnung)'}</strong>
+                                        <strong>
+                                          {billingPayer === 'student' 
+                                            ? 'Direktüberweisung der Eltern an Campus-Groovelab' 
+                                            : studentBillingOption === 'option2'
+                                              ? 'Musikschule (Variable Monatsabrechnung)'
+                                              : studentBillingOption === 'option3_2'
+                                                ? 'Musikschule (Monatsrechnung für Jahresbeiträge)'
+                                                : 'Musikschule (Einmalige Jahresrechnung Komplett)'}
+                                        </strong>
                                       </div>
                                     </div>
                                     <div style={{ borderTop: '1px dotted #3b82f6', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#1d4ed8' }}>
                                       <span>Kosten für die Musikschule (Rechnung B):</span>
-                                      <strong>{totalInvoiceB_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                      <strong>
+                                        {isSchoolOneTime 
+                                          ? `Einmalig ${schoolOneTimeTotal.toFixed(2).replace('.', ',')} €` 
+                                          : `${totalInvoiceB_monthly.toFixed(2).replace('.', ',')} € / Mo.`}
+                                      </strong>
                                     </div>
                                     
                                     {billingPayer === 'student' ? (
@@ -18095,7 +18237,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     ) : (
                                       <>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#1d4ed8' }}>
-                                          <span>Restliches Schuljahr ({remainingMonths} Monate hochgerechnet):</span>
+                                          <span>
+                                            {isSchoolOneTime 
+                                              ? `Berechnet zum Schuljahresstart / bei Aktivierung:` 
+                                              : `Restliches Schuljahr (${remainingMonths} Monate hochgerechnet):`}
+                                          </span>
                                           <strong>{totalInvoiceB_restYear.toFixed(2).replace('.', ',')} €</strong>
                                         </div>
                                         {hasCustomActivationBillingAddress && (
