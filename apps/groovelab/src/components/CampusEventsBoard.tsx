@@ -2823,7 +2823,21 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // --- Layout & Rendering Helpers ---
 
-  // Export CSV
+  // Helper to escape XML characters
+  const escapeXmlForExcel = (unsafe: string): string => {
+    return String(unsafe).replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
+  // Export CSV (Fallback)
   const handleExportCSV = () => {
     if (!selectedEvent) return;
     const headers = ['Name', 'Ensemble/Band', 'Repertoire', 'Dauer (Min)', 'Bühne', 'Status', 'Spezielle Wünsche'];
@@ -2849,6 +2863,600 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Export Excel (.xls XML with Style Metadata)
+  const handleExportExcel = () => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+
+    const rowsXML = programPoints.map((pp, idx) => {
+      const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
+      const songsFormatted = songsList.map((song: any) => `${song.title}${song.artist ? ` (${song.artist})` : ''}`).join('; ');
+      const style = idx % 2 === 0 ? 'RowEven' : 'RowOdd';
+      return `
+   <Row ss:Height="22">
+    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.name || '')}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.ensemble_band || '')}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(songsFormatted)}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="Number">${pp.duration || 0}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="Number">${pp.stage_number || 1}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.status === 'approved' ? 'Bestätigt' : 'Ausstehend')}</Data></Cell>
+    <Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXmlForExcel(pp.remarks || '')}</Data></Cell>
+   </Row>`;
+    }).join('');
+
+    const excelContent = `<?xml version="1.0"?>
+<?mso-application myprog="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:binoculars"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Borders/>
+   <Font ss:FontName="Segoe UI" x:CharSet="1" x:Family="Swiss" ss:Size="11" ss:Color="#1e293b"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="Title">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="16" ss:Bold="1" ss:Color="#0F172A"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#0F172A" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="RowEven">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+   </Borders>
+   <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="RowOdd">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#f1f5f9"/>
+   </Borders>
+   <Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Programmablauf">
+  <Table>
+   <Column ss:Width="140"/>
+   <Column ss:Width="140"/>
+   <Column ss:Width="200"/>
+   <Column ss:Width="80"/>
+   <Column ss:Width="60"/>
+   <Column ss:Width="90"/>
+   <Column ss:Width="220"/>
+   <Row ss:Height="35">
+    <Cell ss:StyleID="Title" ss:MergeAcross="6"><Data ss:Type="String">${escapeXmlForExcel(activeEv.title)} - Programmliste</Data></Cell>
+   </Row>
+   <Row ss:Height="26">
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Beitrag / Schüler</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Ensemble / Band</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Repertoire</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Dauer (Min)</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Bühne</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Status</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Spezielle Wünsche / Notizen</Data></Cell>
+   </Row>
+   ${rowsXML}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `programm_${activeEv.title.replace(/\s+/g, '_')}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export Visitor Program PDF/Print booklet
+  const handleExportPDF = () => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+
+    // Filter points scheduled on ANY stage, order by stage then sort_order
+    const allScheduled = programPoints
+      .filter(pp => pp.is_scheduled || pp.is_pause)
+      .sort((a, b) => {
+        if ((a.stage_number || 1) !== (b.stage_number || 1)) {
+          return (a.stage_number || 1) - (b.stage_number || 1);
+        }
+        return a.sort_order - b.sort_order;
+      });
+
+    // Group by stage number
+    const stagesMap: Record<number, any[]> = {};
+    allScheduled.forEach(pp => {
+      const st = pp.stage_number || 1;
+      if (!stagesMap[st]) stagesMap[st] = [];
+      stagesMap[st].push(pp);
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Bitte erlauben Sie Popups für diese App, um den PDF-Export anzuzeigen.');
+      return;
+    }
+
+    // Generate table content by stage
+    let stagesContentHTML = '';
+    const activeEventStartTime = activeEv.event_start_time || activeEv.start_time || '14:00';
+    const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+
+    Object.keys(stagesMap).sort((a, b) => parseInt(a) - parseInt(b)).forEach(stageKey => {
+      const stageNum = parseInt(stageKey);
+      const points = stagesMap[stageNum];
+
+      stagesContentHTML += `
+      <div class="stage-section">
+        <h2>Bühne ${stageNum}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px;">Zeit</th>
+              <th style="width: 220px;">Beitrag</th>
+              <th style="width: 220px;">Besetzung / Ensemble</th>
+              <th>Repertoire / Lieder</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${points.map(pp => {
+              const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+              const songsList = pp.songs && Array.isArray(pp.songs) ? pp.songs : pp.title ? [{ title: pp.title, artist: pp.artist }] : [];
+              const songsStr = songsList.map((song: any) => `<strong>${song.title}</strong>${song.artist ? ` (von ${song.artist})` : ''}`).join(', ');
+
+              return `
+              <tr class="${pp.is_pause ? 'row-pause' : ''}">
+                <td class="tabular-time">${timeInfo.start} - ${timeInfo.end}</td>
+                <td><strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong></td>
+                <td>${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</td>
+                <td>${pp.is_pause ? 'Pause' : (songsStr || pp.instrument || '-')}</td>
+              </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      `;
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${activeEv.title} - Programmheft</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+          body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #0f172a;
+            margin: 40px;
+            background: #ffffff;
+            line-height: 1.5;
+          }
+          .header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+          }
+          .header-meta {
+            text-align: right;
+            font-size: 0.9rem;
+            color: #475569;
+          }
+          .stage-section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+          }
+          .stage-section h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-left: 4px solid #0f172a;
+            padding-left: 10px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            margin-top: 10px;
+          }
+          th {
+            background: #f8fafc;
+            border-bottom: 2px solid #cbd5e1;
+            padding: 10px 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #475569;
+          }
+          td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            vertical-align: top;
+          }
+          .tabular-time {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            color: #0f172a;
+          }
+          .row-pause {
+            background: #f8fafc;
+          }
+          .row-pause td {
+            color: #64748b;
+            font-style: italic;
+          }
+          .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+          }
+          @media print {
+            body { margin: 20px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>Programmheft</h1>
+            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 5px; color: #475569;">${activeEv.title}</div>
+          </div>
+          <div class="header-meta">
+            <div>Datum: ${new Date(activeEv.event_date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</div>
+            <div>Ort: ${activeEv.location || 'Musikschule'}</div>
+            <div>Einlass: ${activeEv.admission_time || '--:--'} Uhr | Beginn: ${activeEv.event_start_time || activeEv.start_time || '--:--'} Uhr</div>
+          </div>
+        </div>
+
+        ${stagesContentHTML}
+
+        <div class="footer">
+          Erstellt mit Groovelab &middot; &copy; ${new Date().getFullYear()} All Rights Reserved.
+        </div>
+
+        <script>
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          });
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // Export Stage & Technical Rider PDF/Print
+  const handleExportTechRiderPDF = () => {
+    const activeEv = secretaryPlanningEvent || selectedEvent;
+    if (!activeEv) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Bitte erlauben Sie Popups für diese App, um den PDF-Export anzuzeigen.');
+      return;
+    }
+
+    const stagePoints = programPoints
+      .filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    // Compute peaks
+    const totalChairs = stagePoints.reduce((acc, pp) => acc + (pp.chairs_needed || 0), 0);
+    const peakChairs = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.chairs_needed || 0)) : 0;
+    const totalStands = stagePoints.reduce((acc, pp) => acc + (pp.music_stands_needed || 0), 0);
+    const peakStands = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.music_stands_needed || 0)) : 0;
+
+    // Normalize helper inside scope
+    const normalizeTechType = (type: string): string => {
+      const t = type.trim().toLowerCase();
+      if (t.includes('gesang') || t.includes('vocal') || t.includes('mikrofon') || t === 'mic' || t === 'mikro') return 'Mikrofon (Gesang/Amp)';
+      if (t.includes('di-box') || t.includes('di box') || t.includes('d.i. box') || t.includes('direct box') || t === 'di') return 'D.I. Box';
+      if (t.includes('e-bass') || t === 'bass') return 'E-Bass';
+      if (t.includes('e-piano') || t.includes('keyboard') || t === 'piano') return 'E-Piano / Keyboard';
+      if (t.includes('a-gitarre') || t.includes('akustik')) return 'A-Gitarre';
+      if (t.includes('e-gitarre') || t === 'gitarre') return 'E-Gitarre';
+      if (t.includes('schlagzeug') || t.includes('drumset')) return 'Schlagzeug-Set';
+      if (t.includes('trompete')) return 'Trompete';
+      return type.trim();
+    };
+
+    // Calculate peaks per type
+    const audioSetup: Record<string, number> = {};
+    stagePoints.forEach(pp => {
+      if (pp.tech_requirements) {
+        const actSetup: Record<string, number> = {};
+        try {
+          const cleaned = pp.tech_requirements.trim();
+          if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+            const items = JSON.parse(cleaned);
+            if (Array.isArray(items)) {
+              items.forEach((item: any) => {
+                const typeName = normalizeTechType(item.type || 'Sonstiges');
+                const count = parseInt(item.count, 10) || 1;
+                actSetup[typeName] = (actSetup[typeName] || 0) + count;
+              });
+            }
+          } else {
+            const typeName = normalizeTechType(pp.tech_requirements);
+            actSetup[typeName] = (actSetup[typeName] || 0) + 1;
+          }
+        } catch (e) {
+          const typeName = normalizeTechType(pp.tech_requirements || 'Sonstige Inputs');
+          actSetup[typeName] = (actSetup[typeName] || 0) + 1;
+        }
+        Object.entries(actSetup).forEach(([type, count]) => {
+          audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+        });
+      }
+    });
+
+    const activeEventStartTime = activeEv.event_start_time || activeEv.start_time || '14:00';
+    const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
+
+    // Generate table rows
+    const rowsHTML = stagePoints.map((pp, idx) => {
+      const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+      const prevPp = idx > 0 ? stagePoints[idx - 1] : null;
+      const deltaChairs = prevPp ? (pp.chairs_needed || 0) - (prevPp.chairs_needed || 0) : 0;
+      const deltaStands = prevPp ? (pp.music_stands_needed || 0) - (prevPp.music_stands_needed || 0) : 0;
+
+      let techItems: any[] = [];
+      if (pp.tech_requirements && (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{'))) {
+        try {
+          techItems = JSON.parse(pp.tech_requirements);
+        } catch (e) {}
+      }
+
+      const signalStr = techItems.length > 0 
+        ? techItems.map((item: any) => `${item.count}x ${item.type} (${item.connection})`).join('<br/>') 
+        : pp.tech_requirements || 'Kein spezieller Audiobedarf';
+
+      let changeoverHTML = '';
+      if (deltaChairs !== 0 || deltaStands !== 0) {
+        if (deltaChairs !== 0) changeoverHTML += `<span class="delta-pill ${deltaChairs > 0 ? 'pos' : 'neg'}">${deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} 🪑</span> `;
+        if (deltaStands !== 0) changeoverHTML += `<span class="delta-pill ${deltaStands > 0 ? 'pos' : 'neg'}">${deltaStands > 0 ? `+${deltaStands}` : deltaStands} 🎼</span> `;
+      } else {
+        changeoverHTML = '<span style="color:#94a3b8">-</span>';
+      }
+
+      return `
+      <tr class="${pp.is_pause ? 'row-pause' : ''}">
+        <td class="tabular-time">${timeInfo.start}<br/><span style="font-size:0.68rem; color:#64748b;">${timeInfo.end}</span></td>
+        <td>
+          <strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong><br/>
+          <span style="font-size: 0.72rem; color: #64748b;">${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</span>
+        </td>
+        <td style="font-size: 0.75rem;">${pp.is_pause ? '-' : signalStr}</td>
+        <td style="font-size: 0.78rem;">
+          <div style="font-weight: 600;">🪑 ${pp.chairs_needed || 0} &nbsp; 🎼 ${pp.music_stands_needed || 0}</div>
+          <div style="margin-top: 4px;">${pp.is_pause ? '-' : changeoverHTML}</div>
+        </td>
+        <td style="font-size:0.75rem; color:#475569;">${pp.remarks || '-'}</td>
+      </tr>
+      `;
+    }).join('');
+
+    // Generate Audio Patch list HTML
+    const audioPatchHTML = Object.entries(audioSetup).map(([name, count]) => `
+      <span class="tech-patch-badge">🎙️ ${count}x ${name}</span>
+    `).join('') || '<span style="color:#64748b; font-style:italic;">Keine Audiobelegungen</span>';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Technik-Rundown - Bühne ${activeStage}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+          body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #0f172a;
+            margin: 30px;
+            background: #ffffff;
+            line-height: 1.4;
+          }
+          .header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+          }
+          .header-meta {
+            text-align: right;
+            font-size: 0.85rem;
+            color: #475569;
+          }
+          .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+          }
+          .stats-card {
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 14px;
+            background: #f8fafc;
+          }
+          .stats-card-title {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+          }
+          .tech-patch-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e4ed8;
+            font-weight: 600;
+            font-size: 0.72rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-right: 6px;
+            margin-bottom: 6px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+          }
+          th {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 8px 12px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            vertical-align: top;
+          }
+          .tabular-time {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+          }
+          .delta-pill {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 4px;
+          }
+          .delta-pill.pos {
+            background: #dcfce7;
+            color: #15803d;
+          }
+          .delta-pill.neg {
+            background: #fee2e2;
+            color: #b91c1c;
+          }
+          .row-pause {
+            background: #f8fafc;
+          }
+          .row-pause td {
+            color: #64748b;
+          }
+          @media print {
+            body { margin: 15px; }
+            th { background: #000000 !important; color: #ffffff !important; }
+            .tech-patch-badge { border: 1px solid #cbd5e1; background: transparent !important; color: #000000 !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>Bühnen- &amp; Technik-Rider (Bühne ${activeStage})</h1>
+            <div style="font-weight: 600; color: #475569; margin-top: 4px;">${activeEv.title}</div>
+          </div>
+          <div class="header-meta">
+            <div>Datum: ${new Date(activeEv.event_date).toLocaleDateString('de-DE')}</div>
+            <div>Bühne: ${activeStage} von ${stageCount}</div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stats-card">
+            <div class="stats-card-title">Bühnen-Logistik (Maximalbedarf)</div>
+            <div style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
+              <div><span style="font-size:1.3rem;">🪑</span> <strong style="font-size:1.15rem;">${peakChairs}</strong> <span style="font-size:0.75rem; color:#64748b;">Stühle Peak (Gesamt: ${totalChairs})</span></div>
+              <div><span style="font-size:1.3rem;">🎼</span> <strong style="font-size:1.15rem;">${peakStands}</strong> <span style="font-size:0.75rem; color:#64748b;">Ständer Peak (Gesamt: ${totalStands})</span></div>
+            </div>
+          </div>
+          <div class="stats-card">
+            <div class="stats-card-title">FOH Audio Patch (Peak-Kanalbelegung)</div>
+            <div style="margin-top: 6px;">
+              ${audioPatchHTML}
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px;">Zeit</th>
+              <th style="width: 220px;">Beitrag &amp; Besetzung</th>
+              <th style="width: 240px;">Signal / Patch (FOH)</th>
+              <th style="width: 140px;">Setup &amp; Umbau</th>
+              <th>Notizen / Rider</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+          </tbody>
+        </table>
+
+        <script>
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          });
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const renderLessonsColumn = () => {
@@ -8072,13 +8680,128 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           })()}
 
           {coordinatorTab === 'export' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <button
-                onClick={handleExportCSV}
-                style={{ background: '#0f172a', color: '#ffffff', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
-              >
-                📊 Programmliste exportieren (CSV)
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1d1d1f' }}>
+                  Ablauf &amp; Daten exportieren
+                </h3>
+                <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500 }}>
+                  Wählen Sie das passende Format für Ihr Team, die Techniker oder die Konzertbesucher.
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '4px' }}>
+                {/* Excel Card */}
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📊</span>
+                    <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Excel-Programmliste (.xls)</strong>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
+                      Erstellt eine professionell formatierte Excel-Datei mit Kopfzeilen, Spaltenbreiten und Zebra-Streifen für die einfache Weiterverarbeitung.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportExcel}
+                    style={{
+                      width: '100%',
+                      background: '#1d1d1f',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#000000'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#1d1d1f'}
+                  >
+                    Tabelle herunterladen
+                  </button>
+                </div>
+
+                {/* PDF Booklet Card */}
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📄</span>
+                    <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Besucher-Programm (PDF)</strong>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
+                      Generiert ein übersichtliches, minimalistisches Programmheft für Konzertbesucher, sortiert nach Bühnen und Uhrzeiten. Ideal zum Ausdrucken.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportPDF}
+                    style={{
+                      width: '100%',
+                      background: '#007aff',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#0062cc'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#007aff'}
+                  >
+                    Programmheft drucken / PDF
+                  </button>
+                </div>
+
+                {/* Tech Rider Card */}
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>🔌</span>
+                    <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Bühnen- &amp; Technik-Rider (PDF)</strong>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
+                      Erstellt ein detailliertes Übersichtsblatt für Tontechniker und Stagehands für Bühne {activeStage} mit FOH-Patchplan und Umbau-Schritten.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportTechRiderPDF}
+                    style={{
+                      width: '100%',
+                      background: '#34c759',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#28a745'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#34c759'}
+                  >
+                    Technik-Rider drucken / PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Legacy CSV fallback */}
+              <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                <button
+                  onClick={handleExportCSV}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#86868b',
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Als einfache CSV-Rohdaten exportieren
+                </button>
+              </div>
             </div>
           )}
         </div>
