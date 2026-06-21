@@ -219,6 +219,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [annTarget, setAnnTarget] = useState<'all' | 'teachers' | 'students'>('all');
   const [submittingAnn, setSubmittingAnn] = useState(false);
 
+  // --- Student specific Column 3: "Meine Events" ---
+  const [studentProgramPoints, setStudentProgramPoints] = useState<any[]>([]);
+  const [loadingStudentProgramPoints, setLoadingStudentProgramPoints] = useState(false);
+  const [studentTab, setStudentTab] = useState<'upcoming' | 'past' | 'announcements'>('upcoming');
+  const [selectedStudentEvent, setSelectedStudentEvent] = useState<any | null>(null);
+  const [loadingSelectedStudentEventPoints, setLoadingSelectedStudentEventPoints] = useState(false);
+  const [selectedEventAllPoints, setSelectedEventAllPoints] = useState<any[]>([]);
+
+
   // --- M3 Coordinator Panel & Teacher Submission States ---
   const showLessons = role === 'student' || role === 'teacher';
   const isAdminOrSecretary = role === 'admin' || role === 'secretary';
@@ -1609,8 +1618,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     fetchAnnouncements();
     if (role === 'student') {
       fetchStudentEnsembles();
+      fetchStudentProgramPoints();
     }
   }, [userId, schoolId, role]);
+
 
   // Handle auto-open of event planning submissions from teacher dashboard
   useEffect(() => {
@@ -1885,7 +1896,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return { color: '#3b82f6', bg: '#eff6ff' };
     }
     if (cLower.includes('fest') || tLower.includes('fest') || tLower.includes('weihnachtsfeier') || tLower.includes('party') || tLower.includes('feier')) {
-      return { color: '#f97316', bg: '#ffedd5' }; // Orange
+      return { color: '#10b981', bg: '#ecfdf5' }; // Grün (was Orange)
     }
     if (cLower.includes('konzert') || cLower.includes('auftritt') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig')) {
       return { color: '#a855f7', bg: '#f3e8ff' };
@@ -2469,6 +2480,47 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
+  const fetchStudentProgramPoints = async () => {
+    if (role !== 'student' || !userId) return;
+    setLoadingStudentProgramPoints(true);
+    try {
+      const { data, error } = await supabase
+        .from('campus_event_program_points')
+        .select('*')
+        .eq('status', 'approved');
+      if (error) throw error;
+      const filtered = (data || []).filter((pp: any) => {
+        const assigned = pp.additional_feedback_responses?.assigned_students || [];
+        return assigned.includes(userId);
+      });
+      setStudentProgramPoints(filtered);
+    } catch (err) {
+      console.error('Error fetching student program points:', err);
+    } finally {
+      setLoadingStudentProgramPoints(false);
+    }
+  };
+
+  const fetchSelectedStudentEventPoints = async (eventId: string) => {
+    setLoadingSelectedStudentEventPoints(true);
+    try {
+      const { data, error } = await supabase
+        .from('campus_event_program_points')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('status', 'approved')
+        .order('stage_number', { ascending: true })
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      setSelectedEventAllPoints(data || []);
+    } catch (err) {
+      console.error('Error fetching selected student event program points:', err);
+    } finally {
+      setLoadingSelectedStudentEventPoints(false);
+    }
+  };
+
+
   const isAssignedToEvent = (ev: any) => {
     if (ev.student_id === userId) return true;
     if (ev.assigned_student_ids && ev.assigned_student_ids.includes(userId)) return true;
@@ -2784,7 +2836,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         description: ev.description || '',
         event_date: ev.event_date,
         event_end_date: ev.event_end_date || ev.event_date,
-        start_time: ev.start_time.substring(0, 5),
+        start_time: (ev.event_start_time || ev.start_time).substring(0, 5),
         end_time: ev.end_time ? ev.end_time.substring(0, 5) : undefined,
         category: ev.category,
         is_subscribed: false,
@@ -4116,6 +4168,438 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               );
             })
           )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderStudentEventsColumn = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const myAssignedEvents = customEvents.filter(ev => 
+      studentProgramPoints.some(pp => pp.event_id === ev.id) || isAssignedToEvent(ev)
+    );
+
+    const upcomingEvents = myAssignedEvents.filter(ev => {
+      const evDate = new Date(ev.event_date);
+      evDate.setHours(0, 0, 0, 0);
+      return evDate >= now;
+    });
+
+    const pastEvents = myAssignedEvents.filter(ev => {
+      const evDate = new Date(ev.event_date);
+      evDate.setHours(0, 0, 0, 0);
+      return evDate < now;
+    });
+
+    const activeEventsList = studentTab === 'upcoming' ? upcomingEvents : pastEvents;
+
+    return (
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: '24px',
+        padding: '24px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        height: 'calc(100vh - 120px)',
+        overflowY: 'auto'
+      }}>
+        <div>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CalendarDays size={20} color={brandColor} /> Meine Events
+          </h3>
+          <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+            Veranstaltungen, bei denen du mitwirkst
+          </p>
+        </div>
+
+        {/* Tabs switcher */}
+        <div style={{
+          display: 'flex',
+          background: '#f1f5f9',
+          padding: '4px',
+          borderRadius: '12px',
+          gap: '4px'
+        }}>
+          <button
+            onClick={() => setStudentTab('upcoming')}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: studentTab === 'upcoming' ? '#ffffff' : 'transparent',
+              color: studentTab === 'upcoming' ? '#0f172a' : '#64748b',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: studentTab === 'upcoming' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+            }}
+          >
+            Kommende
+          </button>
+          <button
+            onClick={() => setStudentTab('past')}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: studentTab === 'past' ? '#ffffff' : 'transparent',
+              color: studentTab === 'past' ? '#0f172a' : '#64748b',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: studentTab === 'past' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+            }}
+          >
+            Vergangene
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {loadingStudentProgramPoints ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
+              Lädt Events...
+            </div>
+          ) : activeEventsList.length === 0 ? (
+            <div style={{
+              background: '#f8fafc',
+              border: '1.5px dashed #e2e8f0',
+              borderRadius: '16px',
+              padding: '32px 16px',
+              textAlign: 'center',
+              color: '#64748b',
+              fontSize: '0.8rem',
+              fontWeight: 600
+            }}>
+              Keine Veranstaltungen gefunden
+            </div>
+          ) : (
+            activeEventsList.map((ev: any) => {
+              const colors = getEventColors(ev);
+              const eventPps = studentProgramPoints.filter(pp => pp.event_id === ev.id);
+              return (
+                <div
+                  key={ev.id}
+                  onClick={() => {
+                    setSelectedStudentEvent(ev);
+                    fetchSelectedStudentEventPoints(ev.id);
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.05)';
+                    e.currentTarget.style.borderColor = colors.color;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.02)';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 900,
+                      color: colors.color,
+                      background: colors.bg,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}>
+                      {ev.category}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>
+                      {formatDateGerman(ev.event_date)}
+                    </span>
+                  </div>
+
+                  <strong style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 800 }}>
+                    {ev.title}
+                  </strong>
+
+                  {eventPps.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        Deine Beiträge:
+                      </span>
+                      {eventPps.map(pp => (
+                        <div 
+                          key={pp.id} 
+                          style={{ 
+                            fontSize: '0.78rem', 
+                            fontWeight: 650, 
+                            color: '#334155',
+                            background: '#f8fafc',
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            borderLeft: `3px solid ${colors.color}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <span>{pp.name} {pp.title ? `– "${pp.title}"` : ''}</span>
+                          {pp.instrument && (
+                            <span style={{ fontSize: '0.68rem', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                              {pp.instrument}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderStudentEventDetailModal = () => {
+    if (!selectedStudentEvent) return null;
+    const ev = selectedStudentEvent;
+    const colors = getEventColors(ev);
+    
+    // Filter the program points for this student
+    const studentPps = studentProgramPoints.filter(pp => pp.event_id === ev.id);
+    
+    // Sort all event program points (scheduled and pause) to calculate correct timeline start times
+    const eventStartTimeVal = ev.event_start_time || ev.start_time || '18:00';
+    const timeMap = calculateTimelineTimes(selectedEventAllPoints, eventStartTimeVal);
+
+    return (
+      <div
+        onClick={() => setSelectedStudentEvent(null)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(15,23,42,0.55)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px',
+          animation: 'fadeIn 0.15s ease'
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '500px',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
+            overflow: 'hidden',
+            fontFamily: 'Urbanist, sans-serif',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '85vh'
+          }}
+        >
+          {/* Color bar */}
+          <div style={{ height: '5px', background: colors.color, width: '100%' }} />
+
+          {/* Header */}
+          <div style={{ padding: '22px 22px 0 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 900, color: colors.color,
+                background: colors.bg, padding: '4px 10px', borderRadius: '8px',
+                textTransform: 'uppercase', letterSpacing: '0.04em'
+              }}>
+                {ev.category}
+              </span>
+              <span style={{
+                fontSize: '0.62rem', fontWeight: 800,
+                color: '#0369a1',
+                background: '#e0f2fe',
+                padding: '4px 10px', borderRadius: '8px'
+              }}>
+                Mein Event
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedStudentEvent(null)}
+              style={{
+                background: '#f1f5f9', border: 'none', borderRadius: '50%',
+                width: '34px', height: '34px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <X size={16} color="#64748b" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '16px 22px 24px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Title */}
+            <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.25 }}>
+              {ev.title}
+            </h2>
+
+            {/* Date / Time / Room */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 12px', borderRadius: '10px' }}>
+                <Calendar size={13} color="#64748b" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                  {new Date(ev.event_date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                </span>
+              </div>
+              {(ev.event_start_time || ev.start_time) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 12px', borderRadius: '10px' }}>
+                  <Clock size={13} color="#64748b" />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                    {(ev.event_start_time || ev.start_time).substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)}` : ''} Uhr
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Location Address */}
+            {(ev.location_extern || (ev.location_type === 'intern' && ev.room)) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ort</span>
+                <div style={{ fontSize: '0.84rem', fontWeight: 650, color: '#1e293b' }}>
+                  {ev.location_type === 'intern' && ev.room ? `Raum: ${ev.room.name}` : ev.location_extern}
+                  {ev.location_address && <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>{ev.location_address}</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            {ev.event_description && (
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+                {ev.event_description}
+              </div>
+            )}
+
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+
+            {/* Student's contributions */}
+            <div>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                🎸 Deine Auftrittsdetails
+              </h4>
+              
+              {loadingSelectedStudentEventPoints ? (
+                <div style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', fontSize: '0.8rem' }}>
+                  Details laden...
+                </div>
+              ) : studentPps.length === 0 ? (
+                <div style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic' }}>
+                  Keine direkt zugewiesenen Beiträge gefunden. (Du bist dem Event zugeteilt)
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {studentPps.map(pp => {
+                    const scheduledTimes = timeMap[pp.id];
+                    return (
+                      <div 
+                        key={pp.id} 
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Beitrag
+                            </span>
+                            <div style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a' }}>
+                              {pp.name}
+                            </div>
+                          </div>
+                          
+                          {scheduledTimes && (
+                            <div style={{ background: `${colors.color}15`, padding: '6px 12px', borderRadius: '10px', textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: colors.color, textTransform: 'uppercase', display: 'block' }}>
+                                Uhrzeit
+                              </span>
+                              <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: colors.color }}>
+                                {scheduledTimes.start} - {scheduledTimes.end} Uhr
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Title / Song / Artist */}
+                        {(pp.title || pp.artist) && (
+                          <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem' }}>
+                            {pp.title && (
+                              <div>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Titel</span>
+                                <span style={{ fontWeight: 650, color: '#334155' }}>"{pp.title}"</span>
+                              </div>
+                            )}
+                            {pp.artist && (
+                              <div>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Interpret</span>
+                                <span style={{ fontWeight: 650, color: '#334155' }}>{pp.artist}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Stage / Instrument / Duration */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Bühne</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#334155' }}>Bühne {pp.stage_number || 1}</span>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Instrument</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#334155' }}>{pp.instrument || 'Keines'}</span>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Dauer</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#334155' }}>{pp.duration} Min</span>
+                          </div>
+                        </div>
+
+                        {/* Remarks */}
+                        {pp.remarks && (
+                          <div>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Hinweise / Kommentare</span>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#475569', fontStyle: 'italic' }}>
+                              {pp.remarks}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -9681,7 +10165,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       {/* COLUMN 3 */}
       {role === 'teacher' 
         ? renderTeacherEventPlanningColumn() 
-        : renderAnnouncementsColumn()}
+        : role === 'student'
+          ? renderStudentEventsColumn()
+          : renderAnnouncementsColumn()}
 
       {/* Fullscreen Overlay for Teacher submissions */}
       {renderFullscreenTeacherSubmissionOverlay()}
@@ -9805,11 +10291,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       }
                     </span>
                   </div>
-                  {ev.start_time && (
+                  {(ev.event_start_time || ev.start_time) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px' }}>
                       <Clock size={14} color="#64748b" />
                       <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                        {ev.start_time.substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)}` : ''} Uhr
+                        {(ev.event_start_time || ev.start_time).substring(0, 5)}{ev.end_time ? ` – ${ev.end_time.substring(0, 5)}` : ''} Uhr
                       </span>
                     </div>
                   )}
@@ -9987,7 +10473,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         );
       })()}
 
+      {/* Student Event Detail Modal */}
+      {selectedStudentEvent && renderStudentEventDetailModal()}
+
       {/* iCal Subscription Modal */}
+
       {showIcalModal && (() => {
         const supabaseUrlStr = import.meta.env.VITE_SUPABASE_URL || supabase?.supabaseUrl || 'https://supabase.178.105.10.2.sslip.io';
         const cleanSupabaseUrl = supabaseUrlStr.replace('https://', '');

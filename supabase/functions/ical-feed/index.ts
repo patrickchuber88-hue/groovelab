@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       .select(`
         *,
         teacher:teacher_id(first_name, last_name),
-        student:student_id(first_name, last_name),
+        student:student_id(first_name, last_name, instrument),
         room:room_id(name)
       `)
 
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
       .select(`
         *,
         teacher:teacher_id(first_name, last_name),
-        student:student_id(first_name, last_name)
+        student:student_id(first_name, last_name, instrument)
       `)
 
     if (role === 'student') {
@@ -283,22 +283,55 @@ Deno.serve(async (req) => {
     let campusEvents: any[] = [];
     let allSchoolCampusEvents: any[] = [];
     if (schoolId) {
-      if (role === 'teacher') {
-        // Query approved program points of this teacher
-        const { data: progPoints, error: ppErr } = await supabase
-          .from('campus_event_program_points')
-          .select('*, event:event_id(*)')
-          .eq('teacher_id', userId)
-          .eq('status', 'approved');
+      if (role === 'teacher' || role === 'student') {
+        // Query approved program points
+        let progPoints: any[] = [];
+        if (role === 'teacher') {
+          const { data, error } = await supabase
+            .from('campus_event_program_points')
+            .select('*, event:event_id(*)')
+            .eq('teacher_id', userId)
+            .eq('status', 'approved');
+          if (!error && data) progPoints = data;
+        } else {
+          // For students, fetch approved program points
+          const { data, error } = await supabase
+            .from('campus_event_program_points')
+            .select('*, event:event_id(*)')
+            .eq('status', 'approved');
+          if (!error && data) {
+            // Filter locally where user is in assigned_students
+            progPoints = data.filter((pp: any) => {
+              const assigned = pp.additional_feedback_responses?.assigned_students || [];
+              return assigned.includes(userId);
+            });
+          }
+        }
 
-        if (!ppErr && progPoints && progPoints.length > 0) {
-          const eventIds = [...new Set(progPoints.map((pp: any) => pp.event_id))];
-          
+        // We also want to include events where the student is directly assigned (assigned_student_ids contains userId or student_id === userId)
+        const { data: directEvents, error: deErr } = await supabase
+          .from('campus_events')
+          .select('*, room:room_id(name)')
+          .eq('school_id', schoolId);
+
+        let directAssignedEventIds: string[] = [];
+        if (!deErr && directEvents) {
+          const directAssigned = directEvents.filter((ev: any) => {
+            const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
+            return isAssigned;
+          });
+          directAssignedEventIds = directAssigned.map((ev: any) => ev.id);
+        }
+
+        const eventIds = [...new Set(progPoints.map((pp: any) => pp.event_id))];
+        const allEventIds = [...new Set([...eventIds, ...directAssignedEventIds])];
+
+        if (allEventIds.length > 0) {
           // Load the corresponding events
           const { data: eventsData, error: evErr } = await supabase
             .from('campus_events')
             .select('*, room:room_id(name)')
-            .in('id', eventIds);
+            .in('id', allEventIds);
 
           if (!evErr && eventsData) {
             allSchoolCampusEvents = eventsData;
@@ -307,7 +340,7 @@ Deno.serve(async (req) => {
             const { data: allEventPoints, error: aepErr } = await supabase
               .from('campus_event_program_points')
               .select('*')
-              .in('event_id', eventIds)
+              .in('event_id', allEventIds)
               .or('is_scheduled.eq.true,is_pause.eq.true')
               .eq('status', 'approved');
 
@@ -352,22 +385,31 @@ Deno.serve(async (req) => {
                 });
               });
 
-              // Find teacher's points in this event
-              const teacherPointsInEvent = progPoints.filter((p: any) => p.event_id === ev.id);
-              const performanceNotes = teacherPointsInEvent.map((p: any) => {
+              // Find points in this event for the current user
+              const userPointsInEvent = progPoints.filter((p: any) => p.event_id === ev.id);
+              
+              const performanceNotes = userPointsInEvent.map((p: any) => {
                 const time = timeMap[p.id] ? `${timeMap[p.id].start} - ${timeMap[p.id].end}` : 'unbekannt';
                 return `Auftrittszeit: ${time} Uhr (Bühne ${p.stage_number || 1}) - Beitrag: ${p.name}`;
               }).join('\n');
 
+              const isDirectlyAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
+              let newDesc = ev.description || '';
+              if (performanceNotes) {
+                newDesc = `${newDesc}\n\n--- MEINE AUFTRITTE ---\n${performanceNotes}`.trim();
+              } else if (isDirectlyAssigned) {
+                newDesc = `${newDesc}\n\n--- MEINE TEILNAHME ---\nDu bist als Teilnehmer bei diesem Event eingetragen.`.trim();
+              }
+
               return {
                 ...ev,
-                description: `${ev.description || ''}\n\n--- MEINE AUFTRITTE ---\n${performanceNotes}`.trim()
+                description: newDesc
               };
             });
           }
         }
       } else {
-        // Students and admins/secretaries get campus events normally
+        // Only admins/secretaries get campus events normally
         const { data: campusData, error: campusErr } = await supabase
           .from('campus_events')
           .select('*, room:room_id(name)')
@@ -376,19 +418,13 @@ Deno.serve(async (req) => {
         if (!campusErr && campusData) {
           allSchoolCampusEvents = campusData;
           campusEvents = [...campusData];
-          if (role === 'student') {
-            campusEvents = campusEvents.filter((ev: any) => {
-              const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
-              return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
-            });
-          }
         }
       }
     }
 
     // 6. Query and fetch school's subscribed external iCal feed if exists (skipped for teachers)
     let subscribedEvents: any[] = [];
-    if (schoolId && role !== 'teacher') {
+    if (schoolId && role !== 'teacher' && role !== 'student') {
       const { data: schoolData } = await supabase
         .from('schools')
         .select('calendar_url')
@@ -513,22 +549,23 @@ Deno.serve(async (req) => {
       const statusText = isCanceled ? 'CANCELLED' : 'CONFIRMED'
 
       const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
-      const studentInitials = occ.student ? getInitials(occ.student.first_name, occ.student.last_name) : 'Schüler'
+      const studentName = occ.student ? occ.student.first_name : 'Schüler'
+      const instrumentSuffix = (occ.student && occ.student.instrument) ? ` (${occ.student.instrument})` : ''
 
       let summary = ''
       if (role === 'student') {
         summary = isCanceled 
-          ? `❌ ABSAGE: ${studentInitials} - Unterricht bei ${teacherName}`
-          : `🎵 ${studentInitials} - Unterricht bei ${teacherName}`
+          ? `❌ ABSAGE: ${studentName}${instrumentSuffix} bei ${teacherName}`
+          : `🎵 ${studentName}${instrumentSuffix} bei ${teacherName}`
       } else {
         summary = isCanceled
-          ? `❌ ABSAGE: Unterricht mit ${studentInitials}`
-          : `🎵 Unterricht mit ${studentInitials}`
+          ? `❌ ABSAGE: ${studentName}${instrumentSuffix} bei ${teacherName}`
+          : `🎵 ${studentName}${instrumentSuffix} bei ${teacherName}`
       }
 
       let descriptionLines = []
       descriptionLines.push(`Status: ${isCanceled ? 'Abgesagt ❌' : 'Bestätigt 📅'}`)
-      descriptionLines.push(`Schüler: ${studentInitials}`)
+      descriptionLines.push(`Schüler: ${studentName}${instrumentSuffix}`)
       descriptionLines.push(`Lehrer: ${teacherName}`)
       descriptionLines.push(`Raum: ${occ.room_name}`)
       if (occ.duration) descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
