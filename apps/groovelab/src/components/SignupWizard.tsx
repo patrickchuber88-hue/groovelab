@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
@@ -12,6 +12,7 @@ interface SignupWizardProps {
 }
 
 export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,50 +262,24 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     }, 800);
   };
 
-  const downloadQrCode = () => {
-    if (!createdUser) return;
-    const svgElement = document.getElementById('signup-qr-code-svg');
-    if (!svgElement) return;
-
+  const downloadQrCode = async () => {
+    if (!createdUser || !cardRef.current) return;
     try {
-      const svgString = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 300;
-        canvas.height = 300;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, 300, 300);
-          ctx.drawImage(img, 10, 10, 280, 280);
-          const pngUrl = canvas.toDataURL('image/png');
-          const downloadLink = document.createElement('a');
-          downloadLink.href = pngUrl;
-          downloadLink.download = `groovelab_ausweis_${createdUser.first_name}_${createdUser.last_name}.png`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-        }
-        URL.revokeObjectURL(svgUrl);
-      };
-      img.src = svgUrl;
+      const { toJpeg } = await import('html-to-image');
+      const dataUrl = await toJpeg(cardRef.current, { 
+        quality: 0.95,
+        backgroundColor: '#7f1d1d',
+        cacheBust: true,
+        pixelRatio: 2
+      });
+      const downloadLink = document.createElement('a');
+      downloadLink.href = dataUrl;
+      downloadLink.download = `groovelab_ausweis_${createdUser.first_name}_${createdUser.last_name}.jpg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
     } catch (e) {
-      console.error('Error generating offline QR code PNG:', e);
-      // Fallback: download directly as SVG
-      const svgString = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      const link = document.createElement('a');
-      link.href = svgUrl;
-      link.download = `groovelab_ausweis_${createdUser.first_name}_${createdUser.last_name}.svg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(svgUrl);
+      console.error('Error generating card image:', e);
     }
   };
 
@@ -728,20 +703,23 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             </div>
 
             {/* Admin ID / QR Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
-              borderRadius: '24px',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '320px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              color: '#ffffff',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxSizing: 'border-box'
-            }}>
+            <div 
+              ref={cardRef}
+              style={{
+                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+                borderRadius: '24px',
+                padding: '24px',
+                width: '100%',
+                maxWidth: '320px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                color: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxSizing: 'border-box'
+              }}
+            >
               <div style={{ fontSize: '10px', fontWeight: 900, color: '#fef08a', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>
                 Campus-Groovelab Ausweis
               </div>
@@ -771,9 +749,35 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               <div style={{ fontSize: '0.75rem', color: '#a7f3d0', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>
                 Administrator
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#fef08a', fontWeight: 800, marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>Ausweis-PIN: {createdUser.ausweis_nummer}</div>
-                <div>Geräte-PIN: {String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</div>
+            </div>
+
+            {/* Credentials Note Box */}
+            <div style={{
+              background: '#fffbeb',
+              border: '1.5px solid #fef3c7',
+              borderRadius: '20px',
+              padding: '20px',
+              textAlign: 'left',
+              width: '100%',
+              maxWidth: '320px',
+              boxSizing: 'border-box',
+              color: '#78350f',
+              fontSize: '0.85rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(251, 191, 36, 0.05)'
+            }}>
+              <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: '#b45309' }}>
+                ⚠️ WICHTIGE ZUGANGSDATEN (Bitte sicher abspeichern)
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #fde68a', paddingBottom: '6px' }}>
+                <span style={{ fontWeight: 700 }}>Ausweis-PIN:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.95rem' }}>{createdUser.ausweis_nummer}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700 }}>Geräte-PIN:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.95rem' }}>{String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</span>
               </div>
             </div>
 

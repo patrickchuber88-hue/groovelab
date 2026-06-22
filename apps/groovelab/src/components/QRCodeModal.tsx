@@ -65,6 +65,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   const [schoolNameAndCity, setSchoolNameAndCity] = useState<string>('Campus Musikschule');
   const [localQrToken, setLocalQrToken] = useState<string>(user.qr_token || '');
   const [localTeacherQrToken, setLocalTeacherQrToken] = useState<string>(user.teacher_qr_token || '');
+  const roleLower = (user.role || '').toLowerCase();
+  const isAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -326,7 +328,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
         quality: 0.95,
-        backgroundColor: activePlatform === 'campus' ? '#064e3b' : '#ffffff',
+        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#064e3b') : '#ffffff',
         cacheBust: true,
         pixelRatio: 2
       });
@@ -452,12 +454,12 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           <div 
             ref={cardRef} 
             style={{
-              background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-              border: '1.5px solid rgba(52, 168, 83, 0.3)',
+              boxShadow: isAdminOrSecretary ? '0 25px 50px -12px rgba(127, 29, 29, 0.5), 0 0 30px rgba(220, 38, 38, 0.2)' : '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
+              border: isAdminOrSecretary ? '1.5px solid rgba(220, 38, 38, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
