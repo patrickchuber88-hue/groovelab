@@ -499,14 +499,14 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                <img 
                  src={avatarDataUrl || '/avatar_ghost.jpg'} 
                  alt="Avatar" 
-                 crossOrigin={avatarDataUrl?.startsWith('data:') ? undefined : 'anonymous'}
+                 crossOrigin={avatarDataUrl?.startsWith('data:') || avatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
                  style={{ 
                    width: '92px', 
                    height: '92px', 
                    borderRadius: '22px', 
                    objectFit: 'cover',
-                   border: '3px solid #22c55e',
-                   boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
+                   border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(34, 197, 94, 0.75)',
+                   boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                    flexShrink: 0,
                    marginTop: '2px'
                  }} 
@@ -531,7 +531,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
              </div>
 
             {/* Dashed divider line */}
-            <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+            <div style={{ background: isAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
             {/* QR Code Scan area */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -543,7 +543,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                border: '1.5px solid rgba(52, 168, 83, 0.3)'
+                border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
               }}>
                 <QRCode value={`https://campus-groovelab.de/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
               </div>
@@ -598,7 +598,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 <img 
                   src={avatarDataUrl || '/avatar_ghost.jpg'} 
                   alt="Profile"
-                  crossOrigin={avatarDataUrl?.startsWith('data:') ? undefined : 'anonymous'}
+                  crossOrigin={avatarDataUrl?.startsWith('data:') || avatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
                   style={{ 
                     width: '100%', 
                     height: '100%', 

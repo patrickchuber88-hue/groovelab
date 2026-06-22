@@ -1562,8 +1562,12 @@ export function AdminDashboard({
     }
     
     let active = true;
+    const roleLower = (selectedQRUser.role || '').toLowerCase();
+    const isQRAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
     let originalUrl = selectedQRUser.photo_url || '/avatar_ghost.jpg';
-    if (selectedQRUser.role === 'student') {
+    if (isQRAdminOrSecretary) {
+      originalUrl = '/campus_login_hero.png';
+    } else if (selectedQRUser.role === 'student') {
       originalUrl = getInstrumentAvatarUrl(selectedQRUser.instrument);
     }
     
@@ -11870,6 +11874,9 @@ export function AdminDashboard({
   const renderQRModal = () => {
     if (!selectedQRUser) return null;
 
+    const roleLower = (selectedQRUser.role || '').toLowerCase();
+    const isQRAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
+
     const handleRegenerateToken = async () => {
       if (!window.confirm('Möchtest du diesen QR-Code wirklich sperren und neu generieren? Der alte Code verliert sofort seine Gültigkeit.')) {
         return;
@@ -11937,14 +11944,18 @@ export function AdminDashboard({
       if (!qrCardRef.current) return;
       try {
         const { toJpeg } = await import('html-to-image');
+        const roleLower = (selectedQRUser.role || '').toLowerCase();
+        const isQRAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
-          backgroundColor: selectedQRUser.role === 'student' ? '#064e3b' : '#ffffff',
+          backgroundColor: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
+            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#064e3b') 
+            : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
         });
         const link = document.createElement('a');
-        link.download = selectedQRUser.role === 'student' ? `Campus_Pass_${selectedQRUser.first_name}.jpg` : `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+        link.download = (selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? `Campus_Pass_${selectedQRUser.first_name}.jpg` : `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -11966,13 +11977,13 @@ export function AdminDashboard({
           {/* ID Card Design */}
           <div 
             ref={qrCardRef}
-            style={selectedQRUser.role === 'student' ? {
-              background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+            style={(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? {
+              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-              border: '1.5px solid rgba(52, 168, 83, 0.3)',
+              boxShadow: isQRAdminOrSecretary ? '0 25px 50px -12px rgba(127, 29, 29, 0.5), 0 0 30px rgba(220, 38, 38, 0.2)' : '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
+              border: isQRAdminOrSecretary ? '1.5px solid rgba(220, 38, 38, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -11994,7 +12005,7 @@ export function AdminDashboard({
               width: '100%'
             }}
           >
-            {selectedQRUser.role === 'student' ? (
+            {(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (
               <>
                 {/* Sheen effect */}
                 <div style={{
@@ -12023,15 +12034,15 @@ export function AdminDashboard({
                    <img 
                      src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
                      onLoad={handleQRImageLoad}
-                     crossOrigin="anonymous"
+                     crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
                      alt="Avatar" 
                      style={{ 
                        width: '92px', 
                        height: '92px', 
                        borderRadius: '22px', 
                        objectFit: 'cover',
-                       border: '3px solid #22c55e',
-                       boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
+                       border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(34, 197, 94, 0.75)',
+                       boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                        flexShrink: 0,
                        marginTop: '2px'
                      }} 
@@ -12056,7 +12067,7 @@ export function AdminDashboard({
                  </div>
 
                 {/* Dashed divider line */}
-                <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+                <div style={{ background: isQRAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
                 {/* QR Code Scan area */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -12068,7 +12079,7 @@ export function AdminDashboard({
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: '1.5px solid rgba(52, 168, 83, 0.3)'
+                    border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
                   }}>
                     <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
                   </div>
@@ -12112,7 +12123,7 @@ export function AdminDashboard({
                     <img 
                       src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
                       onLoad={handleQRImageLoad}
-                      crossOrigin="anonymous"
+                      crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
                       alt="Profile"
                       style={{ 
                         width: '100%', 
@@ -12161,7 +12172,9 @@ export function AdminDashboard({
             onClick={saveAsImage} 
             style={{ 
               width: '100%', 
-              background: selectedQRUser.role === 'student' ? '#137333' : '#34a853', 
+              background: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
+                ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333') 
+                : '#34a853', 
               color: 'white', 
               border: 'none', 
               padding: '20px', 
@@ -12174,7 +12187,7 @@ export function AdminDashboard({
               justifyContent: 'center', 
               gap: '10px', 
               marginTop: '24px', 
-              boxShadow: `0 15px 35px ${selectedQRUser.role === 'student' ? '#137333' : '#34a853'}50`, 
+              boxShadow: `0 15px 35px ${(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333') : '#34a853'}50`, 
               transition: 'all 0.2s' 
             }} 
           >

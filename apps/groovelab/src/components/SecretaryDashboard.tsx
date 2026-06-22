@@ -9667,16 +9667,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   background: 'white', 
                   padding: '8px 14px', 
                   borderRadius: '12px', 
-                  border: '1px solid #f1f5f9', 
+                  border: `1.5px solid ${activeTab === 'secretary' ? 'rgba(234, 67, 53, 0.25)' : activeTab === 'campus' ? 'rgba(52, 168, 83, 0.25)' : 'rgba(250, 204, 21, 0.3)'}`, 
                   boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
                   cursor: 'pointer',
                   fontWeight: 800,
                   fontSize: '0.8rem',
-                  color: activeTab === 'campus' ? '#34a853' : '#eab308'
+                  color: activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#eab308'
                 }}
               >
                 <span>Ausweis</span>
-                <QrCode size={16} color={activeTab === 'campus' ? '#34a853' : '#eab308'} />
+                <QrCode size={16} color={activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#eab308'} />
               </button>
             )}
 

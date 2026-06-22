@@ -7404,9 +7404,22 @@ function App() {
 
             {/* Ausweis Button (Desktop only) */}
             {windowWidth > 800 && (
-              <button onClick={() => setShowQR(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', padding: '10px 20px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
-                <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
-                <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
+              <button 
+                onClick={() => setShowQR(true)} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  background: 'white', 
+                  padding: '10px 20px', 
+                  borderRadius: '16px', 
+                  border: `1.5px solid ${activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.25)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(250, 204, 21, 0.3)'}`, 
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.05)', 
+                  cursor: 'pointer' 
+                }}
+              >
+                <span style={{ color: activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#3b82f6' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
+                <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'} />
               </button>
             )}
 
