@@ -31,6 +31,11 @@ BEGIN
         END;
     END IF;
 
+    -- SAFETEY CHECK: Check if v_user_id actually exists in public.users to prevent audit_logs_changed_by_fkey violation
+    IF v_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = v_user_id) THEN
+        v_user_id := NULL;
+    END IF;
+
     -- 3. Schul-ID ermitteln (NEW bei INSERT/UPDATE, OLD bei DELETE)
     IF TG_OP = 'DELETE' THEN
         v_school_id := OLD.school_id;

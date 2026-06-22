@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
   School, User, Mail, Lock, Phone, MapPin, CheckCircle, 
-  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles
+  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles, Download
 } from 'lucide-react';
 
 interface SignupWizardProps {
@@ -14,6 +15,15 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [createdUser, setCreatedUser] = useState<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    qr_token: string;
+    ausweis_nummer: string;
+    schoolName: string;
+  } | null>(null);
 
   // Step 1: School Info
   const [schoolName, setSchoolName] = useState('');
@@ -26,12 +36,12 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [zipCode, setZipCode] = useState('');
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [schoolEmail, setSchoolEmail] = useState('');
 
   // Step 2: Owner Info
   const [adminFirstName, setAdminFirstName] = useState('');
   const [adminLastName, setAdminLastName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
 
   // Step 3: OTP
   const [otpCode, setOtpCode] = useState('');
@@ -119,6 +129,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         currentStepIdx++;
       } else {
         clearInterval(interval);
+        
+        let schoolIdCreated = '';
         // Execute actual database insertions!
         try {
           const schoolId = crypto.randomUUID();
@@ -134,12 +146,38 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               zip_code: zipCode.trim(),
               city: city.trim(),
               phone_number: phoneNumber.trim(),
+              email: schoolEmail.trim(),
               is_trial: true,
               trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               status: 'trial'
             });
 
           if (schoolErr) throw schoolErr;
+          schoolIdCreated = schoolId;
+
+          // Generate a unique 6-digit PIN for the administrator
+          let generatedAdminPin = '';
+          let pinIsUnique = false;
+          let attempts = 0;
+          while (!pinIsUnique && attempts < 5) {
+            const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
+            const { data: duplicateUser, error: checkErr } = await supabase
+              .from('users')
+              .select('id')
+              .eq('ausweis_nummer', candidatePin)
+              .maybeSingle();
+
+            if (!checkErr && !duplicateUser) {
+              generatedAdminPin = candidatePin;
+              pinIsUnique = true;
+            }
+            attempts++;
+          }
+
+          // Fallback if loop fails to verify uniqueness
+          if (!generatedAdminPin) {
+            generatedAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+          }
 
           const adminId = crypto.randomUUID();
           const qrToken = crypto.randomUUID();
@@ -155,9 +193,9 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               first_name: adminFirstName.trim(),
               last_name: adminLastName.trim(),
               email: dummyEmail,
-              password_hash: adminPassword, // Pre-hashed or demo plaintext passwords
+              password_hash: generatedAdminPin, // Auto-generated admin login PIN
               qr_token: qrToken,
-              ausweis_nummer: adminPassword.trim(),
+              ausweis_nummer: generatedAdminPin,
               is_campus_active: true,
               is_groovelab_active: true,
               is_active: true,
@@ -170,23 +208,138 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           sessionStorage.setItem('groovelab_user_id', adminId);
           localStorage.setItem('groovelab_active_platform', 'campus');
           
-          // Trigger parent success
+          setCreatedUser({
+            id: adminId,
+            first_name: adminFirstName.trim(),
+            last_name: adminLastName.trim(),
+            qr_token: qrToken,
+            ausweis_nummer: generatedAdminPin,
+            schoolName: schoolName.trim()
+          });
+
+          // Transition to Step 3 success view
           setTimeout(() => {
-            onSignupSuccess(adminId);
+            setStep(3);
           }, 1500);
 
         } catch (err: any) {
-          setError(err.message || 'Onboarding fehlgeschlagen.');
+          console.error('Onboarding failed:', err);
+          // Rollback: Clean up created school to avoid leaving behind an orphaned tenant
+          if (schoolIdCreated) {
+            try {
+              await supabase.from('schools').delete().eq('id', schoolIdCreated);
+            } catch (cleanupErr) {
+              console.error('Failed to cleanup school after user insert failure:', cleanupErr);
+            }
+          }
+
+          let friendlyError = err.message || 'Onboarding fehlgeschlagen.';
+          if (err.code === '23505') {
+            if (err.message?.includes('subdomain') || err.details?.includes('subdomain')) {
+              friendlyError = 'Diese Wunsch-Subdomain wurde leider gerade von einer anderen Musikschule belegt. Bitte wähle eine andere Subdomain.';
+            } else if (err.message?.includes('ausweis_nummer') || err.details?.includes('ausweis_nummer')) {
+              friendlyError = 'Generierung einer einzigartigen PIN fehlgeschlagen. Bitte versuche es erneut.';
+            }
+          }
+          setError(friendlyError);
           setStep(1);
         }
       }
     }, 800);
   };
 
+  const downloadQrCode = () => {
+    if (!createdUser) return;
+    const svgElement = document.getElementById('signup-qr-code-svg');
+    if (!svgElement) return;
+
+    try {
+      const svgString = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 300;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, 300, 300);
+          ctx.drawImage(img, 10, 10, 280, 280);
+          const pngUrl = canvas.toDataURL('image/png');
+          const downloadLink = document.createElement('a');
+          downloadLink.href = pngUrl;
+          downloadLink.download = `groovelab_ausweis_${createdUser.first_name}_${createdUser.last_name}.png`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+        }
+        URL.revokeObjectURL(svgUrl);
+      };
+      img.src = svgUrl;
+    } catch (e) {
+      console.error('Error generating offline QR code PNG:', e);
+      // Fallback: download directly as SVG
+      const svgString = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const link = document.createElement('a');
+      link.href = svgUrl;
+      link.download = `groovelab_ausweis_${createdUser.first_name}_${createdUser.last_name}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(svgUrl);
+    }
+  };
+
+  const downloadWalletPass = () => {
+    if (!createdUser) return;
+    const passContent = JSON.stringify({
+      passTypeIdentifier: "pass.de.groovelab.admin",
+      serialNumber: createdUser.qr_token,
+      teamIdentifier: "GROOVELAB",
+      organizationName: "Campus-Groovelab",
+      description: "Campus-Groovelab Admin Access Pass",
+      logoText: "Campus-Groovelab",
+      foregroundColor: "rgb(255, 255, 255)",
+      backgroundColor: "rgb(10, 54, 28)",
+      labelColor: "rgb(167, 243, 208)",
+      studentName: `${createdUser.first_name} ${createdUser.last_name}`,
+      instrument: "Administrator / Schulleitung",
+      qrToken: createdUser.qr_token
+    }, null, 2);
+
+    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `groovelab-pass-${createdUser.first_name || 'admin'}.pkpass`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedSubdomain = subdomain.trim().toLowerCase();
+    if (trimmedSubdomain.length < 3) {
+      setError('Die Wunsch-Subdomain muss mindestens 3 Zeichen lang sein.');
+      return;
+    }
+    if (/^-+$/.test(trimmedSubdomain)) {
+      setError('Die Wunsch-Subdomain darf nicht nur aus Bindestrichen bestehen.');
+      return;
+    }
     if (!subdomainAvailable) {
       setError('Bitte wähle eine verfügbare Wunsch-Subdomain.');
+      return;
+    }
+    const zipRegex = /^[0-9]{5}$/;
+    if (!zipRegex.test(zipCode.trim())) {
+      setError('Die Postleitzahl (PLZ) muss aus genau 5 Ziffern bestehen.');
       return;
     }
     setError(null);
@@ -273,7 +426,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
       <div style={{
         width: '100%',
-        maxWidth: step === 4 ? '480px' : '580px',
+        maxWidth: (step === 4 || step === 3) ? '480px' : '580px',
         background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '24px',
         padding: '38px',
@@ -290,7 +443,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         color: '#1e293b'
       }}>
         {/* Header (except for provisioning step) */}
-        {step < 4 && (
+        {step < 3 && (
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', color: '#10b981', justifyContent: 'center' }}>
@@ -424,6 +577,19 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               />
             </div>
 
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>E-Mail-Adresse der Musikschule *</label>
+              <input
+                type="email"
+                required
+                value={schoolEmail}
+                onChange={(e) => setSchoolEmail(e.target.value)}
+                placeholder="leitung@musikschule.de"
+                style={inputStyle}
+                className="signup-input"
+              />
+            </div>
+
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button type="button" onClick={onBackToLogin} style={backButtonStyle} className="signup-btn-back">Zurück</button>
               <button type="submit" style={nextButtonStyle} className="signup-btn-next">
@@ -463,21 +629,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Passwort festlegen *</label>
-              <input
-                type="password"
-                required
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="z.B. Geheimnis123"
-                style={inputStyle}
-                className="signup-input"
-              />
-              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                Mit diesem Passwort loggst du dich später über den Login-Bereich ein.
-              </span>
-            </div>
+
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button type="button" onClick={() => setStep(1)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
@@ -524,6 +676,130 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                 {provisionStatus}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: REGISTRATION SUCCESS & QR BADGE PREVIEW */}
+        {step === 3 && createdUser && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', marginBottom: '8px' }}>
+              <CheckCircle size={36} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#16a34a', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+                Die Schule <strong>{createdUser.schoolName}</strong> wurde erfolgreich angelegt.
+              </p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
+                Bitte speichere deinen <strong>Campus-Groovelab</strong> QR-Ausweis für den zukünftigen Login.
+              </p>
+            </div>
+
+            {/* Admin ID / QR Card */}
+            <div style={{
+              background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
+              borderRadius: '24px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '320px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              color: '#ffffff',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 900, color: '#fef08a', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>
+                Campus-Groovelab Ausweis
+              </div>
+              
+              {/* QR Code */}
+              <div style={{
+                background: 'white',
+                borderRadius: '16px',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <QRCode
+                  id="signup-qr-code-svg"
+                  value={`${window.location.origin}/qr/${createdUser.qr_token}`}
+                  size={180}
+                  style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  viewBox={`0 0 256 256`}
+                />
+              </div>
+
+              <div style={{ marginTop: '16px', fontWeight: 800, fontSize: '1.1rem', fontFamily: '"Outfit", sans-serif' }}>
+                {createdUser.first_name} {createdUser.last_name}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#a7f3d0', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>
+                Administrator
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#fef08a', fontWeight: 800, marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', width: '100%' }}>
+                Ausweis-PIN: {createdUser.ausweis_nummer}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '320px', marginTop: '8px' }}>
+              <button 
+                onClick={downloadQrCode} 
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: '1.5px solid #d1d5db',
+                  background: 'white',
+                  color: '#475569',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <Download size={16} /> QR-Ausweis herunterladen
+              </button>
+              <button 
+                onClick={downloadWalletPass} 
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: '1.5px solid #d1d5db',
+                  background: 'white',
+                  color: '#475569',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <Key size={16} /> Wallet Pass (.pkpass)
+              </button>
+              <button 
+                onClick={() => onSignupSuccess(createdUser.id)}
+                style={{
+                  ...nextButtonStyle,
+                  width: '100%',
+                  margin: '8px 0 0 0',
+                  boxSizing: 'border-box'
+                }}
+              >
+                Zum Dashboard fortfahren <ArrowRight size={16} />
+              </button>
             </div>
           </div>
         )}

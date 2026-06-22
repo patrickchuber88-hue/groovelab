@@ -519,6 +519,15 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }
 
     try {
+      // 1. Delete users first to satisfy the audit_logs foreign key constraint
+      const { error: usersErr } = await supabase
+        .from('users')
+        .delete()
+        .eq('school_id', id);
+
+      if (usersErr) throw usersErr;
+
+      // 2. Delete the school itself
       const { error } = await supabase
         .from('schools')
         .delete()

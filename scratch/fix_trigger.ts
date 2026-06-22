@@ -1,16 +1,15 @@
--- Migration: 139_update_audit_logs_rls.sql
--- Description: Add school_id to audit_logs, update trigger to set school_id and resolve changed_by using x-user-id header, and update RLS select policy.
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config({ path: '/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/.env.local' });
 
--- 1. school_id Spalte zu audit_logs hinzufügen
-ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL;
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
 
--- 2. Bestehende Daten anreichern
-UPDATE public.audit_logs
-SET school_id = users.school_id
-FROM public.users
-WHERE audit_logs.record_id = users.id AND audit_logs.school_id IS NULL;
+const supabase = createClient(
+  'https://supabase.campus-groovelab.de',
+  SERVICE_KEY
+);
 
--- 3. Trigger-Funktion für Audit-Log aktualisieren
+const sql = `
 CREATE OR REPLACE FUNCTION public.process_audit_log()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -49,8 +48,8 @@ BEGIN
 
     IF TG_OP = 'INSERT' THEN
         v_new := to_jsonb(NEW);
-        -- Sensible Felder ausschließen
-        v_new := v_new - 'password' - 'personal_pin';
+        -- Sensible Felder und Heartbeats ausschließen
+        v_new := v_new - 'password' - 'personal_pin' - 'password_hash' - 'last_seen';
         
         INSERT INTO public.audit_logs (changed_by, school_id, table_name, action, record_id, new_data)
         VALUES (v_user_id, v_school_id, TG_TABLE_NAME::TEXT, TG_OP, NEW.id, v_new);
@@ -58,8 +57,8 @@ BEGIN
         
     ELSIF TG_OP = 'UPDATE' THEN
         -- Berechne das Diff (altes Feld vs. neues Feld und umgekehrt)
-        v_old := public.jsonb_diff(to_jsonb(OLD), to_jsonb(NEW)) - 'password' - 'personal_pin';
-        v_new := public.jsonb_diff(to_jsonb(NEW), to_jsonb(OLD)) - 'password' - 'personal_pin';
+        v_old := public.jsonb_diff(to_jsonb(OLD), to_jsonb(NEW)) - 'password' - 'personal_pin' - 'password_hash' - 'last_seen';
+        v_new := public.jsonb_diff(to_jsonb(NEW), to_jsonb(OLD)) - 'password' - 'personal_pin' - 'password_hash' - 'last_seen';
         
         -- Nur loggen, wenn sich tatsächlich relevante Spalten geändert haben
         IF v_old != '{}'::JSONB OR v_new != '{}'::JSONB THEN
@@ -69,7 +68,7 @@ BEGIN
         RETURN NEW;
         
     ELSIF TG_OP = 'DELETE' THEN
-        v_old := to_jsonb(OLD) - 'password' - 'personal_pin';
+        v_old := to_jsonb(OLD) - 'password' - 'personal_pin' - 'password_hash' - 'last_seen';
         
         INSERT INTO public.audit_logs (changed_by, school_id, table_name, action, record_id, old_data)
         VALUES (v_user_id, v_school_id, TG_TABLE_NAME::TEXT, TG_OP, OLD.id, v_old);
@@ -79,23 +78,16 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+`;
 
--- 4. RLS-Richtlinien aktualisieren
-DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_logs;
-DROP POLICY IF EXISTS "Admins and secretaries can view audit logs" ON public.audit_logs;
+async function run() {
+  console.log("Applying process_audit_log() safety fix to database...");
+  const { data, error } = await supabase.rpc('execute_sql', { sql_query: sql });
+  if (error) {
+    console.error("Error applying SQL trigger fix:", error);
+  } else {
+    console.log("Successfully updated process_audit_log trigger function in Supabase.");
+  }
+}
 
-CREATE POLICY "Admins and secretaries can view audit logs" ON public.audit_logs
-    FOR SELECT
-    USING (
-        public.is_master_admin() OR (
-            EXISTS (
-                SELECT 1 FROM public.users changer
-                WHERE changer.id = (current_setting('request.headers', true)::json->>'x-user-id')::uuid
-                  AND changer.role IN ('admin', 'secretary')
-                  AND changer.school_id = audit_logs.school_id
-            )
-        )
-    );
-
--- 5. PGRST Schema Cache neu laden
-NOTIFY pgrst, 'reload schema';
+run();
