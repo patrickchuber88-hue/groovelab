@@ -139,6 +139,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   // --- M5 Drag-and-Drop Board & Conflict Prevention ---
   const [activeStage, setActiveStage] = useState<number>(1);
   const [dbConflicts, setDbConflicts] = useState<{ program_point_id: string; conflict_type: string; conflict_message: string }[]>([]);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<'above' | 'below' | null>(null);
   const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
   const [manualTitle, setManualTitle] = useState('');
   const [manualEnsemble, setManualEnsemble] = useState('');
@@ -769,7 +771,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
-  const handleDropOnTimeline = async (e: React.DragEvent, targetPpId?: string) => {
+  const handleDropOnTimeline = async (e: React.DragEvent, targetPpId?: string, insertAbove: boolean = true) => {
     e.preventDefault();
     const ppId = e.dataTransfer.getData('ppId');
     if (!ppId) return;
@@ -795,10 +797,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     if (targetPpId) {
       const targetIdx = stageScheduled.findIndex(p => p.id === targetPpId);
       if (targetIdx !== -1) {
+        const sliceIdx = insertAbove ? targetIdx : targetIdx + 1;
         newStageScheduled = [
-          ...stageScheduled.slice(0, targetIdx),
+          ...stageScheduled.slice(0, sliceIdx),
           draggedItem,
-          ...stageScheduled.slice(targetIdx)
+          ...stageScheduled.slice(sliceIdx)
         ];
       } else {
         newStageScheduled = [...stageScheduled, draggedItem];
@@ -848,6 +851,54 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       }
     }
 
+    setProgramPoints(finalPoints);
+  };
+
+  const handleMoveProgramPoint = async (ppId: string, direction: 'up' | 'down') => {
+    const stagePoints = programPoints.filter(p => (p.is_scheduled || p.is_pause) && (p.stage_number || 1) === activeStage)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    
+    const idx = stagePoints.findIndex(p => p.id === ppId);
+    if (idx === -1) return;
+    
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === stagePoints.length - 1) return;
+    
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const updatedStagePoints = [...stagePoints];
+    
+    // Swap items
+    const temp = updatedStagePoints[idx];
+    updatedStagePoints[idx] = updatedStagePoints[targetIdx];
+    updatedStagePoints[targetIdx] = temp;
+    
+    // Recalculate sort_order
+    updatedStagePoints.forEach((p, index) => {
+      p.sort_order = index;
+    });
+    
+    const finalPoints = programPoints.map(p => {
+      const stageItem = updatedStagePoints.find(sp => sp.id === p.id);
+      return stageItem ? { ...p, sort_order: stageItem.sort_order } : p;
+    });
+    
+    const pointsToUpdate = finalPoints.filter(p => {
+      const original = programPoints.find(orig => orig.id === p.id);
+      return original.sort_order !== p.sort_order;
+    });
+    
+    for (const pp of pointsToUpdate) {
+      const { error } = await supabase
+        .from('campus_event_program_points')
+        .update({ sort_order: pp.sort_order })
+        .eq('id', pp.id);
+      if (error) {
+        console.error('Error updating program point sort order:', error);
+        alert('Fehler beim Umsortieren.');
+        return;
+      }
+    }
+    
     setProgramPoints(finalPoints);
   };
 
@@ -7652,7 +7703,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     border: isExpanded ? '1px solid #cbd5e1' : '1px solid #eef3ef',
                                     cursor: 'pointer',
                                     transition: 'all 0.15s ease',
-                                    boxSizing: 'border-box'
+                                    boxSizing: 'border-box',
+                                    position: 'relative'
                                   }}
                                 >
                                   {/* Row Info */}
@@ -8606,15 +8658,31 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                              return (
                                <div
                                  key={pp.id}
-                                 draggable
+                                 draggable={role === 'admin' || role === 'secretary'}
+                                 onDragOver={e => {
+                                    e.preventDefault();
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const relativeY = e.clientY - rect.top;
+                                    const isAbove = relativeY < rect.height / 2;
+                                    setDragOverId(pp.id);
+                                    setDragOverPosition(isAbove ? 'above' : 'below');
+                                  }}
+                                  onDragLeave={() => {
+                                    setDragOverId(null);
+                                    setDragOverPosition(null);
+                                  }}
+                                  onDrop={e => {
+                                    e.stopPropagation();
+                                    setDragOverId(null);
+                                    setDragOverPosition(null);
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const relativeY = e.clientY - rect.top;
+                                    const isAbove = relativeY < rect.height / 2;
+                                    handleDropOnTimeline(e, pp.id, isAbove);
+                                  }}
                                  onDragStart={e => {
                                    e.dataTransfer.setData('ppId', pp.id);
                                    e.dataTransfer.effectAllowed = 'move';
-                                 }}
-                                 onDragOver={e => e.preventDefault()}
-                                 onDrop={e => {
-                                   e.stopPropagation();
-                                   handleDropOnTimeline(e, pp.id);
                                  }}
                                  onMouseEnter={e => {
                                    e.currentTarget.style.transform = 'translateY(-2px)';
@@ -8649,6 +8717,32 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                                  }}
                                >
+                                 {/* Drop indicator lines */}
+                                 {dragOverId === pp.id && dragOverPosition === 'above' && (
+                                   <div style={{
+                                     position: 'absolute',
+                                     top: '-8px',
+                                     left: '0',
+                                     right: '0',
+                                     height: '4px',
+                                     backgroundColor: brandColor,
+                                     borderRadius: '2px',
+                                     zIndex: 10
+                                   }} />
+                                 )}
+                                 {dragOverId === pp.id && dragOverPosition === 'below' && (
+                                   <div style={{
+                                     position: 'absolute',
+                                     bottom: '-8px',
+                                     left: '0',
+                                     right: '0',
+                                     height: '4px',
+                                     backgroundColor: brandColor,
+                                     borderRadius: '2px',
+                                     zIndex: 10
+                                   }} />
+                                 )}
+
                                  {/* Timeline Dot Indicator */}
                                  <div style={{
                                    position: 'absolute',
@@ -8772,6 +8866,59 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 </div>
   
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  {/* Up/Down Sorting Buttons */}
+                                  {isAdminOrSecretary && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginRight: '4px' }}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleMoveProgramPoint(pp.id, 'up');
+                                        }}
+                                        disabled={idx === 0}
+                                        style={{
+                                          border: 'none',
+                                          background: '#f5f5f7',
+                                          cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          borderRadius: '6px',
+                                          color: idx === 0 ? '#d1d1d6' : '#1d1d1f',
+                                          opacity: idx === 0 ? 0.4 : 1
+                                        }}
+                                        title="Nach oben verschieben"
+                                      >
+                                        <ChevronUp size={14} strokeWidth={2.5} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleMoveProgramPoint(pp.id, 'down');
+                                        }}
+                                        disabled={idx === activeStagePoints.length - 1}
+                                        style={{
+                                          border: 'none',
+                                          background: '#f5f5f7',
+                                          cursor: idx === activeStagePoints.length - 1 ? 'not-allowed' : 'pointer',
+                                          width: '24px',
+                                          height: '24px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          borderRadius: '6px',
+                                          color: idx === activeStagePoints.length - 1 ? '#d1d1d6' : '#1d1d1f',
+                                          opacity: idx === activeStagePoints.length - 1 ? 0.4 : 1
+                                        }}
+                                        title="Nach unten verschieben"
+                                      >
+                                        <ChevronDown size={14} strokeWidth={2.5} />
+                                      </button>
+                                    </div>
+                                  )}
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
                                     <label style={{ 
                                       fontSize: '0.58rem', 

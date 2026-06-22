@@ -63,6 +63,7 @@ interface ProfileData {
   photo_url: string | null;
   role: string;
   school_name: string;
+  school_id: string | null;
   is_campus_active: boolean;
   is_groovelab_active: boolean;
   app_usage_mode: string;
@@ -77,6 +78,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Admin Mobile Stats
+  const [adminStats, setAdminStats] = useState({ activeStudents: 0, activeTeachers: 0, pendingActivations: 0 });
+  const [loadingAdminStats, setLoadingAdminStats] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
@@ -386,7 +392,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
+          .select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
           .eq('qr_token', token)
           .single();
 
@@ -439,8 +445,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           last_name: userData.last_name,
           instrument: userData.instrument || null,
           photo_url: userData.photo_url || null,
-          role: 'student',
+          role: userData.role || 'student',
           school_name: schoolName,
+          school_id: userData.school_id || null,
           is_campus_active: userData.is_campus_active ?? false,
           is_groovelab_active: userData.is_groovelab_active ?? false,
           app_usage_mode: userData.app_usage_mode ?? 'student_only',
@@ -503,6 +510,49 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       sessionStorage.removeItem('groovelab_qr_token');
     };
   }, []);
+
+  // ── Admin-Daten laden (Briefing-Board & Statistiken) ────────────────────────
+  useEffect(() => {
+    if (profile && (profile.role === 'admin' || profile.role === 'secretary')) {
+      const fetchAdminStats = async () => {
+        setLoadingAdminStats(true);
+        try {
+          // 1. Count students
+          const { count: studentCount } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('school_id', profile.school_id)
+            .eq('role', 'student');
+
+          // 2. Count teachers
+          const { count: teacherCount } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('school_id', profile.school_id)
+            .eq('role', 'teacher');
+
+          // 3. Count pending users (where is_campus_active is false and role is student/teacher/secretary)
+          const { count: pendingCount } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('school_id', profile.school_id)
+            .eq('role', 'student')
+            .eq('is_campus_active', false);
+
+          setAdminStats({
+            activeStudents: studentCount || 0,
+            activeTeachers: teacherCount || 0,
+            pendingActivations: pendingCount || 0
+          });
+        } catch (err) {
+          console.error('Error fetching admin mobile stats:', err);
+        } finally {
+          setLoadingAdminStats(false);
+        }
+      };
+      fetchAdminStats();
+    }
+  }, [profile]);
 
   // ── Dashboard-Daten laden ──────────────────────────────────────────────────
   const fetchDashboardData = useCallback(async () => {
@@ -2669,6 +2719,283 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── Render: Profile (10-Sekunden-Interface) ───────────────────────────────
   if (pageState === 'profile' && profile) {
+    const isAdminOrSecretary = profile.role === 'admin' || profile.role === 'secretary';
+
+    if (isAdminOrSecretary) {
+      const handleLogout = () => {
+        sessionStorage.removeItem('groovelab_user_id');
+        sessionStorage.removeItem('groovelab_qr_token');
+        window.location.replace('/');
+      };
+
+      const handleCopyLink = () => {
+        const subdomain = schoolData?.name
+          ? schoolData.name
+              .toLowerCase()
+              .trim()
+              .replace(/[äöüß]/g, (match: string) => {
+                const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+                return mapping[match] || match;
+              })
+              .replace(/[^a-z0-9]/g, '-')
+              .replace(/-+/g, '-')
+              .replace(/^-+|-+$/g, '')
+          : '';
+
+        const origin = window.location.origin;
+        let registerUrl = `${origin}?school=${subdomain}`;
+        if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+          registerUrl = `https://${subdomain}.campus-groovelab.de`;
+        }
+
+        navigator.clipboard.writeText(registerUrl);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      };
+
+      return (
+        <div style={{
+          ...styles.fullScreen,
+          background: '#0f172a',
+          padding: '20px',
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: '"Outfit", "Inter", sans-serif'
+        }}>
+          <div style={{
+            ...styles.card,
+            maxWidth: '420px',
+            width: '100%',
+            background: 'rgba(255, 255, 255, 0.03)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            borderRadius: '24px',
+            padding: '24px',
+            color: '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            {/* Header / Logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)'
+              }}>
+                <Shield size={18} color="#ffffff" />
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#ffffff' }}>
+                  Campus-Groovelab
+                </h1>
+                <span style={{ fontSize: '0.62rem', color: '#10b981', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Mobiles Leitstand-Dashboard
+                </span>
+              </div>
+            </div>
+
+            {/* Profile Briefing Board Card */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.04)',
+              borderRadius: '16px',
+              padding: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px'
+            }}>
+              <img
+                src="/campus_login_hero.png"
+                alt="Profile Chalkboard"
+                style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '12px',
+                  objectFit: 'cover',
+                  border: '1.5px solid rgba(255, 255, 255, 0.1)'
+                }}
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h2 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {profile.first_name} {profile.last_name || ''}
+                </h2>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {profile.role === 'admin' ? 'Schulleitung' : 'Sekretariat/Verwaltung'}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600, marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {profile.school_name}
+                </div>
+              </div>
+            </div>
+
+            {/* Alert: Pending Activations */}
+            {adminStats.pendingActivations > 0 ? (
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.06)',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                borderRadius: '16px',
+                padding: '16px',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start'
+              }}>
+                <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <div>
+                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginBottom: '2px' }}>
+                    Registrierungen ausstehend!
+                  </strong>
+                  <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 550, lineHeight: 1.4 }}>
+                    Es warten <strong>{adminStats.pendingActivations}</strong> neue Profile auf die manuelle Freischaltung im Briefing Board nach Zahlungseingang.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.05)',
+                border: '1px solid rgba(16, 185, 129, 0.15)',
+                borderRadius: '16px',
+                padding: '16px',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center'
+              }}>
+                <CheckCircle size={18} color="#10b981" />
+                <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 600 }}>
+                  Alle Profile sind aktuell freigeschaltet. Keine ausstehenden Aktivitäten.
+                </span>
+              </div>
+            )}
+
+            {/* KPI Stats Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px'
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.04)',
+                borderRadius: '16px',
+                padding: '16px',
+                textAlign: 'center'
+              }}>
+                <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler</span>
+                {loadingAdminStats ? (
+                  <div style={{ height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="animate-spin" style={{ width: '12px', height: '12px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                  </div>
+                ) : (
+                  <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '4px' }}>{adminStats.activeStudents}</strong>
+                )}
+              </div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.04)',
+                borderRadius: '16px',
+                padding: '16px',
+                textAlign: 'center'
+              }}>
+                <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkräfte</span>
+                {loadingAdminStats ? (
+                  <div style={{ height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="animate-spin" style={{ width: '12px', height: '12px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                  </div>
+                ) : (
+                  <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '4px' }}>{adminStats.activeTeachers}</strong>
+                )}
+              </div>
+            </div>
+
+            {/* School Registration Link Card */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.01)',
+              border: '1px solid rgba(255, 255, 255, 0.04)',
+              borderRadius: '16px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Registrierungs-Link
+              </span>
+              <button
+                onClick={handleCopyLink}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: copiedLink ? '#10b981' : 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {copiedLink ? 'Kopiert ✓' : 'Anmeldelink kopieren'}
+              </button>
+            </div>
+
+            {/* Hint & Actions */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.01)',
+              borderRadius: '16px',
+              padding: '14px',
+              border: '1.5px dashed rgba(255, 255, 255, 0.06)',
+              fontSize: '0.7rem',
+              color: '#94a3b8',
+              lineHeight: 1.4,
+              textAlign: 'center'
+            }}>
+              Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking und Schulinformationen) ist für <strong>Desktop-Computer</strong> optimiert.
+            </div>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                color: '#f87171',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#ef4444';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                e.currentTarget.style.color = '#f87171';
+              }}
+            >
+              Abmelden
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const todayStr = new Date().toLocaleDateString('en-CA');
     const currentDayOfWeek = new Date().getDay() || 7; // Monday = 1, ..., Sunday = 7
 
