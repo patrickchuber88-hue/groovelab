@@ -3,8 +3,19 @@ import { supabase } from '../lib/supabase';
 import { 
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
-  Edit2, Settings, Sliders, Search, Tag, Percent
+  Edit2, Settings, Sliders, Search, Tag, Percent,
+  Activity, Cpu, Database, AlertTriangle
 } from 'lucide-react';
+
+interface ServerMetric {
+  id: string;
+  created_at: string;
+  cpu_load: number;
+  mem_used_mb: number;
+  mem_total_mb: number;
+  swap_used_mb: number;
+  active_connections: number;
+}
 
 import { BillingDashboard } from './BillingDashboard';
 
@@ -158,11 +169,37 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [editHasCampus, setEditHasCampus] = useState(false);
   const [editSubscriptionBypass, setEditSubscriptionBypass] = useState(false);
 
+  // Server Telemetry State
+  const [serverMetrics, setServerMetrics] = useState<ServerMetric[]>([]);
+  const [fetchingMetrics, setFetchingMetrics] = useState(false);
+
+  const fetchServerMetrics = async () => {
+    setFetchingMetrics(true);
+    try {
+      const { data, error } = await supabase
+        .from('server_metrics')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      
+      if (error) {
+        console.error('Error fetching server metrics:', error);
+      } else if (data) {
+        setServerMetrics(data);
+      }
+    } catch (err) {
+      console.error('Error in fetchServerMetrics:', err);
+    } finally {
+      setFetchingMetrics(false);
+    }
+  };
+
   useEffect(() => {
     fetchSchoolsAndStats();
     fetchAdminUser();
     fetchBillingSettings();
     fetchPendingUsers();
+    fetchServerMetrics();
   }, []);
 
   const fetchBillingSettings = async () => {
@@ -419,6 +456,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const fetchSchoolsAndStats = async () => {
     try {
       setLoading(true);
+      fetchServerMetrics();
       
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
@@ -2008,6 +2046,343 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   </div>
                 ))}
               </div>
+
+              {/* Server-Systemstatus & Auslastung */}
+              {(() => {
+                const latestMetric = serverMetrics[0] || null;
+                const cpuVal = latestMetric ? latestMetric.cpu_load : 0;
+                const ramUsed = latestMetric ? latestMetric.mem_used_mb : 0;
+                const ramTotal = latestMetric ? latestMetric.mem_total_mb : 8000;
+                const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
+                const dbConns = latestMetric ? latestMetric.active_connections : 0;
+                
+                let healthStatus: 'optimal' | 'warning' | 'critical' = 'optimal';
+                if (cpuVal >= 4.0 || ramPct >= 90 || dbConns >= 80) {
+                  healthStatus = 'critical';
+                } else if (cpuVal >= 2.0 || ramPct >= 75 || dbConns >= 50) {
+                  healthStatus = 'warning';
+                }
+
+                // Format timestamp
+                const formattedTime = latestMetric 
+                  ? new Date(latestMetric.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                  : '--:--:--';
+
+                return (
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '32px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px'
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '12px',
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Activity size={20} className={healthStatus === 'critical' ? 'animate-pulse' : ''} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                            Server-Systemstatus &amp; Live-Messung
+                          </h3>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                            Hetzner VPS Telemetrie-Agent • Letztes Signal: {formattedTime}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 16px',
+                          borderRadius: '9999px',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#10b981',
+                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}`
+                        }}>
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                            display: 'inline-block'
+                          }} />
+                          {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
+                          {healthStatus === 'warning' && 'WARNUNG (Auslastung erhöht)'}
+                          {healthStatus === 'optimal' && 'OPTIMAL (Gesund)'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Critical Alert Callout */}
+                    {healthStatus === 'critical' && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.03)',
+                        border: '1px solid rgba(239, 68, 68, 0.15)',
+                        borderRadius: '16px',
+                        padding: '18px 24px',
+                        display: 'flex',
+                        gap: '16px',
+                        alignItems: 'flex-start'
+                      }}>
+                        <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>
+                            Achtung: Der Server erreicht seine Leistungsgrenzen!
+                          </strong>
+                          <span style={{ fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.5 }}>
+                            Aufgrund hoher Auslastung (CPU Load ≥ 4.0, RAM ≥ 90% oder offene DB-Verbindungen ≥ 80) läuft das System am Limit.
+                            Ein Umstieg auf einen leistungsstärkeren Hetzner Cloud Server (z. B. Upgrade auf CX32 oder CX42 mit mehr CPU-Kernen und RAM) wird dringend empfohlen, um Server-Ausfälle oder Verzögerungen für die Schulen zu vermeiden.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gauges Grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '24px'
+                    }}>
+                      {/* CPU Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Cpu size={14} /> CPU Auslastung
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#10b981' }}>
+                            {cpuVal.toFixed(2)} / 2.0 Cores
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
+                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Auslastung: {Math.round((cpuVal / 2.0) * 100)}%</span>
+                          <span>{cpuVal >= 4.0 ? 'Kritisch' : cpuVal >= 2.0 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+
+                      {/* RAM Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Sliders size={14} /> Arbeitsspeicher (RAM)
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#10b981' }}>
+                            {(ramUsed / 1024).toFixed(2)} GB / {(ramTotal / 1024).toFixed(2)} GB
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(ramPct, 100)}%`,
+                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Belegt: {Math.round(ramPct)}%</span>
+                          <span>{ramPct >= 90 ? 'Kritisch' : ramPct >= 75 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+
+                      {/* DB Connections Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Database size={14} /> DB Pool Connections
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#10b981' }}>
+                            {dbConns} / 100
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(dbConns, 100)}%`,
+                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Auslastung: {dbConns}%</span>
+                          <span>{dbConns >= 80 ? 'Kritisch' : dbConns >= 50 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline Trend Chart */}
+                    {serverMetrics.length > 1 && (
+                      <div style={{
+                        borderTop: '1px solid rgba(15, 23, 42, 0.06)',
+                        paddingTop: '24px'
+                      }}>
+                        <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Auslastungshistorie (Letzte 30 Messungen)
+                        </h4>
+                        
+                        {/* Interactive SVG Chart */}
+                        <div style={{ width: '100%', height: '140px', position: 'relative' }}>
+                          {(() => {
+                            const data = [...serverMetrics].reverse();
+                            const width = 800; // virtual width for SVG viewbox
+                            const height = 120; // virtual height for SVG viewbox
+                            
+                            // Normalization helper
+                            const getPoints = (valExtractor: (m: ServerMetric) => number, maxVal: number) => {
+                              return data.map((m, index) => {
+                                const x = (index / (data.length - 1)) * width;
+                                const y = height - (Math.min(valExtractor(m), maxVal) / maxVal) * (height - 10) - 5;
+                                return { x, y };
+                              });
+                            };
+
+                            const cpuPoints = getPoints((m) => m.cpu_load, 4.0);
+                            const ramPoints = getPoints((m) => (m.mem_used_mb / (m.mem_total_mb || 8000)) * 100, 100);
+                            const dbPoints = getPoints((m) => m.active_connections, 100);
+
+                            const pointsToString = (pts: { x: number, y: number }[]) => {
+                              return pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                            };
+
+                            return (
+                              <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                                {/* Definitions for grid line pattern or gradients */}
+                                <defs>
+                                  <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                  <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                  <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                </defs>
+
+                                {/* Y-axis gridlines */}
+                                <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                                <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                                <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+
+                                {/* Area below curves (fill) */}
+                                {cpuPoints.length > 1 && (
+                                  <polygon
+                                    points={`${cpuPoints[0].x},${height} ${pointsToString(cpuPoints)} ${cpuPoints[cpuPoints.length-1].x},${height}`}
+                                    fill="url(#cpuGrad)"
+                                  />
+                                )}
+                                {ramPoints.length > 1 && (
+                                  <polygon
+                                    points={`${ramPoints[0].x},${height} ${pointsToString(ramPoints)} ${ramPoints[ramPoints.length-1].x},${height}`}
+                                    fill="url(#ramGrad)"
+                                  />
+                                )}
+                                {dbPoints.length > 1 && (
+                                  <polygon
+                                    points={`${dbPoints[0].x},${height} ${pointsToString(dbPoints)} ${dbPoints[dbPoints.length-1].x},${height}`}
+                                    fill="url(#dbGrad)"
+                                  />
+                                )}
+
+                                {/* Line curves */}
+                                <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
+                                <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
+                                <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
+
+                                {/* Interactive dots on latest point */}
+                                {cpuPoints.length > 0 && (
+                                  <>
+                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+                                    <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
+                                    <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
+                                  </>
+                                )}
+                              </svg>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Chart Legend */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '24px',
+                          justifyContent: 'center',
+                          marginTop: '8px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#10b981', borderRadius: '2px' }} />
+                            CPU-Auslastung (Skaliert auf 4.0 Cores)
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#6366f1', borderRadius: '2px' }} />
+                            RAM-Belegung %
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#a855f7', borderRadius: '2px' }} />
+                            Aktive DB-Verbindungen %
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Layout split grid */}
               <div style={{

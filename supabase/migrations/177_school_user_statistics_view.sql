@@ -1,7 +1,7 @@
 -- 📊 GrooveLab School User Statistics View
 -- Erstellt eine View für aggregierte Benutzerstatistiken pro Schule, um die 1000er API-Grenze (PostgREST Limit) im Master-Dashboard zu umgehen.
 
-CREATE OR REPLACE VIEW public.school_user_statistics WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW public.school_user_statistics WITH (security_invoker = false) AS
 SELECT 
     school_id,
     COUNT(CASE WHEN role IN ('teacher', 'admin') THEN 1 END)::int AS teachers,
