@@ -206,8 +206,13 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   useEffect(() => {
     let active = true;
     
+    const roleLower = (user.role || '').toLowerCase();
+    const isAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
+
     let originalUrl = user.photo_url || '/avatar_ghost.jpg';
-    if (activePlatform === 'campus') {
+    if (isAdminOrSecretary) {
+      originalUrl = '/campus_login_hero.png';
+    } else if (activePlatform === 'campus') {
       originalUrl = getInstrumentAvatarUrl(user.instrument);
     } else {
       const isStudentAvatar = user.photo_url && (
@@ -332,6 +337,73 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     } catch (err) {
       console.error('Fehler beim JPEG-Download:', err);
     }
+  };
+
+  const downloadWalletPass = () => {
+    const passContent = JSON.stringify({
+      passTypeIdentifier: user.role === 'admin' ? 'pass.de.groovelab.admin' : (user.role === 'teacher' ? 'pass.de.groovelab.teacher' : 'pass.de.groovelab.student'),
+      serialNumber: user.qr_token || user.teacher_qr_token || user.id,
+      teamIdentifier: "GROOVELAB",
+      organizationName: "Campus-Groovelab",
+      description: `Campus-Groovelab ${user.role} Pass`,
+      logoText: "Campus-Groovelab",
+      foregroundColor: "rgb(255, 255, 255)",
+      backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
+      labelColor: "rgb(167, 243, 208)",
+      studentName: `${user.first_name} ${user.last_name || ''}`,
+      instrument: user.instrument || (user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
+      qrToken: user.qr_token || user.teacher_qr_token
+    }, null, 2);
+
+    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `campus-pass-${user.first_name || 'user'}.pkpass`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  const downloadGoogleWalletPass = () => {
+    const passContent = JSON.stringify({
+      classId: `groovelab.${user.role || 'student'}`,
+      id: user.qr_token || user.teacher_qr_token || user.id,
+      state: "ACTIVE",
+      barcode: {
+        type: "QR_CODE",
+        value: user.qr_token || user.teacher_qr_token
+      },
+      cardTitle: {
+        defaultValue: {
+          language: "de-DE",
+          value: "Campus-Groovelab"
+        }
+      },
+      subheader: {
+        defaultValue: {
+          language: "de-DE",
+          value: user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'))
+        }
+      },
+      header: {
+        defaultValue: {
+          language: "de-DE",
+          value: `${user.first_name} ${user.last_name || ''}`
+        }
+      }
+    }, null, 2);
+
+    const blob = new Blob([passContent], { type: 'application/json' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `google-wallet-pass-${user.first_name || 'user'}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   };
   
   return (
@@ -599,6 +671,71 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         >
           <Download size={24} /> Ausweis als JPEG speichern
         </button>
+
+        {/* Wallet integration options */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+          <button 
+            onClick={downloadWalletPass}
+            style={{
+              flex: 1,
+              padding: '16px',
+              borderRadius: '20px',
+              border: '1.5px solid #e2e8f0',
+              background: '#ffffff',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#e2e8f0';
+            }}
+          >
+            <span>Apple Wallet</span>
+          </button>
+
+          <button 
+            onClick={downloadGoogleWalletPass}
+            style={{
+              flex: 1,
+              padding: '16px',
+              borderRadius: '20px',
+              border: '1.5px solid #e2e8f0',
+              background: '#ffffff',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#e2e8f0';
+            }}
+          >
+            <span>Google Wallet</span>
+          </button>
+        </div>
 
         {/* Action button for managers to regenerate QR Code */}
         {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (

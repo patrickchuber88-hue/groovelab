@@ -7402,8 +7402,8 @@ function App() {
               )}
             </div>
 
-            {/* Ausweis Button (Only Student, Desktop only) */}
-            {user.role?.toLowerCase() === 'student' && windowWidth > 800 && (
+            {/* Ausweis Button (Desktop only) */}
+            {windowWidth > 800 && (
               <button onClick={() => setShowQR(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', padding: '10px 20px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
                 <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
                 <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
@@ -7654,7 +7654,7 @@ function App() {
                     </h1>
 
                     {/* Instrument pills */}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                       {(user.instrument || '').split(',').map((inst: string) => inst.trim()).filter(Boolean).map((inst: string) => (
                         <div key={inst} style={{
                           display: 'inline-flex',
@@ -7672,6 +7672,33 @@ function App() {
                           <span>{inst}</span>
                         </div>
                       ))}
+
+                      {/* Campus-Ausweis Button */}
+                      {(user?.qr_token || user?.teacher_qr_token) && (
+                        <button 
+                          onClick={() => setShowQR(true)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                            color: 'white',
+                            padding: '6px 14px',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
+                          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          <QrCode size={15} />
+                          <span>Campus-Ausweis</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -7895,6 +7922,30 @@ function App() {
                       <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                         <Star size={12} fill="white" /> {userSongs.filter(s => s.progress === 100).length * 100} XP
                       </div>
+                    )}
+
+                    {/* Campus-Ausweis Button */}
+                    {(user?.qr_token || user?.teacher_qr_token) && (
+                      <button 
+                        onClick={() => setShowQR(true)}
+                        style={{
+                          background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                          color: 'white',
+                          padding: '4px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 950,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
+                        }}
+                      >
+                        <QrCode size={12} />
+                        <span>CAMPUS-AUSWEIS</span>
+                      </button>
                     )}
                   </div>
 
@@ -11704,7 +11755,7 @@ function App() {
       )}
 
       {/* Modal: QR Code anzeigen */}
-      {showQR && user?.qr_token && (
+      {showQR && (user?.qr_token || user?.teacher_qr_token) && (
         <QRCodeModal user={user} activePlatform={activePlatform} onClose={() => setShowQR(false)} />
       )}
 

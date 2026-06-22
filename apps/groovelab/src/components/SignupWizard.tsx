@@ -23,6 +23,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     qr_token: string;
     ausweis_nummer: string;
     schoolName: string;
+    birthDay?: number;
   } | null>(null);
 
   // Step 1: School Info
@@ -41,6 +42,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   // Step 2: Owner Info
   const [adminFirstName, setAdminFirstName] = useState('');
   const [adminLastName, setAdminLastName] = useState('');
+  const [adminBirthDay, setAdminBirthDay] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
 
   // Step 3: OTP
@@ -204,6 +206,16 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
           if (userErr) throw userErr;
 
+          // Insert activation_days for the admin user to use as device confirmation PIN
+          const { error: activationErr } = await supabase
+            .from('activation_days')
+            .insert({
+              student_id: adminId,
+              day_of_birth: parseInt(adminBirthDay, 10)
+            });
+
+          if (activationErr) throw activationErr;
+
           // Automatically log the new user in
           sessionStorage.setItem('groovelab_user_id', adminId);
           localStorage.setItem('groovelab_active_platform', 'campus');
@@ -214,7 +226,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             last_name: adminLastName.trim(),
             qr_token: qrToken,
             ausweis_nummer: generatedAdminPin,
-            schoolName: schoolName.trim()
+            schoolName: schoolName.trim(),
+            birthDay: parseInt(adminBirthDay, 10)
           });
 
           // Transition to Step 3 success view
@@ -629,6 +642,24 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </div>
             </div>
 
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Tag des Geburtstags (Geräte-PIN für QR-Anmeldung) *</label>
+              <select
+                required
+                value={adminBirthDay}
+                onChange={(e) => setAdminBirthDay(e.target.value)}
+                style={inputStyle}
+                className="signup-input"
+              >
+                <option value="">Bitte wählen...</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                  <option key={day} value={day}>
+                    {String(day).padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </div>
+
 
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
@@ -740,8 +771,9 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               <div style={{ fontSize: '0.75rem', color: '#a7f3d0', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>
                 Administrator
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#fef08a', fontWeight: 800, marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', width: '100%' }}>
-                Ausweis-PIN: {createdUser.ausweis_nummer}
+              <div style={{ fontSize: '0.8rem', color: '#fef08a', fontWeight: 800, marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', width: '100%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>Ausweis-PIN: {createdUser.ausweis_nummer}</div>
+                <div>Geräte-PIN: {String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</div>
               </div>
             </div>
 

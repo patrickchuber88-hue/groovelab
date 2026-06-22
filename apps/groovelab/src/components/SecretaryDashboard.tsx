@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -16,6 +16,7 @@ import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
+import { QRCodeModal } from './QRCodeModal';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -1144,6 +1145,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
+  const [showOwnQrModal, setShowOwnQrModal] = useState<boolean>(false);
 
   // Visual Live Lab states & refs
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
@@ -1165,7 +1167,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     const loadOwnProfile = async () => {
       const { data } = await supabase
         .from('users')
-        .select('id, first_name, last_name, nickname, photo_url, role, roles, email, instrument')
+        .select('id, first_name, last_name, nickname, photo_url, role, roles, email, instrument, qr_token, teacher_qr_token')
         .eq('id', userId)
         .single();
       if (data) setCurrentUserProfile(data);
@@ -1458,6 +1460,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // School Data & Subscription
   const [schoolName, setSchoolName] = useState<string>('');
+  const [schoolSubdomain, setSchoolSubdomain] = useState<string>('');
   const [openingHours, setOpeningHours] = useState<any>(null);
   const [schoolZipCode, setSchoolZipCode] = useState<string>('');
   const [schoolCity, setSchoolCity] = useState<string>('');
@@ -2481,13 +2484,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       // Fetch school settings
       const { data: schoolData, error: schoolErr } = await supabase
         .from('schools')
-        .select('name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+        .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
         .eq('id', schoolId)
         .single();
 
       if (schoolErr) throw schoolErr;
       if (schoolData) {
         setSchoolName(schoolData.name);
+        setSchoolSubdomain(schoolData.subdomain || '');
         setOpeningHours(schoolData.opening_hours);
         setSchoolZipCode(schoolData.zip_code || '');
         setSchoolCity(schoolData.city || '');
@@ -9309,11 +9313,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         {/* Profile Info at bottom of sidebar */}
         <div style={{ borderTop: activeTab === 'campus' ? '1px solid #d1fae5' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
           <div 
-            onClick={() => {
-              if (activeTab === 'secretary') setSecretarySubTab('briefing');
-              else if (activeTab === 'campus') setCampusSubTab('briefing');
-              else setGroovelabSubTab('briefing');
-            }}
+            onClick={() => setShowOwnQrModal(true)}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -9655,6 +9655,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 )}
               </span>
             </div>
+
+            {/* Ausweis Button (Desktop only) */}
+            {window.innerWidth > 800 && (
+              <button 
+                onClick={() => setShowOwnQrModal(true)} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  background: 'white', 
+                  padding: '8px 14px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #f1f5f9', 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  color: activeTab === 'campus' ? '#34a853' : '#eab308'
+                }}
+              >
+                <span>Ausweis</span>
+                <QrCode size={16} color={activeTab === 'campus' ? '#34a853' : '#eab308'} />
+              </button>
+            )}
 
             {/* Elegant Logout Button */}
             {onLogout && (
@@ -22202,12 +22226,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input 
                         readOnly 
-                        value={`${window.location.origin}/?school_id=${schoolId}`} 
+                        value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
                         style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
                       />
                       <button 
                         onClick={() => { 
-                          navigator.clipboard.writeText(`${window.location.origin}/?school_id=${schoolId}`); 
+                          const link = schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`;
+                          navigator.clipboard.writeText(link); 
                           setCopiedSchoolLink(true);
                           setTimeout(() => setCopiedSchoolLink(false), 2000);
                         }} 
@@ -24185,6 +24210,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           <RefreshCw size={14} style={{ animation: 'spin 4s linear infinite' }} />
           Entwickler-Reset (Bestellvorgang zurücksetzen)
         </button>
+      )}
+      {/* Modal: QR Code anzeigen */}
+      {showOwnQrModal && currentUserProfile && (
+        <QRCodeModal user={currentUserProfile} activePlatform="campus" onClose={() => setShowOwnQrModal(false)} />
       )}
     </div>
   </div>

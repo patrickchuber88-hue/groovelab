@@ -11,6 +11,7 @@ import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
+import { QRCodeModal } from './QRCodeModal';
 
 const showMissionsFeature = false;
 
@@ -1860,6 +1861,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, []);
 
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showOwnQr, setShowOwnQr] = useState<boolean>(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [showSecondEmail, setShowSecondEmail] = useState(false);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
@@ -10278,37 +10280,62 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             </div>
 
-            {/* Profile Edit Action Button */}
-            <button 
-              onClick={() => {
-                setEditingProfile({ ...studentUser });
-                setAvatarCategoryFilter('Alle');
-                setShowSecondEmail(!!studentUser?.parent_email);
-                setShowAvatarSelector(false);
-                setShowEditProfile(true);
-              }} 
-              style={{ 
-                background: '#ffffff', 
-                border: '1px solid rgba(0,0,0,0.06)', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                color: '#0f172a', 
-                fontSize: '0.85rem', 
-                fontWeight: 800, 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                padding: '12px 20px',
-                borderRadius: '16px',
-                transition: 'all 0.2s',
-                marginLeft: 'auto'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
-              onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
-            >
-              <span>Profil bearbeiten</span>
-              <Pencil size={15} />
-            </button>
+            {/* Buttons Area */}
+            <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+              <button 
+                onClick={() => setShowOwnQr(true)}
+                style={{ 
+                  background: 'linear-gradient(135deg, #34a853 0%, #1b8035 100%)', 
+                  border: 'none', 
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                  color: '#ffffff', 
+                  fontSize: '0.85rem', 
+                  fontWeight: 800, 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '12px 20px',
+                  borderRadius: '16px',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <span>Campus-Ausweis</span>
+                <QrCode size={15} />
+              </button>
+
+              <button 
+                onClick={() => {
+                  setEditingProfile({ ...studentUser });
+                  setAvatarCategoryFilter('Alle');
+                  setShowSecondEmail(!!studentUser?.parent_email);
+                  setShowAvatarSelector(false);
+                  setShowEditProfile(true);
+                }} 
+                style={{ 
+                  background: '#ffffff', 
+                  border: '1px solid rgba(0,0,0,0.06)', 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  color: '#0f172a', 
+                  fontSize: '0.85rem', 
+                  fontWeight: 800, 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '12px 20px',
+                  borderRadius: '16px',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
+              >
+                <span>Profil bearbeiten</span>
+                <Pencil size={15} />
+              </button>
+            </div>
           </div>
 
           {/* Metrics Grid */}
@@ -10455,6 +10482,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             </div>
           </div>
+
+          {showOwnQr && studentUser?.qr_token && (
+            <QRCodeModal user={studentUser} activePlatform="campus" onClose={() => setShowOwnQr(false)} />
+          )}
 
           {/* Profile Edit Overlay Modal */}
           {showEditProfile && editingProfile && (
