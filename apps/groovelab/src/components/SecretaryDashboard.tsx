@@ -1800,8 +1800,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [roomFormName, setRoomFormName] = useState('');
   const [roomFormEquipment, setRoomFormEquipment] = useState<string[]>([]);
   const [roomFormMaxTeachers, setRoomFormMaxTeachers] = useState(1);
-  const [roomFormMaxStudents, setRoomFormMaxStudents] = useState(1);
-  const [roomFormQm, setRoomFormQm] = useState(0);
+  const [roomFormMaxStudents, setRoomFormMaxStudents] = useState<number | string>(1);
+  const [roomFormQm, setRoomFormQm] = useState<number | string>(0);
   const [roomFormIsCampusActive, setRoomFormIsCampusActive] = useState(true);
   const [roomFormIsGroovelabActive, setRoomFormIsGroovelabActive] = useState(false);
   const [roomFormFloor, setRoomFormFloor] = useState('Allgemein');
@@ -7590,6 +7590,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const handleSaveRoom = async () => {
     if (!roomFormName.trim() || !schoolId) return;
     setRoomSaving(true);
+    const finalMaxStudents = roomFormMaxStudents === '' ? 1 : (parseInt(roomFormMaxStudents as string) || 1);
+    const finalQm = roomFormQm === '' ? 0 : (parseFloat(roomFormQm as string) || 0);
     try {
       if (editingRoom) {
         // Update local mapping fallback first
@@ -7618,8 +7620,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
           max_teachers: roomFormMaxTeachers,
-          max_students: roomFormMaxStudents,
-          qm: roomFormQm,
+          max_students: finalMaxStudents,
+          qm: finalQm,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
           floor: roomFormFloor,
@@ -7636,8 +7638,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             name: roomFormName.trim(),
             allowed_instruments: roomFormEquipment,
             max_teachers: roomFormMaxTeachers,
-            max_students: roomFormMaxStudents,
-            qm: roomFormQm,
+            max_students: finalMaxStudents,
+            qm: finalQm,
             is_campus_active: roomFormIsCampusActive,
             is_groovelab_active: roomFormIsGroovelabActive
           }).eq('id', editingRoom.id);
@@ -7653,8 +7655,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               allowed_instruments: roomFormEquipment, 
               equipment: roomFormEquipment, 
               max_teachers: roomFormMaxTeachers,
-              max_students: roomFormMaxStudents,
-              qm: roomFormQm,
+              max_students: finalMaxStudents,
+              qm: finalQm,
               is_campus_active: roomFormIsCampusActive,
               is_groovelab_active: roomFormIsGroovelabActive,
               floor: roomFormFloor,
@@ -7669,8 +7671,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           name: roomFormName.trim(),
           allowed_instruments: roomFormEquipment,
           max_teachers: roomFormMaxTeachers,
-          max_students: roomFormMaxStudents,
-          qm: roomFormQm,
+          max_students: finalMaxStudents,
+          qm: finalQm,
           sort_order: rooms.length,
           is_campus_active: roomFormIsCampusActive,
           is_groovelab_active: roomFormIsGroovelabActive,
@@ -7691,8 +7693,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             name: roomFormName.trim(),
             allowed_instruments: roomFormEquipment,
             max_teachers: roomFormMaxTeachers,
-            max_students: roomFormMaxStudents,
-            qm: roomFormQm,
+            max_students: finalMaxStudents,
+            qm: finalQm,
             sort_order: rooms.length,
             is_campus_active: roomFormIsCampusActive,
             is_groovelab_active: roomFormIsGroovelabActive
@@ -21511,8 +21513,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}>
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <DoorOpen size={18} color="#0b57d0" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
+                        <DoorOpen size={18} color="#ea4335" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
                       </h4>
                       <button
                         onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }}
@@ -21533,7 +21535,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingRight: '10px' }}>
                         {/* Name */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Raumname *</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <Tag size={12} color="#ea4335" /> Raumname *
+                          </label>
                           <input
                             value={roomFormName}
                             onChange={e => setRoomFormName(e.target.value)}
@@ -21544,7 +21548,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                         {/* Gebäude */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Gebäude</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <School size={12} color="#ea4335" /> Gebäude
+                          </label>
                           <select
                             value={roomFormBuildingId}
                             onChange={e => setRoomFormBuildingId(e.target.value)}
@@ -21560,21 +21566,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         {/* Max students & QM */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Max. Schüler</label>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                              <Users size={12} color="#ea4335" /> Max. Schüler
+                            </label>
                             <input
                               type="number"
                               value={roomFormMaxStudents}
-                              onChange={e => setRoomFormMaxStudents(parseInt(e.target.value) || 1)}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setRoomFormMaxStudents(val === '' ? '' : parseInt(val));
+                              }}
                               min="1"
                               style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
                             />
                           </div>
                           <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Größe in m²</label>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                              <Ruler size={12} color="#ea4335" /> Größe in m²
+                            </label>
                             <input
                               type="number"
                               value={roomFormQm}
-                              onChange={e => setRoomFormQm(parseFloat(e.target.value) || 0)}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setRoomFormQm(val === '' ? '' : parseFloat(val));
+                              }}
                               min="0"
                               style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
                             />
@@ -21583,32 +21599,73 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                         {/* Modul */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Modul</label>
-                          <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'center' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                            <Sliders size={12} color="#ea4335" /> Module Freigabe
+                          </label>
+                          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                            <div 
+                              onClick={() => setRoomFormIsCampusActive(!roomFormIsCampusActive)}
+                              style={{
+                                flex: 1,
+                                padding: '12px',
+                                borderRadius: '12px',
+                                border: roomFormIsCampusActive !== false ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                                background: roomFormIsCampusActive !== false ? '#fce8e6' : '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                userSelect: 'none'
+                              }}
+                            >
                               <input
                                 type="checkbox"
-                                checked={roomFormIsCampusActive}
-                                onChange={e => setRoomFormIsCampusActive(e.target.checked)}
-                                style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
+                                checked={roomFormIsCampusActive !== false}
+                                readOnly
+                                style={{ width: '16px', height: '16px', accentColor: '#ea4335', cursor: 'pointer' }}
                               />
-                              Campus
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Campus</span>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Für Campus freischalten</span>
+                              </div>
+                            </div>
+
+                            <div 
+                              onClick={() => setRoomFormIsGroovelabActive(!roomFormIsGroovelabActive)}
+                              style={{
+                                flex: 1,
+                                padding: '12px',
+                                borderRadius: '12px',
+                                border: roomFormIsGroovelabActive ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                                background: roomFormIsGroovelabActive ? '#fce8e6' : '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                userSelect: 'none'
+                              }}
+                            >
                               <input
                                 type="checkbox"
-                                checked={roomFormIsGroovelabActive}
-                                onChange={e => setRoomFormIsGroovelabActive(e.target.checked)}
-                                style={{ width: '16px', height: '16px', accentColor: '#0b57d0', cursor: 'pointer' }}
+                                checked={!!roomFormIsGroovelabActive}
+                                readOnly
+                                style={{ width: '16px', height: '16px', accentColor: '#ea4335', cursor: 'pointer' }}
                               />
-                              Groovelab
-                            </label>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Groovelab</span>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Für Groovelab freischalten</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
                         {/* Akustisch ungeeignete Instrumente */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Akustisch ungeeignet für</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                            <ShieldAlert size={12} color="#ea4335" /> Akustisch ungeeignet für
+                          </label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             {['Schlagzeug', 'Klavier', 'E-Piano', 'Gitarre', 'Bass', 'Gesang', 'Bläser', 'Keyboard'].map(inst => {
                               const isUnsuitable = roomFormUnsuitableInstruments.includes(inst);
@@ -21626,9 +21683,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   style={{
                                     padding: '6px 12px',
                                     borderRadius: '8px',
-                                    border: isUnsuitable ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                                    background: isUnsuitable ? '#fef2f2' : 'white',
-                                    color: isUnsuitable ? '#ef4444' : '#475569',
+                                    border: isUnsuitable ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                                    background: isUnsuitable ? '#fce8e6' : 'white',
+                                    color: isUnsuitable ? '#ea4335' : '#475569',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
@@ -21644,7 +21701,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                         {/* Vorhandene Instrumente */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Vorhandene Instrumente (mit Modell)</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                            <Music size={12} color="#ea4335" /> Vorhandene Instrumente (mit Modell)
+                          </label>
                           
                           {/* List of existing */}
                           {roomFormRoomInstruments.length > 0 && (
@@ -21688,7 +21747,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 setNewInstrumentName('');
                                 setNewInstrumentModel('');
                               }}
-                              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#0b57d0', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#ea4335', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                             >
                               +
                             </button>
@@ -21697,7 +21756,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                         {/* Sonstiges */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Sonstiges (z.B. Bluetooth Box)</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <Sparkles size={12} color="#ea4335" /> Sonstige Ausstattung
+                          </label>
                           <input
                             value={roomFormSonstiges}
                             onChange={e => setRoomFormSonstiges(e.target.value)}
@@ -21715,7 +21776,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         disabled={roomSaving || !roomFormName.trim()}
                         style={{
                           flex: 1,
-                          background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
+                          background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)',
                           color: 'white',
                           border: 'none',
                           padding: '8px',
@@ -21724,7 +21785,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           fontSize: '0.82rem',
                           cursor: 'pointer',
                           opacity: roomSaving || !roomFormName.trim() ? 0.6 : 1,
-                          boxShadow: '0 4px 12px rgba(11,87,208,0.15)',
+                          boxShadow: '0 4px 12px rgba(234,67,53,0.15)',
                           transition: 'all 0.2s'
                         }}
                       >
