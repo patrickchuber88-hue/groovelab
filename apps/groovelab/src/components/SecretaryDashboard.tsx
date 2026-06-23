@@ -1877,6 +1877,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [editGroupCoupled, setEditGroupCoupled] = useState<boolean>(true);
   const [editGroupQty, setEditGroupQty] = useState<number>(1);
   const [editGroupInstancesData, setEditGroupInstancesData] = useState<any[]>([]);
+  const [hoveredCloseId, setHoveredCloseId] = useState<string | null>(null);
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
@@ -7639,6 +7640,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       const dataUrl = await toJpeg(element, {
         quality: 0.95,
         backgroundColor: '#ffffff',
+        filter: (node: any) => {
+          if (node.classList && node.classList.contains('no-pdf')) {
+            return false;
+          }
+          return true;
+        },
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left',
@@ -22195,7 +22202,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         style={{
                           height: '38px',
                           padding: '0 16px',
-                          background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)',
+                          background: 'linear-gradient(135deg, #ea4335 0%, #d63031 100%)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '10px',
@@ -22203,7 +22210,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           fontSize: '0.74rem',
                           cursor: 'pointer',
                           opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1,
-                          boxShadow: '0 2px 6px rgba(11,87,208,0.15)',
+                          boxShadow: '0 2px 6px rgba(234,67,53,0.15)',
                           transition: 'all 0.2s',
                           whiteSpace: 'nowrap',
                           flexShrink: 0
@@ -22234,9 +22241,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: equipmentSortFreeFirst ? '#eff6ff' : 'white',
-                        border: equipmentSortFreeFirst ? '1.5px solid #0b57d0' : '1.5px solid #cbd5e1',
-                        color: equipmentSortFreeFirst ? '#0b57d0' : '#475569',
+                        background: equipmentSortFreeFirst ? '#fce8e6' : 'white',
+                        border: equipmentSortFreeFirst ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                        color: equipmentSortFreeFirst ? '#ea4335' : '#475569',
                         padding: '0 14px',
                         borderRadius: '10px',
                         fontSize: '0.78rem',
@@ -22401,7 +22408,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         onClick={(e) => e.stopPropagation()}
-                                        style={{ display: 'inline-flex', alignItems: 'center', color: '#0b57d0' }}
+                                        style={{ display: 'inline-flex', alignItems: 'center', color: '#ea4335' }}
                                         title="Instrument online ansehen"
                                       >
                                         <LinkIcon size={12} />
@@ -22437,17 +22444,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         style={{
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '5px',
-                                          padding: '3px 8px',
-                                          borderRadius: '6px',
-                                          background: isInstAssigned ? '#eff6ff' : '#f8fafc',
-                                          border: isInstAssigned ? '1.5px solid #dbeafe' : '1.5px solid #e2e8f0',
+                                          gap: '6px',
+                                          padding: '4px 10px',
+                                          borderRadius: '8px',
+                                          background: isInstAssigned ? '#f1f5f9' : '#f8fafc',
+                                          border: isInstAssigned ? '1px solid #cbd5e1' : '1px solid #e2e8f0',
                                           cursor: isInstAssigned ? 'pointer' : 'grab',
-                                          fontSize: '0.65rem',
-                                          fontWeight: 800,
-                                          color: isInstAssigned ? '#0b57d0' : '#475569',
-                                          fontFamily: 'Urbanist',
-                                          transition: 'all 0.15s',
+                                          fontSize: '0.7rem',
+                                          fontWeight: 600,
+                                          color: isInstAssigned ? '#334155' : '#475569',
+                                          fontFamily: 'Urbanist, Inter, sans-serif',
+                                          transition: 'all 0.2s ease',
                                           flexShrink: 0,
                                           whiteSpace: 'nowrap'
                                         }}
@@ -22456,7 +22463,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       >
                                         {isInstAssigned ? (
                                           <>
-                                            <span>🚪 {inst.roomName}</span>
+                                            <DoorOpen size={12} style={{ color: '#64748b' }} />
+                                            <span>{inst.roomName}</span>
                                             <button
                                               onClick={async (e) => {
                                                 e.stopPropagation();
@@ -22465,12 +22473,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               style={{
                                                 background: 'transparent',
                                                 border: 'none',
-                                                color: '#ef4444',
+                                                color: hoveredCloseId === inst.id ? '#ea4335' : '#94a3b8',
                                                 fontWeight: 900,
                                                 marginLeft: '3px',
                                                 cursor: 'pointer',
-                                                padding: 0
+                                                padding: '2px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                transition: 'color 0.15s ease',
+                                                fontSize: '10px'
                                               }}
+                                              onMouseEnter={() => setHoveredCloseId(inst.id)}
+                                              onMouseLeave={() => setHoveredCloseId(null)}
                                               title="Freigeben (zurück in den Pool)"
                                             >
                                               ✕
@@ -22569,7 +22584,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <button
                           onClick={() => handleSaveRoomInstrumentEdit(editRoomInstFormName, editRoomInstFormModel)}
                           disabled={!editRoomInstFormName.trim()}
-                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #ea4335 0%, #d63031 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Speichern
                         </button>
@@ -22792,7 +22807,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <button
                           onClick={handleSaveEquipmentGroup}
                           disabled={editGroupCoupled ? !editGroupName.trim() : editGroupInstancesData.some(inst => !inst.fullName.trim())}
-                          style={{ flex: 1, background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
+                          style={{ flex: 1, background: 'linear-gradient(135deg, #ea4335 0%, #d63031 100%)', color: 'white', border: 'none', padding: '8px', borderRadius: '12px', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Speichern
                         </button>
@@ -22820,15 +22835,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     padding: '12px 14px', 
                     borderRadius: '12px', 
                     cursor: 'pointer', 
-                    background: selectedEquipmentRoomId === 'All' ? '#eff6ff' : '#f8fafc',
-                    border: selectedEquipmentRoomId === 'All' ? '1.5px solid #0b57d0' : '1px solid #f1f5f9',
+                    background: selectedEquipmentRoomId === 'All' ? '#fce8e6' : '#f8fafc',
+                    border: selectedEquipmentRoomId === 'All' ? '1.5px solid #ea4335' : '1px solid #f1f5f9',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     transition: 'all 0.2s'
                   }}
                 >
-                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: selectedEquipmentRoomId === 'All' ? '#0b57d0' : '#1e293b' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: selectedEquipmentRoomId === 'All' ? '#ea4335' : '#1e293b' }}>
                     🏢 Alle Räume
                   </span>
                 </div>
@@ -22868,8 +22883,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         padding: '12px 14px', 
                         borderRadius: '12px', 
                         cursor: 'pointer', 
-                        background: isSelected ? '#eff6ff' : isDragOver ? '#f0fdf4' : '#f8fafc',
-                        border: isSelected ? '1.5px solid #0b57d0' : isDragOver ? '2px dashed #22c55e' : '1px solid #f1f5f9',
+                        background: isSelected ? '#fce8e6' : isDragOver ? '#f0fdf4' : '#f8fafc',
+                        border: isSelected ? '1.5px solid #ea4335' : isDragOver ? '2px dashed #22c55e' : '1px solid #f1f5f9',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px',
@@ -22877,7 +22892,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isSelected ? '#0b57d0' : '#1e293b' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isSelected ? '#ea4335' : '#1e293b' }}>
                           🚪 {rm.name}
                         </span>
                         <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#86868b', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>
