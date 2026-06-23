@@ -10929,24 +10929,6 @@ export function TeacherDashboard({
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {student.first_name} {student.last_name}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                              <span style={{ 
-                                background: student.status === 'active' ? '#e6f4ea' : '#f1f3f4', 
-                                color: student.status === 'active' ? '#137333' : '#5f6368', 
-                                padding: '2px 8px', 
-                                borderRadius: '6px', 
-                                fontSize: '0.62rem', 
-                                fontWeight: 900,
-                                textTransform: 'uppercase'
-                              }}>
-                                {student.status === 'active' ? 'Aktiv' : 'Inaktiv'}
-                              </span>
-                              {student.is_trial && (
-                                <span style={{ background: '#fef7e0', color: '#b06000', padding: '2px 8px', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase' }}>
-                                  Test
-                                </span>
-                              )}
-                            </div>
                           </div>
                         </div>
 
@@ -10955,18 +10937,6 @@ export function TeacherDashboard({
                             <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
                             <span style={{ fontWeight: 800 }}>{student.instrument || 'Musiker'}</span>
                           </div>
-                          {student.contract_ends_at && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: '#64748b', fontWeight: 600 }}>Vertrag bis:</span>
-                              <span style={{ fontWeight: 800 }}>{new Date(student.contract_ends_at).toLocaleDateString('de-DE')}</span>
-                            </div>
-                          )}
-                          {student.is_trial && student.trial_ends_at && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: '#64748b', fontWeight: 600 }}>Testphase bis:</span>
-                              <span style={{ fontWeight: 800 }}>{new Date(student.trial_ends_at).toLocaleDateString('de-DE')}</span>
-                            </div>
-                          )}
                         </div>
 
                         <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -11038,14 +11008,6 @@ export function TeacherDashboard({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Gesamt registriert</span>
                   <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#8b5cf6' }}>{allStudents.length}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>In Testphase (Trial)</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#d97706' }}>{allStudents.filter(s => s.is_trial).length}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Inaktive Schüler</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#64748b' }}>{allStudents.filter(s => s.status === 'inactive').length}</span>
                 </div>
               </div>
             </div>

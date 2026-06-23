@@ -1692,8 +1692,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
   const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? 9.99 : ((billedCampus_global ? 7.99 : 0) + (billedGroovelab_global ? 4.99 : 0));
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-  const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.40 : 0;
-  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
+  const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
+  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
   const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
@@ -17402,15 +17402,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
                 const moduleCost = (billedCampus && billedGroovelab) ? 9.99 : ((billedCampus ? 7.99 : 0) + (billedGroovelab ? 4.99 : 0));
-                const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.40 : 0;
-                const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.40 : 0;
+                const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
+                const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
 
                 const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
                 const studentSharePreview = 0;
                 const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial';
                 
                 // Slider prospective change variables (Real-time preview)
-                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.40 : 0);
+                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : 0);
                 const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(effectiveContractStartDateStr, false) : 0);
                 const isAnnualAdditional = extraBillingOption === 'option1';
                 const schoolShareAdditional = 0;
@@ -18516,18 +18516,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         const simulated = typeof window !== 'undefined' ? localStorage.getItem('simulatedContractStartDate') : null;
                                         const todayStr = simulated || new Date().toISOString().split('T')[0];
 
-                                        if (simulatedToday) {
-                                          setIsBillingBooked(true);
-                                          setIsSchoolTrial(false);
-                                          setSchoolStatus('active');
-                                          if (typeof window !== 'undefined') {
-                                            localStorage.setItem('isBillingBooked', 'true');
-                                            localStorage.setItem('contractStartDate', todayStr);
-                                          }
-                                          setShowSuccessModal(true);
-                                          return;
-                                        }
-
                                         const { error } = await supabase
                                           .from('schools')
                                           .update({
@@ -18536,8 +18524,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             has_groovelab_subscription: hasGroovelabSub,
                                             student_billing_option: studentBillingOption,
                                             contract_start_date: todayStr,
-                                             is_trial: false,
-                                             status: 'active'
+                                            is_trial: false,
+                                            status: 'active'
                                           })
                                           .eq('id', schoolId);
                                         if (error) throw error;
@@ -18547,6 +18535,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         setSchoolStatus('active');
                                         if (typeof window !== 'undefined') {
                                           localStorage.setItem('isBillingBooked', 'true');
+                                          localStorage.setItem('contractStartDate', todayStr);
                                         }
                                         setShowSuccessModal(true);
                                       } catch (err: any) {

@@ -147,6 +147,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [manualTeacherId, setManualTeacherId] = useState('');
   const [manualInstrument, setManualInstrument] = useState('');
   const [manualDuration, setManualDuration] = useState('');
+  const [manualPreferredTime, setManualPreferredTime] = useState('');
+  const [manualPerformerCount, setManualPerformerCount] = useState('1');
+  const [manualSongs, setManualSongs] = useState<Song[]>([]);
+  const [manualSongTitle, setManualSongTitle] = useState('');
+  const [manualSongArtist, setManualSongArtist] = useState('');
+  const [manualSongComposer, setManualSongComposer] = useState('');
+  const [manualSongArranger, setManualSongArranger] = useState('');
+  const [techViewMode, setTechViewMode] = useState<'single' | 'all'>('single');
   const [eventDayLessons, setEventDayLessons] = useState<any[]>([]);
   const [eventSubmissionDeadline, setEventSubmissionDeadline] = useState('');
 
@@ -927,22 +935,48 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const activeEv = secretaryPlanningEvent || selectedEvent;
     if (!activeEv) return;
 
-    if (!manualTitle || !manualDuration) {
-      alert('Bitte Titel und Dauer ausfüllen.');
-      return;
+    const finalSongs = [...manualSongs];
+    if (manualSongTitle.trim()) {
+      finalSongs.push({
+        title: manualSongTitle.trim(),
+        artist: manualSongArtist.trim(),
+        composer: manualSongComposer.trim(),
+        arranger: manualSongArranger.trim()
+      });
     }
+
+    const firstSong = finalSongs[0];
+    let resolvedName = manualTitle.trim();
+    if (!resolvedName) {
+      if (manualEnsemble.trim()) {
+        resolvedName = manualEnsemble.trim();
+      } else if (firstSong && firstSong.title) {
+        resolvedName = firstSong.title;
+      } else {
+        resolvedName = 'Unbenannter Beitrag';
+      }
+    }
+
+    const dur = manualDuration ? parseInt(manualDuration, 10) : 10;
+    const perfCount = manualPerformerCount ? parseInt(manualPerformerCount, 10) : 1;
 
     const { data, error } = await supabase
       .from('campus_event_program_points')
       .insert({
         event_id: activeEv.id,
         school_id: activeEv.school_id || schoolId,
-        name: manualTitle,
-        title: manualTitle,
-        ensemble_band: manualEnsemble || null,
+        name: resolvedName,
+        title: manualTitle.trim() || (firstSong ? firstSong.title : null),
+        ensemble_band: manualEnsemble.trim() || null,
         teacher_id: manualTeacherId || null,
-        instrument: manualInstrument || null,
-        duration: parseInt(manualDuration, 10),
+        instrument: manualInstrument.trim() || null,
+        duration: isNaN(dur) ? 10 : dur,
+        performer_count: isNaN(perfCount) ? 1 : perfCount,
+        preferred_time: manualPreferredTime.trim() || null,
+        artist: firstSong ? firstSong.artist : null,
+        composer: firstSong ? firstSong.composer : null,
+        arranger: firstSong ? firstSong.arranger : null,
+        songs: finalSongs,
         status: 'approved',
         is_scheduled: false
       })
@@ -959,6 +993,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setManualTeacherId('');
       setManualInstrument('');
       setManualDuration('');
+      setManualPreferredTime('');
+      setManualPerformerCount('1');
+      setManualSongs([]);
+      setManualSongTitle('');
+      setManualSongArtist('');
+      setManualSongComposer('');
+      setManualSongArranger('');
       setIsManualEntryModalOpen(false);
     }
   };
@@ -6992,8 +7033,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
       planung:       { label: 'In Planung',    color: '#b45309', bg: '#fef3c7' },
-      bestaetigt:    { label: 'Bestätigt',     color: '#1d4ed8', bg: '#dbeafe' },
-      laufend:       { label: 'Laufend',       color: '#15803d', bg: '#dcfce7' },
       abgeschlossen: { label: 'Abgeschlossen', color: '#475569', bg: '#f1f5f9' },
     };
 
@@ -9112,39 +9151,93 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       background: '#ffffff',
                       padding: '28px',
                       borderRadius: '20px',
-                      width: '400px',
+                      width: '550px',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
                       boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '16px'
                     }}>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f' }}>Neuen Beitrag hinzufügen</h3>
-                      <form onSubmit={handleAddManualEntry} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>Neuen Programmpunkt anmelden</h3>
+                      <form onSubmit={handleAddManualEntry} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Titel</label>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Ensemble / Band</label>
                           <input
                             type="text"
-                            required
-                            value={manualTitle}
-                            onChange={e => setManualTitle(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Ensemble / Band</label>
-                          <input
-                            type="text"
+                            placeholder="z.B. Jazz-Ensemble oder Band XYZ"
                             value={manualEnsemble}
                             onChange={e => setManualEnsemble(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
                           />
                         </div>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrer</label>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Name des Auftritts / Beitrags (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="z.B. Beatles-Medley (falls abweichend)"
+                            value={manualTitle}
+                            onChange={e => setManualTitle(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Dauer (Minuten)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={manualDuration}
+                              onChange={e => setManualDuration(e.target.value)}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Teilnehmeranzahl</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={manualPerformerCount}
+                              onChange={e => setManualPerformerCount(e.target.value)}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Wunsch-Uhrzeit (Optional)</label>
+                            <input
+                              type="text"
+                              placeholder="z.B. eher am Anfang"
+                              value={manualPreferredTime}
+                              onChange={e => setManualPreferredTime(e.target.value)}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Instrument (Optional)</label>
+                            <input
+                              type="text"
+                              placeholder="z.B. Klavier"
+                              value={manualInstrument}
+                              onChange={e => setManualInstrument(e.target.value)}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Lehrer (Optional)</label>
                           <select
                             value={manualTeacherId}
                             onChange={e => setManualTeacherId(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.82rem', background: '#ffffff' }}
                           >
                             <option value="">-- Kein Lehrer --</option>
                             {allUsers.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary').map(u => (
@@ -9154,37 +9247,112 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             ))}
                           </select>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Instrument</label>
-                          <input
-                            type="text"
-                            value={manualInstrument}
-                            onChange={e => setManualInstrument(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
-                          />
+
+                        <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '6px 0' }} />
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Repertoire / GEMA</h4>
+                          
+                          {manualSongs.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                              {manualSongs.map((song, index) => (
+                                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
+                                  <div>
+                                    <strong style={{ color: '#0f172a' }}>{song.title}</strong>
+                                    {song.artist && ` - ${song.artist}`}
+                                    {(song.composer || song.arranger) && (
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                                        {song.composer && `Komp: ${song.composer}`}
+                                        {song.composer && song.arranger && ' | '}
+                                        {song.arranger && `Arr/Verl: ${song.arranger}`}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setManualSongs(prev => prev.filter((_, idx) => idx !== index))}
+                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem', padding: '2px 4px' }}
+                                  >
+                                    Löschen
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <input
+                              type="text"
+                              placeholder="Titel des Musikstücks"
+                              value={manualSongTitle}
+                              onChange={e => setManualSongTitle(e.target.value)}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.76rem' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Interpret / Artist"
+                              value={manualSongArtist}
+                              onChange={e => setManualSongArtist(e.target.value)}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.76rem' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Komponist"
+                              value={manualSongComposer}
+                              onChange={e => setManualSongComposer(e.target.value)}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.76rem' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Arrangeur / Verlag"
+                              value={manualSongArranger}
+                              onChange={e => setManualSongArranger(e.target.value)}
+                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none', fontSize: '0.76rem' }}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!manualSongTitle.trim()) {
+                                alert('Bitte geben Sie einen Songtitel an.');
+                                return;
+                              }
+                              setManualSongs(prev => [...prev, {
+                                title: manualSongTitle.trim(),
+                                artist: manualSongArtist.trim(),
+                                composer: manualSongComposer.trim(),
+                                arranger: manualSongArranger.trim()
+                              }]);
+                              setManualSongTitle('');
+                              setManualSongArtist('');
+                              setManualSongComposer('');
+                              setManualSongArranger('');
+                            }}
+                            style={{ padding: '8px', borderRadius: '8px', border: '1px dashed #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 600 }}
+                          >
+                            + Song hinzufügen
+                          </button>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Dauer (Minuten)</label>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            value={manualDuration}
-                            onChange={e => setManualDuration(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', outline: 'none' }}
-                          />
-                        </div>
+
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
                           <button
                             type="button"
-                            onClick={() => setIsManualEntryModalOpen(false)}
+                            onClick={() => {
+                              setIsManualEntryModalOpen(false);
+                              setManualSongs([]);
+                              setManualSongTitle('');
+                              setManualSongArtist('');
+                              setManualSongComposer('');
+                              setManualSongArranger('');
+                            }}
                             style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', background: '#f5f5f7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
                           >
                             Abbrechen
                           </button>
                           <button
                             type="submit"
-                            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#1d1d1f', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
                           >
                             Speichern
                           </button>
@@ -9198,120 +9366,362 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           })()}
 
           {coordinatorTab === 'tech' && (() => {
-            // Get all scheduled program points on active stage in order
-            const stagePoints = programPoints
-              .filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage)
-              .sort((a, b) => a.sort_order - b.sort_order);
-
-            // Compute timeline times
             const activeEv = secretaryPlanningEvent || selectedEvent;
             const activeEventStartTime = activeEv?.event_start_time || activeEv?.start_time || '14:00';
             const timeMap = calculateTimelineTimes(programPoints, activeEventStartTime);
 
-            // Compute logistics sums and peaks
-            const totalChairs = stagePoints.reduce((acc, pp) => acc + (pp.chairs_needed || 0), 0);
-            const peakChairs = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.chairs_needed || 0)) : 0;
-            const totalStands = stagePoints.reduce((acc, pp) => acc + (pp.music_stands_needed || 0), 0);
-            const peakStands = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.music_stands_needed || 0)) : 0;
-
             const normalizeTechType = (type: string): string => {
               const t = type.trim().toLowerCase();
-              if (t.includes('gesang') || t.includes('vocal') || t.includes('mikrofon') || t === 'mic' || t === 'mikro') {
-                return 'Mikrofon (Gesang/Amp)';
-              }
-              if (t.includes('di-box') || t.includes('di box') || t.includes('d.i. box') || t.includes('direct box') || t === 'di') {
-                return 'D.I. Box';
-              }
-              if (t.includes('e-bass') || t === 'bass' || t === 'bassgitarre') {
-                return 'E-Bass';
-              }
-              if (t.includes('keyboard')) {
-                return 'Keyboard';
-              }
-              if (t.includes('e-piano') || t === 'piano' || t === 'klavier') {
-                return 'E-Piano';
-              }
-              if (t.includes('a-gitarre') || t.includes('akustik') || t === 'akustikgitarre' || t === 'akustik-gitarre') {
-                return 'A-Gitarre';
-              }
-              if (t.includes('e-gitarre') || t === 'gitarre') {
-                return 'E-Gitarre';
-              }
-              if (t.includes('schlagzeug') || t.includes('drumset') || t.includes('drums') || t.includes('drum-set') || t.includes('e-drum')) {
-                return 'Schlagzeug-Set';
-              }
-              if (t.includes('trompete')) {
-                return 'Trompete';
-              }
+              if (t.includes('gesang') || t.includes('vocal') || t.includes('mikrofon') || t === 'mic' || t === 'mikro') return 'Mikrofon (Gesang/Amp)';
+              if (t.includes('di-box') || t.includes('di box') || t.includes('d.i. box') || t.includes('direct box') || t === 'di') return 'D.I. Box';
+              if (t.includes('e-bass') || t === 'bass' || t === 'bassgitarre') return 'E-Bass';
+              if (t.includes('keyboard')) return 'Keyboard';
+              if (t.includes('e-piano') || t === 'piano' || t === 'klavier') return 'E-Piano';
+              if (t.includes('a-gitarre') || t === 'akustik' || t === 'akustikgitarre' || t === 'akustik-gitarre') return 'A-Gitarre';
+              if (t.includes('e-gitarre') || t === 'gitarre') return 'E-Gitarre';
+              if (t.includes('schlagzeug') || t === 'drumset' || t === 'drums' || t === 'drum-set' || t === 'e-drum') return 'Schlagzeug-Set';
+              if (t.includes('trompete')) return 'Trompete';
               return type.trim().charAt(0).toUpperCase() + type.trim().slice(1);
             };
 
-            // Compute FOH Audio/Patch Peak summary (max concurrent channels per type)
-            const audioSetup: Record<string, number> = {};
-            stagePoints.forEach(pp => {
-              if (pp.tech_requirements) {
-                const actSetup: Record<string, number> = {};
+            const getParsedTechMap = (pp: any): Record<string, number> => {
+              const map: Record<string, number> = {};
+              if (!pp || pp.is_pause || !pp.tech_requirements) return map;
+              const req = pp.tech_requirements.trim();
+              if (req.startsWith('[') || req.startsWith('{')) {
                 try {
-                  const cleaned = pp.tech_requirements.trim();
-                  if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
-                    const items = JSON.parse(cleaned);
-                    if (Array.isArray(items)) {
-                      items.forEach((item: any) => {
-                        const typeName = normalizeTechType(item.type || 'Sonstiges');
-                        const count = parseInt(item.count, 10) || 1;
-                        actSetup[typeName] = (actSetup[typeName] || 0) + count;
-                      });
+                  const items = JSON.parse(req);
+                  if (Array.isArray(items)) {
+                    items.forEach((item: any) => {
+                      const typeName = normalizeTechType(item.type || 'Sonstiges');
+                      const count = parseInt(item.count, 10) || 1;
+                      map[typeName] = (map[typeName] || 0) + count;
+                    });
+                  }
+                } catch (e) {}
+              } else {
+                const typeName = normalizeTechType(pp.tech_requirements);
+                map[typeName] = 1;
+              }
+              return map;
+            };
+
+            // Render a single stage's tech layout
+            const renderStageLayout = (stageNum: number) => {
+              const stagePoints = programPoints
+                .filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === stageNum)
+                .sort((a, b) => a.sort_order - b.sort_order);
+
+              // Compute logistics sums and peaks
+              const totalChairs = stagePoints.reduce((acc, pp) => acc + (pp.chairs_needed || 0), 0);
+              const peakChairs = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.chairs_needed || 0)) : 0;
+              const totalStands = stagePoints.reduce((acc, pp) => acc + (pp.music_stands_needed || 0), 0);
+              const peakStands = stagePoints.length > 0 ? Math.max(...stagePoints.map(pp => pp.music_stands_needed || 0)) : 0;
+
+              // Compute FOH Audio/Patch Peak summary
+              const audioSetup: Record<string, number> = {};
+              stagePoints.forEach(pp => {
+                if (pp.tech_requirements) {
+                  const actSetup: Record<string, number> = {};
+                  try {
+                    const cleaned = pp.tech_requirements.trim();
+                    if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+                      const items = JSON.parse(cleaned);
+                      if (Array.isArray(items)) {
+                        items.forEach((item: any) => {
+                          const typeName = normalizeTechType(item.type || 'Sonstiges');
+                          const count = parseInt(item.count, 10) || 1;
+                          actSetup[typeName] = (actSetup[typeName] || 0) + count;
+                        });
+                      }
+                    } else {
+                      const typeName = normalizeTechType(pp.tech_requirements);
+                      actSetup[typeName] = (actSetup[typeName] || 0) + 1;
                     }
-                  } else {
-                    const typeName = normalizeTechType(pp.tech_requirements);
+                  } catch (err) {
+                    const typeName = normalizeTechType(pp.tech_requirements || 'Sonstige Inputs');
                     actSetup[typeName] = (actSetup[typeName] || 0) + 1;
                   }
-                } catch (err) {
-                  const typeName = normalizeTechType(pp.tech_requirements || 'Sonstige Inputs');
-                  actSetup[typeName] = (actSetup[typeName] || 0) + 1;
+
+                  Object.entries(actSetup).forEach(([type, count]) => {
+                    if (type === 'Schlagzeug-Set') {
+                      if (techConfig.drumsMode === '4mic') {
+                        audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+                        audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+                        audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+                        audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+                      } else if (techConfig.drumsMode === 'edrum') {
+                        audioSetup['Schlagzeug (E-Drums, 2x DI)'] = Math.max(audioSetup['Schlagzeug (E-Drums, 2x DI)'] || 0, 1);
+                      } else {
+                        audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
+                        audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
+                        audioSetup['Schlagzeug (HiHat)'] = Math.max(audioSetup['Schlagzeug (HiHat)'] || 0, 1);
+                        audioSetup['Schlagzeug (Tom 1)'] = Math.max(audioSetup['Schlagzeug (Tom 1)'] || 0, 1);
+                        audioSetup['Schlagzeug (Tom 2)'] = Math.max(audioSetup['Schlagzeug (Tom 2)'] || 0, 1);
+                        audioSetup['Schlagzeug (Tom 3)'] = Math.max(audioSetup['Schlagzeug (Tom 3)'] || 0, 1);
+                        audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
+                        audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
+                      }
+                    } else if (type === 'Keyboard') {
+                      if (techConfig.keyboardMode === 'stereo') {
+                        audioSetup['Keyboard (Stereo, 2x DI)'] = Math.max(audioSetup['Keyboard (Stereo, 2x DI)'] || 0, count * 2);
+                      } else {
+                        audioSetup['Keyboard (Mono, 1x DI)'] = Math.max(audioSetup['Keyboard (Mono, 1x DI)'] || 0, count);
+                      }
+                    } else if (type === 'E-Piano') {
+                      if (techConfig.epianoMode === 'stereo') {
+                        audioSetup['E-Piano (Stereo, 2x DI)'] = Math.max(audioSetup['E-Piano (Stereo, 2x DI)'] || 0, count * 2);
+                      } else {
+                        audioSetup['E-Piano (Mono, 1x DI)'] = Math.max(audioSetup['E-Piano (Mono, 1x DI)'] || 0, count);
+                      }
+                    } else {
+                      audioSetup[type] = Math.max(audioSetup[type] || 0, count);
+                    }
+                  });
                 }
+              });
 
-                // Update peak for each normalized type
-                Object.entries(actSetup).forEach(([type, count]) => {
-                  if (type === 'Schlagzeug-Set') {
-                    if (techConfig.drumsMode === '4mic') {
-                      audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
-                      audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
-                      audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
-                      audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
-                    } else if (techConfig.drumsMode === 'edrum') {
-                      audioSetup['Schlagzeug (E-Drums, 2x DI)'] = Math.max(audioSetup['Schlagzeug (E-Drums, 2x DI)'] || 0, 1);
-                    } else {
-                      // Standard / 7 channels
-                      audioSetup['Schlagzeug (Kick)'] = Math.max(audioSetup['Schlagzeug (Kick)'] || 0, 1);
-                      audioSetup['Schlagzeug (Snare)'] = Math.max(audioSetup['Schlagzeug (Snare)'] || 0, 1);
-                      audioSetup['Schlagzeug (HiHat)'] = Math.max(audioSetup['Schlagzeug (HiHat)'] || 0, 1);
-                      audioSetup['Schlagzeug (Tom 1)'] = Math.max(audioSetup['Schlagzeug (Tom 1)'] || 0, 1);
-                      audioSetup['Schlagzeug (Tom 2)'] = Math.max(audioSetup['Schlagzeug (Tom 2)'] || 0, 1);
-                      audioSetup['Schlagzeug (Tom 3)'] = Math.max(audioSetup['Schlagzeug (Tom 3)'] || 0, 1);
-                      audioSetup['Schlagzeug (OH L)'] = Math.max(audioSetup['Schlagzeug (OH L)'] || 0, 1);
-                      audioSetup['Schlagzeug (OH R)'] = Math.max(audioSetup['Schlagzeug (OH R)'] || 0, 1);
-                    }
-                  } else if (type === 'Keyboard') {
-                    if (techConfig.keyboardMode === 'stereo') {
-                      audioSetup['Keyboard (Stereo, 2x DI)'] = Math.max(audioSetup['Keyboard (Stereo, 2x DI)'] || 0, count * 2);
-                    } else {
-                      audioSetup['Keyboard (Mono, 1x DI)'] = Math.max(audioSetup['Keyboard (Mono, 1x DI)'] || 0, count);
-                    }
-                  } else if (type === 'E-Piano') {
-                    if (techConfig.epianoMode === 'stereo') {
-                      audioSetup['E-Piano (Stereo, 2x DI)'] = Math.max(audioSetup['E-Piano (Stereo, 2x DI)'] || 0, count * 2);
-                    } else {
-                      audioSetup['E-Piano (Mono, 1x DI)'] = Math.max(audioSetup['E-Piano (Mono, 1x DI)'] || 0, count);
-                    }
-                  } else {
-                    audioSetup[type] = Math.max(audioSetup[type] || 0, count);
-                  }
-                });
-              }
-            });
+              return (
+                <div key={stageNum} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: techViewMode === 'all' ? '12px' : '0', borderBottom: techViewMode === 'all' ? '1px solid rgba(0,0,0,0.05)' : 'none', paddingBottom: techViewMode === 'all' ? '28px' : '0' }}>
+                  {techViewMode === 'all' && (
+                    <h4 style={{ margin: '12px 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🟢 Bühne {stageNum} <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontWeight: 500 }}>({stagePoints.length} Beiträge geplant)</span>
+                    </h4>
+                  )}
 
-            // Night mode colors
+                  {/* Dashboard Summary Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {/* Logistics Card */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      background: theme.cardBg,
+                      border: '1px solid rgba(16, 185, 129, 0.15)',
+                      borderRadius: '16px',
+                      padding: '18px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.01)'
+                    }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Bühnen-Logistik (Maximalbedarf)
+                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '6px' }}>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>🪑</span>
+                          <strong style={{ fontSize: '1.6rem', color: theme.text, display: 'block', fontWeight: 800, margin: '2px 0' }}>
+                            {peakChairs}
+                          </strong>
+                          <span style={{ fontSize: '0.68rem', color: theme.textMuted, fontWeight: 600 }}>
+                            Stühle Peak <span style={{ color: '#78350f', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', fontSize: '0.62rem' }}>Summe: {totalChairs}</span>
+                          </span>
+                        </div>
+                        <div style={{ width: '1px', height: '50px', background: isNight ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>🎼</span>
+                          <strong style={{ fontSize: '1.6rem', color: theme.text, display: 'block', fontWeight: 800, margin: '2px 0' }}>
+                            {peakStands}
+                          </strong>
+                          <span style={{ fontSize: '0.68rem', color: theme.textMuted, fontWeight: 600 }}>
+                            Ständer Peak <span style={{ color: '#1e3a8a', background: '#dbeafe', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px', fontSize: '0.62rem' }}>Summe: {totalStands}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Audio Card */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      background: theme.cardBg,
+                      border: '1px solid rgba(16, 185, 129, 0.15)',
+                      borderRadius: '16px',
+                      padding: '18px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.01)'
+                    }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        FOH Audio Patch (Gesamtbedarf)
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                        {Object.keys(audioSetup).length === 0 ? (
+                          <span style={{ fontSize: '0.74rem', color: theme.textMuted, fontStyle: 'italic', padding: '6px 0' }}>
+                            Kein spezieller Audiobedarf angemeldet
+                          </span>
+                        ) : (
+                          Object.entries(audioSetup).map(([name, count]) => (
+                            <span 
+                              key={name}
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                color: '#10b981',
+                                padding: '5px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(16, 185, 129, 0.15)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 1px 2px rgba(16, 185, 129, 0.02)'
+                              }}
+                            >
+                              🎙️ {count}x {name}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Changeover rundown timeline table */}
+                  <div style={{ border: theme.cardBorder, borderRadius: '16px', background: theme.cardBg, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                        <thead>
+                          <tr style={{ background: isNight ? '#1c1c1e' : '#f8fafc', borderBottom: `1px solid ${isNight ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}>
+                            <th style={{ padding: '14px 18px', fontSize: '0.7rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.06em', width: '90px' }}>Zeit</th>
+                            <th style={{ padding: '14px 18px', fontSize: '0.7rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.06em', width: '220px' }}>Beitrag & Besetzung</th>
+                            <th style={{ padding: '14px 18px', fontSize: '0.7rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.06em', width: '260px' }}>Signal / Patch (FOH)</th>
+                            <th style={{ padding: '14px 18px', fontSize: '0.7rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.06em', width: '160px' }}>Aufbau & Umbau</th>
+                            <th style={{ padding: '14px 18px', fontSize: '0.7rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status / Notizen</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stagePoints.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', fontSize: '0.78rem', color: theme.textMuted, fontStyle: 'italic' }}>
+                                Keine geplanten Beiträge auf dieser Bühne.
+                              </td>
+                            </tr>
+                          ) : (
+                            stagePoints.map((pp) => {
+                              const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
+                              let techItems: any[] = [];
+                              if (pp.tech_requirements && (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{'))) {
+                                try {
+                                  techItems = JSON.parse(pp.tech_requirements);
+                                } catch (e) {}
+                              }
+
+                              return (
+                                <tr key={pp.id} style={{ borderBottom: `1px solid ${isNight ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`, background: pp.is_pause ? (isNight ? '#1c1c1e' : '#f8fafc') : theme.cardBg, transition: 'background 0.2s' }}>
+                                  {/* Time Column */}
+                                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                                    <strong style={{ fontSize: '0.82rem', color: pp.is_pause ? theme.textMuted : theme.text, display: 'block', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.start}</strong>
+                                    <span style={{ fontSize: '0.68rem', color: theme.textMuted, display: 'block', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.end}</span>
+                                  </td>
+
+                                  {/* Name & Besetzung */}
+                                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <strong style={{ fontSize: '0.82rem', color: pp.is_pause ? theme.textMuted : theme.text }}>
+                                        {pp.is_pause ? '☕ ' : ''}{pp.name}
+                                      </strong>
+                                      {!pp.is_pause && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.7rem', color: theme.textMuted }}>
+                                          {pp.ensemble_band && <span style={{ fontWeight: 550 }}>👥 {pp.ensemble_band}</span>}
+                                          {pp.performer_count > 0 && <span>👤 {pp.performer_count} Person(en)</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Signals */}
+                                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                                    {!pp.is_pause && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                        {pp.instrument && (
+                                          <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '0.76rem',
+                                            fontWeight: 800,
+                                            color: theme.text,
+                                            marginBottom: '2px'
+                                          }}>
+                                            🎸 {pp.instrument}
+                                          </div>
+                                        )}
+                                        {techItems.length > 0 ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                            {techItems.map((item, i) => {
+                                              const needsPhantom = item.connection?.toLowerCase().includes('+48') || item.type?.toLowerCase().includes('kondensator');
+                                              return (
+                                                <div key={i} style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '6px',
+                                                  fontSize: '0.72rem',
+                                                  lineHeight: 1.2
+                                                }}>
+                                                  <span style={{ color: '#10b981', fontWeight: 800, fontFamily: 'monospace', minWidth: '18px' }}>
+                                                    {item.count}×
+                                                  </span>
+                                                  <span style={{ color: theme.text, fontWeight: 550 }}>
+                                                    {item.type}
+                                                  </span>
+                                                  <span style={{ color: theme.textMuted, fontSize: '0.66rem' }}>
+                                                    ({item.connection})
+                                                  </span>
+                                                  {needsPhantom && (
+                                                    <span style={{ fontSize: '0.52rem', fontWeight: 'bold', background: '#ff9500', color: '#ffffff', padding: '1px 4px', borderRadius: '3px' }}>+48V</span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : pp.tech_requirements ? (
+                                          <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontStyle: 'italic' }}>{pp.tech_requirements}</span>
+                                        ) : (
+                                          <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontStyle: 'italic' }}>Kein spezieller Audiobedarf</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  {/* Setup */}
+                                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                                    {!pp.is_pause && (pp.chairs_needed > 0 || pp.music_stands_needed > 0) ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.76rem', color: theme.text, fontWeight: 600 }}>
+                                        {pp.chairs_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>🪑 {pp.chairs_needed} Stuhl/Stühle</div>}
+                                        {pp.music_stands_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>🎼 {pp.music_stands_needed} Notenständer</div>}
+                                      </div>
+                                    ) : (
+                                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>-</span>
+                                    )}
+                                  </td>
+
+                                  {/* Remarks & Notes */}
+                                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                                    {pp.remarks ? (
+                                      <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '0.72rem',
+                                        color: theme.textMuted,
+                                        lineHeight: 1.3
+                                      }}>
+                                        <span>📝</span>
+                                        <span>{pp.remarks}</span>
+                                      </div>
+                                    ) : (
+                                      <span style={{ color: '#94a3b8' }}>-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            };
+
             const isNight = techConsoleNightMode;
             const theme = {
               bg: isNight ? '#0b0b0d' : 'transparent',
@@ -9331,43 +9741,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               rowHoverBg: isNight ? '#22222a' : '#f5f5f7',
             };
 
-            const activeLiveIdx = stagePoints.findIndex(pp => pp.id === activeLivePointId);
-
-            const handleToggleCheck = (ppId: string, itemId: string) => {
-              const key = `groovelab_chk_${ppId}_${itemId}`;
-              const checked = localStorage.getItem(key) === 'true';
-              localStorage.setItem(key, String(!checked));
-              setTechCheckTrigger(prev => prev + 1);
-            };
-
-            const isItemChecked = (ppId: string, itemId: string) => {
-              return localStorage.getItem(`groovelab_chk_${ppId}_${itemId}`) === 'true';
-            };
-
-            const handleToggleDelta = (ppId: string, type: 'chairs' | 'stands') => {
-              const key = `groovelab_chk_delta_${ppId}_${type}`;
-              const checked = localStorage.getItem(key) === 'true';
-              localStorage.setItem(key, String(!checked));
-              setTechCheckTrigger(prev => prev + 1);
-            };
-
-            const isDeltaChecked = (ppId: string, type: 'chairs' | 'stands') => {
-              return localStorage.getItem(`groovelab_chk_delta_${ppId}_${type}`) === 'true';
-            };
-
-            const setLiveFocus = (ppId: string) => {
-              const eventId = selectedEvent?.id || secretaryPlanningEvent?.id || 'default';
-              const stageKey = `groovelab_active_live_pp_id_${eventId}_${activeStage}`;
-              if (activeLivePointId === ppId) {
-                localStorage.removeItem(stageKey);
-                setActiveLivePointId(null);
-              } else {
-                localStorage.setItem(stageKey, ppId);
-                setActiveLivePointId(ppId);
-              }
-              setTechCheckTrigger(prev => prev + 1);
-            };
-
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', background: theme.bg, color: theme.text, padding: isNight ? '12px' : '0', borderRadius: isNight ? '16px' : '0', transition: 'all 0.3s' }}>
                 <style>{`
@@ -9378,90 +9751,96 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   }
                 `}</style>
                 
-                {/* Header */}
+                {/* Header with Switch and PDF save button */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: theme.text }}>
-                      Technik-Rundown & Patchplan · Bühne {activeStage}
+                      Technik-Rundown & Patchplan · {techViewMode === 'all' ? 'Alle Bühnen' : `Bühne ${activeStage}`}
                     </h3>
                     <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontWeight: 500 }}>
-                      {stagePoints.length} Beiträge geplant
+                      {techViewMode === 'all' 
+                        ? `${programPoints.filter(pp => pp.is_scheduled || pp.is_pause).length} Beiträge insgesamt`
+                        : `${programPoints.filter(pp => (pp.is_scheduled || pp.is_pause) && (pp.stage_number || 1) === activeStage).length} Beiträge geplant`
+                      }
                     </span>
                   </div>
-                  
-                  {/* Console Night Mode toggle */}
-                  <button
-                    onClick={() => {
-                      const nextVal = !techConsoleNightMode;
-                      setTechConsoleNightMode(nextVal);
-                      localStorage.setItem('groovelab_tech_night_mode', String(nextVal));
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      border: isNight ? '1px solid #ff9f0a' : '1px solid #007aff',
-                      background: isNight ? 'rgba(255, 159, 10, 0.15)' : 'rgba(0, 122, 255, 0.05)',
-                      color: isNight ? '#ff9f0a' : '#007aff',
-                      cursor: 'pointer',
-                      fontSize: '0.74rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {isNight ? '☀️ Studio-Licht' : '🎛️ Mischpult-Ansicht'}
-                  </button>
-                </div>
 
-                {/* Dashboard Summary Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                  {/* Logistics Card */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: theme.cardBg, border: theme.cardBorder, borderRadius: '14px', padding: '16px', boxShadow: isNight ? 'none' : '0 1px 3px rgba(0,0,0,0.02)' }}>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bühnen-Logistik</span>
-                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '4px' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '1.6rem', display: 'block' }}>🪑</span>
-                        <strong style={{ fontSize: '1.25rem', color: theme.text, display: 'block', margin: '4px 0 2px 0' }}>{peakChairs}</strong>
-                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontWeight: 600 }}>Stühle Peak (Summe: {totalChairs})</span>
-                      </div>
-                      <div style={{ width: '1px', height: '40px', background: isNight ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
-                      <div style={{ textAlign: 'center' }}>
-                        <span style={{ fontSize: '1.6rem', display: 'block' }}>🎼</span>
-                        <strong style={{ fontSize: '1.25rem', color: theme.text, display: 'block', margin: '4px 0 2px 0' }}>{peakStands}</strong>
-                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontWeight: 600 }}>Ständer Peak (Summe: {totalStands})</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Audio Card */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: theme.cardBg, border: theme.cardBorder, borderRadius: '14px', padding: '16px', boxShadow: isNight ? 'none' : '0 1px 3px rgba(0,0,0,0.02)' }}>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>FOH Audio Patch (Gesamtbedarf)</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                      {Object.keys(audioSetup).length === 0 ? (
-                        <span style={{ fontSize: '0.74rem', color: theme.textMuted, fontStyle: 'italic', padding: '4px 0' }}>Kein spezieller Audiobedarf angemeldet</span>
-                      ) : (
-                        Object.entries(audioSetup).map(([name, count]) => (
-                          <span 
-                            key={name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* iOS-Style Segmented Control */}
+                    <div style={{ display: 'flex', background: isNight ? '#1e1e24' : '#f1f5f9', padding: '3px', borderRadius: '10px', border: theme.cardBorder, flexWrap: 'wrap', gap: '2px' }}>
+                      {Array.from({ length: stageCount }, (_, i) => i + 1).map(stageNum => {
+                        const isSelected = techViewMode === 'single' && activeStage === stageNum;
+                        return (
+                          <button
+                            key={stageNum}
+                            type="button"
+                            onClick={() => {
+                              setTechViewMode('single');
+                              setActiveStage(stageNum);
+                            }}
                             style={{
-                              fontSize: '0.7rem',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '0.72rem',
                               fontWeight: 700,
-                              background: isNight ? 'rgba(48, 176, 199, 0.15)' : 'rgba(59, 130, 246, 0.08)',
-                              color: isNight ? '#30b0c7' : '#2563eb',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                              cursor: 'pointer',
+                              background: isSelected ? '#10b981' : 'transparent',
+                              color: isSelected ? '#ffffff' : theme.textMuted,
+                              transition: 'all 0.2s',
+                              outline: 'none'
                             }}
                           >
-                            🎙️ {count}x {name}
-                          </span>
-                        ))
-                      )}
+                            Bühne {stageNum}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setTechViewMode('all')}
+                        style={{
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          background: techViewMode === 'all' ? '#10b981' : 'transparent',
+                          color: techViewMode === 'all' ? '#ffffff' : theme.textMuted,
+                          transition: 'all 0.2s',
+                          outline: 'none'
+                        }}
+                      >
+                        Alle Bühnen
+                      </button>
                     </div>
+
+                    {/* PDF Save/Print Button */}
+                    <button
+                      type="button"
+                      onClick={handleExportTechRiderPDF}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#10b981',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '7px 14px',
+                        borderRadius: '10px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 5px rgba(16,185,129,0.2)',
+                        transition: 'all 0.2s',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#059669'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
+                    >
+                      <span>💾</span>
+                      <span>PDF speichern</span>
+                    </button>
                   </div>
                 </div>
 
@@ -9482,6 +9861,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 700,
                       padding: '4px 0',
                       transition: 'all 0.2s',
+                      outline: 'none'
                     }}
                   >
                     <span>⚙️</span>
@@ -9595,33 +9975,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         <div style={{ display: 'flex', background: isNight ? '#1e1e24' : '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '4px' }}>
                           <button
                             type="button"
-                            onClick={() => saveTechConfig({ ...techConfig, drumsMode: '4mic' })}
-                            style={{
-                              flex: 1,
-                              border: 'none',
-                              padding: '6px 6px',
-                              borderRadius: '7px',
-                              fontSize: '0.66rem',
-                              fontWeight: 'bold',
-                              cursor: 'pointer',
-                              background: techConfig.drumsMode === '4mic' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
-                              color: techConfig.drumsMode === '4mic' ? theme.text : theme.textMuted,
-                              boxShadow: techConfig.drumsMode === '4mic' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                              transition: 'all 0.2s'
-                            }}
-                            title="Kick, Snare, Overhead L, Overhead R"
-                          >
-                            4 Mics
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => saveTechConfig({ ...techConfig, drumsMode: 'standard' })}
                             style={{
                               flex: 1,
                               border: 'none',
-                              padding: '6px 6px',
+                              padding: '6px 10px',
                               borderRadius: '7px',
-                              fontSize: '0.66rem',
+                              fontSize: '0.7rem',
                               fontWeight: 'bold',
                               cursor: 'pointer',
                               background: techConfig.drumsMode === 'standard' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
@@ -9629,9 +9989,29 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               boxShadow: techConfig.drumsMode === 'standard' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
                               transition: 'all 0.2s'
                             }}
-                            title="Kick, Snare, HiHat, 3x Tom, 2x OH (7 Kanäle)"
+                            title="Kick, Snare, HiHat, 3x Toms, 2x Overhead (7 Mics)"
                           >
-                            Standard (7 Ch)
+                            Komplett
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveTechConfig({ ...techConfig, drumsMode: '4mic' })}
+                            style={{
+                              flex: 1,
+                              border: 'none',
+                              padding: '6px 10px',
+                              borderRadius: '7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              background: techConfig.drumsMode === '4mic' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
+                              color: techConfig.drumsMode === '4mic' ? theme.text : theme.textMuted,
+                              boxShadow: techConfig.drumsMode === '4mic' && !isNight ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                            title="Kick, Snare, 2x Overhead (4 Mics)"
+                          >
+                            4-Mic
                           </button>
                           <button
                             type="button"
@@ -9639,9 +10019,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                             style={{
                               flex: 1,
                               border: 'none',
-                              padding: '6px 6px',
+                              padding: '6px 10px',
                               borderRadius: '7px',
-                              fontSize: '0.66rem',
+                              fontSize: '0.7rem',
                               fontWeight: 'bold',
                               cursor: 'pointer',
                               background: techConfig.drumsMode === 'edrum' ? (isNight ? '#2c2c35' : '#ffffff') : 'transparent',
@@ -9659,326 +10039,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   )}
                 </div>
 
-                {/* Changeover rundown timeline */}
-                <div style={{ border: theme.cardBorder, borderRadius: '14px', background: theme.cardBg, overflow: 'hidden' }}>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
-                      <thead>
-                        <tr style={{ background: theme.headerBg, borderBottom: theme.border }}>
-                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '90px' }}>Zeit</th>
-                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '220px' }}>Beitrag & Besetzung</th>
-                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '260px' }}>Signal / Patch (FOH)</th>
-                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em', width: '160px' }}>Aufbau & Umbau</th>
-                          <th style={{ padding: '12px 16px', fontSize: '0.68rem', fontWeight: 700, color: theme.thColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status / Notizen</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stagePoints.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', fontSize: '0.78rem', color: theme.textMuted, fontStyle: 'italic' }}>
-                              Keine geplanten Beiträge auf dieser Bühne.
-                            </td>
-                          </tr>
-                        ) : (
-                          stagePoints.map((pp, idx) => {
-                            const timeInfo = timeMap[pp.id] || { start: '--:--', end: '--:--' };
-                            
-                            // Calculate deltas relative to previous planned point
-                            const prevPp = idx > 0 ? stagePoints[idx - 1] : null;
-                            const deltaChairs = prevPp ? (pp.chairs_needed || 0) - (prevPp.chairs_needed || 0) : 0;
-                            const deltaStands = prevPp ? (pp.music_stands_needed || 0) - (prevPp.music_stands_needed || 0) : 0;
-
-                            const isLive = pp.id === activeLivePointId;
-                            const isNext = activeLiveIdx !== -1 && idx === activeLiveIdx + 1;
-
-                            // Parse audio needs
-                            let techItems: any[] = [];
-                            if (pp.tech_requirements && (pp.tech_requirements.trim().startsWith('[') || pp.tech_requirements.trim().startsWith('{'))) {
-                              try {
-                                techItems = JSON.parse(pp.tech_requirements);
-                              } catch (e) {}
-                            }
-
-                            // Dynamic row outline / background based on Live Focus
-                            let rowStyle: React.CSSProperties = {
-                              borderBottom: theme.border,
-                              background: isLive
-                                ? (isNight ? 'rgba(255, 69, 58, 0.08)' : 'rgba(255, 59, 48, 0.04)')
-                                : isNext
-                                  ? (isNight ? 'rgba(48, 176, 199, 0.05)' : 'rgba(0, 122, 255, 0.02)')
-                                  : pp.is_pause ? (isNight ? '#101013' : '#fbfbfc') : theme.cardBg,
-                              transition: 'background 0.2s',
-                              position: 'relative'
-                            };
-
-                            if (isLive) {
-                              rowStyle.boxShadow = `inset 4px 0 0 0 ${theme.liveColor}`;
-                            } else if (isNext) {
-                              rowStyle.boxShadow = `inset 4px 0 0 0 ${theme.nextColor}`;
-                            }
-
-                            return (
-                              <tr 
-                                key={pp.id} 
-                                style={rowStyle}
-                                onMouseEnter={e => {
-                                  if (!isLive && !isNext) {
-                                    e.currentTarget.style.background = theme.rowHoverBg;
-                                  }
-                                }}
-                                onMouseLeave={e => {
-                                  if (!isLive && !isNext) {
-                                    e.currentTarget.style.background = pp.is_pause ? (isNight ? '#101013' : '#fbfbfc') : theme.cardBg;
-                                  }
-                                }}
-                              >
-                                {/* Time column */}
-                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                                  <strong style={{ fontSize: '0.8rem', color: pp.is_pause ? theme.textMuted : theme.text, display: 'block', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.start}</strong>
-                                  <span style={{ fontSize: '0.66rem', color: theme.textMuted, display: 'block', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>{timeInfo.end}</span>
-                                </td>
-
-                                {/* Name & Ensemble */}
-                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                      <strong style={{ fontSize: '0.8rem', color: pp.is_pause ? theme.textMuted : theme.text }}>
-                                        {pp.is_pause ? '☕ ' : ''}{pp.name}
-                                      </strong>
-                                      {isLive && (
-                                        <span style={{
-                                          fontSize: '0.58rem',
-                                          fontWeight: 'bold',
-                                          background: theme.liveColor,
-                                          color: '#ffffff',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
-                                          textTransform: 'uppercase',
-                                          animation: 'pulse 1.5s infinite',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '2px'
-                                        }}>
-                                          ● LIVE
-                                        </span>
-                                      )}
-                                      {isNext && (
-                                        <span style={{
-                                          fontSize: '0.58rem',
-                                          fontWeight: 'bold',
-                                          background: theme.nextColor,
-                                          color: '#ffffff',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
-                                          textTransform: 'uppercase',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '2px'
-                                        }}>
-                                          ● NEXT
-                                        </span>
-                                      )}
-                                    </div>
-                                    {!pp.is_pause && (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.68rem', color: theme.textMuted }}>
-                                        {pp.ensemble_band && <span>👥 {pp.ensemble_band}</span>}
-                                        {pp.performer_count > 0 && <span>👤 {pp.performer_count} Person(en)</span>}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-
-                                {/* Signal patch */}
-                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                                  {!pp.is_pause && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      {pp.instrument && (
-                                        <span style={{ fontSize: '0.68rem', color: theme.text, fontWeight: 600 }}>
-                                          🎸 {pp.instrument}
-                                        </span>
-                                      )}
-                                      {techItems.length > 0 ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                          {techItems.map((item) => {
-                                            const itemId = item.id || `item_${item.type}`;
-                                            const checked = isItemChecked(pp.id, itemId);
-                                            const needsPhantom = item.connection?.toLowerCase().includes('+48') || item.type?.toLowerCase().includes('kondensator');
-                                            
-                                            return (
-                                              <div 
-                                                key={itemId} 
-                                                onClick={() => handleToggleCheck(pp.id, itemId)}
-                                                style={{ 
-                                                  display: 'flex', 
-                                                  alignItems: 'center', 
-                                                  gap: '6px', 
-                                                  fontSize: '0.66rem', 
-                                                  cursor: 'pointer',
-                                                  userSelect: 'none',
-                                                  opacity: checked ? 0.45 : 1,
-                                                  transition: 'opacity 0.2s'
-                                                }}
-                                              >
-                                                <input 
-                                                  type="checkbox" 
-                                                  checked={checked} 
-                                                  readOnly
-                                                  style={{ cursor: 'pointer', margin: 0, width: '12px', height: '12px', accentColor: theme.okColor }}
-                                                />
-                                                <span style={{ 
-                                                  color: checked ? theme.textMuted : theme.text, 
-                                                  textDecoration: checked ? 'line-through' : 'none',
-                                                  fontWeight: 500
-                                                }}>
-                                                  {item.count}x {item.type} ({item.connection})
-                                                </span>
-                                                {needsPhantom && (
-                                                  <span style={{
-                                                    fontSize: '0.55rem',
-                                                    fontWeight: 'bold',
-                                                    background: theme.p48vBg,
-                                                    color: theme.p48vColor,
-                                                    padding: '0px 3px',
-                                                    borderRadius: '3px',
-                                                    letterSpacing: '0.02em',
-                                                    boxShadow: isNight ? '0 0 4px rgba(255, 159, 10, 0.4)' : 'none'
-                                                  }}>
-                                                    +48V
-                                                  </span>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : pp.tech_requirements ? (
-                                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontStyle: 'italic' }}>
-                                          {pp.tech_requirements}
-                                        </span>
-                                      ) : (
-                                        <span style={{ fontSize: '0.66rem', color: theme.textMuted, fontStyle: 'italic' }}>Kein spezieller Audiobedarf</span>
-                                      )}
-                                    </div>
-                                  )}
-                                </td>
-
-                                {/* Stage Setup & Changeover */}
-                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                                  {!pp.is_pause ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      {/* Absolute values */}
-                                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.74rem', fontWeight: 600, color: theme.text }}>
-                                        <span>🪑 {pp.chairs_needed || 0}</span>
-                                        <span>🎼 {pp.music_stands_needed || 0}</span>
-                                      </div>
-                                      
-                                      {/* Changeover instructions (Deltas) */}
-                                      {(deltaChairs !== 0 || deltaStands !== 0) && (
-                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                                          {deltaChairs !== 0 && (() => {
-                                            const checked = isDeltaChecked(pp.id, 'chairs');
-                                            return (
-                                              <span 
-                                                onClick={() => handleToggleDelta(pp.id, 'chairs')}
-                                                style={{
-                                                  fontSize: '0.6rem',
-                                                  fontWeight: 700,
-                                                  background: checked 
-                                                    ? (isNight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.04)')
-                                                    : (deltaChairs > 0 ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
-                                                  color: checked 
-                                                    ? theme.textMuted 
-                                                    : (deltaChairs > 0 ? (isNight ? '#30d158' : '#15803d') : (isNight ? '#ff453a' : '#b91c1c')),
-                                                  padding: '1px 6px',
-                                                  borderRadius: '4px',
-                                                  cursor: 'pointer',
-                                                  textDecoration: checked ? 'line-through' : 'none',
-                                                  userSelect: 'none',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '2px',
-                                                  border: checked ? '1px solid transparent' : (isNight ? '1px solid rgba(255,255,255,0.05)' : 'none')
-                                                }}
-                                              >
-                                                {checked ? '✓' : ''} {deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} 🪑
-                                              </span>
-                                            );
-                                          })()}
-                                          
-                                          {deltaStands !== 0 && (() => {
-                                            const checked = isDeltaChecked(pp.id, 'stands');
-                                            return (
-                                              <span 
-                                                onClick={() => handleToggleDelta(pp.id, 'stands')}
-                                                style={{
-                                                  fontSize: '0.6rem',
-                                                  fontWeight: 700,
-                                                  background: checked 
-                                                    ? (isNight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.04)')
-                                                    : (deltaStands > 0 ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
-                                                  color: checked 
-                                                    ? theme.textMuted 
-                                                    : (deltaStands > 0 ? (isNight ? '#30d158' : '#15803d') : (isNight ? '#ff453a' : '#b91c1c')),
-                                                  padding: '1px 6px',
-                                                  borderRadius: '4px',
-                                                  cursor: 'pointer',
-                                                  textDecoration: checked ? 'line-through' : 'none',
-                                                  userSelect: 'none',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '2px',
-                                                  border: checked ? '1px solid transparent' : (isNight ? '1px solid rgba(255,255,255,0.05)' : 'none')
-                                                }}
-                                              >
-                                                {checked ? '✓' : ''} {deltaStands > 0 ? `+${deltaStands}` : deltaStands} 🎼
-                                              </span>
-                                            );
-                                          })()}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span style={{ fontSize: '0.7rem', color: theme.textMuted }}>-</span>
-                                  )}
-                                </td>
-
-                                {/* Remarks & Live Trigger */}
-                                <td style={{ padding: '14px 16px', verticalAlign: 'top' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <div style={{ fontSize: '0.7rem', color: theme.text, lineHeight: 1.4 }}>
-                                      {pp.remarks || <span style={{ color: theme.textMuted, fontStyle: 'italic' }}>-</span>}
-                                    </div>
-                                    <div style={{ marginTop: '2px' }}>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setLiveFocus(pp.id); }}
-                                        style={{
-                                          padding: '3px 8px',
-                                          borderRadius: '6px',
-                                          border: isLive ? '1px solid rgba(255,69,58,0.3)' : `1px solid ${isNight ? '#3a3a42' : '#d1d1d6'}`,
-                                          background: isLive ? 'rgba(255,69,58,0.1)' : 'transparent',
-                                          color: isLive ? theme.liveColor : theme.text,
-                                          fontSize: '0.62rem',
-                                          fontWeight: 'bold',
-                                          cursor: 'pointer',
-                                          transition: 'all 0.15s',
-                                        }}
-                                      >
-                                        {isLive ? '🔴 Live beenden' : 'Setzt Live'}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                {/* Content Render (Single or All stages) */}
+                {techViewMode === 'single' ? (
+                  renderStageLayout(activeStage)
+                ) : (
+                  Array.from({ length: stageCount }, (_, i) => i + 1).map(stageNum => renderStageLayout(stageNum))
+                )}
               </div>
             );
           })()}
-
           {coordinatorTab === 'export' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

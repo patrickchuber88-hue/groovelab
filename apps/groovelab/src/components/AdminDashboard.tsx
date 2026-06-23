@@ -1949,7 +1949,8 @@ export function AdminDashboard({
         let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform === 'campus' && adminData.role !== 'teacher') sq = sq.eq('is_campus_active', true);
         else if (activePlatform !== 'campus') sq = sq.eq('is_groovelab_active', true);
-        if (adminData.role === 'teacher') sq = sq.eq('teacher_id', adminData.id);
+        const isStaffAdminOrSec = adminData.role === 'admin' || adminData.role === 'secretary' || (adminData.roles && (adminData.roles.includes('admin') || adminData.roles.includes('secretary')));
+        if (adminData.role === 'teacher' && !isStaffAdminOrSec) sq = sq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
