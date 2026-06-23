@@ -4560,7 +4560,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   transition: 'all 0.2s'
                 }}
               >
-                📄 Sammel-Onboarding (CSV) {isSubjectCsvExpanded ? '▲' : '▼'}
+                <FileText size={15} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Sammel-Onboarding (CSV) {isSubjectCsvExpanded ? '▲' : '▼'}
               </button>
 
               <button
@@ -4587,7 +4587,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   transition: 'all 0.2s'
                 }}
               >
-                ➕ Fach anlegen
+                <Plus size={15} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Fach anlegen
               </button>
             </div>
           </div>
@@ -4595,7 +4595,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           {/* Collapsible CSV Box */}
           {isSubjectCsvExpanded && (
             <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid #cbd5e1', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontWeight: 800 }}>📄 Sammel-Onboarding (CSV)</h4>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontWeight: 800 }}><FileText size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Sammel-Onboarding (CSV)</h4>
               <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.4' }}>
                 Gib eine Liste von Fächern ein (ein Fachname pro Zeile). Bereits vorhandene Fächer werden automatisch übersprungen.
               </p>
@@ -4643,7 +4643,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         e.currentTarget.style.borderColor = '#cbd5e1';
                       }}
                     >
-                      ➕ {inst}
+                      <Plus size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> {inst}
                     </button>
                   ))}
                 </div>
@@ -4704,7 +4704,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowX: 'auto', width: '100%' }}>
             {filtered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>📖</span>
+                <BookOpen size={40} style={{ color: '#cbd5e1', display: 'block', margin: '0 auto 8px' }} />
                 Keine Fächer gefunden. Lege ein neues Fach an oder ändere die Suchkriterien.
               </div>
             ) : (
@@ -4764,7 +4764,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',
-                            color: '#ef4444',
+                            color: '#137333',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
@@ -4790,7 +4790,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               {/* Modal Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                  ➕ Neues Unterrichtsfach anlegen
+                  <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Neues Unterrichtsfach anlegen
                 </h3>
                 <button 
                   onClick={() => setShowAddSubjectModal(false)}
