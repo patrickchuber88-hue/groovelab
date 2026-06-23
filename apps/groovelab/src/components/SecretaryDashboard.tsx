@@ -20733,7 +20733,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <Calendar size={15} style={{ color: '#0f172a' }} />
                             Wöchentlicher Belegungsplan
                           </h4>
-                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
+                          <p className="no-pdf" style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
                         </div>
                         <button
                           onClick={handleExportPlanPDF}
@@ -20752,7 +20752,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             fontFamily: 'Urbanist',
                             transition: 'all 0.2s'
                           }}
-                          className="hover-scale"
+                          className="hover-scale no-pdf"
                         >
                           📥 PDF Export
                         </button>
