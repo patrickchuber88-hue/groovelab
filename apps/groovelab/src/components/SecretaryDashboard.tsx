@@ -21878,8 +21878,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}>
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <School size={18} color="#0b57d0" /> {editingBuilding ? `„${editingBuilding.name}“ bearbeiten` : 'Neues Gebäude anlegen'}
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
+                        <School size={18} color="#ea4335" /> {editingBuilding ? `„${editingBuilding.name}“ bearbeiten` : 'Neues Gebäude anlegen'}
                       </h4>
                       <button
                         onClick={() => { setShowBuildingModal(false); setEditingBuilding(null); }}
@@ -21893,7 +21893,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       {/* Modal Body */}
                       <div style={{ padding: '28px 28px 32px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Gebäudename *</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <School size={12} color="#ea4335" /> Gebäudename *
+                          </label>
                           <input
                             value={buildingFormName}
                             onChange={e => setBuildingFormName(e.target.value)}
@@ -21903,7 +21905,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Adresse</label>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <School size={12} color="#ea4335" /> Adresse
+                          </label>
                           <input
                             value={buildingFormAddress}
                             onChange={e => setBuildingFormAddress(e.target.value)}
@@ -21924,7 +21928,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         </button>
                         <button
                           type="submit"
-                          style={{ padding: '10px 20px', border: 'none', background: '#0b57d0', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 12px rgba(11,87,208,0.2)' }}
+                          style={{ padding: '10px 20px', border: 'none', background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 12px rgba(234,67,53,0.2)' }}
                         >
                           Speichern
                         </button>
