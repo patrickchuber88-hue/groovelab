@@ -41,6 +41,11 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
 const resolveCampusAvatar = (u: any): string => {
   if (!u) return '/avatar_ghost.jpg';
   const role = (u.role || '').toLowerCase();
+  const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+  
+  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
+    return '/campus_login_hero.png';
+  }
   
   if (role === 'student') {
     const studentInstrument = u.instrument || 'Nicht festgelegt';
@@ -53,7 +58,7 @@ const resolveCampusAvatar = (u: any): string => {
     }
     return getInstrumentAvatarUrl(studentInstrument);
   } else {
-    // Teachers / Admins
+    // Teachers
     return getInstrumentAvatarUrl(u.instrument);
   }
 };

@@ -262,8 +262,14 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
     const targetUser = user;
     
+    const r = targetUser?.role || '';
+    const rs = targetUser?.roles || [];
+    if (r === 'admin' || r === 'secretary' || rs.includes('admin') || rs.includes('secretary')) {
+      return '/campus_login_hero.png';
+    }
+    
     if (activePlat === 'campus') {
-      if (targetUser && (resolvedInstrument || targetUser.role === 'student' || targetUser.role === 'teacher' || targetUser.role === 'admin')) {
+      if (targetUser && (resolvedInstrument || targetUser.role === 'student' || targetUser.role === 'teacher')) {
         return getInstrumentAvatarUrl(resolvedInstrument);
       }
       if (src && !src.includes('_avatar.png') && !src.includes('avatar_ghost')) {

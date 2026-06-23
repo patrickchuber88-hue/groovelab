@@ -598,7 +598,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Name der Schule *</label>
-                  <input type="text" required value={onboardSchoolName} onChange={e => setOnboardSchoolName(e.target.value)} placeholder="z.B. GrooveLab Musikakademie" style={inputStyle} />
+                  <input type="text" required value={onboardSchoolName} onChange={e => setOnboardSchoolName(e.target.value)} placeholder="z.B. Campus-Groovelab Musikakademie" style={inputStyle} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Vertreten durch (Schulleitung) *</label>
@@ -742,7 +742,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: 'white',
                 border: '1px solid rgba(255,255,255,0.08)'
               }}>
-                <div style={{ fontSize: '10px', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>GrooveLab Admin-Ausweis</div>
+                <div style={{ fontSize: '10px', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>Campus-Groovelab Admin-Ausweis</div>
                 
                 {/* QR Code Container */}
                 <div style={{

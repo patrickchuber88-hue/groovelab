@@ -326,6 +326,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [activeLivePointId, setActiveLivePointId] = useState<string | null>(null);
   const [techCheckTrigger, setTechCheckTrigger] = useState<number>(0);
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const alert = (msg: string) => {
+    let type: 'success' | 'error' | 'info' = 'info';
+    const lower = msg.toLowerCase();
+    if (lower.includes('fehler') || lower.includes('fehlgeschlagen') || lower.includes('error')) {
+      type = 'error';
+    } else if (
+      lower.includes('erfolgreich') || 
+      lower.includes('aktiviert') || 
+      lower.includes('🎉') || 
+      lower.includes('gespeichert') || 
+      lower.includes('storniert') || 
+      lower.includes('übermittelt') || 
+      lower.includes('zurückgesetzt')
+    ) {
+      type = 'success';
+    }
+    showToast(msg, type);
+  };
+
   // Customizable Instrument Patch Configuration (schulweit)
   const [techConfig, setTechConfig] = useState<{
     keyboardMode: 'mono' | 'stereo';
@@ -11261,6 +11295,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </div>
         );
       })()}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 99999,
+          background: toast.type === 'success' ? '#16a34a' : toast.type === 'error' ? '#dc2626' : '#2563eb',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.88rem',
+          fontWeight: 700,
+          pointerEvents: 'none'
+        }}>
+          {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'} {toast.message}
+        </div>
+      )}
     </div>
   );
 }
