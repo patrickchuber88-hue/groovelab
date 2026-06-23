@@ -46,7 +46,8 @@ function formatInstrumentName(name: string): string {
   if (!name) return '';
   const mapping: Record<string, string> = {
     akustisches_klavier: 'Akustisches Klavier',
-    ensemble_geeignet: 'Ensemble-geeignet',
+    ensemble_geeignet: 'Ensembles/Bands',
+    ensembles_geeignet: 'Ensembles/Bands',
     e_piano: 'E-Piano',
     e_gitarre: 'E-Gitarre',
     akustische_gitarre: 'Akustische Gitarre',
