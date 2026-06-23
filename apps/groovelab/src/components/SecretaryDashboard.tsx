@@ -9800,20 +9800,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               display: 'flex', 
               alignItems: 'center', 
               gap: '8px', 
-              background: 'rgba(59, 130, 246, 0.04)', 
+              background: 'rgba(234, 67, 53, 0.04)', 
               padding: '8px 16px', 
               borderRadius: '12px', 
-              border: '1px solid rgba(59, 130, 246, 0.12)',
+              border: '1px solid rgba(234, 67, 53, 0.12)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
-              <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <School size={12} color="#ef4444" />
+              <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ color: '#1e293b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <School size={14} color="#ea4335" />
                   <span>{schoolName || 'Meine Musikschule'}</span>
                 </span>
-                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <User size={14} color="#ef4444" />
+                <div style={{ width: '1px', height: '14px', background: 'rgba(234, 67, 53, 0.18)', margin: '0 4px' }} />
+                <span style={{ color: '#334155', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} color="#ea4335" />
                   <span>
                     {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
                   </span>
@@ -9833,7 +9833,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       alignItems: 'center',
                       justifyContent: 'center',
                       padding: '4px',
-                      color: '#ef4444',
+                      color: '#ea4335',
                       borderRadius: '50%',
                       marginLeft: '6px',
                       transition: 'background 0.2s, transform 0.2s',
@@ -9841,7 +9841,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     title="Zum Lehrer-Dashboard wechseln"
                     className="hover-scale"
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                      e.currentTarget.style.background = 'rgba(234, 67, 53, 0.08)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = 'transparent';
@@ -9850,7 +9850,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     <RefreshCw size={14} />
                   </button>
                 )}
-              </span>
+              </div>
             </div>
 
             {/* Ausweis Button (Desktop only) */}
