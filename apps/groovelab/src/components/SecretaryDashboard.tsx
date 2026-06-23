@@ -1510,6 +1510,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [employeeImportStatus, setEmployeeImportStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState<boolean>(false);
   const [dragHoveredEmployeeRole, setDragHoveredEmployeeRole] = useState<string | null>(null);
+  const [employeeFilterRoleFocused, setEmployeeFilterRoleFocused] = useState<boolean>(false);
+  const [employeeStatusTabFocused, setEmployeeStatusTabFocused] = useState<boolean>(false);
+  const [employeeSearchFocused, setEmployeeSearchFocused] = useState<boolean>(false);
 
   const [userQuota, setUserQuota] = useState<number>(150);
   const [activeUserQuota, setActiveUserQuota] = useState<number>(150);
@@ -12090,15 +12093,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           padding: '8px 16px', 
                           fontSize: '0.8rem', 
                           fontWeight: 800,
-                          background: isEmployeeCsvExpanded ? '#f1f5f9' : '#ffffff',
-                          color: '#475569',
-                          border: '1.5px solid #cbd5e1',
+                          background: isEmployeeCsvExpanded ? '#fce8e6' : '#ffffff',
+                          color: isEmployeeCsvExpanded ? '#ea4335' : '#475569',
+                          border: isEmployeeCsvExpanded ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
+                          boxShadow: isEmployeeCsvExpanded ? '0 4px 10px rgba(234,67,53,0.15)' : 'none',
                           transition: 'all 0.2s'
                         }}
                       >
-                        📄 Sammel-Onboarding (CSV) {isEmployeeCsvExpanded ? '▲' : '▼'}
+                        <FileText size={15} style={{ color: isEmployeeCsvExpanded ? '#ea4335' : '#475569' }} />
+                        Sammel-Onboarding (CSV) {isEmployeeCsvExpanded ? '▲' : '▼'}
                       </button>
 
                       <button
@@ -12111,16 +12116,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           padding: '8px 16px', 
                           fontSize: '0.8rem', 
                           fontWeight: 800,
-                          background: '#dc2626',
+                          background: '#ea4335',
                           color: '#ffffff',
                           border: 'none',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
-                          boxShadow: '0 4px 10px rgba(11,87,208,0.15)',
+                          boxShadow: '0 4px 10px rgba(234,67,53,0.15)',
                           transition: 'all 0.2s'
                         }}
                       >
-                        ➕ Mitarbeiter anlegen
+                        <Plus size={15} />
+                        Mitarbeiter anlegen
                       </button>
                     </div>
                   </div>
@@ -12143,8 +12149,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                         return (
                           <div style={{
-                            background: 'rgba(11, 87, 208, 0.03)',
-                            border: '1.5px solid rgba(11, 87, 208, 0.12)',
+                            background: 'rgba(234, 67, 53, 0.03)',
+                            border: '1.5px solid rgba(234, 67, 53, 0.12)',
                             borderRadius: '16px',
                             padding: '12px 16px',
                             display: 'flex',
@@ -12156,7 +12162,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
-                              <span style={{ fontSize: '0.68rem', color: '#0b57d0', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                              <span style={{ fontSize: '0.68rem', color: '#ea4335', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
                                 ⚡ Smart Auto-Zuweisung:
                               </span>
 
@@ -12194,7 +12200,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                             </div>
                             
-                            <span style={{ fontSize: '0.65rem', color: '#0b57d0', fontWeight: 900, background: '#e8f0fe', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                            <span style={{ fontSize: '0.65rem', color: '#ea4335', fontWeight: 900, background: '#fce8e6', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
                               Rolle wird automatisch verknüpft!
                             </span>
                           </div>
@@ -12224,7 +12230,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       <button
                         onClick={handleImportEmployees}
                         className="google-btn-primary"
-                        style={{ background: '#0b57d0', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
+                        style={{ background: '#ea4335', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
                       >
                         Mitarbeiter importieren
                       </button>
@@ -12238,61 +12244,82 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         type="text"
                         value={employeeSearchQuery}
                         onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                        onFocus={() => setEmployeeSearchFocused(true)}
+                        onBlur={() => setEmployeeSearchFocused(false)}
                         placeholder="Mitarbeiter nach Name oder E-Mail suchen..."
                         style={{
                           width: '100%',
                           padding: '10px 16px 10px 38px',
                           borderRadius: '14px',
-                          border: '1px solid #cbd5e1',
+                          border: employeeSearchFocused ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
                           fontSize: '0.85rem',
                           fontFamily: 'Urbanist',
                           fontWeight: 600,
                           outline: 'none',
-                          background: '#ffffff'
+                          background: '#ffffff',
+                          transition: 'border-color 0.2s'
                         }}
                       />
-                      <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.85rem' }}>🔍</span>
+                      <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                        <Search size={15} style={{ color: '#94a3b8' }} />
+                      </span>
                     </div>
 
-                    <select
-                      value={employeeFilterRole}
-                      onChange={(e) => setEmployeeFilterRole(e.target.value)}
-                      style={{
-                        padding: '10px 16px',
-                        borderRadius: '14px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.85rem',
-                        fontFamily: 'Urbanist',
-                        fontWeight: 600,
-                        outline: 'none',
-                        background: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="All">👥 Alle Rollen</option>
-                      <option value="admin">Administrator</option>
-                      <option value="secretary">Verwaltung</option>
-                    </select>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <Users size={15} style={{ color: '#94a3b8' }} />
+                      </span>
+                      <select
+                        value={employeeFilterRole}
+                        onChange={(e) => setEmployeeFilterRole(e.target.value)}
+                        onFocus={() => setEmployeeFilterRoleFocused(true)}
+                        onBlur={() => setEmployeeFilterRoleFocused(false)}
+                        style={{
+                          padding: '10px 16px 10px 38px',
+                          borderRadius: '14px',
+                          border: employeeFilterRoleFocused ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: 'white',
+                          cursor: 'pointer',
+                          transition: 'border-color 0.2s'
+                        }}
+                      >
+                        <option value="All">Alle Rollen</option>
+                        <option value="admin">Administrator</option>
+                        <option value="secretary">Verwaltung</option>
+                      </select>
+                    </div>
 
-                    <select
-                      value={employeeStatusTab}
-                      onChange={(e) => setEmployeeStatusTab(e.target.value as any)}
-                      style={{
-                        padding: '10px 16px',
-                        borderRadius: '14px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.85rem',
-                        fontFamily: 'Urbanist',
-                        fontWeight: 600,
-                        outline: 'none',
-                        background: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="all">⚡ Alle</option>
-                      <option value="active">Aktiv</option>
-                      <option value="inactive">Inaktiv</option>
-                    </select>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <Sliders size={15} style={{ color: '#94a3b8' }} />
+                      </span>
+                      <select
+                        value={employeeStatusTab}
+                        onChange={(e) => setEmployeeStatusTab(e.target.value as any)}
+                        onFocus={() => setEmployeeStatusTabFocused(true)}
+                        onBlur={() => setEmployeeStatusTabFocused(false)}
+                        style={{
+                          padding: '10px 16px 10px 38px',
+                          borderRadius: '14px',
+                          border: employeeStatusTabFocused ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: 'white',
+                          cursor: 'pointer',
+                          transition: 'border-color 0.2s'
+                        }}
+                      >
+                        <option value="all">Alle</option>
+                        <option value="active">Aktiv</option>
+                        <option value="inactive">Inaktiv</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* DYNAMIC EMPLOYEE LIST */}
@@ -12307,6 +12334,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         const { avatarBg, avatarColor } = getAlphabeticalColor(empName);
                         const roleLabel = emp.role === 'admin' ? 'Admin' : 'Verwaltung';
                         const isActive = emp.is_active ?? true;
+                        const currentRoles = Array.isArray(emp.roles) ? emp.roles : [emp.role || ''];
+                        const isAdminOrSecretary = currentRoles.includes('admin') || currentRoles.includes('secretary') || emp.role === 'admin' || emp.role === 'secretary';
 
                         return (
                           <div
@@ -12334,22 +12363,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           >
                             {/* Avatar & Name Info */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-                              <div style={{
-                                width: '42px',
-                                height: '42px',
-                                borderRadius: '50%',
-                                background: avatarBg,
-                                color: avatarColor,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 800,
-                                fontSize: '0.88rem',
-                                fontFamily: 'Urbanist',
-                                flexShrink: 0
-                              }}>
-                                {(emp.first_name?.[0] || 'M')}{(emp.last_name?.[0] || 'W')}
-                              </div>
+                              {isAdminOrSecretary ? (
+                                <img
+                                  src="/campus_login_hero.png"
+                                  alt={empName}
+                                  style={{
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    flexShrink: 0
+                                  }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '50%',
+                                  background: avatarBg,
+                                  color: avatarColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.88rem',
+                                  fontFamily: 'Urbanist',
+                                  flexShrink: 0
+                                }}>
+                                  {(emp.first_name?.[0] || 'M')}{(emp.last_name?.[0] || 'W')}
+                                </div>
+                              )}
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {empName}
@@ -12380,9 +12423,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       style={{
                                         padding: '4px 8px',
                                         borderRadius: '10px',
-                                        background: hasAdmin ? '#e8f0fe' : '#ffffff',
-                                        color: hasAdmin ? '#0b57d0' : '#a1a1aa',
-                                        border: hasAdmin ? '1.5px solid #0b57d0' : '1.5px dashed #cbd5e1',
+                                        background: hasAdmin ? '#fce8e6' : '#ffffff',
+                                        color: hasAdmin ? '#ea4335' : '#a1a1aa',
+                                        border: hasAdmin ? '1.5px solid #ea4335' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '75px',
@@ -12406,9 +12449,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       style={{
                                         padding: '4px 8px',
                                         borderRadius: '10px',
-                                        background: hasSecretary ? '#e2f6ea' : '#ffffff',
-                                        color: hasSecretary ? '#137333' : '#a1a1aa',
-                                        border: hasSecretary ? '1.5px solid #137333' : '1.5px dashed #cbd5e1',
+                                        background: hasSecretary ? '#f1f5f9' : '#ffffff',
+                                        color: hasSecretary ? '#334155' : '#a1a1aa',
+                                        border: hasSecretary ? '1.5px solid #334155' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '85px',
@@ -12524,7 +12567,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
-                                  color: '#1a73e8',
+                                  color: '#ea4335',
                                   fontSize: '0.8rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
@@ -12804,8 +12847,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               width: '36px',
                               height: '36px',
                               borderRadius: '50%',
-                              background: '#e8f0fe',
-                              color: '#0b57d0',
+                              background: '#fce8e6',
+                              color: '#ea4335',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -12966,8 +13009,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               width: '36px',
                               height: '36px',
                               borderRadius: '50%',
-                              background: '#e2f6ea',
-                              color: '#137333',
+                              background: '#e2e8f0',
+                              color: '#334155',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
