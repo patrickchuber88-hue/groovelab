@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -1617,6 +1617,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activeBillingSubTab, setActiveBillingSubTab] = useState<'overview' | 'matching' | 'history'>('overview');
   const [activeStudentsModalList, setActiveStudentsModalList] = useState<{ list: any[], month: string } | null>(null);
+  const [auditLimit, setAuditLimit] = useState<number>(200);
 
   const getDynamicAnnualPrice = (startDateStr: string | null | undefined, discountPercentOrCoFinancing: number | boolean = 0): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
@@ -2086,7 +2087,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     return () => clearInterval(interval);
   }, [schoolId]);
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (limitVal: number = 200) => {
     setAuditLoading(true);
     try {
       const { data, error } = await supabase
@@ -2107,7 +2108,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         `)
         .eq('school_id', schoolId)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(limitVal);
 
       if (error) throw error;
       setAuditLogs(data || []);
@@ -2120,9 +2121,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   useEffect(() => {
     if (activeTab === 'secretary' && secretarySubTab === 'audit') {
-      fetchAuditLogs();
+      fetchAuditLogs(auditLimit);
     }
-  }, [activeTab, secretarySubTab]);
+  }, [activeTab, secretarySubTab, auditLimit]);
 
   useEffect(() => {
     if (schoolId && matrixAllocations.length > 0) {
@@ -2174,7 +2175,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Aenderungsprotokoll_GrooveLab_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("download", `Aenderungsprotokoll_Campus_Groovelab_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2189,7 +2190,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       email: 'E-Mail',
       is_active: 'Konto-Status',
       is_campus_active: 'Campus-Zugang',
-      is_groovelab_active: 'GrooveLab-Zugang',
+      is_groovelab_active: 'Campus-Groovelab-Zugang',
       is_trial: 'Probezeit-Status',
       trial_ends_at: 'Probezeit-Ende',
       activated_at: 'Aktivierungsdatum',
@@ -2202,6 +2203,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   const translateValue = (key: string, val: any): string => {
     if (val === null || val === undefined || val === '') return 'nicht gesetzt';
+    if (typeof val === 'object' && !Array.isArray(val)) {
+      return JSON.stringify(val);
+    }
     if (typeof val === 'boolean') {
       if (key.startsWith('is_') && key.endsWith('_active')) {
         return val ? 'Freigeschaltet' : 'Gesperrt';
@@ -2233,9 +2237,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
 
   const renderDiffContent = (log: any) => {
-    const ignoredKeys = ['id', 'created_at', 'school_id', 'password', 'password_hash', 'personal_pin'];
-    
-    if (log.action === 'INSERT') {
+    try {
+      const ignoredKeys = ['id', 'created_at', 'school_id', 'password', 'password_hash', 'personal_pin'];
+      
+      if (log.action === 'INSERT') {
       if (!log.new_data) return '-';
       return Object.entries(log.new_data)
         .filter(([key]) => !ignoredKeys.includes(key))
@@ -2294,6 +2299,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         });
     }
     return '-';
+    } catch (err) {
+      console.error('Error rendering diff content:', err);
+      return <span style={{ color: '#ea4335', fontSize: '0.7rem', fontWeight: 700 }}>Fehler beim Laden der Details</span>;
+    }
   };
 
   const fetchLiveStatusData = async () => {
@@ -3726,6 +3735,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
 
   const handleSaveBrandingAndCalendar = async () => {
+    if (!editColor || !/^#([A-Fa-f0-9]{6})$/.test(editColor)) {
+      alert('Bitte gebe einen gültigen Hex-Farbcode ein (z. B. #ea4335).');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('schools')
@@ -22693,14 +22706,27 @@ status: status,
               flexShrink: 0
             }}>
               <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einstellungen</h3>
-              {[
-                { id: 'general', label: 'Allgemein', icon: '⚙️', color: '#64748b' },
-                { id: 'branding', label: 'Branding & Design', icon: '🎨', color: '#a855f7' },
-                { id: 'security', label: 'Sicherheit & Kiosk', icon: '🔒', color: '#ef4444' },
-                { id: 'notifications', label: 'API & Synchronisation', icon: '⚡', color: '#3b82f6' },
-                { id: 'gdpr', label: 'Datenschutz & DSGVO', icon: '🛡️', color: '#10b981' }
+{[
+                { id: 'general', label: 'Allgemein' },
+                { id: 'branding', label: 'Branding & Design' },
+                { id: 'security', label: 'Sicherheit & Kiosk' },
+                { id: 'notifications', label: 'API & Synchronisation' },
+                { id: 'gdpr', label: 'Datenschutz & DSGVO' }
               ].map((item) => {
                 const isSelected = settingsTab === item.id;
+                const activeColor = isSelected ? '#ea4335' : '#64748b';
+                
+                const renderIcon = () => {
+                  switch (item.id) {
+                    case 'general': return <Settings size={14} color={activeColor} />;
+                    case 'branding': return <Palette size={14} color={activeColor} />;
+                    case 'security': return <Lock size={14} color={activeColor} />;
+                    case 'notifications': return <Zap size={14} color={activeColor} />;
+                    case 'gdpr': return <Shield size={14} color={activeColor} />;
+                    default: return null;
+                  }
+                };
+
                 return (
                   <button
                     key={item.id}
@@ -22711,10 +22737,11 @@ status: status,
                       gap: '12px',
                       width: '100%',
                       padding: '10px 12px',
-                      borderRadius: '12px',
+                      borderRadius: isSelected ? '0 12px 12px 0' : '12px',
                       border: 'none',
-                      background: isSelected ? '#e2e8f0' : 'transparent',
-                      color: isSelected ? '#1e293b' : '#475569',
+                      borderLeft: isSelected ? '3px solid #ea4335' : '3px solid transparent',
+                      background: isSelected ? '#fce8e6' : 'transparent',
+                      color: isSelected ? '#ea4335' : '#475569',
                       fontSize: '0.84rem',
                       fontWeight: isSelected ? 700 : 500,
                       cursor: 'pointer',
@@ -22731,9 +22758,8 @@ status: status,
                       height: '24px',
                       borderRadius: '6px',
                       background: isSelected ? '#ffffff' : '#f1f5f9',
-                      fontSize: '0.92rem',
                       boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                    }}>{item.icon}</span>
+                    }}>{renderIcon()}</span>
                     <span style={{ flex: 1 }}>{item.label}</span>
                   </button>
                 );
@@ -22751,9 +22777,9 @@ status: status,
 
                   {/* Integration Link */}
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                    <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID & Integration Link (Campus & GrooveLab)</strong>
+                    <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID & Integration Link (Campus & Groovelab)</strong>
                     <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
-                      Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für GrooveLab.
+                      Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für Groovelab.
                     </span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input 
@@ -22773,9 +22799,9 @@ status: status,
                           fontSize: '0.8rem', 
                           fontWeight: 800,
                           borderRadius: '10px',
-                          border: 'none',
-                          background: copiedSchoolLink ? '#16a34a' : '#0f172a',
-                          color: '#ffffff',
+                          border: copiedSchoolLink ? '1.5px solid #ea4335' : 'none',
+                          background: copiedSchoolLink ? '#fce8e6' : '#ea4335',
+                          color: copiedSchoolLink ? '#ea4335' : '#ffffff',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
@@ -22790,11 +22816,11 @@ status: status,
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Aktive Zahlungsart</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.3' }}>
-                        Die Abrechnung erfolgt standardmäßig per Rechnung mit einem Zahlungsziel von 14 Tagen. Der Versand erfolgt per E-Mail zum Monatsende.
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
+                        Die Software-Lizenz für **Campus-Groovelab** ist zu 100% kostenlos. Es fallen lediglich optionale Hosting- und Aktivierungsgebühren an. Die Abrechnung erfolgt standardmäßig per Rechnung mit einem Zahlungsziel von 14 Tagen. Der Versand erfolgt per E-Mail zum Monatsende.
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#1e3a8a', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em' }}>
                       RECHNUNG (14 TAGE)
                     </div>
                   </div>
@@ -22883,9 +22909,22 @@ status: status,
                             style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontFamily: 'monospace' }}
                           />
                         </div>
-                        <div style={{ height: '36px', borderRadius: '10px', background: editColor, border: '1px solid rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.7rem', fontWeight: 700 }}>
-                          Vorschau Button-Farbe
-                        </div>
+{(() => {
+                          const hex = editColor.replace('#', '');
+                          let textColor = '#ffffff';
+                          if (hex.length === 6) {
+                            const r = parseInt(hex.substring(0, 2), 16);
+                            const g = parseInt(hex.substring(2, 4), 16);
+                            const b = parseInt(hex.substring(4, 6), 16);
+                            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                            textColor = luminance > 0.55 ? '#1e293b' : '#ffffff';
+                          }
+                          return (
+                            <div style={{ height: '36px', borderRadius: '10px', background: editColor, border: '1px solid rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: textColor, fontSize: '0.7rem', fontWeight: 700 }}>
+                              Vorschau Button-Farbe
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -22897,7 +22936,8 @@ status: status,
                       placeholder="https://example.com/calendar.ics"
                       value={calendarUrl}
                       onChange={(e) => setCalendarUrl(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', transition: 'all 0.2s' }}
+                      className="settings-text-input"
                     />
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginTop: '6px' }}>
                       Gibt die URL eines externen Kalenders (.ics Format) an, um Schultermine in den Campus-Events zu synchronisieren.
@@ -22913,10 +22953,10 @@ status: status,
                         fontWeight: 800,
                         borderRadius: '12px',
                         border: 'none',
-                        background: '#6b21a8',
+                        background: '#ea4335',
                         color: '#ffffff',
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(107, 33, 168, 0.15)',
+                        boxShadow: '0 4px 12px rgba(234, 67, 53, 0.15)',
                         transition: 'all 0.2s'
                       }}
                       className="hover-scale"
@@ -22951,9 +22991,9 @@ status: status,
                               padding: '8px 16px',
                               borderRadius: '8px',
                               border: '1.5px solid',
-                              borderColor: kioskPinLength === num ? '#6b21a8' : '#cbd5e1',
-                              background: kioskPinLength === num ? '#f5f3ff' : '#ffffff',
-                              color: kioskPinLength === num ? '#6b21a8' : '#475569',
+                              borderColor: kioskPinLength === num ? '#ea4335' : '#cbd5e1',
+                              background: kioskPinLength === num ? '#fce8e6' : '#ffffff',
+                              color: kioskPinLength === num ? '#ea4335' : '#475569',
                               fontSize: '0.8rem',
                               fontWeight: 800,
                               cursor: 'pointer',
@@ -22985,7 +23025,8 @@ status: status,
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                     <button 
                       onClick={() => alert('Sicherheits- und Kiosk-Optionen erfolgreich aktualisiert!')}
-                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#0f172a', color: '#ffffff', cursor: 'pointer' }}
+                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s' }}
+                      className="hover-scale"
                     >
                       Sicherheit speichern
                     </button>
@@ -23022,7 +23063,7 @@ status: status,
                       onClick={() => alert('Die manuelle Synchronisation wurde erfolgreich durchgeführt!')}
                       style={{ 
                         width: '100%', padding: '10px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                        border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', cursor: 'pointer', transition: 'all 0.15s' 
+                        border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', cursor: 'pointer', transition: 'all 0.15s' 
                       }}
                       className="hover-scale"
                     >
@@ -23033,7 +23074,8 @@ status: status,
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                     <button 
                       onClick={() => alert('Synchronisationseinstellungen erfolgreich gespeichert!')}
-                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#6b21a8', color: '#ffffff', cursor: 'pointer' }}
+                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s' }}
+                      className="hover-scale"
                     >
                       Einstellungen speichern
                     </button>
@@ -23062,7 +23104,7 @@ status: status,
                       color: '#92400e',
                       lineHeight: '1.45'
                     }}>
-                      <span style={{ fontSize: '1.4rem' }}>📄</span>
+                      <FileText size={20} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
@@ -23087,7 +23129,7 @@ status: status,
                       color: '#92400e',
                       lineHeight: '1.45'
                     }}>
-                      <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+                      <Shield size={20} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Hoster (Hetzner Online GmbH)</strong>
@@ -23146,25 +23188,27 @@ status: status,
                         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
                         const downloadAnchor = document.createElement('a');
                         downloadAnchor.setAttribute("href", dataStr);
-                        downloadAnchor.setAttribute("download", `Backup_GrooveLab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
+                        downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
                         document.body.appendChild(downloadAnchor);
                         downloadAnchor.click();
                         downloadAnchor.remove();
                       }}
                       style={{ 
                         padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                        border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', cursor: 'pointer', transition: 'all 0.15s' 
+                        border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
+                        display: 'flex', alignItems: 'center', gap: '6px'
                       }}
-                      className="hover-scale"
+                      className="google-btn-secondary hover-scale"
                     >
-                      📥 Backup (JSON) laden
+                      <Download size={14} style={{ color: '#64748b' }} /> Backup (JSON) laden
                     </button>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                     <button 
                       onClick={() => alert('Datenschutzeinstellungen erfolgreich gespeichert!')}
-                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#10b981', color: '#ffffff', cursor: 'pointer' }}
+                      style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s' }}
+                      className="hover-scale"
                     >
                       DSGVO speichern
                     </button>
@@ -23182,6 +23226,34 @@ status: status,
                 .google-card, table { box-shadow: none !important; border: none !important; }
                 th, td { border-bottom: 1px solid #ddd !important; padding: 8px !important; }
                 tr { page-break-inside: avoid !important; }
+              }
+              .search-input-wrapper:focus-within {
+                border-color: #ea4335 !important;
+                box-shadow: 0 0 0 2px rgba(234, 67, 53, 0.15) !important;
+              }
+              .google-btn-secondary:hover {
+                border-color: #ea4335 !important;
+                background: #fce8e6 !important;
+                color: #ea4335 !important;
+              }
+              .google-btn-primary:hover {
+                background: #d63022 !important;
+              }
+              .settings-text-input:focus {
+                border-color: #ea4335 !important;
+                box-shadow: 0 0 0 2px rgba(234, 67, 53, 0.15) !important;
+              }
+              .audit-row {
+                transition: background 0.15s;
+              }
+              .audit-row:hover {
+                background: #f8fafc !important;
+              }
+              .audit-row:nth-child(even) {
+                background: #fafbfd;
+              }
+              .audit-row:nth-child(even):hover {
+                background: #f8fafc !important;
               }
             `}</style>
             
@@ -23202,7 +23274,7 @@ status: status,
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '8px 14px', borderRadius: '10px', background: 'white', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                   disabled={auditLogs.length === 0}
                 >
-                  📥 Excel/CSV Export
+                  <Download size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Excel/CSV Export
                 </button>
                 <button
                   onClick={() => window.print()}
@@ -23210,14 +23282,14 @@ status: status,
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '8px 14px', borderRadius: '10px', background: '#ea4335', color: 'white', border: 'none', cursor: 'pointer' }}
                   disabled={auditLogs.length === 0}
                 >
-                  🖨️ PDF / Drucken
+                  <Printer size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> PDF / Drucken
                 </button>
               </div>
             </div>
 
             {/* Filter-Bar */}
             <div style={{ background: 'white', borderRadius: '20px', padding: '16px 20px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', gap: '12px', alignItems: 'center' }} className="no-print">
-              <div style={{ flex: 1, display: 'flex', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, display: 'flex', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }} className="search-input-wrapper">
                 <Search size={16} color="#94a3b8" />
                 <input
                   type="text"
@@ -23262,9 +23334,12 @@ status: status,
                     {auditLogs
                       .filter(log => {
                         const changer = log.users ? `${log.users.first_name} ${log.users.last_name}`.toLowerCase() : 'system';
+                        const targetName = log.table_name === 'users' ? (userMap[log.record_id] || '').toLowerCase() : (log.table_name || '').toLowerCase();
+                        const query = auditSearchQuery.toLowerCase().trim();
                         const matchesSearch = !auditSearchQuery.trim() || 
-                          changer.includes(auditSearchQuery.toLowerCase().trim()) || 
-                          log.record_id.toLowerCase().includes(auditSearchQuery.toLowerCase().trim());
+                          changer.includes(query) || 
+                          (log.record_id || '').toLowerCase().includes(query) ||
+                          targetName.includes(query);
                         
                         const matchesAction = auditActionFilter === 'All' || log.action === auditActionFilter;
                         
@@ -23287,11 +23362,11 @@ status: status,
                           badgeColor = '#b06000';
                         } else if (log.action === 'DELETE') {
                           badgeBg = '#fce8e6';
-                          badgeColor = '#c5221f';
+                          badgeColor = '#ea4335';
                         }
 
                         return (
-                          <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="audit-row">
                             <td style={{ padding: '14px 20px', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {dateFormatted}
                             </td>
@@ -23315,7 +23390,7 @@ status: status,
                             <td style={{ padding: '14px 20px', fontSize: '0.75rem', color: '#1e293b', maxWidth: '450px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.9rem' }}>👤</span>
+                                  <User size={14} style={{ color: '#64748b', verticalAlign: 'middle' }} />
                                   <span style={{ fontWeight: 550 }}>
                                     {log.table_name === 'users' ? 'Betroffener Nutzer' : 'Tabelle'}:
                                   </span>
@@ -23343,6 +23418,32 @@ status: status,
                 </table>
               )}
             </div>
+
+            {/* Load More Button */}
+            {!auditLoading && auditLogs.length >= auditLimit && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }} className="no-print">
+                <button
+                  onClick={() => setAuditLimit(prev => prev + 200)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '10px 24px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="google-btn-secondary hover-scale"
+                >
+                  <RefreshCw size={14} /> Ältere Protokolleinträge laden
+                </button>
+              </div>
+            )}
           </div>
         )}
 
