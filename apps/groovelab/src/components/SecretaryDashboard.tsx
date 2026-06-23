@@ -7916,8 +7916,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         continue;
       }
 
-      const maxStudents = parseInt(parts[1]?.trim()) || 1;
-      const qmSize = parseFloat(parts[2]?.trim()) || 0;
+      // Skip common CSV headers
+      const lowerName = roomName.toLowerCase();
+      if (lowerName === 'name' || lowerName === 'raumname' || lowerName === 'raum' || lowerName === 'room' || lowerName === 'roomname') {
+        continue;
+      }
+
+      let maxStudents = 1;
+      if (parts[1]?.trim()) {
+        const parsed = parseInt(parts[1].trim());
+        if (!isNaN(parsed)) {
+          maxStudents = Math.max(1, parsed);
+        }
+      }
+      let qmSize = 0;
+      if (parts[2]?.trim()) {
+        const parsed = parseFloat(parts[2].trim());
+        if (!isNaN(parsed)) {
+          qmSize = Math.max(0, parsed);
+        }
+      }
 
       try {
         const insertPayload: any = {
@@ -21418,12 +21436,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   }
 
                                   // Update local state instantly so UI responds immediately
+                                  const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: flName } : r));
 
                                   // Update in database as primary storage
                                   const { error } = await supabase.from('rooms').update({ floor: flName }).eq('id', roomId);
                                   if (error) {
-                                    console.warn("Supabase floor save failed, fell back to local storage cache:", error.message);
+                                    setRooms(previousRooms);
+                                    alert("Fehler beim Zuweisen des Stockwerks: " + error.message);
                                   }
                                 }
                                 setDragHoveredFloor(null);
