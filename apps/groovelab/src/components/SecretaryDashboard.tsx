@@ -42,6 +42,42 @@ function generateSecureQrToken(): string {
   }
   return token;
 }
+function formatInstrumentName(name: string): string {
+  if (!name) return '';
+  const mapping: Record<string, string> = {
+    akustisches_klavier: 'Akustisches Klavier',
+    ensemble_geeignet: 'Ensemble-geeignet',
+    e_piano: 'E-Piano',
+    e_gitarre: 'E-Gitarre',
+    akustische_gitarre: 'Akustische Gitarre',
+    schlagzeug: 'Schlagzeug',
+    piano: 'Piano',
+    gitarre: 'Gitarre',
+    gesang: 'Gesang',
+    geige: 'Geige',
+    querfloete: 'Querflöte',
+    blockfloete: 'Blockflöte',
+    saxophon: 'Saxophon',
+    bass: 'Bass',
+    keyboard: 'Keyboard',
+    trompete: 'Trompete',
+    blaeser: 'Bläser',
+    tasteninstrumente: 'Tasteninstrumente',
+    saiteninstrumente: 'Saiteninstrumente',
+    blasinstrumente: 'Blasinstrumente',
+    percussion: 'Percussion'
+  };
+
+  const key = name.toLowerCase().trim();
+  if (mapping[key]) return mapping[key];
+
+  return name
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 
 
 interface SystemAlert {
@@ -21180,7 +21216,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           fontFamily: 'Urbanist'
                                         }}
                                       >
-                                        🎸 {inst}
+                                        🎸 {formatInstrumentName(inst)}
                                       </span>
                                     ))}
 
@@ -21200,10 +21236,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           fontFamily: 'Urbanist',
                                           border: '1px solid #fecaca'
                                         }}
-                                        title={`Akustisch ungeeignet für ${inst}`}
+                                        title={`Akustisch ungeeignet für ${formatInstrumentName(inst)}`}
                                       >
                                         <AlertCircle size={8} color="#ef4444" />
-                                        {inst}
+                                        {formatInstrumentName(inst)}
                                       </span>
                                     ))}
                                   </div>
