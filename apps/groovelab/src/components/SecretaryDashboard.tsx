@@ -5961,7 +5961,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               alignItems: 'center'
             }}>
               <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input 
                   type="text" 
                   placeholder="Schüler suchen..." 
@@ -5993,7 +5993,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="All">♫ Alle Instrumente</option>
+                  <option value="All">Alle Instrumente</option>
                   {uniqueInstruments.map(inst => (
                     <option key={inst} value={inst}>{inst}</option>
                   ))}
@@ -6009,8 +6009,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="All">👥 Alle Lehrer</option>
-                  <option value="none">⬜ Allgemein (kein Lehrer)</option>
+                  <option value="All">Alle Lehrer</option>
+                  <option value="none">Allgemein (kein Lehrer)</option>
                   {allUniqueTeachers.map(t => (
                     <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
                   ))}
@@ -6026,10 +6026,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                 >
-                  <option value="all">☇ Alle Tarife</option>
-                  <option value="campus">🎓 Campus Aktiv</option>
-                  <option value="groovelab">🎸 GrooveLab Aktiv</option>
-                  <option value="inactive">⚪ Inaktiv</option>
+                  <option value="all">Alle Tarife</option>
+                  <option value="campus">Campus Aktiv</option>
+                  <option value="groovelab">GrooveLab Aktiv</option>
+                  <option value="inactive">Inaktiv</option>
                 </select>
               </div>
             </div>
@@ -13462,7 +13462,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             transition: 'all 0.2s'
                           }}
                         >
-                          📄 Sammel-Onboarding (CSV) ▼
+                          <FileText size={15} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Sammel-Onboarding (CSV) ▼
                         </button>
 
                         <button
@@ -13484,7 +13484,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             transition: 'all 0.2s'
                           }}
                         >
-                          ➕ Lehrkraft anlegen
+                          <Plus size={15} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Lehrkraft anlegen
                         </button>
                       </div>
                     </div>
@@ -13521,7 +13521,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
                                 <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
-                                  ⚡ Smart Auto-Zuweisung:
+                                  <Zap size={14} style={{ marginRight: '6px', verticalAlign: 'middle', fill: '#166534' }} /> Smart Auto-Zuweisung:
                                 </span>
 
                                 {/* Instrument Pill */}
@@ -13616,7 +13616,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             background: '#ffffff'
                           }}
                         />
-                        <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.85rem' }}>🔍</span>
+                        <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                       </div>
 
                       <select
@@ -13634,7 +13634,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="All">♫ Alle Instrumente</option>
+                        <option value="All">Alle Instrumente</option>
                         {uniqueInstruments.map(inst => (
                           <option key={inst} value={inst}>{inst}</option>
                         ))}
@@ -13655,7 +13655,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="all">☇ Alle</option>
+                        <option value="all">Alle</option>
                         <option value="active">Aktiv (Campus)</option>
                         <option value="inactive">Inaktiv (Bypass)</option>
                       </select>
@@ -13856,7 +13856,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   style={{
                                     background: 'transparent',
                                     border: 'none',
-                                    color: '#ea4335',
+                                    color: '#137333',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -13881,7 +13881,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           {/* Modal Header */}
                           <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                              ➕ Neue Lehrkraft hinzufügen
+                              <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Neue Lehrkraft hinzufügen
                             </h3>
                             <button 
                               onClick={() => setShowAddTeacherModal(false)}
@@ -15543,7 +15543,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       Klicke auf einen Lehrer, um das Sammel-Onboarding zu filtern und direkt Schüler für ihn zu erfassen.
                     </p>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '750px', overflowY: 'auto', paddingRight: '4px' }}>
                       
                       {/* Option / Slot für Alle Lehrer */}
                       {(() => {
@@ -15584,7 +15584,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 fontSize: '1rem',
                                 flexShrink: 0
                               }}>
-                                👥
+                                <Users size={18} />
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
@@ -23535,8 +23535,8 @@ status: status,
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#fee2e2';
-                  e.currentTarget.style.color = '#ef4444';
+                  e.currentTarget.style.background = '#e6f4ea';
+                  e.currentTarget.style.color = '#137333';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = '#ffffff';
@@ -23633,8 +23633,13 @@ status: status,
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Benötigte Ausstattung (Für Räume)</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {(() => {
-                    const availableEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
-                    const requiredEquipment = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
+                    const rawEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
+                    const cleanName = (name: string) => name.replace(/\s*#\d+$/, '').trim();
+                    const availableEquipment = Array.from(new Set(rawEquipment.map(cleanName))).filter(Boolean);
+                    
+                    const dbEq = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
+                    const requiredEquipment = Array.from(new Set(dbEq.map(cleanName))).filter(Boolean) as string[];
+                    
                     return availableEquipment.map((tag: string) => {
                       const active = requiredEquipment.includes(tag);
                       return (
@@ -23647,9 +23652,9 @@ status: status,
                           style={{
                             padding: '6px 12px',
                             borderRadius: '20px',
-                            border: `1px solid ${active ? '#0b57d0' : '#e2e8f0'}`,
-                            background: active ? '#eff6ff' : 'white',
-                            color: active ? '#0b57d0' : '#64748b',
+                            border: `1px solid ${active ? '#137333' : '#e2e8f0'}`,
+                            background: active ? '#e6f4ea' : 'white',
+                            color: active ? '#137333' : '#64748b',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             cursor: 'pointer'
@@ -23767,40 +23772,64 @@ status: status,
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Modulberechtigungen &amp; Status</label>
                 
                 {/* Campus Toggle */}
-                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>🎓 Campus Freigabe</span>
+                <label style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  background: '#f8fafc', 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #e2e8f0', 
+                  cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
+                  opacity: manageTeacher.isActive ? 1 : 0.5,
+                  transition: 'all 0.2s ease'
+                }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><GraduationCap size={15} style={{ color: '#64748b' }} /> Campus Freigabe</span>
                   <input 
                     type="checkbox" 
                     checked={manageTeacher.isCampusActive} 
+                    disabled={!manageTeacher.isActive}
                     onChange={(e) => setManageTeacher({ ...manageTeacher, isCampusActive: e.target.checked })}
                     style={{
                       width: '18px',
                       height: '18px',
                       accentColor: '#10b981',
-                      cursor: 'pointer'
+                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
                     }}
                   />
                 </label>
 
                 {/* GrooveLab Toggle */}
-                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>🎸 GrooveLab Freigabe</span>
+                <label style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  background: '#f8fafc', 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #e2e8f0', 
+                  cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
+                  opacity: manageTeacher.isActive ? 1 : 0.5,
+                  transition: 'all 0.2s ease'
+                }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Music size={15} style={{ color: '#64748b' }} /> GrooveLab Freigabe</span>
                   <input 
                     type="checkbox" 
                     checked={manageTeacher.isGroovelabActive} 
+                    disabled={!manageTeacher.isActive}
                     onChange={(e) => setManageTeacher({ ...manageTeacher, isGroovelabActive: e.target.checked })}
                     style={{
                       width: '18px',
                       height: '18px',
                       accentColor: '#f59e0b',
-                      cursor: 'pointer'
+                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
                     }}
                   />
                 </label>
 
                 {/* Account Active Toggle */}
                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>⏳ Account Aktiviert</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={15} style={{ color: '#64748b' }} /> Account Aktiviert</span>
                   <input 
                     type="checkbox" 
                     checked={manageTeacher.isActive} 
@@ -23808,7 +23837,7 @@ status: status,
                     style={{
                       width: '18px',
                       height: '18px',
-                      accentColor: '#3b82f6',
+                      accentColor: '#137333',
                       cursor: 'pointer'
                     }}
                   />
