@@ -24365,19 +24365,19 @@ status: status,
                       {isInf && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                           <span>• Träger Musikschule (Betrieb &amp; Infrastruktur):</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{schoolShareTotal.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a', whiteSpace: 'nowrap' }}>{schoolShareTotal.toFixed(2).replace('.', ',')} €</span>
                         </div>
                       )}
                       {isAkt && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                           <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Aktivierungen (Träger):'}</span>
-                          <span style={{ fontWeight: 650, color: billingPayer === 'student' ? '#16a34a' : '#ea580c' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ fontWeight: 650, color: billingPayer === 'student' ? '#16a34a' : '#ea580c', whiteSpace: 'nowrap' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
                         </div>
                       )}
                       <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
                         <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                        <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                        <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a', whiteSpace: 'nowrap' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</strong>
                       </div>
                     </div>
                     {isAkt && billingPayer === 'student' && (
