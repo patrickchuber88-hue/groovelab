@@ -42,6 +42,11 @@ function generateSecureQrToken(): string {
   }
   return token;
 }
+
+function checkTimeOverlap(t1Start: string, t1End: string, t2Start: string, t2End: string): boolean {
+  if (!t1Start || !t1End || !t2Start || !t2End) return false;
+  return t1Start < t2End && t2Start < t1End;
+}
 function formatInstrumentName(name: string): string {
   if (!name) return '';
   const mapping: Record<string, string> = {
@@ -7624,6 +7629,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
 
   // ── Räume CRUD ──────────────────────────────────────────────────────────
+  const handleExportPlanPDF = async () => {
+    const element = document.getElementById('belegungsplan-table-container');
+    if (!element) return;
+    try {
+      const { toJpeg } = await import('html-to-image');
+      const { default: jsPDF } = await import('jspdf');
+      
+      const dataUrl = await toJpeg(element, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+          width: element.offsetWidth + 'px',
+          height: element.offsetHeight + 'px'
+        }
+      });
+      
+      const pdf = new jsPDF('l', 'px', [element.offsetWidth, element.offsetHeight]);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, element.offsetWidth, element.offsetHeight);
+      pdf.save(`Belegungsplan_${new Date().toLocaleDateString('de-DE')}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Fehler beim Generieren der PDF-Datei.');
+    }
+  };
+
   const handleSaveRoom = async () => {
     if (!roomFormName.trim() || !schoolId) return;
     setRoomSaving(true);
@@ -20687,7 +20719,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     </div>
 
                     {/* weekly plan grid (full width) */}
-                    <div style={{ background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', overflowX: 'auto', width: '100%' }}>
+                    <div id="belegungsplan-table-container" style={{ background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', overflowX: 'auto', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -20696,6 +20728,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           </h4>
                           <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
                         </div>
+                        <button
+                          onClick={handleExportPlanPDF}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            borderRadius: '10px',
+                            padding: '8px 14px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            background: '#fce8e6',
+                            color: '#ea4335',
+                            border: '1px solid #f9d2ce',
+                            cursor: 'pointer',
+                            fontFamily: 'Urbanist',
+                            transition: 'all 0.2s'
+                          }}
+                          className="hover-scale"
+                        >
+                          📥 PDF Export
+                        </button>
                       </div>
                       {filteredRooms.length === 0 ? (
                         <p style={{ textAlign: 'center', color: '#94a3b8', padding: '32px', fontWeight: 700 }}>Keine Räume gefunden.</p>
@@ -20729,11 +20782,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '50px' }}>
                                           {cellPlans.map(plan => {
                                             const { avatarBg: bg, avatarColor: color } = getAlphabeticalUniColor(plan.teacherName || 'Allgemein');
+                                            const hasConflict = cellPlans.some(other => other.id !== plan.id && checkTimeOverlap(plan.startTime, plan.endTime, other.startTime, other.endTime));
                                             return (
                                               <div
                                                 key={plan.id}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: bg, border: `1px solid ${color}30`, borderLeft: `4px solid ${color}`, borderRadius: '9px', padding: '6px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
+                                                style={{ 
+                                                  background: hasConflict ? '#fef2f2' : bg, 
+                                                  border: hasConflict ? '1.5px solid #ef4444' : `1px solid ${color}30`, 
+                                                  borderLeft: hasConflict ? '5px solid #ef4444' : `4px solid ${color}`, 
+                                                  borderRadius: '9px', 
+                                                  padding: '6px 8px', 
+                                                  cursor: 'pointer', 
+                                                  display: 'flex', 
+                                                  flexDirection: 'column', 
+                                                  gap: '2px',
+                                                  boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.15)' : 'none',
+                                                  animation: hasConflict ? 'pulse 2s infinite' : 'none'
+                                                }}
+                                                title={hasConflict ? '⚠️ Zeitliche Überschneidung in diesem Raum!' : undefined}
                                               >
                                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{getPlanDisplayName(plan)}</span>
                                                 <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
@@ -21054,7 +21121,51 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       {/* Rooms List Board */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '550px', width: '100%' }}>
                         {filteredRooms.length === 0 ? (
-                          <p style={{ textAlign: 'center', color: '#cbd5e1', padding: '32px', fontWeight: 700 }}>Keine Räume gefunden.</p>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '48px 24px',
+                            background: '#ffffff',
+                            borderRadius: '24px',
+                            border: '1.5px dashed #cbd5e1',
+                            textAlign: 'center',
+                            gap: '14px',
+                            marginTop: '10px'
+                          }}>
+                            <div style={{ fontSize: '3rem', opacity: 0.65 }}>🚪</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                Keine Räume gefunden
+                              </h4>
+                              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', maxWidth: '280px', lineHeight: 1.4 }}>
+                                Erstelle einen neuen Raum oder passe deine Filter an.
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => openRoomEditor()}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                borderRadius: '10px',
+                                padding: '8px 16px',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                background: '#ea4335',
+                                color: '#ffffff',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontFamily: 'Urbanist',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 4px 10px rgba(234,67,53,0.15)'
+                              }}
+                              className="hover-scale"
+                            >
+                              ➕ Raum anlegen
+                            </button>
+                          </div>
                         ) : (
                           filteredRooms.map((room: any) => {
                             const initials = (room.name || 'RM').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
