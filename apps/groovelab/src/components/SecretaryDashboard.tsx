@@ -679,7 +679,8 @@ function TeacherCard({
             alignItems: 'center',
             gap: '4px'
           }}>
-            🎓 Campus
+            <GraduationCap size={12} style={{ color: '#10b981' }} />
+            Campus
           </span>
         )}
         {isGroovelab && (
@@ -694,7 +695,8 @@ function TeacherCard({
             alignItems: 'center',
             gap: '4px'
           }}>
-            🎸 GrooveLab
+            <Music size={12} style={{ color: '#f59e0b' }} />
+            Groovelab
           </span>
         )}
         {!isActive && (
@@ -706,9 +708,11 @@ function TeacherCard({
             padding: '4px 10px',
             borderRadius: '100px',
             display: 'inline-flex',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: '4px'
           }}>
-            ⏳ Inaktiv
+            <Clock size={12} style={{ color: '#64748b' }} />
+            Inaktiv
           </span>
         )}
         {contractEndsAt && (
@@ -723,7 +727,8 @@ function TeacherCard({
             alignItems: 'center',
             gap: '4px'
           }}>
-            📅 Bis {new Date(contractEndsAt).toLocaleDateString('de-DE')}
+            <Calendar size={12} style={{ color: '#ef4444' }} />
+            Bis {new Date(contractEndsAt).toLocaleDateString('de-DE')}
           </span>
         )}
       </div>
@@ -13092,6 +13097,100 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     </p>
                   </div>
 
+                  {/* Overdue Activation Invoice Alerts */}
+                  {(() => {
+                    const today = simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date();
+                    const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                    const diffDays = Math.floor((today.getTime() - prevMonthEnd.getTime()) / (1000 * 60 * 60 * 24));
+                    const isSchoolPaid = billingPayer === 'school' && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2');
+                    
+                    if (isSchoolPaid && diffDays >= 11 && diffDays <= 20) {
+                      return (
+                        <div style={{
+                          background: '#fffbeb',
+                          border: '1.5px solid #f59e0b',
+                          borderRadius: '20px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.04)'
+                        }}>
+                          <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                            <strong style={{ fontSize: '0.85rem', color: '#78350f', fontFamily: 'Urbanist' }}>
+                              Zahlungserinnerung: Aktivierungs-Rechnung ausstehend
+                            </strong>
+                            <span style={{ fontSize: '0.78rem', color: '#b45309', fontFamily: 'Inter', lineHeight: '1.4' }}>
+                              Die monatliche Aktivierungs-Rechnung ist seit über 10 Tagen überfällig. Bitte begleichen Sie den ausstehenden Betrag in den nächsten Tagen, um eine automatische Deaktivierung der betroffenen Schüler-Profile zu vermeiden.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setSecretarySubTab('licenses')}
+                            style={{
+                              background: '#f59e0b',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              fontFamily: 'Urbanist',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Jetzt begleichen
+                          </button>
+                        </div>
+                      );
+                    }
+                    
+                    if (isSchoolPaid && diffDays > 20) {
+                      return (
+                        <div style={{
+                          background: '#fef2f2',
+                          border: '1.5px solid #ef4444',
+                          borderRadius: '20px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
+                        }}>
+                          <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                            <strong style={{ fontSize: '0.85rem', color: '#991b1b', fontFamily: 'Urbanist' }}>
+                              Zahlungsverzug: Schüler-Profile deaktiviert
+                            </strong>
+                            <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontFamily: 'Inter', lineHeight: '1.4' }}>
+                              Aufgrund des anhaltenden Zahlungsverzugs (über 20 Tage) wurden die betroffenen Schüler-Accounts temporär in den inaktiven Modus versetzt. Nach Begleichung der Rechnung werden alle Profile sofort wieder freigeschaltet.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setSecretarySubTab('licenses')}
+                            style={{
+                              background: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              fontFamily: 'Urbanist',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Rechnung ausgleichen
+                          </button>
+                        </div>
+                      );
+                    }
+                    
+                    return null;
+                  })()}
+
                   {(() => {
                     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
                       if (!acc.some(existing => existing.id === t.id)) {
@@ -13130,7 +13229,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         id: 'students',
                         label: 'Schüler',
                         value: `${activeStudents} Aktiv`,
-                        details: `${pendingStudents} ausstehend, ${trialStudents.length} Probezeit`,
+                        details: `${pendingStudents} ausstehend`,
                         icon: Users,
                         iconBg: '#fdf2f8',
                         iconColor: '#db2777',
@@ -13247,16 +13346,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           })}
                         </div>
 
-                        {/* Two-Column Bottom Area */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '24px', alignItems: 'start' }}>
+                        {/* Single-Column Bottom Area */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: '1fr', 
+                          gap: '24px', 
+                          alignItems: 'start' 
+                        }}>
                           {/* Left Column: Notices */}
                           <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>📌</span> Wichtige Hinweise &amp; Aufgaben
+                              <ClipboardList size={18} style={{ color: '#137333' }} />
+                              Wichtige Hinweise &amp; Aufgaben
                             </h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                                <span style={{ fontSize: '1.25rem' }}>📢</span>
+                                <AlertCircle size={20} style={{ color: '#137333', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Stundenplan-Reviews:</strong>
                                   <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
@@ -13266,7 +13371,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
 
                               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                                <span style={{ fontSize: '1.25rem' }}>🔑</span>
+                                <Key size={20} style={{ color: '#137333', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Lehrer-Bypass:</strong>
                                   <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
@@ -13275,121 +13380,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </div>
                               </div>
                             </div>
-                          </div>
-
-                          {/* Right Column: Trial Activations */}
-                          <div className="google-card" style={{ padding: '24px' }}>
-                            <h4 style={{ margin: '0 0 16px 0', fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '1.25rem' }}>⚡</span> Offene Probezeit-Aktivierungen ({trialStudents.length})
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  fetchTrialLogs();
-                                  setShowTrialLogModal(true);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#64748b',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: '6px',
-                                  borderRadius: '8px',
-                                  transition: 'all 0.2s',
-                                }}
-                                title="Aktivierungs-Logbuch öffnen"
-                              >
-                                <ClipboardList size={18} />
-                              </button>
-                            </h4>
-                            <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550, lineHeight: '1.45', fontFamily: 'Inter' }}>
-                              Die folgenden Schüler befinden sich in der 7-tägigen Probezeit. Klicke auf das Briefumschlag-Icon, um die E-Mail-Vorlage für die Eltern zu öffnen. Nach Erhalt der Bestätigung kannst du den Account dauerhaft freischalten.
-                            </p>
-                            
-                            {trialStudents.length === 0 ? (
-                              <div style={{ padding: '20px', borderRadius: '16px', background: '#f8fafc', border: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, fontFamily: 'Inter' }}>
-                                Aktuell befinden sich keine Schüler in der 7-tägigen Probezeit.
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
-                                {trialStudents.map(student => {
-                                  const daysLeft = Math.ceil((new Date(student.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                                  return (
-                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>
-                                          {student.first_name} {student.last_name}
-                                        </strong>
-                                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, fontFamily: 'Inter' }}>
-                                          🎸 {student.instrument || 'Nicht festgelegt'}
-                                        </span>
-                                        <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 700, fontFamily: 'Inter' }}>
-                                          ⏳ Probezeit läuft noch {daysLeft} Tag(e) (bis {new Date(student.trial_ends_at).toLocaleDateString('de-DE')})
-                                        </span>
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <a 
-                                          href={generateMailtoLink(student)}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            width: '36px',
-                                            height: '36px',
-                                            borderRadius: '10px',
-                                            background: '#eff6ff',
-                                            color: '#1d4ed8',
-                                            border: '1px solid #bfdbfe',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                          }}
-                                          title="E-Mail an Eltern entwerfen"
-                                        >
-                                          <Mail size={16} />
-                                        </a>
-                                        <button
-                                          onClick={() => handleConfirmStudentTrial(student.id)}
-                                          style={{
-                                            padding: '8px 12px',
-                                            borderRadius: '10px',
-                                            background: '#10b981',
-                                            color: 'white',
-                                            border: 'none',
-                                            fontWeight: 800,
-                                            fontSize: '0.75rem',
-                                            cursor: 'pointer',
-                                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)',
-                                            fontFamily: 'Urbanist'
-                                          }}
-                                        >
-                                          Freischalten
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeactivateStudentTrial(student.id)}
-                                          style={{
-                                            padding: '8px 12px',
-                                            borderRadius: '10px',
-                                            background: '#fee2e2',
-                                            color: '#b91c1c',
-                                            border: '1px solid #fca5a5',
-                                            fontWeight: 800,
-                                            fontSize: '0.75rem',
-                                            cursor: 'pointer',
-                                            fontFamily: 'Urbanist'
-                                          }}
-                                        >
-                                          Inaktivieren
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </div>
                         </div>
 

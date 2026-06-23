@@ -68,8 +68,9 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#ea4335', fontFamily: 'Urbanist' }}>
-            🏫 Musikschul-Verwaltung &amp; Cockpit
+          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#ea4335', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <School size={24} style={{ color: '#ea4335' }} />
+            Musikschul-Verwaltung &amp; Cockpit
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550 }}>
             Zentrale Administration, Lehrerkartei, Schul branding, Räume, Limits &amp; Sicherheits-Bypässe.
@@ -113,7 +114,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
       <div style={{ background: '#f8fafc', borderRadius: '24px', padding: '24px', border: '1.5px solid #f1f5f9' }}>
         {props.subTab === 'briefing' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>⚡ Administratives Briefing</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sliders size={18} style={{ color: '#ea4335' }} />
+              Administratives Briefing
+            </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
               Auslastung stabil. Aktuell {props.students.filter(s => s.is_active).length} Lizenzen aktiv erfasst.
             </p>
@@ -144,7 +148,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
         {props.subTab === 'employees' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>👤 Lehrkräfte-Kartei ({props.coaches.length})</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={18} style={{ color: '#ea4335' }} />
+                Lehrkräfte-Kartei ({props.coaches.length})
+              </h3>
               <button 
                 onClick={() => props.setManageTeacher({
                   id: 'NEW-' + Math.random(),
@@ -183,7 +190,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
                   style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s' }}
                 >
                   <strong style={{ fontSize: '0.95rem', display: 'block' }}>{t.firstName || t.first_name} {t.lastName || t.last_name}</strong>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '2px' }}>🎸 {t.instrument || 'Kein Hauptfach'}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <Music size={14} style={{ color: '#64748b' }} />
+                    {t.instrument || 'Kein Hauptfach'}
+                  </span>
                   <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
                     {t.isCampusActive && <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '20px' }}>CAMPUS</span>}
                     {t.isGroovelabActive && <span style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '20px' }}>GROOVELAB</span>}
@@ -196,7 +206,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
 
         {props.subTab === 'linking' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>🔗 Datenabgleich &amp; Modul-Kopplung</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LinkIcon size={18} style={{ color: '#ea4335' }} />
+              Datenabgleich &amp; Modul-Kopplung
+            </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
               Synchronisieren Sie hier Datenbestände, gleichen Sie Profile ab oder verknüpfen Sie unvollständige Datensätze.
             </p>
@@ -205,7 +218,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
 
         {props.subTab === 'licenses' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>💳 Lizenz quotas &amp; Abrechnung</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={18} style={{ color: '#ea4335' }} />
+              Lizenz-Quotas &amp; Abrechnung
+            </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
               Ihr aktuelles Benutzerlimit beträgt <strong>{props.userQuota} Schüler</strong>.
             </p>
@@ -214,7 +230,10 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
 
         {props.subTab === 'setup' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>🎨 Branding, Identity &amp; Limits</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Settings size={18} style={{ color: '#ea4335' }} />
+              Branding, Identity &amp; Limits
+            </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
               Definieren Sie hier Ihre Corporate Identity, laden Sie Logos hoch oder verändern Sie Systemprüfungen.
             </p>
