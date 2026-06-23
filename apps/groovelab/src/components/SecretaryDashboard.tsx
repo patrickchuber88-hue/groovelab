@@ -7,7 +7,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -1616,6 +1616,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(() => new Date().getMonth());
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activeBillingSubTab, setActiveBillingSubTab] = useState<'overview' | 'matching' | 'history'>('overview');
+  const [activeStudentsModalList, setActiveStudentsModalList] = useState<{ list: any[], month: string } | null>(null);
 
   const getDynamicAnnualPrice = (startDateStr: string | null | undefined, discountPercentOrCoFinancing: number | boolean = 0): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
@@ -19188,7 +19189,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       transition: 'all 0.15s ease'
                                     }}
                                   >
-                                    📊 Übersicht
+                                    <BarChart2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Übersicht
                                   </button>
                                   
                                   <button
@@ -19206,7 +19207,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       transition: 'all 0.15s ease'
                                     }}
                                   >
-                                    📁 Rechnungsverlauf
+                                    <FileText size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Rechnungsverlauf
                                   </button>
                                 </div>
                               </div>
@@ -19237,15 +19238,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         {hasGroovelabSub && (
                                           <span style={{ fontSize: '0.74rem', background: '#fef9c3', color: '#854d0e', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            GrooveLab Aktiv
+                                            Groovelab Aktiv
                                           </span>
                                         )}
                                         <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#6b21a8', padding: '6px 12px', borderRadius: '100px', fontWeight: 800 }}>
                                           Kostenträger: {billingPayer === 'school' ? 'Musikschule (Sammelzahler)' : 'Eltern / Schüler (Selbstzahler)'}
                                         </span>
+                                        <span style={{ fontSize: '0.74rem', background: '#e0f2fe', color: '#0369a1', padding: '6px 12px', borderRadius: '100px', fontWeight: 800 }}>
+                                          Schülertarif: {
+                                            studentBillingOption === 'option1' ? 'Jahrespauschale (4,80 € / Jahr)' :
+                                            studentBillingOption === 'option2' ? 'Monatsumlage (0,40 € / Monat)' :
+                                            studentBillingOption === 'option3_2' ? 'Kofinanzierung (Jährlich)' :
+                                            studentBillingOption === 'option3_3' ? 'Kofinanzierung (Monatlich)' :
+                                            studentBillingOption === 'debit' ? 'Lastschrift' :
+                                            studentBillingOption === 'cash' ? 'Barzahlung' :
+                                            studentBillingOption === 'both' ? 'Lastschrift & Barzahlung' :
+                                            'Standard-Tarif'
+                                          }
+                                        </span>
                                       </div>
                                       <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.4' }}>
-                                        Die System-Nutzung ist für das Schuljahr 2026/2027 vollständig registriert. Du profitierst vom B2B Kombi-Discount bundle.
+                                        Die System-Nutzung ist für das Schuljahr 2026/2027 vollständig registriert. Du profitierst vom **Campus-Groovelab Kombi-Rabatt**.
                                       </p>
                                     </div>
 
@@ -19282,7 +19295,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         gap: '6px'
                                       }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <span style={{ fontSize: '1.2rem' }}>💰</span>
+                                          <TrendingDown size={18} style={{ color: '#065f46', verticalAlign: 'middle', marginRight: '6px' }} />
                                           <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
@@ -19317,7 +19330,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         borderRadius: '16px',
                                         padding: '16px'
                                       }}>
-                                        <span style={{ fontSize: '1.2rem', color: '#10b981' }}>👥</span>
+                                        <Users size={18} style={{ color: '#10b981', verticalAlign: 'middle', marginRight: '6px' }} />
                                         <div>
                                           <strong style={{ display: 'block', fontSize: '0.78rem', color: '#1e293b', marginBottom: '4px' }}>Neue Schüler hinzufügen &amp; aktivieren</strong>
                                           <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: '1.4' }}>
@@ -19464,7 +19477,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       lineHeight: '1.35',
                                       boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                                     }}>
-                                      <span>💡 Abrechnung erfolgt am Monatsende. Rechnungen sind im Rechnungsverlauf einsehbar.</span>
+                                      <span><Lightbulb size={14} style={{ color: '#6b21a8', verticalAlign: 'middle', marginRight: '6px' }} />Abrechnung erfolgt am Monatsende. Rechnungen sind im Rechnungsverlauf einsehbar.</span>
                                     </div>
                                   </div>
                                 </div>
@@ -19486,7 +19499,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 color: '#475569',
                                 fontFamily: 'Inter, system-ui, sans-serif'
                               }}>
-                                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '12px' }}>🏫</span>
+                                <School size={36} style={{ color: '#64748b', display: 'block', margin: '0 auto 12px' }} />
                                 <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Kostenträger: Musikschule (Sammelzahler)</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto', lineHeight: '1.4' }}>
                                   In diesem Tarifmodell übernimmt die Musikschule sämtliche Schülergebühren gesammelt. 
@@ -19698,372 +19711,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         {/* Slider & Invoices in dashboard */}
                         {activeBillingSubTab === 'history' && (
                           <div style={{ display: 'block', marginTop: '12px' }}>
-                          {/* Slider Section */}
-                          {false && <div style={{
+                          {/* Aktive Schüler Info Card */}
+                          <div style={{
                             padding: '20px',
                             borderRadius: '24px',
-                            border: '1.5px solid #ddd6fe',
-                            background: '#faf5ff',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '14px',
-                            boxShadow: '0 4px 12px rgba(107, 33, 168, 0.02)'
+                            gap: '12px',
+                            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
+                            marginBottom: '16px'
                           }}>
-                            {showConfirmExtra ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                <div>
-                                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Buchung bestätigen</span>
-                                  <strong style={{ display: 'block', fontSize: '1.1rem', color: '#1e293b', marginTop: '2px', fontFamily: 'Urbanist' }}>
-                                    Zusammenfassung
-                                  </strong>
-                                </div>
-
-                                <div style={{ 
-                                  background: '#ffffff', 
-                                  border: '1.5px solid #e9d5ff', 
-                                  borderRadius: '16px', 
-                                  padding: '14px', 
-                                  display: 'flex', 
-                                  flexDirection: 'column', 
-                                  gap: '10px',
-                                  position: 'relative'
-                                }}>
-                                  {/* Delete / Trash Button */}
-                                  <button
-                                    onClick={() => {
-                                      setExtraUsersSliderVal(0);
-                                      setShowConfirmExtra(false);
-                                    }}
-                                    title="Position löschen"
-                                    style={{
-                                      position: 'absolute',
-                                      top: '12px',
-                                      right: '12px',
-                                      background: '#fef2f2',
-                                      border: '1px solid #fee2e2',
-                                      borderRadius: '8px',
-                                      width: '28px',
-                                      height: '28px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: '#ef4444',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-                                      <polyline points="3 6 5 6 21 6"/>
-                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                      <line x1="10" y1="11" x2="10" y2="17"/>
-                                      <line x1="14" y1="11" x2="14" y2="17"/>
-                                    </svg>
-                                  </button>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '32px' }}>
-                                    <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase' }}>Position</span>
-                                    <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>+{extraUsersSliderVal} zusätzliche Schüler</strong>
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase' }}>Abrechnungsmethode</span>
-                                    <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>
-                                      {extraBillingOption === 'option1' && 'Option 1: Jahrespauschale (Schüler zahlt vollständig)'}
-                                      {extraBillingOption === 'option2' && 'Option 2: Monatsumlage (Schüler zahlt vollständig)'}
-                                      {extraBillingOption === 'option3_1' && 'Option 3.1: Kofinanzierung (Monatlich)'}
-                                      {extraBillingOption === 'option3_2' && 'Option 3.2: Kofinanzierung (Jährlich)'}
-                                    </span>
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '8px', fontSize: '0.74rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>Anteil Schule (Netto):</span>
-                                      <strong>{schoolShareAdditional.toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                      <span>Umlage Schüler:</span>
-                                      <strong>
-                                        {extraLevyYearlyAdditional > 0 ? extraLevyYearlyAdditional.toFixed(2).replace('.', ',') : extraLevyMonthlyAdditional.toFixed(2).replace('.', ',')} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}
-                                      </strong>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        const newVal = bookedExtraUsers + extraUsersSliderVal;
-                                        const { error } = await supabase
-                                          .from('schools')
-                                          .update({ user_quota: 150 + newVal })
-                                          .eq('id', schoolId);
-                                        if (error) throw error;
-
-                                        setBookedExtraUsers(newVal);
-                                        localStorage.setItem('bookedExtraUsers', newVal.toString());
-                                        alert(`${extraUsersSliderVal} zusätzliche User wurden erfolgreich gebucht!`);
-                                        setExtraUsersSliderVal(0);
-                                        setShowConfirmExtra(false);
-                                      } catch (err: any) {
-                                        console.error("Error booking extra users:", err);
-                                        alert("Fehler beim Buchen der zusätzlichen User. Bitte versuche es erneut.");
-                                      }
-                                    }}
-                                    style={{
-                                      background: '#7c3aed',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      borderRadius: '12px',
-                                      padding: '8px',
-                                      fontSize: '0.8rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    Jetzt zahlungspflichtig bestellen
-                                  </button>
-                                  <button
-                                    onClick={() => setShowConfirmExtra(false)}
-                                    style={{
-                                      background: '#ffffff',
-                                      color: '#64748b',
-                                      border: '1.5px solid #cbd5e1',
-                                      borderRadius: '12px',
-                                      padding: '10px',
-                                      fontSize: '0.76rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    Abbrechen &amp; Bearbeiten
-                                  </button>
-                                </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                backgroundColor: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#64748b'
+                              }}>
+                                <Users size={20} />
                               </div>
-                            ) : (
-                              <>
-                                <div>
-                                  <span style={{ fontSize: '0.62rem', color: '#6b21a8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge erweitern</span>
-                                  <strong style={{ display: 'block', fontSize: '1.1rem', color: '#1e293b', marginTop: '2px', fontFamily: 'Urbanist' }}>
-                                    Gebucht: <span style={{ color: '#6b21a8' }}>{bookedExtraUsers} Extra-Schüler</span>
-                                  </strong>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <span style={{ fontSize: '0.68rem', color: '#6b21a8', fontWeight: 700 }}>Zusätzliche Schüler hinzufügen (max. 500):</span>
-                                  
-                                  <style>{`
-                                    .custom-range-slider {
-                                      -webkit-appearance: none;
-                                      appearance: none;
-                                      width: 100%;
-                                      height: 32px;
-                                      background: transparent;
-                                      margin: 0;
-                                      padding: 0;
-                                      outline: none;
-                                    }
-                                    .custom-range-slider::-webkit-slider-runnable-track {
-                                      width: 100%;
-                                      height: 6px;
-                                      cursor: pointer;
-                                      background: var(--track-background);
-                                      border-radius: 100px;
-                                    }
-                                    .custom-range-slider::-moz-range-track {
-                                      width: 100%;
-                                      height: 6px;
-                                      cursor: pointer;
-                                      background: var(--track-background);
-                                      border-radius: 100px;
-                                    }
-                                    .custom-range-slider::-webkit-slider-thumb {
-                                      -webkit-appearance: none;
-                                      appearance: none;
-                                      width: 28px;
-                                      height: 28px;
-                                      border-radius: 50%;
-                                      background: #7c3aed;
-                                      cursor: pointer;
-                                      border: 3px solid #ffffff;
-                                      box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
-                                      transition: transform 0.15s;
-                                      margin-top: -11px; /* Centering mathematically: (6px track / 2) - (28px thumb / 2) */
-                                    }
-                                    .custom-range-slider::-webkit-slider-thumb:hover {
-                                      transform: scale(1.15);
-                                    }
-                                    .custom-range-slider::-moz-range-thumb {
-                                      width: 28px;
-                                      height: 28px;
-                                      border-radius: 50%;
-                                      background: #7c3aed;
-                                      cursor: pointer;
-                                      border: 3px solid #ffffff;
-                                      box-shadow: 0 3px 8px rgba(124, 58, 237, 0.4);
-                                      transition: transform 0.15s;
-                                    }
-                                    .custom-range-slider::-moz-range-thumb:hover {
-                                      transform: scale(1.15);
-                                    }
-                                  `}</style>
-
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
-                                    {/* Minus Button */}
-                                    <button 
-                                      onClick={() => setExtraUsersSliderVal(Math.max(0, extraUsersSliderVal - 5))}
-                                      className="hover-scale"
-                                      style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '50%',
-                                        border: '1.5px solid #ddd6fe',
-                                        background: '#ffffff',
-                                        color: '#6b21a8',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                                        transition: 'all 0.15s'
-                                      }}
-                                    >
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    </button>
-                                    
-                                    {/* Slider track wrapper */}
-                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                                      {(() => {
-                                        const fillPercent = (extraUsersSliderVal / 500) * 100;
-                                        return (
-                                          <input 
-                                            type="range" 
-                                            min="0" 
-                                            max="500" 
-                                            value={extraUsersSliderVal} 
-                                            onChange={(e) => setExtraUsersSliderVal(parseInt(e.target.value, 10))} 
-                                            className="custom-range-slider"
-                                            style={{
-                                              '--track-background': `linear-gradient(to right, #7c3aed 0%, #7c3aed ${fillPercent}%, #e2e8f0 ${fillPercent}%, #e2e8f0 100%)`
-                                            } as React.CSSProperties}
-                                          />
-                                        );
-                                      })()}
-                                    </div>
-
-                                    {/* Plus Button */}
-                                    <button 
-                                      onClick={() => setExtraUsersSliderVal(Math.min(500, extraUsersSliderVal + 5))}
-                                      className="hover-scale"
-                                      style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '50%',
-                                        border: '1.5px solid #ddd6fe',
-                                        background: '#ffffff',
-                                        color: '#6b21a8',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                                        transition: 'all 0.15s'
-                                      }}
-                                    >
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    </button>
-                                  </div>
-
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', padding: '0 4px', alignItems: 'center' }}>
-                                    <span>0</span>
-                                    <span style={{ 
-                                      background: '#7c3aed', 
-                                      color: '#ffffff', 
-                                      padding: '3px 12px', 
-                                      borderRadius: '100px', 
-                                      fontSize: '0.74rem',
-                                      fontWeight: 800,
-                                      boxShadow: '0 2px 5px rgba(124, 58, 237, 0.2)'
-                                    }}>
-                                      +{extraUsersSliderVal} Schüler
-                                    </span>
-                                    <span>500</span>
-                                  </div>
-
-                                  {/* Billing Option Dropdown for Additional Students */}
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                                    <span style={{ fontSize: '0.65rem', color: '#6b21a8', fontWeight: 700 }}>Abrechnungsmethode für zusätzliche Schüler:</span>
-                                    <select
-                                      value={extraBillingOption}
-                                      onChange={(e) => handleUpdateExtraBillingOption(e.target.value)}
-                                      style={{
-                                        padding: '8px 12px',
-                                        borderRadius: '10px',
-                                        border: '1.5px solid #ddd6fe',
-                                        background: '#ffffff',
-                                        fontSize: '0.74rem',
-                                        color: '#1e293b',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        outline: 'none',
-                                        width: '100%'
-                                      }}
-                                    >
-                                      <option value="option1">Option 1: Jahrespauschale (Schüler zahlt 4,80 € / Jahr)</option>
-                                      <option value="option2">Option 2: Monatsumlage (Schüler zahlt 0,40 € / Mo.)</option>
-                                    </select>
-                                  </div>
-                                </div>
-
-                                {extraUsersSliderVal > 0 && (
-                                  <div style={{ background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
-                                    <span style={{ fontWeight: 800, color: '#6b21a8' }}>Kosten für {extraUsersSliderVal} zusätzliche Schüler:</span>
-                                    {(() => {
-                                      const addB2B = schoolShareAdditional;
-                                      const addB2C = isAnnualAdditional ? extraLevyYearlyAdditional : extraLevyMonthlyAdditional;
-                                      return (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>• Anteil Schule (Netto):</span>
-                                            <strong>{addB2B.toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                          </div>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>• Umlage Schüler:</span>
-                                            <strong>{addB2C.toFixed(2).replace('.', ',')} € {isAnnualAdditional ? 'einmalig' : '/ Mo.'}</strong>
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                    
-                                    <button
-                                      onClick={() => {
-                                        setShowConfirmExtra(true);
-                                      }}
-                                      style={{
-                                        background: '#7c3aed',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        padding: '8px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 800,
-                                        marginTop: '6px',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.15)'
-                                      }}
-                                    >
-                                      Zusätzliche Schüler buchen
-                                    </button>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>}
-
+                              <div>
+                                <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Schülerzugänge</span>
+                                <strong style={{ display: 'block', fontSize: '1.2rem', color: '#0f172a', marginTop: '2px', fontFamily: 'Urbanist' }}>
+                                  Aktive Schüler: <span style={{ color: '#ea4335' }}>{activeStudentsCount_global}</span>
+                                </strong>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#475569', lineHeight: '1.5', background: '#f8fafc', padding: '14px', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                              Hier siehst du, wie viele deiner Schüler **Campus-Groovelab** nutzen. Neue Schüler kannst du ganz einfach in der Schülerverwaltung eintragen.
+                            </div>
+                          </div>
+                          
                           {/* Rechnungen list */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <h4 style={{ margin: '0', fontSize: '0.92rem', fontWeight: 800, fontFamily: 'Urbanist', color: '#1e293b' }}>Rechnungs-Historie</h4>
@@ -20206,12 +19891,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       extraEinmalzahlung: 0,
                                       b2c: aktAmount,
                                       einmalzahlung: studentBillingOption === 'option1' ? aktAmount : 0,
-                                      status: status,
+status: status,
                                       paid: paid,
                                       creationTime: creationTime,
                                       activationsCount: monthActivationsCount,
                                       restmonate: restmonate,
-                                      studentFee: studentFee
+                                      studentFee: studentFee,
+                                      activatedStudentsList: monthActivations
                                     });
                                   }
 
@@ -20227,23 +19913,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 invoicesData.reverse();
 
                                 const grouped: Record<string, typeof invoicesData> = {};
+                                const monthKeys: string[] = [];
                                 invoicesData.forEach(inv => {
-                                  if (!grouped[inv.year]) {
-                                    grouped[inv.year] = [];
+                                  const key = `${inv.monthName} ${inv.year}`;
+                                  if (!grouped[key]) {
+                                    grouped[key] = [];
+                                    monthKeys.push(key);
                                   }
-                                  grouped[inv.year].push(inv);
+                                  grouped[key].push(inv);
                                 });
-
-                                const sortedYears = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
                                 return (
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {sortedYears.map((year) => {
-                                      const isExpanded = expandedYears[year] !== false;
+                                    {monthKeys.map((monthKey) => {
+                                      const isExpanded = expandedYears[monthKey] !== false;
                                       return (
-                                        <div key={year} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                        <div key={monthKey} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                           <div 
-                                            onClick={() => setExpandedYears(prev => ({ ...prev, [year]: !isExpanded }))}
+                                            onClick={() => setExpandedYears(prev => ({ ...prev, [monthKey]: !isExpanded }))}
                                             style={{
                                               background: '#f8fafc',
                                               padding: '12px 20px',
@@ -20257,17 +19944,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               userSelect: 'none'
                                             }}
                                           >
-                                            <span><Calendar size={13} style={{ marginRight: '6px', color: '#64748b', verticalAlign: 'middle' }} />Kalenderjahr {year}</span>
+                                            <span><Calendar size={13} style={{ marginRight: '6px', color: '#ea4335', verticalAlign: 'middle' }} />Abrechnungsmonat {monthKey}</span>
                                             <span>{isExpanded ? '▼' : '▶'}</span>
                                           </div>
                                           
-                                          {isExpanded && grouped[year].map((inv) => (
+                                          {isExpanded && grouped[monthKey].map((inv) => (
                                             <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                                               <div>
                                                 <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
-                                                <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'block', fontWeight: 700 }}>
-                                                   {inv.type === 'INF' ? '💳 Service- & Infrastrukturgebühren' : (billingPayer === 'student' ? '👥 Direktabrechnung Schüleraktivierungen' : '👥 Sammelabrechnung Schüleraktivierungen')}
-                                                 </span>
+                                                <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, marginTop: '2px' }}>
+                                                   {inv.type === 'INF' ? (
+                                                     <>
+                                                       <CreditCard size={12} style={{ verticalAlign: 'middle', color: '#0369a1' }} />
+                                                       Service- &amp; Infrastrukturgebühren
+                                                     </>
+                                                   ) : (
+                                                     <>
+                                                       <Users size={12} style={{ verticalAlign: 'middle', color: '#6b21a8' }} />
+                                                       {billingPayer === 'student' ? 'Direktabrechnung Schüleraktivierungen' : 'Sammelabrechnung Schüleraktivierungen'}
+                                                     </>
+                                                   )}
+                                                </span>
                                                  <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>
                                                    Rechnungsdatum: {getLastDayOfMonth(inv.monthName, inv.year)}
                                                  </span>
@@ -20302,6 +19999,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                   borderRadius: '100px', 
                                                   fontWeight: 800 
                                                 }}>{inv.status}</span>
+{inv.type === 'AKT' && (
+                                                  <button 
+                                                    onClick={() => setActiveStudentsModalList({ list: inv.activatedStudentsList || [], month: monthKey })} 
+                                                    className="hover-scale font-bold"
+                                                    style={{ border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s', marginRight: '6px' }}
+                                                  >
+                                                    Schüler auflisten
+                                                  </button>
+                                                )}
                                                 <button 
                                                   onClick={() => setSelectedInvoice(inv)} 
                                                   className="hover-scale font-bold"
@@ -24220,6 +23926,113 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 Wechsel vormerken
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Active Students list for monthly invoice */}
+      {activeStudentsModalList && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            border: '1px solid #e2e8f0',
+            padding: '30px',
+            maxWidth: '520px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            maxHeight: '80vh'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  Aktivierte Schüler
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                  Abrechnungsmonat: {activeStudentsModalList.month}
+                </span>
+              </div>
+              <button 
+                onClick={() => setActiveStudentsModalList(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  fontSize: '1rem',
+                  fontWeight: 900
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+              {activeStudentsModalList.list.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '20px 0', fontSize: '0.8rem' }}>
+                  In diesem Abrechnungszeitraum wurden keine neuen Schülerprofile aktiv geschaltet.
+                </div>
+              ) : (
+                activeStudentsModalList.list.map((student: any) => {
+                  const name = `${student.first_name || student.vorname || ''} ${student.last_name || student.nachname || ''}`.trim() || 'Unbenannter Schüler';
+                  const email = student.email || 'Keine E-Mail angegeben';
+                  const dateStr = student.activated_at ? new Date(student.activated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Automatisch aktiv';
+                  return (
+                    <div key={student.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b' }}>{name}</strong>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{email}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '100px', fontWeight: 800, display: 'inline-block' }}>
+                          Aktiv seit: {dateStr}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <button 
+              onClick={() => setActiveStudentsModalList(null)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                border: 'none',
+                background: '#ea4335',
+                color: '#ffffff',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.2)'
+              }}
+            >
+              Schließen
+            </button>
           </div>
         </div>
       )}
