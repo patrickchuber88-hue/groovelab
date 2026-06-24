@@ -173,9 +173,8 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }
   const [hasError, setHasError] = useState(false);
 
   const displaySrc = React.useMemo(() => {
-    const r = user?.role || '';
-    const rs = user?.roles || [];
-    if (r === 'admin' || r === 'secretary' || rs.includes('admin') || rs.includes('secretary')) {
+    const r = (user?.role || '').toLowerCase();
+    if (r === 'admin' || r === 'secretary') {
       return '/campus_login_hero.png';
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
