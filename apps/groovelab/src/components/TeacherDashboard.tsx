@@ -3506,7 +3506,7 @@ export function TeacherDashboard({
           wallSongsQuery = wallSongsQuery.eq('teacher_id', userId);
         }
 
-        // Concurrently query all school-based dashboard resources (11 queries in parallel)
+        // Concurrently query all school-based dashboard resources based on activeTab
         const [
           rRes,
           avRes,
@@ -3519,23 +3519,61 @@ export function TeacherDashboard({
           formingBandsRes,
           wallRes,
           occRes,
-          crisisRes
+          crisisRes,
+          stationsRes
         ] = await Promise.all([
-          Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
-          // Only use valid enum values (lowercase) — Postgres user_role enum rejects any other casing
-          Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e })),
-          Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),
-          (viewMode !== 'student' 
-            ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false }))
-            : Promise.resolve({ data: null, error: null })).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active'])).catch(e => ({ data: [], error: e })),
-          Promise.resolve(wallSongsQuery).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e })),
-          Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
+          // rooms
+          (activeTab === 'live' || activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // user_availability
+          (activeTab === 'settings')
+            ? Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // sessions
+          (activeTab === 'live' || activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // coaches
+          (activeTab === 'live' || activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // submissions (user_song_skills pending approval)
+          (activeTab === 'briefing' || activeTab === 'proposals')
+            ? Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // bands
+          (activeTab === 'briefing' || activeTab === 'bands')
+            ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // student list (also needed on live tab for checking in student roster modal)
+          (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'students' || activeTab === 'bands' || activeTab === 'proposals')
+            ? Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // help requests
+          ((activeTab === 'live' || activeTab === 'briefing') && viewMode !== 'student')
+            ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: null, error: null }),
+          // forming bands
+          (activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active'])).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // wall songs
+          (activeTab === 'briefing' || activeTab === 'proposals')
+            ? Promise.resolve(wallSongsQuery).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // occupied slots (band_song_slots)
+          (activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // crisis
+          (activeTab === 'briefing')
+            ? Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null }),
+          // stations
+          (activeTab === 'live')
+            ? Promise.resolve(supabase.from('stations').select('*, rooms!inner(school_id, is_groovelab_active)').eq('rooms.school_id', tData.school_id).eq('rooms.is_groovelab_active', true).order('name')).catch(e => ({ data: [], error: e }))
+            : Promise.resolve({ data: [], error: null })
         ]);
 
         const rData = rRes.data;
@@ -3552,6 +3590,7 @@ export function TeacherDashboard({
         const wallErr = wallRes.error;
         const occupiedSlots = occRes.data;
         const crisisData = crisisRes.data;
+        const sData = stationsRes.data;
 
         setCrisisNotifications(crisisData || []);
 
@@ -3566,8 +3605,6 @@ export function TeacherDashboard({
             setSelectedRoomId(rData[0].id);
           }
         }
-        const roomIds = rData?.map(r => r.id) || [];
-        const { data: sData } = await supabase.from('stations').select('*').in('room_id', roomIds).order('name');
         setStations(sData || []);
 
         if (sessErr) {
@@ -4213,166 +4250,168 @@ export function TeacherDashboard({
 
         setWallSongs(allMatching);
 
-        // 10. Rehearsal Suggestions
-        let userBandIds: string[] = [];
-        const { data: memberOf } = await supabase.from('band_members').select('band_id').eq('user_id', userId);
-        if (memberOf) userBandIds.push(...memberOf.map(m => m.band_id));
-        const { data: coachOf } = await supabase.from('bands').select('id').eq('coach_id', userId);
-        if (coachOf) userBandIds.push(...coachOf.map(b => b.id));
-        userBandIds = [...new Set(userBandIds)];
+        if (activeTab === 'briefing') {
+          // 10. Rehearsal Suggestions
+          let userBandIds: string[] = [];
+          const { data: memberOf } = await supabase.from('band_members').select('band_id').eq('user_id', userId);
+          if (memberOf) userBandIds.push(...memberOf.map(m => m.band_id));
+          const { data: coachOf } = await supabase.from('bands').select('id').eq('coach_id', userId);
+          if (coachOf) userBandIds.push(...coachOf.map(b => b.id));
+          userBandIds = [...new Set(userBandIds)];
 
-        if (userBandIds.length > 0) {
-          const { data: bandsWithMembers } = await supabase.from('bands').select('id, name, band_members(user_id)').in('id', userBandIds);
-          const allMemberIds = [...new Set((bandsWithMembers || []).flatMap(b => (b.band_members || []).map((m: any) => m.user_id)))];
-          
-          if (allMemberIds.length > 0) {
-            const { data: planning } = await supabase.from('lab_planning').select('*').in('user_id', allMemberIds);
+          if (userBandIds.length > 0) {
+            const { data: bandsWithMembers } = await supabase.from('bands').select('id, name, band_members(user_id)').in('id', userBandIds);
+            const allMemberIds = [...new Set((bandsWithMembers || []).flatMap(b => (b.band_members || []).map((m: any) => m.user_id)))];
             
-            const suggestions = (bandsWithMembers || []).map(band => {
-              const bMemberIds = [...new Set((band.band_members || []).map((m: any) => m.user_id))];
-              const bPlanning = (planning || []).filter(p => bMemberIds.includes(p.user_id));
-              if (!bPlanning.length) return null;
+            if (allMemberIds.length > 0) {
+              const { data: planning } = await supabase.from('lab_planning').select('*').in('user_id', allMemberIds);
+              
+              const suggestions = (bandsWithMembers || []).map(band => {
+                const bMemberIds = [...new Set((band.band_members || []).map((m: any) => m.user_id))];
+                const bPlanning = (planning || []).filter(p => bMemberIds.includes(p.user_id));
+                if (!bPlanning.length) return null;
 
-              const slotUsers: Record<string, Set<string>> = {};
-              bPlanning.forEach(s => {
-                const key = `${s.day}-${s.time}`;
-                if (!slotUsers[key]) slotUsers[key] = new Set();
-                slotUsers[key].add(s.user_id);
-              });
+                const slotUsers: Record<string, Set<string>> = {};
+                bPlanning.forEach(s => {
+                  const key = `${s.day}-${s.time}`;
+                  if (!slotUsers[key]) slotUsers[key] = new Set();
+                  slotUsers[key].add(s.user_id);
+                });
 
-              const counts: Record<string, number> = {};
-              Object.entries(slotUsers).forEach(([key, usersSet]) => {
-                counts[key] = usersSet.size;
-              });
+                const counts: Record<string, number> = {};
+                Object.entries(slotUsers).forEach(([key, usersSet]) => {
+                  counts[key] = usersSet.size;
+                });
 
-              const vals = Object.values(counts);
-              const maxMatches = vals.length ? Math.max(...vals) : 0;
-              if (maxMatches <= 1) return null;
+                const vals = Object.values(counts);
+                const maxMatches = vals.length ? Math.max(...vals) : 0;
+                if (maxMatches <= 1) return null;
 
-              const dayBlocks: Record<string, string[]> = {};
-              bPlanning.forEach(s => {
-                const count = bPlanning.filter(p => p.day === s.day && p.time === s.time).length;
-                if (count === maxMatches) {
-                  if (!dayBlocks[s.day]) dayBlocks[s.day] = [];
-                  if (!dayBlocks[s.day].includes(s.time)) dayBlocks[s.day].push(s.time);
-                }
-              });
+                const dayBlocks: Record<string, string[]> = {};
+                bPlanning.forEach(s => {
+                  const count = bPlanning.filter(p => p.day === s.day && p.time === s.time).length;
+                  if (count === maxMatches) {
+                    if (!dayBlocks[s.day]) dayBlocks[s.day] = [];
+                    if (!dayBlocks[s.day].includes(s.time)) dayBlocks[s.day].push(s.time);
+                  }
+                });
 
-              let bestDay = '', bestStart = '', bestEnd = '', longestBlock = 0;
-              Object.entries(dayBlocks).forEach(([day, times]) => {
-                times.sort();
-                let currentBlock: string[] = [];
-                for (let i = 0; i < times.length; i++) {
-                  if (currentBlock.length === 0) currentBlock.push(times[i]);
-                  else {
-                    const prev = currentBlock[currentBlock.length - 1];
-                    const curr = times[i];
-                    const prevDate = new Date(`2000-01-01T${prev}:00`);
-                    const currDate = new Date(`2000-01-01T${curr}:00`);
-                    if ((currDate.getTime() - prevDate.getTime()) / 60000 === 15) currentBlock.push(curr);
+                let bestDay = '', bestStart = '', bestEnd = '', longestBlock = 0;
+                Object.entries(dayBlocks).forEach(([day, times]) => {
+                  times.sort();
+                  let currentBlock: string[] = [];
+                  for (let i = 0; i < times.length; i++) {
+                    if (currentBlock.length === 0) currentBlock.push(times[i]);
                     else {
-                      if (currentBlock.length > longestBlock) { longestBlock = currentBlock.length; bestDay = day; bestStart = currentBlock[0]; bestEnd = currentBlock[currentBlock.length - 1]; }
-                      currentBlock = [times[i]];
+                      const prev = currentBlock[currentBlock.length - 1];
+                      const curr = times[i];
+                      const prevDate = new Date(`2000-01-01T${prev}:00`);
+                      const currDate = new Date(`2000-01-01T${curr}:00`);
+                      if ((currDate.getTime() - prevDate.getTime()) / 60000 === 15) currentBlock.push(curr);
+                      else {
+                        if (currentBlock.length > longestBlock) { longestBlock = currentBlock.length; bestDay = day; bestStart = currentBlock[0]; bestEnd = currentBlock[currentBlock.length - 1]; }
+                        currentBlock = [times[i]];
+                      }
                     }
                   }
-                }
-                if (currentBlock.length > longestBlock) { longestBlock = currentBlock.length; bestDay = day; bestStart = currentBlock[0]; bestEnd = currentBlock[currentBlock.length - 1]; }
-              });
+                  if (currentBlock.length > longestBlock) { longestBlock = currentBlock.length; bestDay = day; bestStart = currentBlock[0]; bestEnd = currentBlock[currentBlock.length - 1]; }
+                });
 
-              if (!bestDay) return null;
-              const endTimeDate = new Date(`2000-01-01T${bestEnd}:00`);
-              endTimeDate.setMinutes(endTimeDate.getMinutes() + 15);
-              const formattedEnd = endTimeDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                if (!bestDay) return null;
+                const endTimeDate = new Date(`2000-01-01T${bestEnd}:00`);
+                endTimeDate.setMinutes(endTimeDate.getMinutes() + 15);
+                const formattedEnd = endTimeDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-              return { 
-                bandId: band.id, 
-                bandName: band.name, 
-                day: bestDay, 
-                start: bestStart, 
-                end: formattedEnd, 
-                count: maxMatches,
-                totalMembers: bMemberIds.length 
-              };
-            }).filter(Boolean);
-            setRehearsalSuggestions(suggestions);
-          }
-        }
-
-        // 9. Fetch Administrative Feedback Requests & Responses
-        try {
-          const { data: feedbackRequests } = await supabase
-            .from('campus_feedback_requests')
-            .select('*')
-            .eq('school_id', tData.school_id)
-            .order('created_at', { ascending: false });
-
-          if (feedbackRequests && feedbackRequests.length > 0) {
-            setAdminFeedbackRequests(feedbackRequests);
-            
-            const requestIds = feedbackRequests.map(r => r.id);
-            const { data: feedbackResponses } = await supabase
-              .from('campus_feedback_responses')
-              .select('*')
-              .eq('teacher_id', userId)
-              .in('request_id', requestIds);
-            
-            if (feedbackResponses) {
-              setAdminFeedbackResponses(feedbackResponses);
+                return { 
+                  bandId: band.id, 
+                  bandName: band.name, 
+                  day: bestDay, 
+                  start: bestStart, 
+                  end: formattedEnd, 
+                  count: maxMatches,
+                  totalMembers: bMemberIds.length 
+                };
+              }).filter(Boolean);
+              setRehearsalSuggestions(suggestions);
             }
-          } else {
-            setAdminFeedbackRequests([]);
-            setAdminFeedbackResponses([]);
           }
-        } catch (fErr) {
-          console.error('Error fetching admin feedback:', fErr);
-        }
 
-        // Fetch planning events & teacher program points submissions
-        try {
-          const { data: evs } = await supabase
-            .from('campus_events')
-            .select('*')
-            .eq('school_id', tData.school_id)
-            .eq('planning_status', 'planung');
-          setPlanningEvents(evs || []);
-
-          const isStaff = tData.role?.toLowerCase() === 'teacher' || tData.role?.toLowerCase() === 'admin';
-          if (isStaff) {
-            const { data: myPP } = await supabase
-              .from('campus_event_program_points')
+          // 9. Fetch Administrative Feedback Requests & Responses
+          try {
+            const { data: feedbackRequests } = await supabase
+              .from('campus_feedback_requests')
               .select('*')
-              .eq('teacher_id', userId);
-            setMySubmittedProgramPoints(myPP || []);
-          } else {
-            setMySubmittedProgramPoints([]);
-          }
-        } catch (pErr) {
-          console.error('Error fetching planning events:', pErr);
-        }
+              .eq('school_id', tData.school_id)
+              .order('created_at', { ascending: false });
 
-        // 10. Fetch Live Campus Feed Announcements from campus_announcements table
-        try {
-          const { data: annData, error: annErr } = await supabase
-            .from('campus_announcements')
-            .select('*, users(first_name, last_name, photo_url)')
-            .eq('school_id', tData.school_id)
-            .order('created_at', { ascending: false });
-
-          if (!annErr && annData) {
-            const parsed = annData.map(ann => ({
-              id: ann.id,
-              title: ann.title,
-              content: ann.message,
-              target_type: ann.target_type || 'all',
-              created_at: ann.created_at,
-              user: ann.users
-            }));
-            setCampusFeedAnnouncements(parsed);
-          } else {
-            setCampusFeedAnnouncements([]);
+            if (feedbackRequests && feedbackRequests.length > 0) {
+              setAdminFeedbackRequests(feedbackRequests);
+              
+              const requestIds = feedbackRequests.map(r => r.id);
+              const { data: feedbackResponses } = await supabase
+                .from('campus_feedback_responses')
+                .select('*')
+                .eq('teacher_id', userId)
+                .in('request_id', requestIds);
+              
+              if (feedbackResponses) {
+                setAdminFeedbackResponses(feedbackResponses);
+              }
+            } else {
+              setAdminFeedbackRequests([]);
+              setAdminFeedbackResponses([]);
+            }
+          } catch (fErr) {
+            console.error('Error fetching admin feedback:', fErr);
           }
-        } catch (aErr) {
-          console.error('Error fetching announcements:', aErr);
+
+          // Fetch planning events & teacher program points submissions
+          try {
+            const { data: evs } = await supabase
+              .from('campus_events')
+              .select('*')
+              .eq('school_id', tData.school_id)
+              .eq('planning_status', 'planung');
+            setPlanningEvents(evs || []);
+
+            const isStaff = tData.role?.toLowerCase() === 'teacher' || tData.role?.toLowerCase() === 'admin';
+            if (isStaff) {
+              const { data: myPP } = await supabase
+                .from('campus_event_program_points')
+                .select('*')
+                .eq('teacher_id', userId);
+              setMySubmittedProgramPoints(myPP || []);
+            } else {
+              setMySubmittedProgramPoints([]);
+            }
+          } catch (pErr) {
+            console.error('Error fetching planning events:', pErr);
+          }
+
+          // 10. Fetch Live Campus Feed Announcements from campus_announcements table
+          try {
+            const { data: annData, error: annErr } = await supabase
+              .from('campus_announcements')
+              .select('*, users(first_name, last_name, photo_url)')
+              .eq('school_id', tData.school_id)
+              .order('created_at', { ascending: false });
+
+            if (!annErr && annData) {
+              const parsed = annData.map(ann => ({
+                id: ann.id,
+                title: ann.title,
+                content: ann.message,
+                target_type: ann.target_type || 'all',
+                created_at: ann.created_at,
+                user: ann.users
+              }));
+              setCampusFeedAnnouncements(parsed);
+            } else {
+              setCampusFeedAnnouncements([]);
+            }
+          } catch (aErr) {
+            console.error('Error fetching announcements:', aErr);
+          }
         }
       }
     } catch (err) {
@@ -4380,6 +4419,10 @@ export function TeacherDashboard({
       setFetchError(err instanceof Error ? err.message : String(err));
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
 
   const handleMarkAsRead = async (shoutId: string) => {
     if (!userId) return;
