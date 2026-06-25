@@ -65,6 +65,62 @@ const DAYS_OF_WEEK = [
   { value: 7, name: 'Sonntag' }
 ];
 
+function InstrumentBadge({ instrument, color }: { instrument: string; color: string }) {
+  const name = (instrument || '').toLowerCase();
+  
+  if (name.includes('gesang') || name.includes('vocals') || name.includes('stimme') || name.includes('gesangunterricht')) {
+    return (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </svg>
+    );
+  }
+  
+  if (name.includes('klavier') || name.includes('piano') || name.includes('keyboard')) {
+    return (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <rect x="2" y="3" width="20" height="18" rx="2" ry="2" />
+        <line x1="2" x2="22" y1="12" y2="12" />
+        <line x1="6" x2="6" y1="12" y2="21" />
+        <line x1="10" x2="10" y1="12" y2="21" />
+        <line x1="14" x2="14" y1="12" y2="21" />
+        <line x1="18" x2="18" y1="12" y2="21" />
+      </svg>
+    );
+  }
+
+  if (name.includes('gitarre') || name.includes('guitar') || name.includes('bass') || name.includes('ukulele')) {
+    return (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <path d="m16 16 3.6 3.6a2 2 0 1 1-2.8 2.8L13 19" />
+        <path d="m19.1-4.9.7.7a2 2 0 0 1 0 2.8L13 5" />
+        <path d="m15 2-8 8a5 5 0 1 0 7 7l8-8Z" />
+      </svg>
+    );
+  }
+
+  if (name.includes('trommel') || name.includes('schlagzeug') || name.includes('drum')) {
+    return (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <ellipse cx="12" cy="8" rx="9" ry="3" />
+        <path d="M3 8v8a9 9 0 0 0 18 0V8" />
+        <path d="M7 10v4" />
+        <path d="M17 10v4" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
+
 export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
@@ -249,16 +305,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         localStorage.removeItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`);
       }
 
-      // Save to Supabase planned_boards column dynamically in real-time
-      supabase
-        .from('users')
-        .update({ [columnName]: draftStateToSave })
-        .eq('id', selectedTeacherId)
-        .then(({ error }) => {
-          if (error) {
-            console.error(`Error auto-saving ${columnName} to DB:`, error);
-          }
-        });
+      // Debounce Supabase write (1000ms delay)
+      const handler = setTimeout(() => {
+        supabase
+          .from('users')
+          .update({ [columnName]: draftStateToSave })
+          .eq('id', selectedTeacherId)
+          .then(({ error }) => {
+            if (error) {
+              console.error(`Error auto-saving ${columnName} to DB:`, error);
+            }
+          });
+      }, 1000);
+
+      return () => clearTimeout(handler);
     }
   }, [boards, drafts, activeDraftId, submittedDraftId, selectedTeacherId, isInitialLoadDone]);
 
@@ -2860,62 +2920,76 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           ? `Doppelbelegung Lehrkraft: Zeitgleich mit ${teacherConflictStudentName} in ${teacherConflictRoomName}`
                           : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`;
 
+                        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+                        const campusPrimary = '#137333';
+                        const campusBg = 'rgba(230, 244, 234, 0.65)';
+                        const campusBorder = 'rgba(19, 115, 51, 0.2)';
+                        const campusText = '#137333';
+
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
                               ? '#064e3b'
                               : (isSelected 
-                                  ? 'rgba(0, 122, 255, 0.08)' 
-                                  : (isSubmitted ? 'rgba(220, 252, 231, 0.5)' : 'rgba(219, 234, 254, 0.65)')));
+                                  ? (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
+                                  : (isSubmitted 
+                                      ? 'rgba(220, 252, 231, 0.5)' 
+                                      : (isCampus ? campusBg : 'rgba(219, 234, 254, 0.65)'))));
 
                         const cardBorder = hasConflict
                           ? '1.5px solid #ef4444'
                           : (isInsideWunsch
                               ? '1px solid #047857'
                               : (isSelected 
-                                  ? '1.5px solid #007aff' 
-                                  : (isSubmitted ? '1px solid rgba(16, 185, 129, 0.18)' : '1px solid rgba(59, 130, 246, 0.2)')));
+                                  ? (isCampus ? `1.5px solid ${campusPrimary}` : '1.5px solid #007aff') 
+                                  : (isSubmitted 
+                                      ? '1px solid rgba(16, 185, 129, 0.18)' 
+                                      : (isCampus ? `1px solid ${campusBorder}` : '1px solid rgba(59, 130, 246, 0.2)'))));
 
                         const cardBorderLeft = hasConflict
                           ? '4px solid #dc2626'
                           : (isInsideWunsch
                               ? '4px solid #10b981'
                               : (isSelected 
-                                  ? '4px solid #007aff' 
-                                  : (isSubmitted ? '4px solid #10b981' : '4px solid #3b82f6')));
+                                  ? (isCampus ? `4px solid ${campusPrimary}` : '4px solid #007aff') 
+                                  : (isSubmitted ? '4px solid #10b981' : (isCampus ? `4px solid ${campusPrimary}` : '4px solid #3b82f6'))));
 
                         const textColor = hasConflict
                           ? '#991b1b'
                           : (isInsideWunsch
                               ? '#ffffff'
                               : (isSelected 
-                                  ? '#007aff' 
-                                  : (isSubmitted ? '#065f46' : '#1e3a8a')));
+                                  ? (isCampus ? campusText : '#007aff') 
+                                  : (isSubmitted ? '#065f46' : (isCampus ? campusText : '#1e3a8a'))));
 
                         const badgeBg = hasConflict
                           ? 'rgba(239, 68, 68, 0.1)'
                           : (isInsideWunsch
                               ? 'rgba(255, 255, 255, 0.2)'
                               : (isSelected 
-                                  ? 'rgba(0, 122, 255, 0.08)' 
-                                  : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)')));
+                                  ? (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
+                                  : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(59, 130, 246, 0.08)'))));
 
                         const badgeColor = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
                               ? '#ffffff'
                               : (isSelected 
-                                  ? '#007aff' 
-                                  : (isSubmitted ? '#047857' : '#1d4ed8')));
+                                  ? (isCampus ? campusText : '#007aff') 
+                                  : (isSubmitted ? '#047857' : (isCampus ? campusText : '#1d4ed8'))));
 
-                        const shadowColor = isSubmitted ? 'rgba(16,185,129,0.06)' : 'rgba(59,130,246,0.06)';
-                        const shadowHoverColor = isSubmitted ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)';
+                        const shadowColor = isSubmitted 
+                          ? 'rgba(16,185,129,0.06)' 
+                          : (isCampus ? 'rgba(19,115,51,0.06)' : 'rgba(59,130,246,0.06)');
+                        const shadowHoverColor = isSubmitted 
+                          ? 'rgba(16,185,129,0.14)' 
+                          : (isCampus ? 'rgba(19,115,51,0.14)' : 'rgba(59,130,246,0.14)');
                         const cardShadow = hasConflict
                           ? '0 4px 10px rgba(239, 68, 68, 0.15)'
                           : (isInsideWunsch
                               ? '0 6px 16px rgba(16, 185, 129, 0.25)'
                               : (isSelected 
-                                  ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                                  ? (isCampus ? `0 0 10px ${campusPrimary}40` : '0 0 10px rgba(0, 122, 255, 0.25)') 
                                   : `0 2px 6px ${shadowColor}`));
 
                         const isSelectedForGroup = selectedForGroup.includes(bs.id);
@@ -3091,16 +3165,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <InstrumentBadge instrument={bs.instrument} color={textColor} />
                             {bs.first_name} {bs.last_name}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#047857' : '#2563eb')), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#065f46' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
                         </div>
                       );
                     })}
-
                       {/* Drag insertion indicator line */}
                       {(() => {
                         if (dragOverBoardId !== board.id || dragOverIndex === null) return null;

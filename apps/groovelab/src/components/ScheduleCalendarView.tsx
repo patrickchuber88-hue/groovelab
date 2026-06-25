@@ -1676,15 +1676,37 @@ export function ScheduleCalendarView({
           }
         }
 
-        const confirmMsg = `Möchtest du ${sourceOcc.student?.first_name || 'den Schüler'} auf die Position der Pause (${targetOcc.start_time.substring(0, 5)} Uhr) verschieben? \n\nHinweis: Dadurch werden alle nachfolgenden Unterrichtsstunden dieses Tages automatisch lückenlos nach hinten verschoben (Sliding-Modus).`;
+        const isSourceGroup = sourceOcc.isGroupBlock || occurrences.some(o => 
+          o.id !== sourceOcc.id && 
+          o.student_id && 
+          o.student_id !== 'vacant' &&
+          o.date === sourceOcc.date && 
+          o.start_time === sourceOcc.start_time && 
+          (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+        );
+        const sourceGroupOccs = isSourceGroup ? occurrences.filter(o => 
+          o.student_id && 
+          o.student_id !== 'vacant' &&
+          o.date === sourceOcc.date && 
+          o.start_time === sourceOcc.start_time && 
+          (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+        ) : [sourceOcc];
+
+        const displayName = isSourceGroup 
+          ? 'die Ensemble- / Bandstunde (ganze Gruppe)' 
+          : (sourceOcc.student?.first_name || 'den Schüler');
+
+        const confirmMsg = `Möchtest du ${displayName} auf die Position der Pause (${targetOcc.start_time.substring(0, 5)} Uhr) verschieben? \n\nHinweis: Dadurch werden alle nachfolgenden Unterrichtsstunden dieses Tages automatisch lückenlos nach hinten verschoben (Sliding-Modus).`;
         if (confirm(confirmMsg)) {
           const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
           
-          updatesMap[sourceId] = { 
-            date: targetOcc.date, 
-            start_time: targetOcc.start_time, 
-            status: 'pending_reschedule' 
-          };
+          sourceGroupOccs.forEach(go => {
+            updatesMap[go.id] = { 
+              date: targetOcc.date, 
+              start_time: targetOcc.start_time, 
+              status: 'pending_reschedule' 
+            };
+          });
 
           const addMins = (t: string, mins: number) => {
             const [h, m] = t.split(':').map(Number);
@@ -1702,7 +1724,7 @@ export function ScheduleCalendarView({
           // 3. Find and shift all subsequent student and break appointments of this day lückenlos
           const sameDayOccs = occurrences.filter(o => 
             o.date === targetOcc.date && 
-            o.id !== sourceId && 
+            !sourceGroupOccs.some(go => go.id === o.id) && 
             o.id !== targetId &&
             o.student_id !== 'vacant' &&
             o.start_time.localeCompare(targetOcc.start_time) > 0
