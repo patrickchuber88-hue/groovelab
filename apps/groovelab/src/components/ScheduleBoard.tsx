@@ -1282,8 +1282,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       
       const mergedBlock: Student = {
         id: targetStudent.isGroup ? targetStudent.id : `group-${crypto.randomUUID()}`,
-        first_name: 'Gruppentermin',
-        last_name: `(${groupStudentsList.length} Schüler)`,
+        first_name: groupStudentsList[0].first_name,
+        last_name: groupStudentsList[0].last_name,
         instrument: groupStudentsList.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
         duration: targetStudent.duration || 30,
         isGroup: true,
@@ -1591,14 +1591,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     const targetBoard = boards.find(b => b.students.some(s => selectedForGroup.includes(s.id)));
     if (!targetBoard) return;
 
-    const groupStudents = targetBoard.students.filter(s => selectedForGroup.includes(s.id));
+    const groupStudents = selectedForGroup
+      .map(id => targetBoard.students.find(s => s.id === id))
+      .filter((s): s is Student => !!s);
     const firstSelectedIndex = targetBoard.students.findIndex(s => selectedForGroup.includes(s.id));
     const remainingStudents = targetBoard.students.filter(s => !selectedForGroup.includes(s.id));
 
     const newGroupBlock: Student = {
       id: `group-${crypto.randomUUID()}`,
-      first_name: 'Gruppentermin',
-      last_name: `(${groupStudents.length} Schüler)`,
+      first_name: groupStudents[0].first_name,
+      last_name: groupStudents[0].last_name,
       instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
       duration: groupStudents.reduce((acc, s) => acc + s.duration, 0),
       isGroup: true,
@@ -2840,8 +2842,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 >
                                   {[5,10,15,20,30,45,60].map(v => <option key={v} value={v}>{v}m</option>)}
                                 </select>
-                                <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#d97706', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px' }} title="Pause löschen">
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleRemoveStudentFromBoard(board.id, bs.id);
+                                  }}
+                                  style={{ background: 'transparent', border: 'none', color: '#d97706', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px' }} 
+                                  title="Pause löschen"
+                                >
                                   <X size={11} strokeWidth={2.5} />
                                 </button>
                               </div>
@@ -3074,9 +3084,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   >
                                     {[30, 45, 60, 75, 90, 120].map(v => <option key={v} value={v}>{v}m</option>)}
                                   </select>
-                                  <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                                  <button 
+                                    type="button" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      handleRemoveStudentFromBoard(board.id, bs.id);
+                                    }}
                                     style={{ background: 'transparent', border: 'none', color: highlightColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
-                                    title="Entfernen">
+                                    title="Entfernen"
+                                  >
                                     <X size={11} strokeWidth={2.5} />
                                   </button>
                                 </div>
@@ -3158,11 +3175,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
-                              <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                              <button 
+                                type="button" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleRemoveStudentFromBoard(board.id, bs.id);
+                                }}
                                 style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
                                 onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
-                                title="Entfernen"><X size={11} strokeWidth={2.5} /></button>
+                                title="Entfernen"
+                              >
+                                <X size={11} strokeWidth={2.5} />
+                              </button>
                             </div>
                           </div>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>

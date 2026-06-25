@@ -1333,7 +1333,7 @@ export function ScheduleCalendarView({
                       }
                     }
                   });
-                } else if (!dbRecord && !isSlotOccupied) {
+                } else if (!dbRecord) {
                   // Standard projected card for student not in DB yet
                   projectedData.push({
                     id: `mock-${board.id}-${student.id}`,
@@ -2388,9 +2388,16 @@ export function ScheduleCalendarView({
                   }
 
                   if (isGroup) {
-                    cardBackground = 'linear-gradient(135deg, rgba(239, 246, 255, 0.98) 0%, rgba(219, 234, 254, 0.98) 100%)';
-                    finalColors.border = '#007aff';
-                    finalColors.text = '#0055d4';
+                    const anyUnacknowledged = occurrencesInGroup.some(o => o.student_acknowledged === false);
+                    if (anyUnacknowledged) {
+                      cardBackground = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
+                      finalColors.border = '#eab308';
+                      finalColors.text = '#713f12';
+                    } else {
+                      cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
+                      finalColors.border = '#10b981';
+                      finalColors.text = '#065f46';
+                    }
                   }
  
                   const occStartMinutes = timeToMinutes(occ.start_time);
@@ -2450,35 +2457,35 @@ export function ScheduleCalendarView({
                         style={{ 
                           background: cardBackground || finalColors.bg, 
                           border: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `2.5px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            ? `2px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : (isRescheduled 
-                              ? `1.5px solid ${finalColors.border}` 
+                              ? `1px solid ${finalColors.border}` 
                               : isVacant 
                                 ? '1px dashed #10b981' 
                                 : isBreak 
-                                  ? '1.5px dashed rgba(245, 158, 11, 0.25)' 
+                                  ? '1px dashed rgba(245, 158, 11, 0.3)' 
                                   : (isSick || isCancelled)
                                     ? '1px solid rgba(239, 68, 68, 0.15)' 
                                     : `1px solid ${finalColors.border}22`),
                           borderLeft: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `5px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : (isRescheduled 
-                              ? `5px solid ${finalColors.border}` 
+                              ? `4px solid ${finalColors.border}` 
                               : isVacant 
                                 ? '3px dashed #10b981' 
                                 : isBreak 
                                   ? '4px solid #f59e0b' 
                                   : (isSick || isCancelled)
                                     ? '3px solid #ef4444'
-                                    : `3px solid ${finalColors.border}`),
+                                    : `4px solid ${finalColors.border}`),
                           borderRadius: '8px', 
-                          padding: (occ.duration || 30) < 30 ? '2px 8px' : '8px',
+                          padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
                           cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                           opacity: draggedId === occ.id ? 0.5 : 1,
                           position: 'relative',
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `0 0 12px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
-                            : '0 2px 8px rgba(0,0,0,0.02)',
+                            ? `0 0 10px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
                           transition: 'all 0.2s',
                           userSelect: 'none',
                           visibility: isVacant ? 'hidden' : 'visible',
@@ -2488,109 +2495,391 @@ export function ScheduleCalendarView({
                           overflow: 'hidden'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px' }}>
-                              {occ.start_time.substring(0, 5)}
-                              {(() => {
-                                const roomId = occ.schedules?.room_id;
-                                const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
-                                return rName ? (
-                                  <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.8, fontSize: '0.7rem' }}>
-                                    ({rName})
+                        {(() => {
+                          const duration = occ.duration || 30;
+
+                          // 1. VERY COMPACT HEIGHT (<= 15 Min, height ~29.5px)
+                          if (duration <= 15) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', width: '100%', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', minWidth: 0, flex: 1 }}>
+                                  <span style={{ 
+                                    fontSize: '0.65rem', 
+                                    fontWeight: 800, 
+                                    color: finalColors.text, 
+                                    background: 'rgba(0,0,0,0.04)', 
+                                    padding: '1px 3px', 
+                                    borderRadius: '3px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {occ.start_time.substring(0, 5)}
+                                    {(() => {
+                                      const roomId = occ.schedules?.room_id;
+                                      const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
+                                      return rName ? ` (${rName.length > 4 ? rName.substring(0, 3) + '..' : rName})` : '';
+                                    })()}
                                   </span>
-                                ) : null;
-                              })()}
-                            </span>
-                            {isGroup && (
-                              <span style={{ fontSize: '0.75rem', display: 'inline-flex' }}>👥</span>
-                            )}
-                            {(isSick || isCancelled) && (
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid #fecaca' }}>
-                                {isSick ? 'Entfällt' : 'Abgesagt'}
-                              </span>
-                            )}
-                            {(isRescheduled || isResetPending) && (
-                              <span 
-                                title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
-                                style={{ 
-                                  width: '8px', 
-                                  height: '8px', 
-                                  borderRadius: '50%', 
-                                  background: isResetPending ? '#eab308' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#eab308'), 
-                                  boxShadow: isResetPending ? '0 0 6px #eab308' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '0 0 6px #10b981' : '0 0 6px #eab308'),
-                                  display: 'inline-block' 
-                                }} 
-                              />
-                            )}
-                          </div>
-                           {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                            <button 
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (isBreak) {
-                                  handleCancelBreak(e, occ);
-                                } else {
-                                  if (isGroup) {
-                                    if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
-                                      const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                      occurrencesInGroup.forEach(go => {
-                                        updatesMap[go.id] = { status: 'cancelled' };
-                                      });
-                                      await persistMultipleOccurrencesDirectly(updatesMap);
+                                  
+                                  {isGroup && (
+                                    <Users size={10} style={{ color: finalColors.text, opacity: 0.7, flexShrink: 0 }} />
+                                  )}
+                                  
+                                  <span style={{ 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 700, 
+                                    color: finalColors.text, 
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    {isGroup 
+                                      ? (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name[0]}. (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`) 
+                                      : (isBreak ? 'Pause' : displayNames)
                                     }
-                                  } else {
-                                    handleCancel(e, occ.id);
-                                  }
-                                }
-                              }}
-                              title={isBreak ? "Pause löschen" : "Termin absagen"}
-                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.border, padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.1s' }}
-                              onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-                              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                            >
-                              <X size={14} strokeWidth={2.5} />
-                            </button>
-                          )}
-                        </div>
-                        {isGroup ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '4px', width: '100%' }}>
-                            <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 800, color: '#0055d4', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>👥 Gruppentermin</span>
-                              <span style={{ background: 'rgba(0, 122, 255, 0.12)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.58rem' }}>{occurrencesInGroup.length} Schüler</span>
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', overflow: 'hidden', maxHeight: `${(occ.duration || 30) * 2.5 - 38}px` }}>
-                              {occurrencesInGroup.map(o => {
-                                const name = `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim();
-                                return (
-                                  <span 
-                                    key={o.id} 
-                                    style={{ 
-                                      background: 'rgba(0, 122, 255, 0.08)', 
-                                      color: '#0055d4', 
-                                      fontSize: '0.68rem', 
-                                      fontWeight: 700, 
-                                      padding: '2px 8px', 
-                                      borderRadius: '6px', 
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                  >
-                                    {name}
                                   </span>
-                                );
-                              })}
+
+                                  {(isRescheduled || isResetPending) && (
+                                    <span 
+                                      title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
+                                      style={{ 
+                                        width: '6px', 
+                                        height: '6px', 
+                                        borderRadius: '50%', 
+                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                        boxShadow: 'none',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                      }} 
+                                    />
+                                  )}
+                                </div>
+
+                                {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                  <button 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (isBreak) {
+                                        handleCancelBreak(e, occ);
+                                      } else {
+                                        if (isGroup) {
+                                          if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                            const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                            occurrencesInGroup.forEach(go => {
+                                              updatesMap[go.id] = { status: 'cancelled' };
+                                            });
+                                            await persistMultipleOccurrencesDirectly(updatesMap);
+                                          }
+                                        } else {
+                                          handleCancel(e, occ.id);
+                                        }
+                                      }
+                                    }}
+                                    title={isBreak ? "Pause löschen" : "Termin absagen"}
+                                    style={{ 
+                                      background: 'transparent', 
+                                      border: 'none', 
+                                      cursor: 'pointer', 
+                                      color: finalColors.text, 
+                                      opacity: 0.5, 
+                                      padding: '2px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      borderRadius: '4px',
+                                      transition: 'all 0.1s' 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                    onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                  >
+                                    <X size={11} strokeWidth={2.5} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // 2. STANDARD HEIGHT (16 - 30 Min, height ~67px)
+                          if (duration <= 30) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <span style={{ 
+                                      fontSize: '0.7rem', 
+                                      fontWeight: 800, 
+                                      color: finalColors.text, 
+                                      background: 'rgba(0,0,0,0.04)', 
+                                      padding: '2px 4px', 
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}>
+                                      {occ.start_time.substring(0, 5)}
+                                      {(() => {
+                                        const roomId = occ.schedules?.room_id;
+                                        const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
+                                        return rName ? (
+                                          <span style={{ marginLeft: '3px', fontWeight: 600, opacity: 0.7, fontSize: '0.65rem' }}>
+                                            ({rName})
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                    </span>
+                                    {isGroup && (
+                                      <Users size={12} style={{ color: finalColors.text, opacity: 0.7 }} />
+                                    )}
+                                    {(isSick || isCancelled) && (
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                        {isSick ? 'Entfällt' : 'Abgesagt'}
+                                      </span>
+                                    )}
+                                    {(isRescheduled || isResetPending) && (
+                                      <span 
+                                        title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
+                                        style={{ 
+                                          width: '7px', 
+                                          height: '7px', 
+                                          borderRadius: '50%', 
+                                          background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                          boxShadow: 'none',
+                                          display: 'inline-block' 
+                                        }} 
+                                      />
+                                    )}
+                                  </div>
+                                  
+                                  {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                    <button 
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (isBreak) {
+                                          handleCancelBreak(e, occ);
+                                        } else {
+                                          if (isGroup) {
+                                            if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                              const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                              occurrencesInGroup.forEach(go => {
+                                                updatesMap[go.id] = { status: 'cancelled' };
+                                              });
+                                              await persistMultipleOccurrencesDirectly(updatesMap);
+                                            }
+                                          } else {
+                                            handleCancel(e, occ.id);
+                                          }
+                                        }
+                                      }}
+                                      title={isBreak ? "Pause löschen" : "Termin absagen"}
+                                      style={{ 
+                                        background: 'transparent', 
+                                        border: 'none', 
+                                        cursor: 'pointer', 
+                                        color: finalColors.text, 
+                                        opacity: 0.5, 
+                                        padding: '2px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center', 
+                                        borderRadius: '4px', 
+                                        transition: 'all 0.1s' 
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                      onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                    >
+                                      <X size={12} strokeWidth={2.5} />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
+                                  {isGroup ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
+                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                      </span>
+                                      <span style={{ 
+                                        background: 'rgba(0, 0, 0, 0.05)', 
+                                        color: finalColors.text, 
+                                        padding: '1px 4px', 
+                                        borderRadius: '4px', 
+                                        fontSize: '0.58rem', 
+                                        fontWeight: 700,
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {occurrencesInGroup.length} Sch.
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {displayNames}
+                                      {isBreak && (
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.6 }}> • {occ.duration || 15} Min</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 3. GENEROUS HEIGHT (> 30 Min, height >= 104.5px)
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 800, 
+                                    color: finalColors.text, 
+                                    background: 'rgba(0,0,0,0.05)', 
+                                    padding: '2px 6px', 
+                                    borderRadius: '5px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center'
+                                  }}>
+                                    {occ.start_time.substring(0, 5)}
+                                    {(() => {
+                                      const roomId = occ.schedules?.room_id;
+                                      const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
+                                      return rName ? (
+                                        <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.7, fontSize: '0.68rem' }}>
+                                          ({rName})
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                  </span>
+                                  {isGroup && (
+                                    <Users size={13} style={{ color: finalColors.text, opacity: 0.7 }} />
+                                  )}
+                                  {(isSick || isCancelled) && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      {isSick ? 'Entfällt' : 'Abgesagt'}
+                                    </span>
+                                  )}
+                                  {(isRescheduled || isResetPending) && (
+                                    <span 
+                                      title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
+                                      style={{ 
+                                        width: '8px', 
+                                        height: '8px', 
+                                        borderRadius: '50%', 
+                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                        boxShadow: 'none',
+                                        display: 'inline-block' 
+                                      }} 
+                                    />
+                                  )}
+                                </div>
+                                
+                                {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                  <button 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (isBreak) {
+                                        handleCancelBreak(e, occ);
+                                      } else {
+                                        if (isGroup) {
+                                          if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                            const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                            occurrencesInGroup.forEach(go => {
+                                              updatesMap[go.id] = { status: 'cancelled' };
+                                            });
+                                            await persistMultipleOccurrencesDirectly(updatesMap);
+                                          }
+                                        } else {
+                                          handleCancel(e, occ.id);
+                                        }
+                                      }
+                                    }}
+                                    title={isBreak ? "Pause löschen" : "Termin absagen"}
+                                    style={{ 
+                                      background: 'transparent', 
+                                      border: 'none', 
+                                      cursor: 'pointer', 
+                                      color: finalColors.text, 
+                                      opacity: 0.5, 
+                                      padding: '3px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      borderRadius: '4px', 
+                                      transition: 'all 0.1s' 
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                    onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                  >
+                                    <X size={14} strokeWidth={2.5} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {isGroup ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                      Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
+                                    </div>
+                                  </div>
+                                  
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    flexWrap: 'wrap', 
+                                    gap: '4px', 
+                                    overflowY: 'auto', 
+                                    maxHeight: `${(occ.duration || 30) * 2.5 - 52}px`,
+                                    scrollbarWidth: 'none'
+                                  }}>
+                                    {occurrencesInGroup.map(o => {
+                                      const name = `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim();
+                                      const acknowledged = o.student_acknowledged;
+                                      return (
+                                        <span 
+                                          key={o.id} 
+                                          style={{ 
+                                            background: 'rgba(255, 255, 255, 0.65)', 
+                                            border: `1px solid ${finalColors.border}22`,
+                                            color: finalColors.text, 
+                                            fontSize: '0.68rem', 
+                                            fontWeight: 700, 
+                                            padding: '2px 8px', 
+                                            borderRadius: '6px', 
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            whiteSpace: 'nowrap',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                          }}
+                                        >
+                                          <span>{name}</span>
+                                          <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>
+                                            {acknowledged ? '✓' : '🕒'}
+                                          </span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {displayNames}
+                                  </div>
+                                  {isBreak ? (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 600, opacity: 0.6 }}>• {occ.duration || 15} Min</span>
+                                  ) : (
+                                    occ.student?.instrument && (
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: finalColors.text, opacity: 0.7 }}>
+                                        {occ.student.instrument}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>{displayNames}</span>
-                            {isBreak && (
-                              <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.7 }}>• {occ.duration || 15} Min</span>
-                            )}
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     </React.Fragment>
                   );
@@ -2835,60 +3124,9 @@ export function ScheduleCalendarView({
                       }} 
                     />
                   </div>
-                  {isGroupOcc ? (
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Beginn</label>
-                        <input 
-                          type="time" 
-                          value={editOccState.start_time.substring(0, 5)} 
-                          onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
-                          style={{ 
-                            width: '100%', 
-                            padding: '11px 14px', 
-                            borderRadius: '10px', 
-                            border: '1px solid rgba(0, 0, 0, 0.15)', 
-                            background: 'rgba(255,255,255,0.8)',
-                            fontSize: '0.92rem', 
-                            fontFamily: 'inherit',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                            transition: 'border-color 0.2s'
-                          }} 
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Ende</label>
-                        <input 
-                          type="time" 
-                          value={endTimeStr} 
-                          onChange={e => {
-                            const newEndMin = timeToMinutes(e.target.value);
-                            const startMin = timeToMinutes(editOccState.start_time);
-                            let diff = newEndMin - startMin;
-                            if (diff < 0) diff = 0;
-                            setEditOccState({ ...editOccState, duration: diff });
-                          }} 
-                          style={{ 
-                            width: '100%', 
-                            padding: '11px 14px', 
-                            borderRadius: '10px', 
-                            border: '1px solid rgba(0, 0, 0, 0.15)', 
-                            background: 'rgba(255,255,255,0.8)',
-                            fontSize: '0.92rem', 
-                            fontFamily: 'inherit',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                            transition: 'border-color 0.2s'
-                          }} 
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ marginBottom: '18px' }}>
-                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Beginn</label>
                       <input 
                         type="time" 
                         value={editOccState.start_time.substring(0, 5)} 
@@ -2908,7 +3146,34 @@ export function ScheduleCalendarView({
                         }} 
                       />
                     </div>
-                  )}
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Ende</label>
+                      <input 
+                        type="time" 
+                        value={endTimeStr} 
+                        onChange={e => {
+                          const newEndMin = timeToMinutes(e.target.value);
+                          const startMin = timeToMinutes(editOccState.start_time);
+                          let diff = newEndMin - startMin;
+                          if (diff < 0) diff = 0;
+                          setEditOccState({ ...editOccState, duration: diff });
+                        }} 
+                        style={{ 
+                          width: '100%', 
+                          padding: '11px 14px', 
+                          borderRadius: '10px', 
+                          border: '1px solid rgba(0, 0, 0, 0.15)', 
+                          background: 'rgba(255,255,255,0.8)',
+                          fontSize: '0.92rem', 
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'border-color 0.2s'
+                        }} 
+                      />
+                    </div>
+                  </div>
 
                   {/* Room Selection Dropdown */}
                   <div style={{ marginBottom: '20px', position: 'relative' }}>

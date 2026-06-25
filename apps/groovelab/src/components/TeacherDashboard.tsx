@@ -6846,11 +6846,9 @@ export function TeacherDashboard({
                             if (!slot.student) {
                               groupedTimeline.push({ ...slot, isBreak: true });
                             } else {
-                              const slotRoom = slot.room || slot.rooms?.name || slot.schedules?.rooms?.name || 'Raum';
                               const existing = groupedTimeline.find(item => 
                                 !item.isBreak && 
-                                item.timeSlot === slot.timeSlot && 
-                                (item.room || item.rooms?.name || item.schedules?.rooms?.name || 'Raum') === slotRoom
+                                item.timeSlot === slot.timeSlot
                               );
                               if (existing) {
                                 if (existing.students && !existing.students.some((s: any) => s.id === slot.student.id)) {
