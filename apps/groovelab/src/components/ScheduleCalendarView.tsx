@@ -666,6 +666,84 @@ export function ScheduleCalendarView({
     });
   };
 
+  const updateMultipleOccurrences = (updatesMap: Record<string, Partial<ScheduleOccurrence>>) => {
+    setPendingChanges(prev => {
+      const next = { ...prev };
+      Object.keys(updatesMap).forEach(id => {
+        if (id.startsWith('vacant-')) return;
+        const baseOcc = baseOccurrences.find(o => o.id === id);
+        const existing = next[id] || baseOcc;
+        if (!existing) return;
+        
+        const newOcc = { ...existing, ...updatesMap[id] };
+        if (baseOcc && !newOcc.original_date) {
+          newOcc.original_date = baseOcc.date;
+        }
+        if (baseOcc && !newOcc.original_start_time) {
+          newOcc.original_start_time = baseOcc.start_time;
+        }
+        next[id] = newOcc;
+      });
+      return next;
+    });
+  };
+
+  const moveOccurrenceOrGroup = (id: string, updates: Partial<ScheduleOccurrence>) => {
+    const occ = occurrences.find(o => o.id === id);
+    if (!occ) return;
+
+    const isGroupOcc = occurrences.some(o => 
+      o.id !== id && 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === occ.date && 
+      o.start_time === occ.start_time && 
+      (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
+    );
+
+    const groupOccs = isGroupOcc ? occurrences.filter(o => 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === occ.date && 
+      o.start_time === occ.start_time && 
+      (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
+    ) : [occ];
+
+    const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+    groupOccs.forEach(o => {
+      updatesMap[o.id] = updates;
+    });
+    updateMultipleOccurrences(updatesMap);
+  };
+
+  const moveOccurrenceOrGroupDirectly = async (id: string, updates: Partial<ScheduleOccurrence>) => {
+    const occ = occurrences.find(o => o.id === id);
+    if (!occ) return;
+
+    const isGroupOcc = occurrences.some(o => 
+      o.id !== id && 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === occ.date && 
+      o.start_time === occ.start_time && 
+      (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
+    );
+
+    const groupOccs = isGroupOcc ? occurrences.filter(o => 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === occ.date && 
+      o.start_time === occ.start_time && 
+      (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
+    ) : [occ];
+
+    const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+    groupOccs.forEach(o => {
+      updatesMap[o.id] = updates;
+    });
+    await persistMultipleOccurrencesDirectly(updatesMap);
+  };
+
   const handleMergeSelectedOccurrences = async () => {
     if (selectedForGroup.length < 2) return;
     
@@ -1628,7 +1706,7 @@ export function ScheduleCalendarView({
       }
     }
 
-    updateOccurrence(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
+    moveOccurrenceOrGroup(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
     setDraggedId(null);
   };
 
@@ -1662,7 +1740,7 @@ export function ScheduleCalendarView({
       }
     }
 
-    await persistOccurrenceDirectly(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
+    await moveOccurrenceOrGroupDirectly(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
     setDraggedId(null);
   };
 
@@ -1730,8 +1808,48 @@ export function ScheduleCalendarView({
       }
     }
 
-    updateOccurrence(sourceId, { date: targetOcc.date, start_time: targetOcc.start_time, status: 'pending_reschedule' });
-    updateOccurrence(targetId, { date: sourceOcc.date, start_time: sourceOcc.start_time, status: 'pending_reschedule' });
+    // Swapping handles groups:
+    const isSrcGroup = occurrences.some(o => 
+      o.id !== sourceId && 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === sourceOcc.date && 
+      o.start_time === sourceOcc.start_time && 
+      (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+    );
+    const srcGroupOccs = isSrcGroup ? occurrences.filter(o => 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === sourceOcc.date && 
+      o.start_time === sourceOcc.start_time && 
+      (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+    ) : [sourceOcc];
+
+    const isTgtGroup = occurrences.some(o => 
+      o.id !== targetId && 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === targetOcc.date && 
+      o.start_time === targetOcc.start_time && 
+      (o.schedules?.room_id || null) === (targetOcc.schedules?.room_id || null)
+    );
+    const tgtGroupOccs = isTgtGroup ? occurrences.filter(o => 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === targetOcc.date && 
+      o.start_time === targetOcc.start_time && 
+      (o.schedules?.room_id || null) === (targetOcc.schedules?.room_id || null)
+    ) : [targetOcc];
+
+    const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+    srcGroupOccs.forEach(o => {
+      updatesMap[o.id] = { date: targetOcc.date, start_time: targetOcc.start_time, status: 'pending_reschedule' };
+    });
+    tgtGroupOccs.forEach(o => {
+      updatesMap[o.id] = { date: sourceOcc.date, start_time: sourceOcc.start_time, status: 'pending_reschedule' };
+    });
+
+    updateMultipleOccurrences(updatesMap);
     
     setDraggedId(null);
     setSwapLinks(prev => [...prev, { id1: sourceId, id2: targetId }]);
@@ -3799,15 +3917,15 @@ export function ScheduleCalendarView({
               <button 
                 onClick={() => {
                   // Perform a complete swap, keeping both active. Proposes target student the old time slot of the source student.
-                  updateOccurrence(swapConfirmState.sourceId, { 
+                  moveOccurrenceOrGroup(swapConfirmState.sourceId, { 
                     date: swapConfirmState.targetDate, 
                     start_time: swapConfirmState.targetStartTime, 
                     status: 'pending_reschedule' 
                   });
-                  updateOccurrence(swapConfirmState.targetId, { 
+                  moveOccurrenceOrGroup(swapConfirmState.targetId, { 
                     date: swapConfirmState.sourceDate, 
                     start_time: swapConfirmState.sourceStartTime, 
-                    status: 'pending_reschedule' // becomes pending reschedule so target student gets offered the new time slot
+                    status: 'pending_reschedule' 
                   });
                   setSwapLinks(prev => [...prev, { id1: swapConfirmState.sourceId, id2: swapConfirmState.targetId }]);
                   setSwapConfirmState(null);
@@ -3821,13 +3939,12 @@ export function ScheduleCalendarView({
                 onClick={() => {
                   // Reschedule the active student, but keep the cancelled student cancelled.
                   // Active student goes to the new slot.
-                  updateOccurrence(swapConfirmState.sourceId, { 
+                  moveOccurrenceOrGroup(swapConfirmState.sourceId, { 
                     date: swapConfirmState.targetDate, 
                     start_time: swapConfirmState.targetStartTime, 
                     status: 'pending_reschedule' 
                   });
-                  // Cancelled student stays cancelled, but moves to the old time slot of the active student.
-                  updateOccurrence(swapConfirmState.targetId, { 
+                  moveOccurrenceOrGroup(swapConfirmState.targetId, { 
                     date: swapConfirmState.sourceDate, 
                     start_time: swapConfirmState.sourceStartTime, 
                     status: 'cancelled' 
@@ -3890,23 +4007,42 @@ export function ScheduleCalendarView({
                 <button
                   onClick={async () => {
                     const targetRoomId = targetOcc.schedules?.room_id || null;
-                    const updatedSchedules = sourceOcc.schedules ? {
-                      ...sourceOcc.schedules,
-                      room_id: targetRoomId,
-                      room: { name: rooms.find(r => r.id === targetRoomId)?.name || '' }
-                    } : {
-                      room_id: targetRoomId,
-                      room: { name: rooms.find(r => r.id === targetRoomId)?.name || '' }
-                    };
+                    const isSourceGroup = occurrences.some(o => 
+                      o.id !== sourceOcc.id && 
+                      o.student_id && 
+                      o.student_id !== 'vacant' &&
+                      o.date === sourceOcc.date && 
+                      o.start_time === sourceOcc.start_time && 
+                      (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+                    );
+                    const sourceGroupOccs = isSourceGroup ? occurrences.filter(o => 
+                      o.student_id && 
+                      o.student_id !== 'vacant' &&
+                      o.date === sourceOcc.date && 
+                      o.start_time === sourceOcc.start_time && 
+                      (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+                    ) : [sourceOcc];
 
-                    await persistOccurrenceDirectly(dropDecisionState.sourceId, {
-                      date: targetOcc.date,
-                      start_time: targetOcc.start_time,
-                      status: 'pending_reschedule',
-                      schedules: updatedSchedules,
-                      duration: targetOcc.duration
+                    const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                    sourceGroupOccs.forEach(go => {
+                      const updatedSchedules = go.schedules ? {
+                        ...go.schedules,
+                        room_id: targetRoomId,
+                        room: { name: rooms.find(r => r.id === targetRoomId)?.name || '' }
+                      } : {
+                        room_id: targetRoomId,
+                        room: { name: rooms.find(r => r.id === targetRoomId)?.name || '' }
+                      };
+                      updatesMap[go.id] = {
+                        date: targetOcc.date,
+                        start_time: targetOcc.start_time,
+                        status: 'pending_reschedule',
+                        schedules: updatedSchedules,
+                        duration: targetOcc.duration
+                      };
                     });
-                    
+
+                    await persistMultipleOccurrencesDirectly(updatesMap);
                     setDropDecisionState(null);
                   }}
                   style={{
