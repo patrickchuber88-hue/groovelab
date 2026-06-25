@@ -168,6 +168,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Group Mode states
   const [isGroupModeActive, setIsGroupModeActive] = useState<boolean>(false);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
+  const [deleteBreakState, setDeleteBreakState] = useState<{ boardId: string, breakId: string } | null>(null);
 
   // Submission tracking states
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
@@ -771,7 +772,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   function recalculateBoardTimes(board: DayBoard): DayBoard {
     let currentTime = board.startAnchor;
     const updatedStudents = board.students.map(s => {
-      if (s.isBreak && s.customStartTime) {
+      if (s.customStartTime) {
         currentTime = s.customStartTime;
       }
       const assignedTime = currentTime;
@@ -1547,8 +1548,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDragOverIndex(null);
   };
 
+  const executeRemoveBreak = (boardId: string, breakId: string, slideUp: boolean) => {
+    setBoards(prev => {
+      const board = prev.find(b => b.id === boardId);
+      if (!board) return prev;
+
+      const breakIndex = board.students.findIndex(s => s.id === breakId);
+      if (breakIndex === -1) return prev;
+
+      let nextStudents = board.students.filter(s => s.id !== breakId);
+
+      if (!slideUp && breakIndex < nextStudents.length) {
+        const nextCard = nextStudents[breakIndex];
+        nextStudents = nextStudents.map((s, idx) => {
+          if (idx === breakIndex) {
+            return { ...s, customStartTime: nextCard.assignedTime };
+          }
+          return s;
+        });
+      }
+
+      const updatedBoard = recalculateBoardTimes({ ...board, students: nextStudents });
+      return prev.map(b => b.id === boardId ? updatedBoard : b);
+    });
+  };
+
   // Remove a student from a day board (make them unassigned again)
   const handleRemoveStudentFromBoard = (boardId: string, studentId: string) => {
+    if (studentId.startsWith('break-')) {
+      setDeleteBreakState({ boardId, breakId: studentId });
+      return;
+    }
+
     setBoards(prev => {
       const board = prev.find(b => b.id === boardId);
       if (!board) return prev;
@@ -3500,7 +3531,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       {dropDecisionState && (() => {
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#137333' : '#007aff';
+        const primaryColor = isCampusTheme ? '#137333' : '#ea4335';
         
         // Find names of the students
         const getStudentName = (id: string) => {
@@ -3522,6 +3553,108 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const tgtName = getStudentName(dropDecisionState.targetId);
 
         return (
+          <>
+            {/* Delete Pause Dialog */}
+            {deleteBreakState && (() => {
+              const bgAccent = isCampusTheme ? '#e6f4ea' : '#fce8e6';
+              
+              return (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ 
+                    background: '#ffffff', 
+                    padding: '28px', 
+                    borderRadius: '24px', 
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
+                    width: '420px', 
+                    maxWidth: '90vw', 
+                    border: '1px solid rgba(0,0,0,0.08)', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '16px', 
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    boxSizing: 'border-box' 
+                  }}>
+                    <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
+                      Pause entfernen
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#515154', lineHeight: 1.5 }}>
+                      Wie soll mit der entstandenen Lücke verfahren werden?
+                    </p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
+                      <button
+                        onClick={() => {
+                          executeRemoveBreak(deleteBreakState.boardId, deleteBreakState.breakId, true);
+                          setDeleteBreakState(null);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 20px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          background: primaryColor,
+                          color: '#ffffff',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                        }}
+                        onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
+                        onMouseOut={e => e.currentTarget.style.filter = 'none'}
+                      >
+                        Folgetermine aufrutschen lassen (Lücke füllen)
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          executeRemoveBreak(deleteBreakState.boardId, deleteBreakState.breakId, false);
+                          setDeleteBreakState(null);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 20px',
+                          borderRadius: '12px',
+                          border: `1.5px solid ${primaryColor}`,
+                          background: 'transparent',
+                          color: primaryColor,
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = bgAccent}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        Lücke belassen (Terminzeiten einfrieren)
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteBreakState(null)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 20px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#86868b',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                        onMouseOut={e => e.currentTarget.style.color = '#86868b'}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ 
               background: '#ffffff', 
@@ -3602,6 +3735,110 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     setDragOverBoardId(null);
                     setDragOverIndex(null);
                   }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#86868b',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                  onMouseOut={e => e.currentTarget.style.color = '#86868b'}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+          </>
+        );
+      })()}
+      
+      {/* Fallback rendering of deleteBreakState modal when dropDecisionState is not active */}
+      {!dropDecisionState && deleteBreakState && (() => {
+        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
+        const primaryColor = isCampusTheme ? '#137333' : '#ea4335';
+        const bgAccent = isCampusTheme ? '#e6f4ea' : '#fce8e6';
+        
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ 
+              background: '#ffffff', 
+              padding: '28px', 
+              borderRadius: '24px', 
+              boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
+              width: '420px', 
+              maxWidth: '90vw', 
+              border: '1px solid rgba(0,0,0,0.08)', 
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '16px', 
+              alignItems: 'center',
+              textAlign: 'center',
+              boxSizing: 'border-box' 
+            }}>
+              <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
+                Pause entfernen
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#515154', lineHeight: 1.5 }}>
+                Wie soll mit der entstandenen Lücke verfahren werden?
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    executeRemoveBreak(deleteBreakState.boardId, deleteBreakState.breakId, true);
+                    setDeleteBreakState(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: primaryColor,
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                  }}
+                  onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
+                  onMouseOut={e => e.currentTarget.style.filter = 'none'}
+                >
+                  Folgetermine aufrutschen lassen (Lücke füllen)
+                </button>
+
+                <button
+                  onClick={() => {
+                    executeRemoveBreak(deleteBreakState.boardId, deleteBreakState.breakId, false);
+                    setDeleteBreakState(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: `1.5px solid ${primaryColor}`,
+                    background: 'transparent',
+                    color: primaryColor,
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = bgAccent}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  Lücke belassen (Terminzeiten einfrieren)
+                </button>
+
+                <button
+                  onClick={() => setDeleteBreakState(null)}
                   style={{
                     width: '100%',
                     padding: '10px 20px',
