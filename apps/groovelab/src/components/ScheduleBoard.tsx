@@ -32,6 +32,8 @@ interface Student {
   isBreak?: boolean;
   customStartTime?: string;
   status?: 'ausstehend' | 'verplant' | 'aktiv' | 'in_bearbeitung';
+  isGroup?: boolean;
+  groupStudents?: Student[];
 }
 
 interface DayBoard {
@@ -94,6 +96,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [draggedStudentId, setDraggedStudentId] = useState<string | null>(null);
   const [dragSource, setDragSource] = useState<'sidebar' | 'board' | null>(null);
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
+  const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Drag-and-Drop Decision state
+  const [dropDecisionState, setDropDecisionState] = useState<{ 
+    sourceId: string, 
+    targetId: string, 
+    targetBoardId: string, 
+    index: number,
+    dragSource: string | null,
+    dragSourceBoardId: string | null
+  } | null>(null);
+
+  // Group Mode states
+  const [isGroupModeActive, setIsGroupModeActive] = useState<boolean>(false);
+  const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
 
   // Submission tracking states
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
@@ -194,7 +212,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           assignedDay: s.assignedDay,
           assignedTime: s.assignedTime,
           isBreak: s.isBreak,
-          customStartTime: s.customStartTime
+          customStartTime: s.customStartTime,
+          isGroup: s.isGroup,
+          groupStudents: s.groupStudents
         }))
       }));
 
@@ -1132,11 +1152,111 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDraggedStudentId(studentId);
     setDragSource(source);
     if (boardId) setDragSourceBoardId(boardId);
+    setDragOverBoardId(null);
+    setDragOverIndex(null);
   };
 
   // Drag over handler to allow dropping
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const mergeStudentsViaDragAndDrop = (sourceId: string, targetId: string, targetBoardId: string) => {
+    // Find source student
+    let sourceStudent: Student | null = null;
+    let sourceBoardId: string | null = null;
+    
+    // Check if source student is in designer boards
+    for (const b of boards) {
+      const found = b.students.find(s => s.id === sourceId);
+      if (found) {
+        sourceStudent = found;
+        sourceBoardId = b.id;
+        break;
+      }
+    }
+    
+    // Check in sidebar if not in boards
+    if (!sourceStudent) {
+      const found = students.find(s => s.id === sourceId);
+      if (found) sourceStudent = found;
+    }
+    
+    if (!sourceStudent) return;
+    
+    // Find target board and target student
+    const targetBoard = boards.find(b => b.id === targetBoardId);
+    if (!targetBoard) return;
+    const targetStudent = targetBoard.students.find(s => s.id === targetId);
+    if (!targetStudent || targetStudent.isBreak) return;
+    
+    setBoards(prev => {
+      // 1. Remove source student from its source board if it was on a board
+      let nextSourceBoardStudents: Student[] = [];
+      if (sourceBoardId) {
+        const sBoard = prev.find(b => b.id === sourceBoardId)!;
+        nextSourceBoardStudents = sBoard.students.filter(s => s.id !== sourceId);
+      }
+      
+      // 2. Build the merged student list/group on target board
+      const targetBoardInstance = prev.find(b => b.id === targetBoardId)!;
+      let nextTargetBoardStudents = [...targetBoardInstance.students];
+      
+      // If source and target are on the same board, make sure we remove source first to prevent duplication
+      if (sourceBoardId === targetBoardId) {
+        nextTargetBoardStudents = nextTargetBoardStudents.filter(s => s.id !== sourceId);
+      }
+      
+      const idx = nextTargetBoardStudents.findIndex(s => s.id === targetId);
+      if (idx === -1) return prev;
+      
+      // Merge logic:
+      const flatStudents = (studentObj: Student): Student[] => {
+        if (studentObj.isGroup && studentObj.groupStudents) {
+          return studentObj.groupStudents;
+        }
+        return [studentObj];
+      };
+      
+      const groupStudentsList = [...flatStudents(targetStudent), ...flatStudents(sourceStudent)];
+      
+      const mergedBlock: Student = {
+        id: targetStudent.isGroup ? targetStudent.id : `group-${crypto.randomUUID()}`,
+        first_name: 'Gruppentermin',
+        last_name: `(${groupStudentsList.length} Schüler)`,
+        instrument: groupStudentsList.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
+        duration: targetStudent.duration || 30,
+        isGroup: true,
+        groupStudents: groupStudentsList.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument,
+          duration: s.duration,
+          assignedDay: targetBoard.dayOfWeek,
+          assignedTime: targetStudent.assignedTime || s.assignedTime
+        })),
+        assignedDay: targetBoard.dayOfWeek,
+        assignedTime: targetStudent.assignedTime
+      };
+      
+      nextTargetBoardStudents.splice(idx, 1, mergedBlock);
+      
+      return prev.map(b => {
+        if (b.id === sourceBoardId && b.id === targetBoardId) {
+          return recalculateBoardTimes({ ...b, students: nextTargetBoardStudents });
+        }
+        if (b.id === sourceBoardId) {
+          return recalculateBoardTimes({ ...b, students: nextSourceBoardStudents });
+        }
+        if (b.id === targetBoardId) {
+          return recalculateBoardTimes({ ...b, students: nextTargetBoardStudents });
+        }
+        return b;
+      });
+    });
+    
+    setToast({ message: 'Termine per Drag & Drop zusammengeführt!', type: 'success' });
   };
 
   // Handle drops on columns
@@ -1147,13 +1267,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     const student = students.find(s => s.id === draggedStudentId);
     if (!student && !isBreakDrag) return;
 
+    // Check if we dropped on a specific student card (cross-student drop)
+    if (index !== undefined && !isBreakDrag) {
+      const targetBoard = boards.find(b => b.id === targetBoardId);
+      if (targetBoard) {
+        const targetStudent = targetBoard.students[index];
+        if (targetStudent && targetStudent.id !== draggedStudentId && !targetStudent.isBreak) {
+          // Open decision popup
+          setDropDecisionState({ 
+            sourceId: draggedStudentId, 
+            targetId: targetStudent.id, 
+            targetBoardId, 
+            index,
+            dragSource,
+            dragSourceBoardId
+          });
+          return;
+        }
+      }
+    }
+
+    // Otherwise, execute standard drop immediately!
+    await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId);
+  };
+
+  const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null) => {
+    const isBreakDrag = sourceId.startsWith('break-') || sourceId === 'sidebar-pause';
+    const student = students.find(s => s.id === sourceId);
+
     // Validate if the timeframe overlaps with a 'gesperrt' (blocked) preference for the student
     if (!isBreakDrag && student) {
       const targetBoard = boards.find(b => b.id === targetBoardId);
       if (targetBoard) {
         // Calculate proposed start/end times by simulating the drop
         let targetNextStudents = [...targetBoard.students];
-        targetNextStudents = targetNextStudents.filter(s => s.id !== draggedStudentId);
+        targetNextStudents = targetNextStudents.filter(s => s.id !== sourceId);
         
         const studentToAssign = { ...student, assignedDay: targetBoard.dayOfWeek };
         if (index !== undefined) {
@@ -1163,50 +1311,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         const tempBoard = recalculateBoardTimes({ ...targetBoard, students: targetNextStudents });
-        const assignedStudent = tempBoard.students.find(s => s.id === draggedStudentId);
+        const assignedStudent = tempBoard.students.find(s => s.id === sourceId);
 
         if (assignedStudent && assignedStudent.assignedTime) {
           const [sh, sm] = assignedStudent.assignedTime.split(':').map(Number);
           const startMin = sh * 60 + sm;
           const endMin = startMin + student.duration;
 
-          console.log("[DND Debug] Student:", student.first_name, student.last_name);
-          console.log("[DND Debug] Proposed slot:", assignedStudent.assignedTime, "startMin:", startMin, "endMin:", endMin);
-          console.log("[DND Debug] targetBoard.dayOfWeek:", targetBoard.dayOfWeek, "type:", typeof targetBoard.dayOfWeek);
-
           try {
             // Fetch student's 'gesperrt' preferences from Supabase
             const { data: prefs, error } = await supabase
               .from('student_schedule_preferences')
               .select('*')
-              .eq('student_id', draggedStudentId)
+              .eq('student_id', sourceId)
               .eq('preference_type', 'gesperrt');
-
-            console.log("[DND Debug] Fetched prefs:", prefs);
 
             if (!error && prefs && prefs.length > 0) {
               let isBlocked = false;
               for (const pref of prefs) {
-                console.log("[DND Debug] Comparing pref:", pref.day_of_week, "type:", typeof pref.day_of_week, "with target:", targetBoard.dayOfWeek);
                 if (Number(pref.day_of_week) === Number(targetBoard.dayOfWeek)) {
                   const [psh, psm] = pref.start_time.split(':').map(Number);
                   const [peh, pem] = pref.end_time.split(':').map(Number);
                   const prefStart = psh * 60 + psm;
                   const prefEnd = peh * 60 + pem;
 
-                  console.log("[DND Debug] Overlap check: startMin:", startMin, "< prefEnd:", prefEnd, "&& endMin:", endMin, "> prefStart:", prefStart);
                   // Overlap check
                   if (startMin < prefEnd && endMin > prefStart) {
                     isBlocked = true;
-                    console.log("[DND Debug] BLOCKED!");
                     break;
                   }
                 }
               }
 
               if (isBlocked) {
-                // Shake the card (state updates to trigger card-shake animation class)
-                setShakingStudentId(draggedStudentId);
+                // Shake the card
+                setShakingStudentId(sourceId);
                 setTimeout(() => setShakingStudentId(null), 500);
 
                 // Show warnings toast
@@ -1219,6 +1358,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 setDraggedStudentId(null);
                 setDragSource(null);
                 setDragSourceBoardId(null);
+                setDragOverBoardId(null);
+                setDragOverIndex(null);
                 return;
               }
             }
@@ -1230,16 +1371,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
 
     setBoards(prev => {
-      let sourceBoard = prev.find(b => b.id === dragSourceBoardId);
+      let sourceBoard = prev.find(b => b.id === sourceBoardId);
       let targetBoard = prev.find(b => b.id === targetBoardId);
       if (!targetBoard) return prev;
 
       // 1. If moving within boards
-      if (dragSource === 'board' && sourceBoard) {
+      if (source === 'board' && sourceBoard) {
         // If moving inside the SAME board
         if (sourceBoard.id === targetBoard.id) {
           const nextStudents = [...targetBoard.students];
-          const curIndex = nextStudents.findIndex(s => s.id === draggedStudentId);
+          const curIndex = nextStudents.findIndex(s => s.id === sourceId);
           if (curIndex !== -1) {
             const [moved] = nextStudents.splice(curIndex, 1);
             if (index !== undefined) {
@@ -1253,14 +1394,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         // If moving to a DIFFERENT board
-        const sourceNextStudents = sourceBoard.students.filter(s => s.id !== draggedStudentId);
+        const sourceNextStudents = sourceBoard.students.filter(s => s.id !== sourceId);
         const targetNextStudents = [...targetBoard.students];
         
         // Remove from source and recalculate
         const updatedSource = recalculateBoardTimes({ ...sourceBoard, students: sourceNextStudents });
         
         // Add to target and recalculate
-        const movedStudent = sourceBoard.students.find(s => s.id === draggedStudentId)!;
+        const movedStudent = sourceBoard.students.find(s => s.id === sourceId)!;
         if (index !== undefined) {
           targetNextStudents.splice(index, 0, movedStudent);
         } else {
@@ -1276,8 +1417,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
 
       // 2. If moving from sidebar to board
-      if (dragSource === 'sidebar') {
-        if (draggedStudentId === 'sidebar-pause') {
+      if (source === 'sidebar') {
+        if (sourceId === 'sidebar-pause') {
           const targetNextStudents = [...targetBoard.students];
           const newBreak: Student = {
             id: `break-${crypto.randomUUID()}`,
@@ -1298,12 +1439,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
         if (!student) return prev;
         // Check if student is already in target board
-        if (targetBoard.students.some(s => s.id === draggedStudentId)) return prev;
+        if (targetBoard.students.some(s => s.id === sourceId)) return prev;
 
         // Remove student from any other board if they were assigned
         const cleanedBoards = prev.map(b => {
-          if (b.students.some(s => s.id === draggedStudentId)) {
-            return recalculateBoardTimes({ ...b, students: b.students.filter(s => s.id !== draggedStudentId) });
+          if (b.students.some(s => s.id === sourceId)) {
+            return recalculateBoardTimes({ ...b, students: b.students.filter(s => s.id !== sourceId) });
           }
           return b;
         });
@@ -1322,11 +1463,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
         // Update overall student list flags
         setStudents(currentStudents => currentStudents.map(s => {
-          if (s.id === draggedStudentId) {
+          if (s.id === sourceId) {
             return {
               ...s,
               assignedDay: targetBoard!.dayOfWeek,
-              assignedTime: updatedTarget.students.find(bs => bs.id === draggedStudentId)?.assignedTime
+              assignedTime: updatedTarget.students.find(bs => bs.id === sourceId)?.assignedTime
             };
           }
           return s;
@@ -1342,6 +1483,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDraggedStudentId(null);
     setDragSource(null);
     setDragSourceBoardId(null);
+    setDragOverBoardId(null);
+    setDragOverIndex(null);
   };
 
   // Remove a student from a day board (make them unassigned again)
@@ -1362,6 +1505,90 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       return prev.map(b => b.id === boardId ? updatedBoard : b);
     });
+  };
+
+  const handleToggleSelectForGroup = (studentId: string, boardId: string) => {
+    setSelectedForGroup(prev => {
+      const board = boards.find(b => b.id === boardId);
+      if (!board) return prev;
+
+      const hasDifferentBoardSelection = prev.some(id => !board.students.some(s => s.id === id));
+      if (hasDifferentBoardSelection) {
+        return [studentId];
+      }
+
+      if (prev.includes(studentId)) {
+        return prev.filter(id => id !== studentId);
+      } else {
+        return [...prev, studentId];
+      }
+    });
+  };
+
+  const handleMergeSelectedIntoGroup = () => {
+    if (selectedForGroup.length < 2) return;
+
+    const targetBoard = boards.find(b => b.students.some(s => selectedForGroup.includes(s.id)));
+    if (!targetBoard) return;
+
+    const groupStudents = targetBoard.students.filter(s => selectedForGroup.includes(s.id));
+    const firstSelectedIndex = targetBoard.students.findIndex(s => selectedForGroup.includes(s.id));
+    const remainingStudents = targetBoard.students.filter(s => !selectedForGroup.includes(s.id));
+
+    const newGroupBlock: Student = {
+      id: `group-${crypto.randomUUID()}`,
+      first_name: 'Gruppentermin',
+      last_name: `(${groupStudents.length} Schüler)`,
+      instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
+      duration: groupStudents.reduce((acc, s) => acc + s.duration, 0),
+      isGroup: true,
+      groupStudents: groupStudents.map(s => ({
+        id: s.id,
+        first_name: s.first_name,
+        last_name: s.last_name,
+        instrument: s.instrument,
+        duration: s.duration,
+        assignedDay: s.assignedDay,
+        assignedTime: s.assignedTime
+      })),
+      assignedDay: targetBoard.dayOfWeek,
+      assignedTime: groupStudents[0].assignedTime
+    };
+
+    const nextStudents = [...remainingStudents];
+    nextStudents.splice(firstSelectedIndex, 0, newGroupBlock);
+
+    setBoards(prev => prev.map(b => b.id === targetBoard.id ? recalculateBoardTimes({ ...b, students: nextStudents }) : b));
+
+    setSelectedForGroup([]);
+    setIsGroupModeActive(false);
+    setToast({ message: 'Termine erfolgreich zusammengeführt!', type: 'success' });
+  };
+
+  const handleUngroupBlock = (boardId: string, groupBlockId: string) => {
+    setBoards(prev => prev.map(b => {
+      if (b.id !== boardId) return b;
+
+      const groupBlock = b.students.find(s => s.id === groupBlockId);
+      if (!groupBlock || !groupBlock.isGroup || !groupBlock.groupStudents) return b;
+
+      const nextStudents: Student[] = [];
+      b.students.forEach(s => {
+        if (s.id === groupBlockId) {
+          groupBlock.groupStudents!.forEach(gs => {
+            nextStudents.push({
+              ...gs,
+              assignedDay: b.dayOfWeek
+            });
+          });
+        } else {
+          nextStudents.push(s);
+        }
+      });
+
+      return recalculateBoardTimes({ ...b, students: nextStudents });
+    }));
+    setToast({ message: 'Gruppentermin wieder aufgeteilt!', type: 'success' });
   };
 
   // Update student's lesson duration (Unterrichtsdauer)
@@ -1632,7 +1859,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           assignedDay: s.assignedDay,
           assignedTime: s.assignedTime,
           isBreak: s.isBreak,
-          customStartTime: s.customStartTime
+          customStartTime: s.customStartTime,
+          isGroup: s.isGroup,
+          groupStudents: s.groupStudents
         }))
       }));
 
@@ -1662,16 +1891,31 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const inserts = [];
       for (const board of validBoards) {
         for (const s of board.students) {
-          inserts.push({
-            school_id: schoolId,
-            teacher_id: selectedTeacherId,
-            student_id: s.isBreak ? null : s.id,
-            day_of_week: board.dayOfWeek,
-            time_slot: s.assignedTime,
-            room_id: board.roomId || null,
-            duration: s.duration,
-            status: s.isBreak ? 'approved' : 'ready_for_admin_review' // A break/pause is auto-approved
-          });
+          if (s.isGroup && s.groupStudents) {
+            for (const gs of s.groupStudents) {
+              inserts.push({
+                school_id: schoolId,
+                teacher_id: selectedTeacherId,
+                student_id: gs.id,
+                day_of_week: board.dayOfWeek,
+                time_slot: s.assignedTime,
+                room_id: board.roomId || null,
+                duration: s.duration,
+                status: 'ready_for_admin_review'
+              });
+            }
+          } else {
+            inserts.push({
+              school_id: schoolId,
+              teacher_id: selectedTeacherId,
+              student_id: s.isBreak ? null : s.id,
+              day_of_week: board.dayOfWeek,
+              time_slot: s.assignedTime,
+              room_id: board.roomId || null,
+              duration: s.duration,
+              status: s.isBreak ? 'approved' : 'ready_for_admin_review' // A break/pause is auto-approved
+            });
+          }
         }
       }
 
@@ -2055,6 +2299,57 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setIsGroupModeActive(prev => !prev);
+                  setSelectedForGroup([]);
+                }}
+                style={{
+                  background: isGroupModeActive 
+                    ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff') 
+                    : 'transparent',
+                  color: isGroupModeActive ? 'white' : '#64748b',
+                  border: `1px solid ${isGroupModeActive 
+                    ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff') 
+                    : '#cbd5e1'}`,
+                  fontWeight: 600,
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <Users size={12} />
+                {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
+              </button>
+              {isGroupModeActive && selectedForGroup.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={handleMergeSelectedIntoGroup}
+                  style={{
+                    background: '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    fontWeight: 600,
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s',
+                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
+                  }}
+                >
+                  Zusammenführen ({selectedForGroup.length})
+                </button>
+              )}
+              <button
+                type="button"
                 onClick={handleResetAllAssignments}
                 disabled={students.filter(s => !!s.assignedDay).length === 0}
                 style={{
@@ -2261,8 +2556,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
                     <div
-                      onDragOver={handleDragOver}
-                      onDrop={() => handleDropOnBoard(board.id)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverBoardId !== board.id || dragOverIndex !== board.students.length) {
+                          setDragOverBoardId(board.id);
+                          setDragOverIndex(board.students.length);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        setDragOverBoardId(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDrop={() => {
+                        handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined);
+                      }}
                       style={{ position: 'relative', height: `${columnHeightPx}px`, flexShrink: 0, marginTop: '4px' }}
                     >
                        {/* Hour marker & 15-minute subdivision lines */}
@@ -2412,7 +2719,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               key={bs.id}
                               draggable
                               onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
-                              onDragOver={handleDragOver}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDragOverBoardId(board.id);
+                                setDragOverIndex(cardIndex);
+                              }}
                               onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
                               style={{
                                 position: 'absolute', left: 0, right: 0,
@@ -2606,24 +2918,142 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   ? '0 0 10px rgba(0, 122, 255, 0.25)' 
                                   : `0 2px 6px ${shadowColor}`));
 
+                        const isSelectedForGroup = selectedForGroup.includes(bs.id);
+                        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
+                        const highlightColor = isCampusTheme ? '#137333' : '#007aff';
+
+                        if (bs.isGroup) {
+                          return (
+                            <div
+                              key={bs.id}
+                              draggable
+                              onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDragOverBoardId(board.id);
+                                setDragOverIndex(cardIndex);
+                              }}
+                              onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                              onClick={(e) => { e.stopPropagation(); }}
+                              style={{
+                                position: 'absolute', left: 0, right: 0,
+                                top: `${Math.max(cardTopPx, 0)}px`,
+                                height: `${Math.max(cardHeightPx, 32)}px`,
+                                background: isCampusTheme ? 'rgba(230, 244, 234, 0.95)' : 'rgba(219, 234, 254, 0.95)',
+                                border: isSelected ? `1.5px solid ${highlightColor}` : '1px solid rgba(16, 185, 129, 0.25)',
+                                borderLeft: `4px solid ${highlightColor}`,
+                                borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
+                                cursor: 'grab', display: 'flex', flexDirection: 'column',
+                                justifyContent: 'center', gap: '2px',
+                                zIndex: 2,
+                                boxShadow: isSelected ? `0 0 10px ${highlightColor}` : '0 2px 6px rgba(0,0,0,0.05)',
+                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: highlightColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  👥 {bs.assignedTime}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUngroupBlock(board.id, bs.id)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: highlightColor,
+                                      fontSize: '0.62rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      padding: '2px 4px',
+                                      borderRadius: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '2px'
+                                    }}
+                                    title="Gruppe aufteilen"
+                                  >
+                                    Aufteilen
+                                  </button>
+                                  <select
+                                    value={bs.duration}
+                                    onChange={(e) => {
+                                      const newDur = parseInt(e.target.value) || 15;
+                                      setBoards(prev => prev.map(b => {
+                                        if (b.id !== board.id) return b;
+                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
+                                        return recalculateBoardTimes({ ...b, students: nextStudents });
+                                      }));
+                                    }}
+                                    style={{
+                                      background: 'rgba(255,255,255,0.7)',
+                                      border: `1px solid ${highlightColor}20`,
+                                      borderRadius: '5px',
+                                      padding: '1px 3px',
+                                      fontSize: '0.62rem',
+                                      fontWeight: 700,
+                                      color: highlightColor,
+                                      outline: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {[30, 45, 60, 75, 90, 120].map(v => <option key={v} value={v}>{v}m</option>)}
+                                  </select>
+                                  <button type="button" onClick={() => handleRemoveStudentFromBoard(board.id, bs.id)}
+                                    style={{ background: 'transparent', border: 'none', color: highlightColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
+                                    title="Entfernen">
+                                    <X size={11} strokeWidth={2.5} />
+                                  </button>
+                                </div>
+                              </div>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {bs.first_name} {bs.last_name}
+                              </span>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name[0]}.`).join(', ')}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        const finalBorder = isGroupModeActive && isSelectedForGroup
+                          ? `2.5px solid ${highlightColor}`
+                          : cardBorder;
+                        const finalShadow = isGroupModeActive && isSelectedForGroup
+                          ? `0 0 12px ${highlightColor}`
+                          : cardShadow;
+
                         return (
                           <div
                             key={bs.id}
-                            draggable
+                            draggable={true}
                             onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
-                            onDragOver={handleDragOver}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverBoardId(board.id);
+                              setDragOverIndex(cardIndex);
+                            }}
                             onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
-                            onClick={(e) => { e.stopPropagation(); handleSelectStudent(bs.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isGroupModeActive) {
+                                handleToggleSelectForGroup(bs.id, board.id);
+                              } else {
+                                handleSelectStudent(bs.id);
+                              }
+                            }}
                             className={isShaking ? 'card-shake' : ''}
                             style={{
                               position: 'absolute', left: 0, right: 0,
                               top: `${Math.max(cardTopPx, 0)}px`,
                               height: `${Math.max(cardHeightPx, 32)}px`,
                               background: cardBg,
-                              border: cardBorder,
+                              border: finalBorder,
                               borderLeft: cardBorderLeft,
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
-                              cursor: 'grab', display: 'flex', flexDirection: 'column',
+                              cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
                               opacity: selectedStudentId !== null ? (isSelected ? 1 : 0.8) : 1,
@@ -2631,7 +3061,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
                               overflow: 'hidden',
-                              boxShadow: cardShadow,
+                              boxShadow: finalShadow,
                               transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                             }}
                           onMouseOver={e => {
@@ -2670,6 +3100,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </div>
                       );
                     })}
+
+                      {/* Drag insertion indicator line */}
+                      {(() => {
+                        if (dragOverBoardId !== board.id || dragOverIndex === null) return null;
+                        const isGreenTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
+                        const lineColor = isGreenTheme ? '#137333' : '#007aff';
+                        
+                        let topPx = 0;
+                        if (dragOverIndex < board.students.length) {
+                          const targetStudent = board.students[dragOverIndex];
+                          const [sh, sm] = (targetStudent.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          topPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN;
+                        } else if (board.students.length > 0) {
+                          const lastStudent = board.students[board.students.length - 1];
+                          const [sh, sm] = (lastStudent.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          topPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN + lastStudent.duration * PX_PER_MIN;
+                        }
+                        
+                        return (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              right: 0,
+                              top: `${Math.max(topPx - 2, 0)}px`,
+                              height: '4px',
+                              background: lineColor,
+                              borderRadius: '2px',
+                              zIndex: 10,
+                              pointerEvents: 'none',
+                              boxShadow: `0 0 8px ${lineColor}`
+                            }}
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* Column summary */}
@@ -2932,6 +3397,133 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       )}
         </>
       )}
+
+      {dropDecisionState && (() => {
+        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
+        const primaryColor = isCampusTheme ? '#137333' : '#007aff';
+        
+        // Find names of the students
+        const getStudentName = (id: string) => {
+          // Check designer boards
+          for (const b of boards) {
+            const found = b.students.find(s => s.id === id);
+            if (found) {
+              if (found.isGroup) return found.first_name + " " + found.last_name;
+              return `${found.first_name} ${found.last_name}`;
+            }
+          }
+          // Check sidebar list
+          const found = students.find(s => s.id === id);
+          if (found) return `${found.first_name} ${found.last_name}`;
+          return 'Schüler';
+        };
+
+        const srcName = getStudentName(dropDecisionState.sourceId);
+        const tgtName = getStudentName(dropDecisionState.targetId);
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ 
+              background: '#ffffff', 
+              padding: '28px', 
+              borderRadius: '24px', 
+              boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
+              width: '420px', 
+              maxWidth: '90vw', 
+              border: '1px solid rgba(0,0,0,0.08)', 
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '16px', 
+              alignItems: 'center',
+              textAlign: 'center',
+              boxSizing: 'border-box' 
+            }}>
+              <div style={{ fontSize: '2.5rem' }}>🔀</div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f' }}>Termine zusammenführen oder tauschen?</h3>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#515154', lineHeight: 1.5 }}>
+                Du hast den Termin von <strong>{srcName}</strong> auf den Termin von <strong>{tgtName}</strong> gezogen. Was möchtest du tun?
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    mergeStudentsViaDragAndDrop(dropDecisionState.sourceId, dropDecisionState.targetId, dropDecisionState.targetBoardId);
+                    setDropDecisionState(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: primaryColor,
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(0, 122, 255, 0.2)'}`
+                  }}
+                  onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
+                  onMouseOut={e => e.currentTarget.style.filter = 'none'}
+                >
+                  👥 Zusammenführen (Gruppenunterricht)
+                </button>
+
+                <button
+                  onClick={async () => {
+                    const { sourceId, targetBoardId, index, dragSource, dragSourceBoardId } = dropDecisionState;
+                    setDropDecisionState(null);
+                    await executeStandardDrop(sourceId, targetBoardId, index, dragSource, dragSourceBoardId);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: 'transparent',
+                    color: '#1d1d1f',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  🔄 Tauschen / Platzieren
+                </button>
+
+                <button
+                  onClick={() => {
+                    setDropDecisionState(null);
+                    setDraggedStudentId(null);
+                    setDragSource(null);
+                    setDragSourceBoardId(null);
+                    setDragOverBoardId(null);
+                    setDragOverIndex(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#86868b',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                  onMouseOut={e => e.currentTarget.style.color = '#86868b'}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {toast && (
         <div style={{

@@ -3,14 +3,7 @@ import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldChec
 import { useWindowSize } from 'react-use';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
-import { QRCodeModal } from './components/QRCodeModal';
-import { QRLandingPage } from './components/QRLandingPage';
-import { DeviceSetupScreen } from './components/DeviceSetupScreen';
-import { TeacherDetailModal } from './components/TeacherDetailModal';
-import { StudentDetailModal } from './components/StudentDetailModal';
-import { ContractEndPrompt } from './components/ContractEndPrompt';
 import { subscribeUserToPush } from './utils/webPush';
-import { SignupWizard } from './components/SignupWizard';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -21,9 +14,16 @@ const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').th
 const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
 const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(module => ({ default: module.ArtistGateway })));
 
-import StudentRadarChart from './components/StudentRadarChart';
-import ConfettiModal from './components/ConfettiModal';
-import CampusDirectMessages from './components/CampusDirectMessages';
+const QRCodeModal = lazy(() => import('./components/QRCodeModal').then(module => ({ default: module.QRCodeModal })));
+const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(module => ({ default: module.QRLandingPage })));
+const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(module => ({ default: module.DeviceSetupScreen })));
+const TeacherDetailModal = lazy(() => import('./components/TeacherDetailModal').then(module => ({ default: module.TeacherDetailModal })));
+const StudentDetailModal = lazy(() => import('./components/StudentDetailModal').then(module => ({ default: module.StudentDetailModal })));
+const ContractEndPrompt = lazy(() => import('./components/ContractEndPrompt').then(module => ({ default: module.ContractEndPrompt })));
+const SignupWizard = lazy(() => import('./components/SignupWizard').then(module => ({ default: module.SignupWizard })));
+const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
+const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
+const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import './App.css';
@@ -155,11 +155,7 @@ const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick,
   } else if (activePlat === 'campus') {
     if (targetUser) {
       if (role === 'student' || role === 'teacher') {
-        if (targetUser.photo_url && targetUser.photo_url !== '/avatar_ghost.jpg') {
-          displaySrc = targetUser.photo_url;
-        } else {
-          displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
-        }
+        displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
       }
     } else {
       displaySrc = '/avatar_ghost.jpg';
@@ -5619,13 +5615,15 @@ function App() {
           
           {/* Standing credit-card style layout */}
           <div style={{ maxWidth: '380px', width: '100%' }}>
-            <QRCodeModal 
-              user={publicPassUser} 
-              activePlatform="campus" 
-              onClose={() => {
-                window.close();
-              }} 
-            />
+            <Suspense fallback={<div style={{ color: 'white', textAlign: 'center', fontSize: '0.85rem' }}>Lade QR Code...</div>}>
+              <QRCodeModal 
+                user={publicPassUser} 
+                activePlatform="campus" 
+                onClose={() => {
+                  window.close();
+                }} 
+              />
+            </Suspense>
           </div>
         </div>
       );
@@ -5651,7 +5649,11 @@ function App() {
 
   // 1.8a KIOSK SETUP MODE: kiosk_room_id + kiosk_setup=1 → show DeviceSetupScreen
   if (kioskRoomIdParam && kioskSetupParam === '1') {
-    return <DeviceSetupScreen />;
+    return (
+      <Suspense fallback={<div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}><div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>Lade Setup...</div></div>}>
+        <DeviceSetupScreen />
+      </Suspense>
+    );
   }
 
   // 1.8b KIOSK ROOM AUTO-BOOTSTRAP (show spinner while resolving station)
@@ -5678,24 +5680,30 @@ function App() {
       // Clean up the URL in the PWA so it returns to the dashboard
       window.history.replaceState({}, '', '/');
     } else {
-      return <QRLandingPage token={qrPathMatch[1]} />;
+      return (
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
+          <QRLandingPage token={qrPathMatch[1]} />
+        </Suspense>
+      );
     }
   }
 
   // 1. SIGNUP WIZARD
   if (isSignup) {
     return (
-      <SignupWizard 
-        onBackToLogin={() => {
-          window.history.pushState({}, '', '/');
-          setIsSignup(false);
-        }} 
-        onSignupSuccess={(uid) => {
-          window.history.pushState({}, '', '/');
-          setIsSignup(false);
-          setLoggedInUserId(uid);
-        }}
-      />
+      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Registrierung...</div>}>
+        <SignupWizard 
+          onBackToLogin={() => {
+            window.history.pushState({}, '', '/');
+            setIsSignup(false);
+          }} 
+          onSignupSuccess={(uid) => {
+            window.history.pushState({}, '', '/');
+            setIsSignup(false);
+            setLoggedInUserId(uid);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -5706,19 +5714,21 @@ function App() {
 
   if (showDeletionPrompt && deletionPromptUserId) {
     return (
-      <ContractEndPrompt
-        userId={deletionPromptUserId}
-        isHome={deletionPromptIsHome}
-        onDecisionComplete={(uid, home) => {
-          setShowDeletionPrompt(false);
-          setDeletionPromptUserId(null);
-          handleLogin(uid, home);
-        }}
-        onCancel={() => {
-          setShowDeletionPrompt(false);
-          setDeletionPromptUserId(null);
-        }}
-      />
+      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Kündigungs-Abfrage...</div>}>
+        <ContractEndPrompt
+          userId={deletionPromptUserId}
+          isHome={deletionPromptIsHome}
+          onDecisionComplete={(uid, home) => {
+            setShowDeletionPrompt(false);
+            setDeletionPromptUserId(null);
+            handleLogin(uid, home);
+          }}
+          onCancel={() => {
+            setShowDeletionPrompt(false);
+            setDeletionPromptUserId(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -11769,7 +11779,9 @@ function App() {
 
       {/* Modal: QR Code anzeigen */}
       {showQR && (user?.qr_token || user?.teacher_qr_token) && (
-        <QRCodeModal user={user} activePlatform={activePlatform} onClose={() => setShowQR(false)} />
+        <Suspense fallback={null}>
+          <QRCodeModal user={user} activePlatform={activePlatform} onClose={() => setShowQR(false)} />
+        </Suspense>
       )}
 
       {/* Privacy Policy Modal */}
@@ -12468,34 +12480,38 @@ function App() {
       })()}
 
       {selectedTeacher && (
-        <TeacherDetailModal 
-          teacher={selectedTeacher} 
-          onClose={() => setSelectedTeacher(null)} 
-        />
+        <Suspense fallback={null}>
+          <TeacherDetailModal 
+            teacher={selectedTeacher} 
+            onClose={() => setSelectedTeacher(null)} 
+          />
+        </Suspense>
       )}
 
       {selectedStudentProfile && (
-        <StudentDetailModal 
-          student={selectedStudentProfile} 
-          onClose={() => setSelectedStudentProfile(null)} 
-          onOpenBandProfile={(band) => {
-            setSelectedBandForProfile(band);
-            setBandProfileView('public');
-            setShowBandProfile(true);
-            setSelectedStudentProfile(null);
-          }}
-          onOpenTageskompass={(student) => {
-            if ((window as any).openTageskompass) {
-              (window as any).openTageskompass(student);
-            }
-            setSelectedStudentProfile(null);
-          }}
-          activePlatform={activePlatform as any}
-          onSwitchPlatform={(newPlatform) => {
-            setActivePlatform(newPlatform);
-            setActiveStudentTab(newPlatform === 'campus' ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') : 'live');
-          }}
-        />
+        <Suspense fallback={null}>
+          <StudentDetailModal 
+            student={selectedStudentProfile} 
+            onClose={() => setSelectedStudentProfile(null)} 
+            onOpenBandProfile={(band) => {
+              setSelectedBandForProfile(band);
+              setBandProfileView('public');
+              setShowBandProfile(true);
+              setSelectedStudentProfile(null);
+            }}
+            onOpenTageskompass={(student) => {
+              if ((window as any).openTageskompass) {
+                (window as any).openTageskompass(student);
+              }
+              setSelectedStudentProfile(null);
+            }}
+            activePlatform={activePlatform as any}
+            onSwitchPlatform={(newPlatform) => {
+              setActivePlatform(newPlatform);
+              setActiveStudentTab(newPlatform === 'campus' ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') : 'live');
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Edit Profile Modal */}

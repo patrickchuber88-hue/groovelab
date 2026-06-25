@@ -2467,65 +2467,91 @@ export function AdminDashboard({
   }, [admin?.school_id, rooms, setupRooms, stations, setupStations, kiosks]);
 
   const fetchStats = async (schoolId: string, customOpeningHours?: any) => {
-    let studentSq = supabase.from('users').select('*', { count: 'exact', head: true }).eq('school_id', schoolId).eq('role', 'student');
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentSq = studentSq.eq('is_campus_active', true);
-    else if (activePlatform !== 'campus') studentSq = studentSq.eq('is_groovelab_active', true);
-    const { count: studentCount } = await studentSq;
-
-    let studentListSq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentListSq = studentListSq.eq('is_campus_active', true);
-    else if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
-    const { data: schoolStudents } = await studentListSq;
-    if (schoolStudents) {
-      setStudents(schoolStudents);
-    }
-
-    let songSq = supabase.from('songs').select('*', { count: 'exact', head: true }).eq('school_id', schoolId);
-    if (activePlatform === 'campus') songSq = songSq.eq('is_campus_active', true);
-    else songSq = songSq.eq('is_groovelab_active', true);
-    const { count: songCount } = await songSq;
-    
-    // Fetch sessions filtered by active students
-    let sessionsSq = supabase
-      .from('sessions')
-      .select('check_in_time, check_out_time, station_id, user_id, users!inner(school_id, is_campus_active, is_groovelab_active)')
-      .eq('users.school_id', schoolId)
-      .not('check_out_time', 'is', null);
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') sessionsSq = sessionsSq.eq('users.is_campus_active', true);
-    else if (activePlatform !== 'campus') sessionsSq = sessionsSq.eq('users.is_groovelab_active', true);
-    const { data: sessions } = await sessionsSq;
-
-    // Fetch focus logs filtered by active students
-    let focusLogsSq = supabase
-      .from('fokus_logs')
-      .select('user_id, duration_minutes, duration_seconds, created_at, users!inner(school_id, is_campus_active, is_groovelab_active)')
-      .eq('users.school_id', schoolId);
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') focusLogsSq = focusLogsSq.eq('users.is_campus_active', true);
-    else if (activePlatform !== 'campus') focusLogsSq = focusLogsSq.eq('users.is_groovelab_active', true);
-    const { data: focusLogs } = await focusLogsSq;
-
-    // Fetch skills filtered by active students and active songs
-    let skillsSq = supabase
-      .from('user_song_skills')
-      .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, student:users!user_song_skills_user_id_fkey!inner(school_id, is_campus_active, is_groovelab_active), songs!inner(title, artist, is_campus_active, is_groovelab_active)')
-      .eq('student.school_id', schoolId);
-    if (activePlatform === 'campus') {
-      if (admin?.role !== 'teacher') {
-        skillsSq = skillsSq.eq('student.is_campus_active', true).eq('songs.is_campus_active', true);
-      } else {
-        skillsSq = skillsSq.eq('songs.is_campus_active', true);
-      }
-    } else {
-      skillsSq = skillsSq.eq('student.is_groovelab_active', true).eq('songs.is_groovelab_active', true);
-    }
-    const { data: skills } = await skillsSq;
-
-    // Get school opening hours & reset stats timestamp
+    // Calculate required date ranges upfront to avoid querying historical records
     const openingHours = customOpeningHours || admin?.schools?.opening_hours;
     const resetDateStr = activePlatform === 'campus'
       ? (openingHours?.campus_stats_reset_at || openingHours?.stats_reset_at)
       : (openingHours?.groovelab_stats_reset_at || openingHours?.stats_reset_at);
     const resetDate = resetDateStr ? new Date(resetDateStr) : null;
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    const annualStartDate = new Date(startYear, 8, 1, 0, 0, 0, 0);
+
+    const queryStartDate = resetDate ? (resetDate > annualStartDate ? resetDate : annualStartDate) : annualStartDate;
+    const sessionStartDate = new Date(queryStartDate.getTime() - 24 * 60 * 60 * 1000); // 1 day buffer for session overlap
+
+    let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
+    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentListSq = studentListSq.eq('is_campus_active', true);
+    else if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
+
+    let statsSongsSq = supabase.from('songs').select('level').eq('school_id', schoolId);
+    if (activePlatform === 'campus') statsSongsSq = statsSongsSq.eq('is_campus_active', true);
+    else statsSongsSq = statsSongsSq.eq('is_groovelab_active', true);
+
+    // Execute initial queries first
+    const [
+      { data: schoolStudents },
+      { data: songsData }
+    ] = await Promise.all([
+      studentListSq,
+      statsSongsSq
+    ]);
+
+    const studentCount = schoolStudents?.length || 0;
+    const songCount = songsData?.length || 0;
+
+    if (schoolStudents) {
+      setStudents(schoolStudents);
+    }
+
+    const studentIds = (schoolStudents || []).map((s: any) => s.id);
+    let sessions: any[] = [];
+    let focusLogs: any[] = [];
+    let skills: any[] = [];
+
+    if (studentIds.length > 0) {
+      // Fetch sessions, focus logs, and skills filtered by active students and date range
+      let sessionsSq = supabase
+        .from('sessions')
+        .select('check_in_time, check_out_time, station_id, user_id')
+        .in('user_id', studentIds)
+        .not('check_out_time', 'is', null)
+        .gte('check_in_time', sessionStartDate.toISOString());
+
+      let focusLogsSq = supabase
+        .from('fokus_logs')
+        .select('user_id, duration_minutes, duration_seconds, created_at')
+        .in('user_id', studentIds)
+        .gte('created_at', queryStartDate.toISOString());
+
+      let skillsSq = supabase
+        .from('user_song_skills')
+        .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs!inner(title, artist, is_campus_active, is_groovelab_active)')
+        .in('user_id', studentIds);
+
+      if (activePlatform === 'campus') {
+        skillsSq = skillsSq.eq('songs.is_campus_active', true);
+      } else {
+        skillsSq = skillsSq.eq('songs.is_groovelab_active', true);
+      }
+
+      const [
+        { data: sessionsData },
+        { data: focusLogsData },
+        { data: skillsData }
+      ] = await Promise.all([
+        sessionsSq,
+        focusLogsSq,
+        skillsSq
+      ]);
+
+      sessions = sessionsData || [];
+      focusLogs = focusLogsData || [];
+      skills = skillsData || [];
+    }
+
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
     let totalMins = 0;
@@ -2591,24 +2617,10 @@ export function AdminDashboard({
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
-    // Leaderboard
-    let leaderboardSq = supabase
-      .from('users')
-      .select('*, skills:user_song_skills!user_song_skills_user_id_fkey(progress_percent, is_stage_ready, songs(is_campus_active, is_groovelab_active))')
-      .eq('school_id', schoolId)
-      .eq('role', 'student');
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') leaderboardSq = leaderboardSq.eq('is_campus_active', true);
-    else if (activePlatform !== 'campus') leaderboardSq = leaderboardSq.eq('is_groovelab_active', true);
-    const { data: studentsWithSkills } = await leaderboardSq;
-
-    const leaderboard = (studentsWithSkills || []).map((student: any) => {
-      const xp = (student.skills || [])
-        .filter((s: any) => {
-          const song = s.songs ? (Array.isArray(s.songs) ? s.songs[0] : s.songs) : null;
-          if (!song) return false;
-          const matchesSong = activePlatform === 'campus' ? song.is_campus_active : song.is_groovelab_active;
-          return matchesSong && (s.progress_percent === 100 || s.is_stage_ready);
-        })
+    // Compute Leaderboard in memory from the fetched students and skills lists
+    const leaderboard = (schoolStudents || []).map((student: any) => {
+      const xp = (skills || [])
+        .filter((s: any) => s.user_id === student.id && (s.progress_percent === 100 || s.is_stage_ready))
         .length * 100;
       return {
         id: student.id,
@@ -2622,10 +2634,6 @@ export function AdminDashboard({
     .slice(0, 5);
 
     const levelDist = { level1: 0, level2: 0, level3: 0 };
-    let statsSongsSq = supabase.from('songs').select('level').eq('school_id', schoolId);
-    if (activePlatform === 'campus') statsSongsSq = statsSongsSq.eq('is_campus_active', true);
-    else statsSongsSq = statsSongsSq.eq('is_groovelab_active', true);
-    const { data: songsData } = await statsSongsSq;
     songsData?.forEach(s => {
       if (s.level === 1) levelDist.level1++;
       if (s.level === 2) levelDist.level2++;
