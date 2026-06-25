@@ -91,6 +91,10 @@ export function ScheduleCalendarView({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const grabOffsetRef = useRef<number>(0);
   const draggedOccRef = useRef<ScheduleOccurrence | null>(null);
+  const [cachedWeekSchedules, setCachedWeekSchedules] = useState<any[]>([]);
+  const [cachedWeekEvents, setCachedWeekEvents] = useState<any[]>([]);
+  const [cachedWeekRoomBookings, setCachedWeekRoomBookings] = useState<any[]>([]);
+  const scrollIntervalRef = useRef<any>(null);
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number } | null>(null);
   const [freeRooms, setFreeRooms] = useState<any[]>([]);
   const [loadingFreeRooms, setLoadingFreeRooms] = useState(false);
@@ -332,7 +336,7 @@ export function ScheduleCalendarView({
     const occ = occurrences.find(o => o.id === editOccState.id);
     const duration = occ?.duration || 45;
 
-    const fetchFreeRooms = async () => {
+    const fetchFreeRooms = () => {
       setLoadingFreeRooms(true);
       try {
         const date = editOccState.date;
@@ -343,42 +347,15 @@ export function ScheduleCalendarView({
         const startMins = timeToMinutes(formattedStartTime);
         const endMins = startMins + duration;
         
-        // Convert end minutes back to a time string like "HH:MM:SS"
         const eh = Math.floor(endMins / 60);
         const em = endMins % 60;
         const formattedEndTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
 
-        // Get day of week (1 = Mon, 7 = Sun) from UTC components to avoid local timezone offset shifting
         const [yyyy, mm, dd] = date.split('-').map(Number);
         const d = new Date(Date.UTC(yyyy, mm - 1, dd));
         const rawDay = d.getUTCDay();
         const dayOfWeek = rawDay === 0 ? 7 : rawDay;
 
-        // 1. Fetch booked room_ids from schedules (recurring)
-        const { data: schedBooked } = await supabase
-          .from('schedules')
-          .select('room_id, time_slot, duration')
-          .eq('school_id', schoolId)
-          .eq('day_of_week', dayOfWeek)
-          .not('room_id', 'is', null);
-
-        // 2. Fetch booked room_ids from campus_events (one-off)
-        const { data: evBooked } = await supabase
-          .from('campus_events')
-          .select('room_id, start_time, end_time')
-          .eq('school_id', schoolId)
-          .eq('event_date', date)
-          .not('room_id', 'is', null);
-
-        // 3. Fetch booked room_ids from room_bookings (one-off)
-        const { data: rbBooked } = await supabase
-          .from('room_bookings')
-          .select('room_id, start_time, end_time, booked_by')
-          .eq('school_id', schoolId)
-          .eq('date', date)
-          .not('room_id', 'is', null);
-
-        // Helper: check time overlap
         const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
           const aS = aStart.substring(0, 5);
           const aE = aEnd.substring(0, 5);
@@ -389,7 +366,8 @@ export function ScheduleCalendarView({
 
         const bookedRoomIds = new Set<string>();
 
-        (schedBooked || []).forEach((s: any) => {
+        cachedWeekSchedules.forEach((s: any) => {
+          if (s.day_of_week !== dayOfWeek) return;
           const sStart = (s.time_slot || '00:00').substring(0, 5);
           const durMins = s.duration || 45;
           const [sh, sm] = sStart.split(':').map(Number);
@@ -403,7 +381,8 @@ export function ScheduleCalendarView({
           }
         });
 
-        (evBooked || []).forEach((ev: any) => {
+        cachedWeekEvents.forEach((ev: any) => {
+          if (ev.event_date !== date) return;
           const evStart = (ev.start_time || '00:00').substring(0, 5);
           const evEnd = ev.end_time ? ev.end_time.substring(0, 5) : (() => {
             const [h, m] = evStart.split(':').map(Number);
@@ -417,8 +396,8 @@ export function ScheduleCalendarView({
           }
         });
 
-        (rbBooked || []).forEach((rb: any) => {
-          // If this is the current teacher's booking for this exact slot, we do not treat it as a conflict
+        cachedWeekRoomBookings.forEach((rb: any) => {
+          if (rb.date !== date) return;
           const isCurrentOwnBooking = rb.booked_by === userId && 
             rb.date === occ?.date && 
             rb.start_time.substring(0, 5) === occ?.start_time.substring(0, 5);
@@ -445,7 +424,7 @@ export function ScheduleCalendarView({
         const filtered = rooms.filter(r => !bookedRoomIds.has(r.id) || r.id === currentRoomId || r.id === selectedRoomId);
         setFreeRooms(filtered);
       } catch (err) {
-        console.error("Error fetching free rooms:", err);
+        console.error("Error calculating free rooms:", err);
       } finally {
         setLoadingFreeRooms(false);
       }
@@ -623,26 +602,82 @@ export function ScheduleCalendarView({
     const targetStart = parseTimeToMinutes(targetStartTime);
     const targetEnd = targetStart + duration;
 
-    const conflictingOcc = occurrences.find(occ => {
-      if (occ.id === occId || occ.id.includes(occId) || occId.includes(occ.id)) return false;
-      if (excludeTargetId && (occ.id === excludeTargetId || occ.id.includes(excludeTargetId) || excludeTargetId.includes(occ.id))) return false;
-      if (occ.status === 'cancelled') return false;
-      if (!occ.student_id || occ.student_id === 'vacant') return false;
+    const formattedTargetStart = targetStartTime.substring(0, 5);
+    const formattedTargetEnd = (() => {
+      const h = Math.floor(targetEnd / 60) % 24;
+      const m = targetEnd % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    })();
 
-      const occRoomId = occ.schedules?.room_id;
-      if (occRoomId !== roomId) return false;
-      if (occ.date !== targetDate) return false;
+    // Helper: check time overlap
+    const overlaps = (aS: string, aE: string, bS: string, bE: string) => {
+      return aS < bE && aE > bS;
+    };
 
-      const occStart = parseTimeToMinutes(occ.start_time);
-      const occEnd = occStart + occ.duration;
+    // 1. Check cached recurring schedules
+    const [yyyy, mm, dd] = targetDate.split('-').map(Number);
+    const d = new Date(Date.UTC(yyyy, mm - 1, dd));
+    const rawDay = d.getUTCDay();
+    const dayOfWeek = rawDay === 0 ? 7 : rawDay;
 
-      return targetStart < occEnd && targetEnd > occStart;
+    const schedConflict = cachedWeekSchedules.find(s => {
+      if (s.room_id !== roomId) return false;
+      if (s.day_of_week !== dayOfWeek) return false;
+      
+      const sStart = (s.time_slot || '00:00').substring(0, 5);
+      const sEnd = (() => {
+        const [sh, sm] = sStart.split(':').map(Number);
+        const sEndMins = sh * 60 + sm + (s.duration || 45);
+        return `${String(Math.floor(sEndMins / 60)).padStart(2, '0')}:${String(sEndMins % 60).padStart(2, '0')}`;
+      })();
+      return overlaps(sStart, sEnd, formattedTargetStart, formattedTargetEnd);
     });
 
-    if (conflictingOcc) {
-      const studentName = `${conflictingOcc.student?.first_name || ''} ${conflictingOcc.student?.last_name || ''}`.trim() || 'Anderer Schüler';
-      return `${studentName} (${conflictingOcc.start_time.substring(0, 5)} - ${conflictingOcc.duration} min)`;
+    if (schedConflict) {
+      const teacherName = schedConflict.teacher ? `${schedConflict.teacher.first_name || ''} ${schedConflict.teacher.last_name || ''}`.trim() : 'Anderer Lehrer';
+      return `${teacherName} (Dauertermin: ${schedConflict.time_slot.substring(0, 5)} - ${schedConflict.duration} min)`;
     }
+
+    // 2. Check cached events
+    const evConflict = cachedWeekEvents.find(ev => {
+      if (ev.room_id !== roomId) return false;
+      if (ev.event_date !== targetDate) return false;
+
+      const evStart = (ev.start_time || '00:00').substring(0, 5);
+      const evEnd = ev.end_time ? ev.end_time.substring(0, 5) : (() => {
+        const [h, m] = evStart.split(':').map(Number);
+        return `${String(Math.floor((h * 60 + m + 60) / 60)).padStart(2, '0')}:${String((h * 60 + m + 60) % 60).padStart(2, '0')}`;
+      })();
+      return overlaps(evStart, evEnd, formattedTargetStart, formattedTargetEnd);
+    });
+
+    if (evConflict) {
+      return `Event: "${evConflict.title || 'Veranstaltung'}" (${evConflict.start_time.substring(0, 5)})`;
+    }
+
+    // 3. Check cached room bookings
+    const rbConflict = cachedWeekRoomBookings.find(rb => {
+      if (rb.room_id !== roomId) return false;
+      if (rb.date !== targetDate) return false;
+
+      const isCurrentOwnBooking = rb.booked_by === userId && 
+        rb.date === targetDate && 
+        rb.start_time.substring(0, 5) === formattedTargetStart;
+      if (isCurrentOwnBooking) return false;
+
+      const rbStart = (rb.start_time || '00:00').substring(0, 5);
+      const rbEnd = rb.end_time ? rb.end_time.substring(0, 5) : (() => {
+        const [h, m] = rbStart.split(':').map(Number);
+        return `${String(Math.floor((h * 60 + m + duration) / 60)).padStart(2, '0')}:${String((h * 60 + m + duration) % 60).padStart(2, '0')}`;
+      })();
+      return overlaps(rbStart, rbEnd, formattedTargetStart, formattedTargetEnd);
+    });
+
+    if (rbConflict) {
+      const userName = rbConflict.user ? `${rbConflict.user.first_name || ''} ${rbConflict.user.last_name || ''}`.trim() : 'Kollege';
+      return `${userName} (Buchung: ${rbConflict.start_time.substring(0, 5)})`;
+    }
+
     return null;
   };
 
@@ -1269,6 +1304,36 @@ export function ScheduleCalendarView({
         console.warn('Error fetching room bookings:', err);
       }
 
+      // Pre-load and cache school-wide week details for instant conflict evaluation
+      try {
+        const { data: schedData } = await supabase
+          .from('schedules')
+          .select('room_id, time_slot, duration, day_of_week, teacher:users(first_name, last_name)')
+          .eq('school_id', schoolId)
+          .not('room_id', 'is', null);
+        if (schedData) setCachedWeekSchedules(schedData);
+
+        const { data: evData } = await supabase
+          .from('campus_events')
+          .select('room_id, event_date, start_time, end_time, title')
+          .eq('school_id', schoolId)
+          .gte('event_date', startDateStr)
+          .lte('event_date', endDateStr)
+          .not('room_id', 'is', null);
+        if (evData) setCachedWeekEvents(evData);
+
+        const { data: rbData } = await supabase
+          .from('room_bookings')
+          .select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)')
+          .eq('school_id', schoolId)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr)
+          .not('room_id', 'is', null);
+        if (rbData) setCachedWeekRoomBookings(rbData);
+      } catch (cacheErr) {
+        console.warn('Error pre-loading week bookings cache:', cacheErr);
+      }
+
       try {
         const { data, error } = await supabase
           .from('schedule_occurrences')
@@ -1578,6 +1643,13 @@ export function ScheduleCalendarView({
     }
   };
 
+  const stopAutoScroll = () => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
     setDraggedId(id);
@@ -1589,12 +1661,47 @@ export function ScheduleCalendarView({
     const grabOffset = e.clientY - rect.top;
     grabOffsetRef.current = grabOffset;
     e.dataTransfer.setData('grabOffset', String(grabOffset));
+
+    // Create a custom Apple-style drag image
+    const dragImg = document.createElement('div');
+    dragImg.id = 'temp-drag-image';
+    dragImg.style.position = 'absolute';
+    dragImg.style.top = '-1000px';
+    dragImg.style.width = '140px';
+    dragImg.style.padding = '8px 12px';
+    dragImg.style.borderRadius = '12px';
+    dragImg.style.background = 'rgba(255, 255, 255, 0.85)';
+    dragImg.style.backdropFilter = 'blur(10px)';
+    dragImg.style.border = '1px solid rgba(0,0,0,0.1)';
+    dragImg.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+    dragImg.style.color = '#1d1d1f';
+    dragImg.style.fontSize = '0.75rem';
+    dragImg.style.fontWeight = '700';
+    dragImg.style.pointerEvents = 'none';
+    dragImg.style.zIndex = '100000';
+    
+    const nameText = sourceOcc?.student ? `${sourceOcc.student.first_name} ${sourceOcc.student.last_name.substring(0, 1)}.` : 'Pause';
+    const instrumentText = sourceOcc?.student?.instrument || '';
+    dragImg.innerHTML = `
+      <div style="font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nameText}</div>
+      ${instrumentText ? `<div style="font-size: 0.65rem; color: #86868b; margin-top: 1px;">${instrumentText}</div>` : ''}
+    `;
+    
+    document.body.appendChild(dragImg);
+    e.dataTransfer.setDragImage(dragImg, 70, 20);
+    
+    setTimeout(() => {
+      if (dragImg.parentNode) {
+        dragImg.parentNode.removeChild(dragImg);
+      }
+    }, 0);
   };
 
   const handleDragEnd = () => {
     setDraggedId(null);
     draggedOccRef.current = null;
     cleanupDragGhost();
+    stopAutoScroll();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1645,13 +1752,14 @@ export function ScheduleCalendarView({
       ghost.style.flexDirection = 'column';
       ghost.style.justifyContent = 'center';
       ghost.style.opacity = '0.85';
-      ghost.style.transition = 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1), height 0.08s';
+      ghost.style.transition = 'top 0.12s cubic-bezier(0.16, 1, 0.3, 1), height 0.12s, transform 0.12s';
     }
     
     ghost.style.top = `${previewTopPx}px`;
     ghost.style.height = `${previewHeightPx}px`;
     ghost.style.background = highlightBg;
     ghost.style.border = `2px dashed ${highlightColor}`;
+    ghost.style.transform = 'scale(0.97)';
     
     const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${sourceOcc.student.last_name}` : 'Pause';
     ghost.innerHTML = `
@@ -1664,15 +1772,40 @@ export function ScheduleCalendarView({
     if (ghost.parentNode !== e.currentTarget) {
       e.currentTarget.appendChild(ghost);
     }
+
+    // Auto-scroll logic if dragging near boundaries
+    const scrollContainer = e.currentTarget.closest('.overflow-y-auto') || e.currentTarget;
+    if (scrollContainer) {
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      const relativeCursorY = e.clientY - scrollRect.top;
+      const scrollThreshold = 60;
+      const maxScrollSpeed = 15;
+      
+      stopAutoScroll();
+      
+      if (relativeCursorY < scrollThreshold) {
+        const speed = Math.round((scrollThreshold - relativeCursorY) / scrollThreshold * maxScrollSpeed);
+        scrollIntervalRef.current = setInterval(() => {
+          scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - speed);
+        }, 16);
+      } else if (relativeCursorY > scrollRect.height - scrollThreshold) {
+        const speed = Math.round((relativeCursorY - (scrollRect.height - scrollThreshold)) / scrollThreshold * maxScrollSpeed);
+        scrollIntervalRef.current = setInterval(() => {
+          scrollContainer.scrollTop = Math.min(scrollContainer.scrollHeight - scrollRect.height, scrollContainer.scrollTop + speed);
+        }, 16);
+      }
+    }
   };
 
   const handleDragLeaveDay = () => {
     cleanupDragGhost();
+    stopAutoScroll();
   };
 
   const handleDropOnDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
     cleanupDragGhost();
+    stopAutoScroll();
     if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
       alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
