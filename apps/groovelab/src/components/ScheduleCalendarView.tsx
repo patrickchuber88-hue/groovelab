@@ -89,6 +89,8 @@ export function ScheduleCalendarView({
   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const grabOffsetRef = useRef<number>(0);
+  const draggedOccRef = useRef<ScheduleOccurrence | null>(null);
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number } | null>(null);
   const [freeRooms, setFreeRooms] = useState<any[]>([]);
   const [loadingFreeRooms, setLoadingFreeRooms] = useState(false);
@@ -1485,22 +1487,108 @@ export function ScheduleCalendarView({
     }
   };
 
+  const cleanupDragGhost = () => {
+    const ghost = document.getElementById('drag-preview-ghost');
+    if (ghost && ghost.parentNode) {
+      ghost.parentNode.removeChild(ghost);
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
     setDraggedId(id);
+    const sourceOcc = occurrences.find(o => o.id === id);
+    draggedOccRef.current = sourceOcc || null;
     
     // Save the vertical offset where the card was grabbed
     const rect = e.currentTarget.getBoundingClientRect();
     const grabOffset = e.clientY - rect.top;
+    grabOffsetRef.current = grabOffset;
     e.dataTransfer.setData('grabOffset', String(grabOffset));
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    draggedOccRef.current = null;
+    cleanupDragGhost();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
+  const handleDragOverDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
+    e.preventDefault();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const grabOffset = grabOffsetRef.current || 15;
+    const relativeY = e.clientY - rect.top - grabOffset;
+    const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
+    
+    // Snap to 15 mins
+    const snappedMinutes = Math.round(droppedMinutes / 15) * 15;
+    
+    // Clamp to valid values based on dragged occurrence duration
+    const sourceOcc = draggedOccRef.current;
+    if (!sourceOcc) return;
+    const duration = sourceOcc.duration || 30;
+    const clampedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, snappedMinutes));
+    
+    // Position/update the ghost DOM element directly
+    const previewTopPx = (clampedMinutes - dayBaselineMinutes) * 2.5;
+    const previewHeightPx = duration * 2.5 - 8;
+    const h = Math.floor(clampedMinutes / 60) % 24;
+    const m = clampedMinutes % 60;
+    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    
+    const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+    const highlightColor = isCampus ? '#137333' : '#007aff';
+    const highlightBg = isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)';
+    
+    let ghost = document.getElementById('drag-preview-ghost');
+    if (!ghost) {
+      ghost = document.createElement('div');
+      ghost.id = 'drag-preview-ghost';
+      ghost.style.position = 'absolute';
+      ghost.style.left = '8px';
+      ghost.style.right = '8px';
+      ghost.style.borderRadius = '8px';
+      ghost.style.padding = '8px';
+      ghost.style.boxSizing = 'border-box';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.zIndex = '10';
+      ghost.style.display = 'flex';
+      ghost.style.flexDirection = 'column';
+      ghost.style.justifyContent = 'center';
+      ghost.style.opacity = '0.85';
+      ghost.style.transition = 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1), height 0.08s';
+    }
+    
+    ghost.style.top = `${previewTopPx}px`;
+    ghost.style.height = `${previewHeightPx}px`;
+    ghost.style.background = highlightBg;
+    ghost.style.border = `2px dashed ${highlightColor}`;
+    
+    const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${sourceOcc.student.last_name}` : 'Pause';
+    ghost.innerHTML = `
+      <div style="font-size: 0.72rem; font-weight: 800; color: ${highlightColor};">${timeStr} Uhr</div>
+      <div style="font-size: 0.78rem; font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+        ${studentName}
+      </div>
+    `;
+    
+    if (ghost.parentNode !== e.currentTarget) {
+      e.currentTarget.appendChild(ghost);
+    }
+  };
+
+  const handleDragLeaveDay = () => {
+    cleanupDragGhost();
+  };
+
   const handleDropOnDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
+    cleanupDragGhost();
     if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
       alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
@@ -1508,8 +1596,7 @@ export function ScheduleCalendarView({
     const sourceId = e.dataTransfer.getData('text/plain');
     if (!sourceId) return;
 
-    const grabOffsetStr = e.dataTransfer.getData('grabOffset');
-    const grabOffset = grabOffsetStr ? parseFloat(grabOffsetStr) : 0;
+    const grabOffset = grabOffsetRef.current || 0;
 
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     const duration = sourceOcc?.duration || 30;
@@ -2266,10 +2353,13 @@ export function ScheduleCalendarView({
               </div>
 
               <div
-                onDragOver={handleDragOver}
+                onDragOver={(e) => handleDragOverDay(e, dateStr, dayBaselineMinutes)}
+                onDragLeave={handleDragLeaveDay}
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
+
+                {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
                 {markers.map(m => (
                   <div 
@@ -2420,6 +2510,7 @@ export function ScheduleCalendarView({
                         id={`occ-${occ.id}`}
                         draggable={!( (currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule ) && !isBreak && !isVacant}
                         onDragStart={(e) => handleDragStart(e, occ.id)}
+                        onDragEnd={handleDragEnd}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
                         title={isVacant ? displayNames : undefined}
