@@ -1,0 +1,644 @@
+diff --git a/apps/groovelab/src/components/ScheduleCalendarView.tsx b/apps/groovelab/src/components/ScheduleCalendarView.tsx
+index 22d9700..84ad9f8 100644
+--- a/apps/groovelab/src/components/ScheduleCalendarView.tsx
++++ b/apps/groovelab/src/components/ScheduleCalendarView.tsx
+@@ -41,6 +41,7 @@ interface ScheduleOccurrence {
+       name: string;
+     } | null;
+   } | null;
++  isGroupBlock?: boolean;
+ }
+ 
+ interface ScheduleCalendarViewProps {
+@@ -86,7 +87,7 @@ export function ScheduleCalendarView({
+   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
+   const [loading, setLoading] = useState(true);
+   const [draggedId, setDraggedId] = useState<string | null>(null);
+-  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null } | null>(null);
++  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number } | null>(null);
+   const [freeRooms, setFreeRooms] = useState<any[]>([]);
+   const [loadingFreeRooms, setLoadingFreeRooms] = useState(false);
+   const [roomDropdownOpen, setRoomDropdownOpen] = useState(false);
+@@ -455,7 +456,29 @@ export function ScheduleCalendarView({
+       .select('*');
+       
+     if (occurrenceId) {
+-      query = query.eq('occurrence_id', occurrenceId);
++      const occ = occurrences.find(o => o.id === occurrenceId);
++      const isGroupOcc = occ && (occ.isGroupBlock || occurrences.some(o => 
++        o.id !== occ.id && 
++        o.student_id && 
++        o.student_id !== 'vacant' &&
++        o.date === occ.date && 
++        o.start_time === occ.start_time && 
++        (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++      ));
++      
++      if (isGroupOcc && occ) {
++        const groupOccIds = occurrences.filter(o => 
++          o.student_id && 
++          o.student_id !== 'vacant' &&
++          o.date === occ.date && 
++          o.start_time === occ.start_time && 
++          (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++        ).map(o => o.id);
++        
++        query = query.in('occurrence_id', groupOccIds);
++      } else {
++        query = query.eq('occurrence_id', occurrenceId);
++      }
+     } else {
+       query = query.or(`and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`);
+     }
+@@ -531,13 +554,42 @@ export function ScheduleCalendarView({
+       setChatTypedMessage('');
+       setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+ 
+-      const { error } = await supabase.from('campus_direct_messages').insert({
+-        sender_id: userId,
+-        recipient_id: studentId,
+-        content: messageContent,
+-        occurrence_id: occ.id
+-      });
+-      if (error) throw error;
++      const isGroupOcc = occ && (occ.isGroupBlock || occurrences.some(o => 
++        o.id !== occ.id && 
++        o.student_id && 
++        o.student_id !== 'vacant' &&
++        o.date === occ.date && 
++        o.start_time === occ.start_time && 
++        (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++      ));
++
++      if (isGroupOcc) {
++        const groupOccs = occurrences.filter(o => 
++          o.student_id && 
++          o.student_id !== 'vacant' &&
++          o.date === occ.date && 
++          o.start_time === occ.start_time && 
++          (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++        );
++        const insertPromises = groupOccs.map(go => {
++          if (!go.student_id || go.student_id === 'vacant') return Promise.resolve();
++          return supabase.from('campus_direct_messages').insert({
++            sender_id: userId,
++            recipient_id: go.student_id,
++            content: messageContent,
++            occurrence_id: go.id
++          });
++        });
++        await Promise.all(insertPromises);
++      } else {
++        const { error } = await supabase.from('campus_direct_messages').insert({
++          sender_id: userId,
++          recipient_id: studentId,
++          content: messageContent,
++          occurrence_id: occ.id
++        });
++        if (error) throw error;
++      }
+       
+       await fetchChat(studentId, occ.id);
+     } catch (err) {
+@@ -1315,25 +1367,39 @@ export function ScheduleCalendarView({
+     const occ = occurrences.find(o => o.id === editOccState.id);
+     if (occ) {
+       const formattedTime = editOccState.start_time.length === 5 ? `${editOccState.start_time}:00` : editOccState.start_time;
+-      const timeChanged = occ.date !== editOccState.date || occ.start_time !== formattedTime;
+-      const roomChanged = (occ.schedules?.room_id || null) !== editOccState.room_id;
+-
+-      if (timeChanged || roomChanged) {
+-        // If room changed but time didn't, or both changed, we check room conflict for the new room_id
+-        if (editOccState.room_id) {
+-          const conflict = getRoomConflict(editOccState.id, editOccState.date, formattedTime, occ.duration, editOccState.room_id);
+-          if (conflict) {
+-            const roomName = rooms.find(r => r.id === editOccState.room_id)?.name || 'diesem Raum';
+-            const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben/buchen?`;
+-            if (!confirm(confirmMsg)) {
+-              return;
+-            }
++      
++      const isGroupOcc = occ.isGroupBlock || occurrences.some(o => 
++        o.id !== occ.id && 
++        o.student_id && 
++        o.student_id !== 'vacant' &&
++        o.date === occ.date && 
++        o.start_time === occ.start_time && 
++        (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++      );
++
++      const groupOccs = isGroupOcc ? occurrences.filter(o => 
++        o.student_id && 
++        o.student_id !== 'vacant' &&
++        o.date === occ.date && 
++        o.start_time === occ.start_time && 
++        (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++      ) : [occ];
++
++      if (editOccState.room_id) {
++        const conflict = getRoomConflict(editOccState.id, editOccState.date, formattedTime, editOccState.duration || occ.duration, editOccState.room_id);
++        if (conflict) {
++          const roomName = rooms.find(r => r.id === editOccState.room_id)?.name || 'diesem Raum';
++          const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben/buchen?`;
++          if (!confirm(confirmMsg)) {
++            return;
+           }
+         }
++      }
+ 
+-        // Update occurrence local state
+-        const updatedSchedules = occ.schedules ? {
+-          ...occ.schedules,
++      // Propagate edits to all group occurrences
++      groupOccs.forEach(o => {
++        const updatedSchedules = o.schedules ? {
++          ...o.schedules,
+           room_id: editOccState.room_id,
+           room: { name: rooms.find(r => r.id === editOccState.room_id)?.name || '' }
+         } : {
+@@ -1341,16 +1407,17 @@ export function ScheduleCalendarView({
+           room: { name: rooms.find(r => r.id === editOccState.room_id)?.name || '' }
+         };
+ 
+-        const templateRoomId = occ.template_room_id !== undefined ? occ.template_room_id : (occ.schedules?.room_id || null);
++        const templateRoomId = o.template_room_id !== undefined ? o.template_room_id : (o.schedules?.room_id || null);
+ 
+-        updateOccurrence(editOccState.id, {
++        updateOccurrence(o.id, {
+           date: editOccState.date,
+           start_time: formattedTime,
+           status: 'pending_reschedule',
+           schedules: updatedSchedules,
+-          template_room_id: templateRoomId
++          template_room_id: templateRoomId,
++          duration: editOccState.duration !== undefined ? editOccState.duration : o.duration
+         });
+-      }
++      });
+     }
+     setEditOccState(null);
+   };
+@@ -1422,7 +1489,8 @@ export function ScheduleCalendarView({
+               status: finalStatus,
+               original_date: origDateStr,
+               student_acknowledged: false,
+-              student_id: change.student_id ? change.student_id : null
++              student_id: change.student_id ? change.student_id : null,
++              duration: change.duration
+             })
+             .eq('id', change.id);
+           
+@@ -2100,7 +2168,8 @@ export function ScheduleCalendarView({
+                             id: occ.id, 
+                             date: occ.date, 
+                             start_time: occ.start_time,
+-                            room_id: occ.schedules?.room_id || null
++                            room_id: occ.schedules?.room_id || null,
++                            duration: occ.duration
+                           });
+                         }
+                         // Save selected sick date to localStorage for persistence across tab unmounts
+@@ -2305,14 +2374,48 @@ export function ScheduleCalendarView({
+           );
+         }
+         
++        const isGroupOcc = (occ && (occ.isGroupBlock || occurrences.some(o => 
++          o.id !== occ.id && 
++          o.student_id && 
++          o.student_id !== 'vacant' &&
++          o.date === occ.date && 
++          o.start_time === occ.start_time && 
++          (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++        ))) || false;
++
++        const groupOccs = (isGroupOcc && occ) ? occurrences.filter(o => 
++          o.student_id && 
++          o.student_id !== 'vacant' &&
++          o.date === occ.date && 
++          o.start_time === occ.start_time && 
++          (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
++        ) : [];
++
+         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
+         const isCancelled = occ?.status === 'cancelled';
+         const canDiscard = isMoved || isCancelled;
+         const studentName = occ ? `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim() : 'Schüler';
+-        const modalTitle = occ?.student_id ? `Termin bearbeiten: ${studentName}` : 'Pause bearbeiten';
++        const modalTitle = occ?.student_id ? (isGroupOcc ? `Gruppentermin bearbeiten` : `Termin bearbeiten: ${studentName}`) : 'Pause bearbeiten';
+         const formattedDateLabel = occ ? new Date(editOccState.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+         const formattedTimeLabel = editOccState.start_time.substring(0, 5);
+ 
++        const timeToMinutes = (t: string): number => {
++          const parts = t.split(':');
++          const h = parseInt(parts[0] || '0', 10);
++          const m = parseInt(parts[1] || '0', 10);
++          return h * 60 + m;
++        };
++
++        const minutesToTime = (m: number): string => {
++          const h = Math.floor(m / 60) % 24;
++          const mins = m % 60;
++          return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
++        };
++
++        const startMin = timeToMinutes(editOccState.start_time);
++        const endMin = startMin + (editOccState.duration || 30);
++        const endTimeStr = minutesToTime(endMin);
++
+         return (
+           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ 
+@@ -2320,7 +2423,7 @@ export function ScheduleCalendarView({
+               background: '#ffffff', 
+               borderRadius: '24px', 
+               boxShadow: '0 20px 50px rgba(0,0,0,0.12)', 
+-              width: '780px', 
++              width: isGroupOcc ? '1120px' : '780px', 
+               maxWidth: '95vw', 
+               border: '1px solid rgba(0,0,0,0.08)', 
+               display: 'flex', 
+@@ -2330,7 +2433,9 @@ export function ScheduleCalendarView({
+               
+               {/* Premium Green Header Banner */}
+               <div style={{ 
+-                background: 'linear-gradient(135deg, #118a44 0%, #15803d 100%)', 
++                background: isGroupOcc 
++                  ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
++                  : 'linear-gradient(135deg, #118a44 0%, #15803d 100%)', 
+                 padding: '20px 28px', 
+                 display: 'flex', 
+                 justifyContent: 'space-between', 
+@@ -2408,27 +2513,80 @@ export function ScheduleCalendarView({
+                       }} 
+                     />
+                   </div>
+-                  <div style={{ marginBottom: '18px' }}>
+-                    <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
+-                    <input 
+-                      type="time" 
+-                      value={editOccState.start_time.substring(0, 5)} 
+-                      onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
+-                      style={{ 
+-                        width: '100%', 
+-                        padding: '11px 14px', 
+-                        borderRadius: '10px', 
+-                        border: '1px solid rgba(0, 0, 0, 0.15)', 
+-                        background: 'rgba(255,255,255,0.8)',
+-                        fontSize: '0.92rem', 
+-                        fontFamily: 'inherit',
+-                        outline: 'none',
+-                        boxSizing: 'border-box',
+-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+-                        transition: 'border-color 0.2s'
+-                      }} 
+-                    />
+-                  </div>
++                  {isGroupOcc ? (
++                    <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
++                      <div style={{ flex: 1 }}>
++                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Beginn</label>
++                        <input 
++                          type="time" 
++                          value={editOccState.start_time.substring(0, 5)} 
++                          onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
++                          style={{ 
++                            width: '100%', 
++                            padding: '11px 14px', 
++                            borderRadius: '10px', 
++                            border: '1px solid rgba(0, 0, 0, 0.15)', 
++                            background: 'rgba(255,255,255,0.8)',
++                            fontSize: '0.92rem', 
++                            fontFamily: 'inherit',
++                            outline: 'none',
++                            boxSizing: 'border-box',
++                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
++                            transition: 'border-color 0.2s'
++                          }} 
++                        />
++                      </div>
++                      <div style={{ flex: 1 }}>
++                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Ende</label>
++                        <input 
++                          type="time" 
++                          value={endTimeStr} 
++                          onChange={e => {
++                            const newEndMin = timeToMinutes(e.target.value);
++                            const startMin = timeToMinutes(editOccState.start_time);
++                            let diff = newEndMin - startMin;
++                            if (diff < 0) diff = 0;
++                            setEditOccState({ ...editOccState, duration: diff });
++                          }} 
++                          style={{ 
++                            width: '100%', 
++                            padding: '11px 14px', 
++                            borderRadius: '10px', 
++                            border: '1px solid rgba(0, 0, 0, 0.15)', 
++                            background: 'rgba(255,255,255,0.8)',
++                            fontSize: '0.92rem', 
++                            fontFamily: 'inherit',
++                            outline: 'none',
++                            boxSizing: 'border-box',
++                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
++                            transition: 'border-color 0.2s'
++                          }} 
++                        />
++                      </div>
++                    </div>
++                  ) : (
++                    <div style={{ marginBottom: '18px' }}>
++                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Uhrzeit</label>
++                      <input 
++                        type="time" 
++                        value={editOccState.start_time.substring(0, 5)} 
++                        onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
++                        style={{ 
++                          width: '100%', 
++                          padding: '11px 14px', 
++                          borderRadius: '10px', 
++                          border: '1px solid rgba(0, 0, 0, 0.15)', 
++                          background: 'rgba(255,255,255,0.8)',
++                          fontSize: '0.92rem', 
++                          fontFamily: 'inherit',
++                          outline: 'none',
++                          boxSizing: 'border-box',
++                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
++                          transition: 'border-color 0.2s'
++                        }} 
++                      />
++                    </div>
++                  )}
+ 
+                   {/* Room Selection Dropdown */}
+                   <div style={{ marginBottom: '20px', position: 'relative' }}>
+@@ -2761,9 +2919,9 @@ export function ScheduleCalendarView({
+                       </button>
+                       <button 
+                         onClick={handleSaveEdit} 
+-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+-                        onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+-                        onMouseOut={e => e.currentTarget.style.background = '#118a44'}
++                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isGroupOcc ? '#007aff' : '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
++                        onMouseOver={e => e.currentTarget.style.background = isGroupOcc ? '#0055d4' : '#15803d'}
++                        onMouseOut={e => e.currentTarget.style.background = isGroupOcc ? '#007aff' : '#118a44'}
+                       >
+                         Speichern
+                       </button>
+@@ -2780,90 +2938,183 @@ export function ScheduleCalendarView({
+                   } catch (e) {}
+   
+                   return (
+-                    <div style={{ flex: 1, width: '320px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+-                      <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+-                        Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
+-                      </h4>
+-  
+-                      {isMoved && (
+-                        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
+-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
+-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
+-                            {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
+-                          </span>
++                    <>
++                      {/* Third Column: Schülerliste (only for groups) */}
++                      {isGroupOcc && (
++                        <div style={{ width: '280px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
++                          <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
++                            👥 Schüler in dieser Gruppe
++                          </h4>
++                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px', paddingRight: '4px' }}>
++                            {groupOccs.map(go => {
++                              const isGoCancelled = go.status === 'cancelled';
++                              const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
++                              return (
++                                <div key={go.id} style={{ 
++                                  display: 'flex', 
++                                  justifyContent: 'space-between', 
++                                  alignItems: 'center', 
++                                  padding: '10px 14px', 
++                                  borderRadius: '10px', 
++                                  background: isGoCancelled || isGoSick ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0, 0, 0, 0.02)',
++                                  border: isGoCancelled || isGoSick ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)'
++                                }}>
++                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
++                                    <span style={{ 
++                                      fontSize: '0.88rem', 
++                                      fontWeight: 700, 
++                                      color: isGoCancelled || isGoSick ? '#ef4444' : '#1d1d1f',
++                                      textDecoration: isGoCancelled ? 'line-through' : 'none' 
++                                    }}>
++                                      {go.student?.first_name} {go.student?.last_name}
++                                    </span>
++                                    <span style={{ fontSize: '0.72rem', color: '#86868b', marginTop: '2px' }}>
++                                      {go.student?.instrument || 'Kein Instrument'} • {go.duration || 30} Min
++                                    </span>
++                                  </div>
++                                  
++                                  {!isGoCancelled && !isGoSick && (
++                                    <button
++                                      onClick={() => {
++                                        if (confirm(`Möchtest du ${go.student?.first_name} ${go.student?.last_name} für diesen Gruppentermin absagen?`)) {
++                                          updateOccurrence(go.id, { status: 'cancelled' });
++                                          setEditOccState(null);
++                                        }
++                                      }}
++                                      title={`${go.student?.first_name} absagen`}
++                                      style={{ 
++                                        background: 'transparent', 
++                                        border: 'none', 
++                                        cursor: 'pointer', 
++                                        color: '#ef4444', 
++                                        padding: '4px', 
++                                        display: 'flex', 
++                                        alignItems: 'center', 
++                                        justifyContent: 'center', 
++                                        borderRadius: '50%',
++                                        transition: 'background 0.2s'
++                                      }}
++                                      onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
++                                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
++                                    >
++                                      <X size={14} strokeWidth={2.5} />
++                                    </button>
++                                  )}
++                                </div>
++                              );
++                            })}
++                          </div>
+                         </div>
+                       )}
+-  
+-                      {/* Chat messages viewport */}
+-                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
+-                        {isFrozen && (
+-                          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
+-                            🔒 Shoutbox eingefroren (Schreibschutz aktiv)
++
++                      <div style={{ flex: 1, width: '320px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
++                        <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
++                          Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
++                        </h4>
++    
++                        {isMoved && (
++                          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
++                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
++                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
++                              {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
++                            </span>
+                           </div>
+                         )}
+-                        {chatMessages.length === 0 ? (
+-                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
+-                            Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
+-                          </div>
+-                        ) : (
+-                          chatMessages.map((msg, idx) => {
+-                            const isMe = msg.sender_id === userId;
+-                            const isTerminMsg = msg.content.startsWith('[Termin');
+-                            let displayedContent = msg.content;
+-                            let prefixText = '';
+-                            if (isTerminMsg) {
+-                              const closeBracketIdx = msg.content.indexOf(']');
+-                              if (closeBracketIdx !== -1) {
+-                                prefixText = msg.content.substring(1, closeBracketIdx);
+-                                displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
++    
++                        {/* Chat messages viewport */}
++                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
++                          {isFrozen && (
++                            <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
++                              🔒 Shoutbox eingefroren (Schreibschutz aktiv)
++                            </div>
++                          )}
++                          {(() => {
++                            const deduplicatedMessages: any[] = [];
++                            const seenMessages = new Set<string>();
++                            chatMessages.forEach(msg => {
++                              const timeKey = new Date(msg.created_at).toISOString().substring(0, 16); // group by minute
++                              const key = `${msg.sender_id}_${timeKey}_${msg.content}`;
++                              if (!seenMessages.has(key)) {
++                                seenMessages.add(key);
++                                deduplicatedMessages.push(msg);
+                               }
++                            });
++
++                            if (deduplicatedMessages.length === 0) {
++                              return (
++                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
++                                  Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
++                                </div>
++                              );
+                             }
+-  
+-                            return (
+-                              <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
+-                                {prefixText && (
+-                                  <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+-                                    📅 {prefixText}
++
++                            return deduplicatedMessages.map((msg, idx) => {
++                              const isMe = msg.sender_id === userId;
++                              const isTerminMsg = msg.content.startsWith('[Termin');
++                              let displayedContent = msg.content;
++                              let prefixText = '';
++                              if (isTerminMsg) {
++                                const closeBracketIdx = msg.content.indexOf(']');
++                                if (closeBracketIdx !== -1) {
++                                  prefixText = msg.content.substring(1, closeBracketIdx);
++                                  displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
++                                }
++                              }
++
++                              const senderStudent = groupOccs.find(o => o.student_id === msg.sender_id)?.student;
++                              const senderName = senderStudent ? `${senderStudent.first_name} ${senderStudent.last_name}` : 'Schüler';
++    
++                              return (
++                                <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
++                                  {isGroupOcc && !isMe && (
++                                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#86868b', marginBottom: '2px', marginLeft: '4px' }}>
++                                      {senderName}
++                                    </span>
++                                  )}
++                                  {prefixText && (
++                                    <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
++                                      📅 {prefixText}
++                                    </span>
++                                  )}
++                                  <div style={{ 
++                                    background: isMe ? (isGroupOcc ? '#007aff' : '#118a44') : '#f5f5f7', 
++                                    color: isMe ? 'white' : '#1d1d1f', 
++                                    padding: '8px 12px', 
++                                    borderRadius: '12px', 
++                                    borderBottomRightRadius: isMe ? '2px' : '12px',
++                                    borderBottomLeftRadius: isMe ? '12px' : '2px',
++                                    fontSize: '0.82rem',
++                                    lineHeight: 1.4,
++                                    wordBreak: 'break-word'
++                                  }}>
++                                    {displayedContent}
++                                  </div>
++                                  <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
++                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                   </span>
+-                                )}
+-                                <div style={{ 
+-                                  background: isMe ? '#118a44' : '#f5f5f7', 
+-                                  color: isMe ? 'white' : '#1d1d1f', 
+-                                  padding: '8px 12px', 
+-                                  borderRadius: '12px', 
+-                                  borderBottomRightRadius: isMe ? '2px' : '12px',
+-                                  borderBottomLeftRadius: isMe ? '12px' : '2px',
+-                                  fontSize: '0.82rem',
+-                                  lineHeight: 1.4,
+-                                  wordBreak: 'break-word'
+-                                }}>
+-                                  {displayedContent}
+                                 </div>
+-                                <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
+-                                  {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+-                                </span>
+-                              </div>
+-                            );
+-                          })
+-                        )}
+-                        <div ref={chatMessagesEndRef} />
++                              );
++                            });
++                          })()}
++                          <div ref={chatMessagesEndRef} />
++                        </div>
++    
++                        {/* Send Input Form */}
++                        <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
++                          <input 
++                            type="text" 
++                            placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
++                            disabled={isFrozen}
++                            value={chatTypedMessage}
++                            onChange={e => setChatTypedMessage(e.target.value)}
++                            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
++                          />
++                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isGroupOcc ? '#007aff' : '#118a44'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
++                            <Send size={14} />
++                          </button>
++                        </form>
+                       </div>
+-  
+-                      {/* Send Input Form */}
+-                      <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+-                        <input 
+-                          type="text" 
+-                          placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
+-                          disabled={isFrozen}
+-                          value={chatTypedMessage}
+-                          onChange={e => setChatTypedMessage(e.target.value)}
+-                          style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
+-                        />
+-                        <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#118a44', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+-                          <Send size={14} />
+-                        </button>
+-                      </form>
+-                    </div>
++                    </>
+                   );
+                 })()}
+               </div>
