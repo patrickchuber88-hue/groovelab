@@ -12,7 +12,8 @@ import {
   Send,
   Trash2,
   Palmtree,
-  Users
+  Users,
+  Link2Off
 } from 'lucide-react';
 
 interface ScheduleOccurrence {
@@ -80,6 +81,40 @@ export function ScheduleCalendarView({
 
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  interface CustomDialogConfig {
+    type: 'confirm' | 'alert';
+    message: string;
+    resolve: (value: boolean) => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }
+  const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig | null>(null);
+
+  const showConfirm = (message: string, confirmLabel = 'Ja', cancelLabel = 'Nein'): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        type: 'confirm',
+        message,
+        resolve,
+        confirmLabel,
+        cancelLabel
+      });
+    });
+  };
+
+  const showAlert = (message: string): Promise<void> => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        type: 'alert',
+        message,
+        resolve: () => resolve(),
+        confirmLabel: 'OK'
+      });
+    });
+  };
+
+
+
   // School year: September 1 – July 31 of the following year (August excluded)
   const now = new Date();
   const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
@@ -101,6 +136,29 @@ export function ScheduleCalendarView({
   const [roomDropdownOpen, setRoomDropdownOpen] = useState(false);
   const [isGroupModeActive, setIsGroupModeActive] = useState(false);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
+
+  const [localEndTime, setLocalEndTime] = useState<string>('');
+
+  useEffect(() => {
+    if (editOccState) {
+      const timeToMinutesLocal = (t: string): number => {
+        const parts = t.split(':');
+        const h = parseInt(parts[0] || '0', 10);
+        const m = parseInt(parts[1] || '0', 10);
+        return h * 60 + m;
+      };
+      const minutesToTimeLocal = (m: number): string => {
+        const h = Math.floor(m / 60) % 24;
+        const mins = m % 60;
+        return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      };
+      const startMin = timeToMinutesLocal(editOccState.start_time);
+      const endMin = startMin + (editOccState.duration || 30);
+      setLocalEndTime(minutesToTimeLocal(endMin));
+    } else {
+      setLocalEndTime('');
+    }
+  }, [editOccState?.start_time, editOccState?.duration]);
 
   const [calendarUrl, setCalendarUrl] = useState<string>('');
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -511,7 +569,7 @@ export function ScheduleCalendarView({
       const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
       const lessonDateTime = new Date(`${occ.date}T${timePart}`);
       if (Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000) {
-        alert('Dieser Chat ist eingefroren (48 Stunden nach dem Termin) und kann nicht mehr bearbeitet werden.');
+        await showAlert('Dieser Chat ist eingefroren (48 Stunden nach dem Termin) und kann nicht mehr bearbeitet werden.');
         return;
       }
     } catch (err) {
@@ -828,7 +886,7 @@ export function ScheduleCalendarView({
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
 
         if (change.id.startsWith('mock-')) {
-          if (!change.student_id || change.student_id === 'vacant') {
+          if ((!change.student_id || change.student_id === 'vacant') && change.status !== 'cancelled') {
             continue;
           }
           const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, ...insertData } = change;
@@ -1040,7 +1098,7 @@ export function ScheduleCalendarView({
 
       await loadOccurrences();
     } catch (error: any) {
-      alert('Fehler beim Speichern: ' + (error.message || error));
+      await showAlert('Fehler beim Speichern: ' + (error.message || error));
     } finally {
       setLoading(false);
     }
@@ -1426,9 +1484,15 @@ export function ScheduleCalendarView({
           board.students.forEach((student: any) => {
             const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
             if (student.isBreak) {
-              // Only project the break if there is no active/non-cancelled appointment occupying this slot
+              const isBreakCancelled = fetchedData.some(o => 
+                o.date === dateStr && 
+                (!o.student_id || o.student_id === 'vacant') && 
+                o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5) && 
+                o.status === 'cancelled'
+              );
+              // Only project the break if it is not cancelled, and there is no active/non-cancelled appointment occupying this slot
               const isOccupied = fetchedData.some(o => o.date === dateStr && o.start_time && (o.start_time || '').substring(0, 5) === (student.assignedTime || '').substring(0, 5) && o.status !== 'cancelled');
-              if (!isOccupied) {
+              if (!isBreakCancelled && !isOccupied) {
                 projectedData.push({
                   id: `mock-${board.id}-${student.id}`,
                   student_id: '',
@@ -1630,7 +1694,7 @@ export function ScheduleCalendarView({
       await loadOccurrences();
     } catch (err) {
       console.error('Error resetting saved occurrences for week:', err);
-      alert('Fehler beim Zurücksetzen der gespeicherten Termine');
+      await showAlert('Fehler beim Zurücksetzen der gespeicherten Termine');
     } finally {
       setLoading(false);
     }
@@ -1802,12 +1866,12 @@ export function ScheduleCalendarView({
     stopAutoScroll();
   };
 
-  const handleDropOnDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
+  const handleDropOnDay = async (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
     cleanupDragGhost();
     stopAutoScroll();
     if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
-      alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
+      await showAlert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
     }
     const sourceId = e.dataTransfer.getData('text/plain');
@@ -1832,7 +1896,7 @@ export function ScheduleCalendarView({
       if (conflict) {
         const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
         const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetStartTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
-        if (!confirm(confirmMsg)) {
+        if (!await showConfirm(confirmMsg)) {
           setDraggedId(null);
           return;
         }
@@ -1867,7 +1931,7 @@ export function ScheduleCalendarView({
     if (conflict) {
       const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
       const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetStartTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
-      if (!confirm(confirmMsg)) {
+      if (!await showConfirm(confirmMsg)) {
         setDraggedId(null);
         return;
       }
@@ -1877,7 +1941,7 @@ export function ScheduleCalendarView({
     setDraggedId(null);
   };
 
-  const executeOccurrenceSwap = (sourceId: string, targetId: string) => {
+  const executeOccurrenceSwap = async (sourceId: string, targetId: string) => {
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     const targetOcc = occurrences.find(o => o.id === targetId);
     if (!sourceOcc || !targetOcc) return;
@@ -1896,7 +1960,7 @@ export function ScheduleCalendarView({
       if (conflict) {
         const roomName = normalOcc.schedules?.room?.name || 'diesem Raum';
         const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${cancelledOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben?`;
-        if (!confirm(confirmMsg)) {
+        if (!await showConfirm(confirmMsg)) {
           setDraggedId(null);
           return;
         }
@@ -1935,7 +1999,7 @@ export function ScheduleCalendarView({
       }
 
       const confirmMsg = `Warnung: Beim Tauschen gibt es Raumbelegungs-Konflikte:${conflictsText}\n\nMöchtest du die Termine trotzdem tauschen?`;
-      if (!confirm(confirmMsg)) {
+      if (!await showConfirm(confirmMsg)) {
         setDraggedId(null);
         return;
       }
@@ -1992,7 +2056,7 @@ export function ScheduleCalendarView({
     e.preventDefault();
     e.stopPropagation();
     if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
-      alert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
+      await showAlert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
     }
     const sourceId = e.dataTransfer.getData('text/plain');
@@ -2014,7 +2078,7 @@ export function ScheduleCalendarView({
         if (conflict) {
           const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
           const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
-          if (!confirm(confirmMsg)) {
+          if (!await showConfirm(confirmMsg)) {
             setDraggedId(null);
             return;
           }
@@ -2041,7 +2105,7 @@ export function ScheduleCalendarView({
           : (sourceOcc.student?.first_name || 'den Schüler');
 
         const confirmMsg = `Möchtest du ${displayName} auf die Position der Pause (${targetOcc.start_time.substring(0, 5)} Uhr) verschieben? \n\nHinweis: Dadurch werden alle nachfolgenden Unterrichtsstunden dieses Tages automatisch lückenlos nach hinten verschoben (Sliding-Modus).`;
-        if (confirm(confirmMsg)) {
+        if (await showConfirm(confirmMsg)) {
           const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
           
           sourceGroupOccs.forEach(go => {
@@ -2091,7 +2155,7 @@ export function ScheduleCalendarView({
         }
       }
 
-      alert('Tausch blockiert: Ein Unterrichtstermin kann nicht mit einer Pause oder einem freien Slot getauscht werden.');
+      await showAlert('Tausch blockiert: Ein Unterrichtstermin kann nicht mit einer Pause oder einem freien Slot getauscht werden.');
       setDraggedId(null);
       return;
     }
@@ -2128,7 +2192,7 @@ export function ScheduleCalendarView({
         if (conflict) {
           const roomName = rooms.find(r => r.id === editOccState.room_id)?.name || 'diesem Raum';
           const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${formattedTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem verschieben/buchen?`;
-          if (!confirm(confirmMsg)) {
+          if (!await showConfirm(confirmMsg)) {
             return;
           }
         }
@@ -2174,35 +2238,39 @@ export function ScheduleCalendarView({
   const handleCancelBreak = async (e: React.MouseEvent, breakOcc: ScheduleOccurrence) => {
     e.stopPropagation();
     
-    const confirmMsg = `Möchtest du diese Pause wirklich löschen? Dadurch werden alle nachfolgenden Termine dieses Tages automatisch lückenlos vorgezogen.`;
-    if (!confirm(confirmMsg)) return;
+    const confirmDelete = await showConfirm("Möchtest du diese Pause wirklich löschen?");
+    if (!confirmDelete) return;
+
+    const confirmSlide = await showConfirm("Sollen alle nachfolgenden Termine dieses Tages lückenlos vorgezogen werden?");
 
     const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
     updatesMap[breakOcc.id] = { status: 'cancelled' };
 
-    const addMins = (t: string, mins: number) => {
-      const [h, m] = t.split(':').map(Number);
-      const total = h * 60 + m + mins;
-      return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}:00`;
-    };
-
-    const sameDayOccs = occurrences.filter(o => 
-      o.date === breakOcc.date && 
-      o.id !== breakOcc.id &&
-      o.student_id !== 'vacant' &&
-      o.status !== 'cancelled' &&
-      o.start_time.localeCompare(breakOcc.start_time) > 0
-    ).sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-    let nextTime = breakOcc.start_time;
-
-    sameDayOccs.forEach(occ => {
-      updatesMap[occ.id] = { 
-        start_time: nextTime, 
-        status: 'pending_reschedule' 
+    if (confirmSlide) {
+      const addMins = (t: string, mins: number) => {
+        const [h, m] = t.split(':').map(Number);
+        const total = h * 60 + m + mins;
+        return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}:00`;
       };
-      nextTime = addMins(nextTime, occ.duration);
-    });
+
+      const sameDayOccs = occurrences.filter(o => 
+        o.date === breakOcc.date && 
+        o.id !== breakOcc.id &&
+        o.student_id !== 'vacant' &&
+        o.status !== 'cancelled' &&
+        o.start_time.localeCompare(breakOcc.start_time) > 0
+      ).sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+      let nextTime = breakOcc.start_time;
+
+      sameDayOccs.forEach(occ => {
+        updatesMap[occ.id] = { 
+          start_time: nextTime, 
+          status: 'pending_reschedule' 
+        };
+        nextTime = addMins(nextTime, occ.duration);
+      });
+    }
 
     await persistMultipleOccurrencesDirectly(updatesMap);
   };
@@ -2786,7 +2854,7 @@ export function ScheduleCalendarView({
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
                         title={isVacant ? displayNames : undefined}
-                        onClick={() => {
+                        onClick={async () => {
                           if (isGroupModeActive) {
                             if (isBreak || isVacant) return;
                             setSelectedForGroup(prev => {
@@ -2799,7 +2867,7 @@ export function ScheduleCalendarView({
                             return;
                           }
                           if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
-                            alert('Dieser Stundenplan ist noch ein Entwurf und wurde noch nicht eingereicht. Zuteilung oder Änderungen sind gesperrt.');
+                            await showAlert('Dieser Stundenplan ist noch ein Entwurf und wurde noch nicht eingereicht. Zuteilung oder Änderungen sind gesperrt.');
                             return;
                           }
                           if (!isBreak) {
@@ -2925,7 +2993,7 @@ export function ScheduleCalendarView({
                                         handleCancelBreak(e, occ);
                                       } else {
                                         if (isGroup) {
-                                          if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                          if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
                                             const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
                                             occurrencesInGroup.forEach(go => {
                                               updatesMap[go.id] = { status: 'cancelled' };
@@ -3019,7 +3087,7 @@ export function ScheduleCalendarView({
                                           handleCancelBreak(e, occ);
                                         } else {
                                           if (isGroup) {
-                                            if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                            if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
                                               const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
                                               occurrencesInGroup.forEach(go => {
                                                 updatesMap[go.id] = { status: 'cancelled' };
@@ -3141,7 +3209,7 @@ export function ScheduleCalendarView({
                                         handleCancelBreak(e, occ);
                                       } else {
                                         if (isGroup) {
-                                          if (confirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                          if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
                                             const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
                                             occurrencesInGroup.forEach(go => {
                                               updatesMap[go.id] = { status: 'cancelled' };
@@ -3513,13 +3581,18 @@ export function ScheduleCalendarView({
                       <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Ende</label>
                       <input 
                         type="time" 
-                        value={endTimeStr} 
+                        value={localEndTime} 
                         onChange={e => {
-                          const newEndMin = timeToMinutes(e.target.value);
-                          const startMin = timeToMinutes(editOccState.start_time);
-                          let diff = newEndMin - startMin;
-                          if (diff < 0) diff = 0;
-                          setEditOccState({ ...editOccState, duration: diff });
+                          const newTime = e.target.value;
+                          setLocalEndTime(newTime);
+                          if (newTime) {
+                            const newEndMin = timeToMinutes(newTime);
+                            const startMin = timeToMinutes(editOccState.start_time);
+                            let diff = newEndMin - startMin;
+                            if (diff >= 0) {
+                              setEditOccState({ ...editOccState, duration: diff });
+                            }
+                          }
                         }} 
                         style={{ 
                           width: '100%', 
@@ -3799,7 +3872,7 @@ export function ScheduleCalendarView({
                                 await loadOccurrences();
                               } catch (err) {
                                 console.error(err);
-                                alert('Fehler beim Zurücksetzen des Termins');
+                                await showAlert('Fehler beim Zurücksetzen des Termins');
                               } finally {
                                 setLoading(false);
                               }
@@ -3883,31 +3956,75 @@ export function ScheduleCalendarView({
                                   </div>
                                   
                                   {!isGoCancelled && !isGoSick && (
-                                    <button
-                                      onClick={async () => {
-                                        if (confirm(`Möchtest du ${go.student?.first_name} ${go.student?.last_name} für diesen Gruppentermin absagen?`)) {
-                                          await persistOccurrenceDirectly(go.id, { status: 'cancelled' });
-                                          setEditOccState(null);
-                                        }
-                                      }}
-                                      title={`${go.student?.first_name} absagen`}
-                                      style={{ 
-                                        background: 'transparent', 
-                                        border: 'none', 
-                                        cursor: 'pointer', 
-                                        color: '#ef4444', 
-                                        padding: '4px', 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center', 
-                                        borderRadius: '50%',
-                                        transition: 'background 0.2s'
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                                    >
-                                      <X size={14} strokeWidth={2.5} />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                      {/* Absagen (Cancel) Button */}
+                                      <button
+                                        onClick={async () => {
+                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${go.student?.last_name} für diesen Gruppentermin absagen?`)) {
+                                            await persistOccurrenceDirectly(go.id, { status: 'cancelled' });
+                                            setEditOccState(null);
+                                          }
+                                        }}
+                                        title="Termin absagen (Schüler fehlt)"
+                                        style={{ 
+                                          background: 'transparent', 
+                                          border: 'none', 
+                                          cursor: 'pointer', 
+                                          color: '#ef4444', 
+                                          padding: '6px', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center', 
+                                          borderRadius: '8px',
+                                          transition: 'background 0.2s'
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <X size={14} strokeWidth={2.5} />
+                                      </button>
+
+                                      {/* Entkoppeln (Decouple) Button */}
+                                      <button
+                                        onClick={async () => {
+                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${go.student?.last_name} wirklich aus dieser Gruppe entkoppeln?`)) {
+                                            const { error } = await supabase.from('schedule_occurrences').delete().eq('id', go.id);
+                                            if (error) {
+                                              await showAlert('Fehler beim Entkoppeln des Schülers: ' + error.message);
+                                            } else {
+                                              if (groupOccs.length === 1) {
+                                                try {
+                                                  await supabase.from('room_bookings')
+                                                    .delete()
+                                                    .eq('booked_by', userId)
+                                                    .eq('date', go.date)
+                                                    .eq('start_time', go.start_time);
+                                                } catch (e) {}
+                                              }
+                                              await loadOccurrences();
+                                              setEditOccState(null);
+                                            }
+                                          }
+                                        }}
+                                        title="Schüler entkoppeln (aus Gruppe entfernen)"
+                                        style={{ 
+                                          background: 'transparent', 
+                                          border: 'none', 
+                                          cursor: 'pointer', 
+                                          color: '#86868b', 
+                                          padding: '6px', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center', 
+                                          borderRadius: '8px',
+                                          transition: 'background 0.2s'
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'}
+                                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                      >
+                                        <Link2Off size={14} strokeWidth={2.2} />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               );
@@ -4338,6 +4455,146 @@ export function ScheduleCalendarView({
           </div>
         </>
       )}
+
+      {dialogConfig && (() => {
+      const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+      return (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes scaleIn {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+            .dialog-btn:hover {
+              opacity: 0.95;
+              transform: translateY(-0.5px);
+            }
+            .dialog-btn:active {
+              transform: translateY(0);
+            }
+          `}</style>
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              padding: '24px 28px',
+              maxWidth: '440px',
+              width: '90%',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: isCampus ? '#e6f4ea' : '#fce8e6',
+                color: isCampus ? '#137333' : '#ea4335',
+                flexShrink: 0
+              }}>
+                <AlertCircle size={20} style={{ color: isCampus ? '#137333' : '#ea4335' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  color: '#1f2937'
+                }}>
+                  {dialogConfig.type === 'confirm' ? 'Bestätigung' : 'Hinweis'}
+                </h3>
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.9rem',
+                  lineHeight: '1.5',
+                  color: '#4b5563',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {dialogConfig.message}
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+              {dialogConfig.type === 'confirm' && (
+                <button
+                  className="dialog-btn"
+                  onClick={() => {
+                    const resolve = dialogConfig.resolve;
+                    setDialogConfig(null);
+                    resolve(false);
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {dialogConfig.cancelLabel || 'Nein'}
+                </button>
+              )}
+              <button
+                className="dialog-btn"
+                onClick={() => {
+                  const resolve = dialogConfig.resolve;
+                  setDialogConfig(null);
+                  resolve(true);
+                }}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: isCampus ? '#137333' : '#ea4335',
+                  color: '#ffffff',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: isCampus ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {dialogConfig.confirmLabel || (dialogConfig.type === 'confirm' ? 'Ja' : 'OK')}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
 
     </div>
   );

@@ -124,6 +124,38 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
 export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
+
+  interface CustomDialogConfig {
+    type: 'confirm' | 'alert';
+    message: string;
+    resolve: (value: boolean) => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }
+  const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig | null>(null);
+
+  const showConfirm = (message: string, confirmLabel = 'Ja', cancelLabel = 'Nein'): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        type: 'confirm',
+        message,
+        resolve,
+        confirmLabel,
+        cancelLabel
+      });
+    });
+  };
+
+  const showAlert = (message: string): Promise<void> => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        type: 'alert',
+        message,
+        resolve: () => resolve(),
+        confirmLabel: 'OK'
+      });
+    });
+  };
   const [boards, setBoards] = useState<DayBoard[]>([]);
   const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<string>('default');
@@ -829,8 +861,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   // Delete a day board and return all its students to the sidebar list
-  const handleDeleteBoard = (boardId: string) => {
-    if (!window.confirm('Möchtest du diesen Unterrichtstag wirklich löschen? Alle zugewiesenen Schüler werden wieder freigegeben.')) return;
+  const handleDeleteBoard = async (boardId: string) => {
+    if (!await showConfirm('Möchtest du diesen Unterrichtstag wirklich löschen? Alle zugewiesenen Schüler werden wieder freigegeben.')) return;
     
     const boardToDelete = boards.find(b => b.id === boardId);
     if (!boardToDelete) return;
@@ -885,7 +917,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleResetPreferences = async (studentId: string) => {
-    if (!confirm("Möchtest du die Stundenplan-Präferenzen und das Onboarding für diesen Schüler wirklich zurücksetzen? Der Schüler muss das Onboarding dann erneut durchlaufen.")) {
+    if (!await showConfirm("Möchtest du die Stundenplan-Präferenzen und das Onboarding für diesen Schüler wirklich zurücksetzen? Der Schüler muss das Onboarding dann erneut durchlaufen.")) {
       return;
     }
     try {
@@ -902,11 +934,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const { error: studentErr } = await supabase.from('students').update({ status: 'ausstehend', parent_notes: null }).eq('id', studentId);
       if (studentErr) console.error("Error updating student during reset:", studentErr);
 
-      alert("Onboarding erfolgreich zurückgesetzt.");
+      await showAlert("Onboarding erfolgreich zurückgesetzt.");
       loadInitialData();
     } catch (err) {
       console.error("Error resetting student onboarding:", err);
-      alert("Fehler beim Zurücksetzen.");
+      await showAlert("Fehler beim Zurücksetzen.");
     } finally {
       setLoading(false);
     }
@@ -1107,8 +1139,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
-  const handleResetAllAssignments = () => {
-    if (!window.confirm("Möchtest du wirklich alle zugeteilten Schüler dieses Entwurfs zurücksetzen? Alle Schüler werden wieder in den Schüler-Pool (Offen) gelegt.")) {
+  const handleResetAllAssignments = async () => {
+    if (!await showConfirm("Möchtest du wirklich alle zugeteilten Schüler dieses Entwurfs zurücksetzen? Alle Schüler werden wieder in den Schüler-Pool (Offen) gelegt.")) {
       return;
     }
     setBoards(currentBoards => currentBoards.map(b => {
@@ -1801,16 +1833,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           }));
           const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
           localStorage.setItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`, JSON.stringify(boardDefinitions));
-          alert('Stundenplan erfolgreich aus dem Backup wiederhergestellt!');
+          await showAlert('Stundenplan erfolgreich aus dem Backup wiederhergestellt!');
         } else {
-          alert('Ungültiges Backup-Format.');
+          await showAlert('Ungültiges Backup-Format.');
         }
       } else {
-        alert('Kein Backup in dieser PDF gefunden.');
+        await showAlert('Kein Backup in dieser PDF gefunden.');
       }
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Wiederherstellen der Datei.');
+      await showAlert('Fehler beim Wiederherstellen der Datei.');
     }
     
     e.target.value = '';
@@ -1885,12 +1917,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     syncStudentsWithBoards(initialBoards);
   };
 
-  const handleDeleteDraft = (draftId: string) => {
+  const handleDeleteDraft = async (draftId: string) => {
     if (drafts.length <= 1) {
-      alert('Der letzte verbleibende Entwurf kann nicht gelöscht werden.');
+      await showAlert('Der letzte verbleibende Entwurf kann nicht gelöscht werden.');
       return;
     }
-    if (!confirm('Möchtest du diesen Entwurf wirklich löschen?')) {
+    if (!await showConfirm('Möchtest du diesen Entwurf wirklich löschen?')) {
       return;
     }
     const filtered = drafts.filter(d => d.id !== draftId);
@@ -1914,11 +1946,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     const unassignedCount = students.filter(s => !s.assignedDay).length;
     
     if (unassignedCount > 0) {
-      if (!window.confirm(`Achtung: Es sind noch ${unassignedCount} Schüler nicht auf deine Unterrichtstage verteilt. Möchtest du den Stundenplan trotzdem einloggen und an die Verwaltung senden?`)) {
+      if (!await showConfirm(`Achtung: Es sind noch ${unassignedCount} Schüler nicht auf deine Unterrichtstage verteilt. Möchtest du den Stundenplan trotzdem einloggen und an die Verwaltung senden?`)) {
         return;
       }
     } else {
-      if (!window.confirm('Möchtest du diesen Stundenplan final einloggen und an die Verwaltung senden?')) {
+      if (!await showConfirm('Möchtest du diesen Stundenplan final einloggen und an die Verwaltung senden?')) {
         return;
       }
     }
@@ -2102,7 +2134,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setLastSubmittedTime(`am ${formattedDate}. um ${formattedTime}`);
     } catch (err: any) {
       console.error('Error saving schedule:', err);
-      alert('Fehler beim Speichern: ' + err.message);
+      await showAlert('Fehler beim Speichern: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -3484,11 +3516,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {s.status === 'ausstehend' ? (
                               <button
                                 type="button"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
                                   const inviteLink = window.location.origin + "?onboarding=parent";
                                   navigator.clipboard.writeText(inviteLink);
-                                  alert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
+                                  await showAlert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
                                 }}
                                 style={{ flex: 1, padding: '4px 8px', background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                               >
@@ -3888,6 +3920,146 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           </button>
         </div>
       )}
+
+      {dialogConfig && (() => {
+        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+        return (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              animation: 'fadeIn 0.2s ease-out'
+            }}
+          >
+            <style>{`
+              @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes scaleIn {
+                from { transform: scale(0.95); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+              .dialog-btn:hover {
+                opacity: 0.95;
+                transform: translateY(-0.5px);
+              }
+              .dialog-btn:active {
+                transform: translateY(0);
+              }
+            `}</style>
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '20px',
+                padding: '24px 28px',
+                maxWidth: '440px',
+                width: '90%',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: isCampus ? '#e6f4ea' : '#fce8e6',
+                  color: isCampus ? '#137333' : '#ea4335',
+                  flexShrink: 0
+                }}>
+                  <AlertCircle size={20} style={{ color: isCampus ? '#137333' : '#ea4335' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <h3 style={{
+                    margin: 0,
+                    fontSize: '1.05rem',
+                    fontWeight: 700,
+                    color: '#1f2937'
+                  }}>
+                    {dialogConfig.type === 'confirm' ? 'Bestätigung' : 'Hinweis'}
+                  </h3>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '0.9rem',
+                    lineHeight: '1.5',
+                    color: '#4b5563',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {dialogConfig.message}
+                  </p>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+                {dialogConfig.type === 'confirm' && (
+                  <button
+                    className="dialog-btn"
+                    onClick={() => {
+                      const resolve = dialogConfig.resolve;
+                      setDialogConfig(null);
+                      resolve(false);
+                    }}
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '10px',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {dialogConfig.cancelLabel || 'Nein'}
+                  </button>
+                )}
+                <button
+                  className="dialog-btn"
+                  onClick={() => {
+                    const resolve = dialogConfig.resolve;
+                    setDialogConfig(null);
+                    resolve(true);
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: isCampus ? '#137333' : '#ea4335',
+                    color: '#ffffff',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: isCampus ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {dialogConfig.confirmLabel || (dialogConfig.type === 'confirm' ? 'Ja' : 'OK')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
