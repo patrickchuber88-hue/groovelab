@@ -668,14 +668,20 @@ export function ScheduleCalendarView({
 
   const handleMergeSelectedOccurrences = async () => {
     if (selectedForGroup.length < 2) return;
-    const selectedOccs = occurrences.filter(o => selectedForGroup.includes(o.id));
-    if (selectedOccs.length < 2) return;
+    
+    // Find the target occurrence based on user selection order (first clicked)
+    const targetOccId = selectedForGroup[0];
+    const targetOcc = occurrences.find(o => o.id === targetOccId);
+    if (!targetOcc) return;
 
-    const targetOcc = selectedOccs[0];
     const targetRoomId = targetOcc.schedules?.room_id || null;
 
     const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-    selectedOccs.slice(1).forEach(occ => {
+    
+    // Filter out the target occurrence from the other merged occurrences
+    const otherOccs = occurrences.filter(o => selectedForGroup.includes(o.id) && o.id !== targetOccId);
+
+    otherOccs.forEach(occ => {
       const updatedSchedules = occ.schedules ? {
         ...occ.schedules,
         room_id: targetRoomId,
@@ -2422,6 +2428,21 @@ export function ScheduleCalendarView({
                         mainOcc: occ
                       });
                     }
+                  }
+                });
+
+                // Sort each group's occurrences so that the one that has not been rescheduled from another slot is first,
+                // ensuring the first selected/target student acts as the placeholder/mainOcc.
+                renderedGroups.forEach(group => {
+                  if (group.occurrences.length > 1) {
+                    group.occurrences.sort((a, b) => {
+                      const aMoved = a.original_date && a.original_date !== a.date;
+                      const bMoved = b.original_date && b.original_date !== b.date;
+                      if (aMoved && !bMoved) return 1;
+                      if (!aMoved && bMoved) return -1;
+                      return 0;
+                    });
+                    group.mainOcc = group.occurrences[0];
                   }
                 });
 
