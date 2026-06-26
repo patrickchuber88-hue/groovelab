@@ -2908,7 +2908,7 @@ export function ScheduleCalendarView({
                   );
 
                   const colors = isBreak 
-                    ? { bg: 'rgba(254, 243, 199, 0.5)', border: '#f59e0b', text: '#b45309' } 
+                    ? { bg: '#fff7ed', border: '#f97316', text: '#c2410c' } 
                     : isSick 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : isVacant
@@ -2937,8 +2937,7 @@ export function ScheduleCalendarView({
                       : (isResetPending || (isRescheduled && !(occ.status === 'rescheduled_confirmed' || occ.student_acknowledged)))
                   );
 
-                  const isGroovelab = occ.student?.is_groovelab_active === true || 
-                    (!occ.student?.is_campus_active && localStorage.getItem('groovelab_active_platform') !== 'campus');
+                  const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
 
                   if (isGroup) {
                     if (isWaiting) {
@@ -3053,10 +3052,10 @@ export function ScheduleCalendarView({
                               : isVacant 
                                 ? '1px dashed #10b981' 
                                 : isBreak 
-                                  ? '1px dashed rgba(245, 158, 11, 0.3)' 
+                                  ? '1px dashed #f97316' 
                                   : (isSick || isCancelled)
                                     ? '1px solid rgba(239, 68, 68, 0.15)' 
-                                    : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}22`)),
+                                    : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`)),
                           borderLeft: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : (isRescheduled 
@@ -3064,7 +3063,7 @@ export function ScheduleCalendarView({
                               : isVacant 
                                 ? '3px dashed #10b981' 
                                 : isBreak 
-                                  ? '4px solid #f59e0b' 
+                                  ? '4px solid #f97316' 
                                   : (isSick || isCancelled)
                                     ? '3px solid #ef4444'
                                     : `4px solid ${finalColors.border}`),
@@ -4138,15 +4137,15 @@ export function ScheduleCalendarView({
                                 itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
                                 nameColor = '#ef4444';
                               } else if (isConfirmed) {
-                                itemBg = '#e6f4ea';
-                                itemBorder = '1px solid #137333';
-                                nameColor = '#137333';
-                                subtextColor = '#137333cc';
+                                itemBg = '#e8f0fe';
+                                itemBorder = '1px solid #0b57d0';
+                                nameColor = '#174ea6';
+                                subtextColor = '#174ea6cc';
                               } else {
-                                itemBg = '#fef7e0';
-                                itemBorder = '1px solid #f59e0b';
-                                nameColor = '#b45309';
-                                subtextColor = '#b45309cc';
+                                itemBg = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
+                                itemBorder = '1px solid #0b57d0';
+                                nameColor = '#174ea6';
+                                subtextColor = '#174ea6cc';
                               }
 
                               return (
