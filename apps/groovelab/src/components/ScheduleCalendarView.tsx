@@ -2772,88 +2772,41 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
-                {/* Column Background Layout: White inside terminblock, gray outside */}
-                {(() => {
-                  if (daySchedules.length === 0) {
-                    // No teaching schedule: entire day is outside terminblock (gray)
-                    return (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
-                          background: 'rgba(241, 245, 249, 0.35)',
-                          zIndex: 0,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    );
-                  }
-
-                  // Find earliest start and latest end minutes
-                  let earliestStart = 1440;
-                  let latestEnd = 0;
-                  daySchedules.forEach((s: any) => {
-                    const start = timeToMinutes(s.time_slot);
-                    const end = start + (s.duration || 45);
-                    if (start < earliestStart) earliestStart = start;
-                    if (end > latestEnd) latestEnd = end;
-                  });
-
-                  const topGrayHeight = Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5);
-                  const bottomGrayTop = Math.max(0, (latestEnd - dayBaselineMinutes) * 2.5);
-                  const bottomGrayHeight = Math.max(0, (1440 - latestEnd) * 2.5);
-
+                {/* Default light gray column background */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
+                    background: '#f1f5f9',
+                    zIndex: 0,
+                    pointerEvents: 'none'
+                  }}
+                />
+                {/* White background only for individual regular scheduled blocks */}
+                {daySchedules.map((s: any, sIdx: number) => {
+                  const start = timeToMinutes(s.time_slot);
+                  const duration = s.duration || 45;
+                  const top = (start - dayBaselineMinutes) * 2.5;
+                  const height = duration * 2.5;
                   return (
-                    <>
-                      {/* White background for the entire terminblock area */}
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: `${Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5)}px`,
-                          height: `${Math.max(0, (latestEnd - earliestStart) * 2.5)}px`,
-                          background: '#ffffff',
-                          zIndex: 0,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                      {/* Gray overlay BEFORE the terminblock */}
-                      {topGrayHeight > 0 && (
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            right: 0,
-                            top: 0,
-                            height: `${topGrayHeight}px`,
-                            background: 'rgba(241, 245, 249, 0.35)',
-                            zIndex: 0,
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      )}
-                      {/* Gray overlay AFTER the terminblock */}
-                      {bottomGrayHeight > 0 && (
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            right: 0,
-                            top: `${bottomGrayTop}px`,
-                            height: `${bottomGrayHeight}px`,
-                            background: 'rgba(241, 245, 249, 0.35)',
-                            zIndex: 0,
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      )}
-                    </>
+                    <div 
+                      key={sIdx}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        background: '#ffffff',
+                        zIndex: 0,
+                        pointerEvents: 'none'
+                      }}
+                    />
                   );
-                })()}
+                })}
 
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
