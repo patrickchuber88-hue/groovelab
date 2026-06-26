@@ -2468,150 +2468,151 @@ export function ScheduleCalendarView({
       `}</style>
       
       <div style={{ 
-        background: 'rgba(255, 255, 255, 0.55)', 
-        backdropFilter: 'blur(20px) saturate(190%)', 
-        borderRadius: '20px', 
-        padding: '16px 20px', 
-        border: '1px solid rgba(255, 255, 255, 0.5)', 
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
-        display: 'grid', 
-        gridTemplateColumns: 'auto 1fr auto auto', 
-        alignItems: 'center',
+        background: 'rgba(255, 255, 255, 0.65)', 
+        backdropFilter: 'blur(30px) saturate(210%)', 
+        borderRadius: '24px', 
+        padding: '20px', 
+        border: '1px solid rgba(255, 255, 255, 0.6)', 
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)', 
+        display: 'flex',
+        flexDirection: 'column',
         gap: '16px'
       }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-          <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(22, 163, 74, 0.15)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CalendarIcon size={20} />
-          </div>
-          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                KW {weekNumber}
-              </h2>
-              <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
-              </span>
+        {/* Row 1: Title & Main Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ height: '44px', width: '44px', borderRadius: '14px', background: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CalendarIcon size={22} />
             </div>
-            {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
-                <select
-                  value={selectedTeacherId}
-                  onChange={(e) => setSelectedTeacherId(e.target.value)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.75)',
-                    border: '1px solid rgba(0, 0, 0, 0.08)',
-                    borderRadius: '6px',
-                    padding: '2px 8px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: '#1d1d1f',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.first_name} {t.last_name}
-                    </option>
-                  ))}
-                </select>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '26px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                  KW {weekNumber}
+                </h2>
+                <span style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
+                </span>
               </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.03)', padding: '4px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              🔍 Röntgen-Ansicht:
-            </span>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {activeRooms.map(room => {
-                const isActive = selectedRoomIdForXRay === room.id;
-                return (
-                  <button
-                    key={room.id}
-                    onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+              {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+                  <select
+                    value={selectedTeacherId}
+                    onChange={(e) => setSelectedTeacherId(e.target.value)}
                     style={{
-                      background: isActive 
-                        ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
-                        : 'transparent',
-                      color: isActive ? '#ffffff' : '#64748b',
-                      border: `1px solid ${isActive 
-                        ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
-                        : 'rgba(0,0,0,0.15)'}`,
+                      background: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
                       borderRadius: '8px',
-                      padding: '4px 10px',
+                      padding: '3px 8px',
                       fontSize: '0.72rem',
                       fontWeight: 700,
+                      color: '#1d1d1f',
+                      outline: 'none',
                       cursor: 'pointer',
-                      transition: 'all 0.15s'
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                     }}
                   >
-                    {room.name}
-                  </button>
-                );
-              })}
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.first_name} {t.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Right: Tab switch */}
+          {activeTab && setActiveTab && (
+            <div className="app-segmented-switch" style={{ margin: 0 }}>
+              <button 
+                onClick={() => setActiveTab('calendar')}
+                className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+              >
+                Stundenplan
+              </button>
+              <button 
+                onClick={() => setActiveTab('designer')}
+                className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+              >
+                Stundenplan-Designer
+              </button>
+            </div>
+          )}
         </div>
 
-        {activeTab && setActiveTab && (
-          <div className="app-segmented-switch" style={{ margin: 0 }}>
-            <button 
-              onClick={() => setActiveTab('calendar')}
-              className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-            >
-              Stundenplan
-            </button>
-            <button 
-              onClick={() => setActiveTab('designer')}
-              className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-            >
-              Stundenplan-Designer
-            </button>
-          </div>
-        )}
+        {/* Divider line */}
+        <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsGroupModeActive(prev => !prev);
-              setSelectedForGroup([]);
-            }}
-            style={{
-              background: isGroupModeActive 
-                ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
-                : 'transparent',
-              color: isGroupModeActive ? 'white' : '#64748b',
-              border: `1px solid ${isGroupModeActive 
-                ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
-                : '#cbd5e1'}`,
-              fontWeight: 600,
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              transition: 'all 0.15s'
-            }}
-          >
-            <Users size={13} />
-            {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
-          </button>
-          {isGroupModeActive && selectedForGroup.length >= 2 && (
+        {/* Row 2: Röntgen Filter & Utilities */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
+          {/* Left: Röntgen selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.04)' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                🔍 Röntgen-Ansicht:
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {activeRooms.map(room => {
+                  const isActive = selectedRoomIdForXRay === room.id;
+                  return (
+                    <button
+                      key={room.id}
+                      onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                      style={{
+                        background: isActive 
+                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                          : '#ffffff',
+                        color: isActive ? '#ffffff' : '#475569',
+                        border: `1px solid ${isActive 
+                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                          : 'rgba(0,0,0,0.08)'}`,
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.12s',
+                        boxShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      {room.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {Object.keys(pendingChanges).length > 0 && (
+              <button 
+                onClick={savePendingChanges}
+                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)' }}
+                onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+                onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
+              >
+                Änderungen speichern ({Object.keys(pendingChanges).length})
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleMergeSelectedOccurrences}
+              onClick={() => {
+                setIsGroupModeActive(prev => !prev);
+                setSelectedForGroup([]);
+              }}
               style={{
-                background: localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335',
-                color: 'white',
-                border: 'none',
-                fontWeight: 650,
+                background: isGroupModeActive 
+                  ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
+                  : 'transparent',
+                color: isGroupModeActive ? 'white' : '#64748b',
+                border: `1px solid ${isGroupModeActive 
+                  ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
+                  : '#cbd5e1'}`,
+                fontWeight: 600,
                 padding: '6px 12px',
                 borderRadius: '8px',
                 fontSize: '0.75rem',
@@ -2619,56 +2620,69 @@ export function ScheduleCalendarView({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                transition: 'all 0.15s',
-                boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(19, 115, 51, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
+                transition: 'all 0.15s'
               }}
             >
-              Zusammenführen ({selectedForGroup.length})
+              <Users size={13} />
+              {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
             </button>
-          )}
 
-          <button 
-            onClick={handleResetWeek}
-            style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'}
-            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-            title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
-          >
-            Woche zurücksetzen
-          </button>
-          
+            {isGroupModeActive && selectedForGroup.length >= 2 && (
+              <button
+                type="button"
+                onClick={handleMergeSelectedOccurrences}
+                style={{
+                  background: localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 650,
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s',
+                  boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(19, 115, 51, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
+                }}
+              >
+                Zusammenführen ({selectedForGroup.length})
+              </button>
+            )}
 
-          {Object.keys(pendingChanges).length > 0 && (
             <button 
-              onClick={savePendingChanges}
-              style={{ background: '#16a34a', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)' }}
-              onMouseOver={e => e.currentTarget.style.background = '#15803d'}
-              onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
+              onClick={handleResetWeek}
+              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
             >
-              Änderungen speichern ({Object.keys(pendingChanges).length})
+              Woche zurücksetzen
             </button>
-          )}
-          <button 
-            onClick={jumpToToday}
-            style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'}
-            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-          >
-            Heute
-          </button>
-          
-          <button 
-            onClick={jumpToMonthStart}
-            style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.2)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.05)'}
-            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-          >
-            Zum Monatsanfang
-          </button>
-          
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.7)', borderRadius: '10px', padding: '4px', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '6px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f' }}><ChevronLeft size={18} /></button>
-            <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '6px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f' }}><ChevronRight size={18} /></button>
+
+            <button 
+              onClick={jumpToToday}
+              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              Heute
+            </button>
+            
+            <button 
+              onClick={jumpToMonthStart}
+              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.04)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              Zum Monatsanfang
+            </button>
+            
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', padding: '3px', border: '1px solid rgba(0,0,0,0.04)' }}>
+              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={16} /></button>
+              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={16} /></button>
+            </div>
           </div>
         </div>
       </div>
