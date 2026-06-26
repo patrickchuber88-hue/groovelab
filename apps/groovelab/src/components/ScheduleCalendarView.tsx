@@ -138,6 +138,13 @@ export function ScheduleCalendarView({
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
 
   const [localEndTime, setLocalEndTime] = useState<string>('');
+  const [hoveredTooltip, setHoveredTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
+
 
   useEffect(() => {
     if (editOccState) {
@@ -896,24 +903,6 @@ export function ScheduleCalendarView({
             insertData.student_id = null;
           }
 
-          try {
-            const { data: schData } = await supabase
-              .from('schedules')
-              .select('id')
-              .eq('student_id', change.student_id || null)
-              .eq('teacher_id', userId)
-              .limit(1);
-            
-            if (schData && schData.length > 0) {
-              insertData.schedule_id = schData[0].id;
-            } else {
-              insertData.schedule_id = undefined;
-            }
-          } catch (schErr) {
-            console.warn('Error fetching schedule_id for mock insert:', schErr);
-            insertData.schedule_id = undefined;
-          }
-          
           const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
           
@@ -925,8 +914,54 @@ export function ScheduleCalendarView({
           insertData.original_date = origDateStr;
           insertData.status = finalStatus;
           
-          const { error } = await supabase.from('schedule_occurrences').insert(insertData);
-          if (error) throw error;
+          if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
+            const groupInserts = [];
+            for (const gs of groupOccurrences) {
+              let scheduleId = undefined;
+              try {
+                const { data: schData } = await supabase
+                  .from('schedules')
+                  .select('id')
+                  .eq('student_id', gs.id)
+                  .eq('teacher_id', userId)
+                  .limit(1);
+                if (schData && schData.length > 0) {
+                  scheduleId = schData[0].id;
+                }
+              } catch (e) {}
+              
+              groupInserts.push({
+                ...insertData,
+                student_id: gs.id,
+                schedule_id: scheduleId,
+                duration: gs.duration || insertData.duration
+              });
+            }
+            
+            const { error } = await supabase.from('schedule_occurrences').insert(groupInserts);
+            if (error) throw error;
+          } else {
+            try {
+              const { data: schData } = await supabase
+                .from('schedules')
+                .select('id')
+                .eq('student_id', change.student_id || null)
+                .eq('teacher_id', userId)
+                .limit(1);
+              
+              if (schData && schData.length > 0) {
+                insertData.schedule_id = schData[0].id;
+              } else {
+                insertData.schedule_id = undefined;
+              }
+            } catch (schErr) {
+              console.warn('Error fetching schedule_id for mock insert:', schErr);
+              insertData.schedule_id = undefined;
+            }
+            
+            const { error } = await supabase.from('schedule_occurrences').insert(insertData);
+            if (error) throw error;
+          }
         } else {
           const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
@@ -1515,8 +1550,17 @@ export function ScheduleCalendarView({
                 });
               }
             } else {
-              // Check if a saved database record already covers this student in this week range
-              const dbRecord = fetchedData.find(o => o.student_id === student.id);
+              // Check if a saved database record already covers this student (or any of the group students) in this week range
+              let dbRecord;
+              if (student.isGroup && student.groupStudents) {
+                dbRecord = fetchedData.find(o => 
+                  student.groupStudents.some((gs: any) => gs.id === o.student_id) &&
+                  o.date === dateStr &&
+                  o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5)
+                );
+              } else {
+                dbRecord = fetchedData.find(o => o.student_id === student.id);
+              }
               
               // If there is no DB record, OR if the DB record has been rescheduled/moved away from this template day/time
               const isRescheduledAway = dbRecord && (dbRecord.date !== dateStr || (dbRecord.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5));
@@ -1558,6 +1602,8 @@ export function ScheduleCalendarView({
                     start_time: formattedTime,
                     duration: student.duration,
                     status: 'scheduled',
+                    isGroupBlock: student.isGroup || false,
+                    groupOccurrences: student.groupStudents || [],
                     student: { 
                       first_name: student.first_name || 'Pause', 
                       last_name: student.last_name || '', 
@@ -2296,6 +2342,16 @@ export function ScheduleCalendarView({
     return h * 60 + m;
   };
 
+  const onMouseEnterHelper = (e: React.MouseEvent, isResetPending: boolean, occ: any) => {
+    e.stopPropagation();
+    setHoveredTooltip({
+      text: isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)"),
+      x: e.clientX,
+      y: e.clientY,
+      visible: true
+    });
+  };
+
   const nonCancelledOccurrences = occurrences.filter(o => o.status !== 'cancelled');
   const weekMinMinutes = nonCancelledOccurrences.length > 0
     ? nonCancelledOccurrences.reduce((min, o) => {
@@ -2306,6 +2362,16 @@ export function ScheduleCalendarView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+      <style>{`
+        @keyframes pulse-yellow {
+          0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+          70% { transform: scale(1.2); opacity: 0.8; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+          100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .pulse-yellow-indicator {
+          animation: pulse-yellow 2s infinite;
+        }
+      `}</style>
       
       <div style={{ 
         background: 'rgba(255, 255, 255, 0.55)', 
@@ -2569,6 +2635,20 @@ export function ScheduleCalendarView({
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
+          
+          const dayOfWeek = dayDate.getDay() || 7;
+          const daySchedules = cachedWeekSchedules.filter((s: any) => s.day_of_week === dayOfWeek);
+          let regMin = Infinity;
+          let regMax = -Infinity;
+          daySchedules.forEach(s => {
+            const start = timeToMinutes(s.time_slot);
+            const duration = s.duration || 45;
+            const end = start + duration;
+            if (start < regMin) regMin = start;
+            if (end > regMax) regMax = end;
+          });
+          const hasRegularBlock = regMin !== Infinity;
+
           const dayOccurrences = occurrences
             .filter(o => o.date === dateStr)
             .sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -2620,6 +2700,15 @@ export function ScheduleCalendarView({
               return timeToMinutes(occ.start_time);
             });
             dayBaselineMinutes = Math.min(...origStarts);
+          }
+
+          // Ensure baseline is not after the earliest actual occurrence start time of the day
+          const actualStarts = dayOccurrences.map(o => timeToMinutes(o.start_time));
+          if (actualStarts.length > 0) {
+            const minActualStart = Math.min(...actualStarts);
+            if (dayBaselineMinutes > minActualStart) {
+              dayBaselineMinutes = minActualStart;
+            }
           }
           
           const columnHeight = (1440 - dayBaselineMinutes) * 2.5;
@@ -2683,6 +2772,68 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
+                {/* Outside regular hours background highlight */}
+                {hasRegularBlock ? (
+                  <>
+                    {regMin > dayBaselineMinutes && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          height: `${(regMin - dayBaselineMinutes) * 2.5}px`,
+                          background: 'rgba(241, 245, 249, 0.35)',
+                          zIndex: 0,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    )}
+                    {regMax > regMin && (
+                      <>
+                        {/* Regular teaching hours white background */}
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: `${(regMin - dayBaselineMinutes) * 2.5}px`,
+                            height: `${(regMax - regMin) * 2.5}px`,
+                            background: '#ffffff',
+                            zIndex: 0,
+                            pointerEvents: 'none'
+                          }}
+                        />
+                        {/* Outside regular hours below block */}
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: `${(regMax - dayBaselineMinutes) * 2.5}px`,
+                            height: `${(1440 - regMax) * 2.5}px`,
+                            background: 'rgba(241, 245, 249, 0.35)',
+                            zIndex: 0,
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
+                      background: 'rgba(241, 245, 249, 0.35)',
+                      zIndex: 0,
+                      pointerEvents: 'none'
+                    }}
+                  />
+                )}
 
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
@@ -2807,35 +2958,42 @@ export function ScheduleCalendarView({
                     occ.date === occ.original_date &&
                     occ.student_acknowledged === false;
  
+                  const isWaiting = !isBreak && !isVacant && !isSick && (
+                    isGroup 
+                      ? occurrencesInGroup.some(o => o.student_acknowledged === false)
+                      : (isResetPending || (isRescheduled && !(occ.status === 'rescheduled_confirmed' || occ.student_acknowledged)))
+                  );
+
                   if (isRescheduled) {
-                    cardBackground = 'rgba(253, 224, 71, 0.35)';
-                    finalColors.border = '#facc15';
-                    finalColors.text = '#713f12';
+                    if (isWaiting) {
+                      cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #fef9c3 8px, #fef9c3 16px)';
+                      finalColors.border = '#eab308';
+                      finalColors.text = '#713f12';
+                    } else {
+                      cardBackground = 'rgba(253, 224, 71, 0.35)';
+                      finalColors.border = '#facc15';
+                      finalColors.text = '#713f12';
+                    }
                   } else if (isResetPending) {
-                    cardBackground = '#fef9c3';
+                    cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #fef9c3 8px, #fef9c3 16px)';
                     finalColors.border = '#eab308';
                     finalColors.text = '#713f12';
                   }
 
                   if (isGroup) {
-                    const anyUnacknowledged = occurrencesInGroup.some(o => o.student_acknowledged === false);
-                    if (anyUnacknowledged) {
-                      cardBackground = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
-                      finalColors.border = '#eab308';
-                      finalColors.text = '#713f12';
+                    if (isWaiting) {
+                      cardBackground = 'repeating-linear-gradient(-45deg, #f4f8ff 0px, #f4f8ff 8px, #e8f0fe 8px, #e8f0fe 16px)';
+                      finalColors.border = '#0b57d0';
+                      finalColors.text = '#174ea6';
                     } else {
-                      cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
-                      finalColors.border = '#10b981';
-                      finalColors.text = '#065f46';
+                      cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
+                      finalColors.border = '#0b57d0';
+                      finalColors.text = '#174ea6';
                     }
                   }
  
                   const occStartMinutes = timeToMinutes(occ.start_time);
-                  const gapMinutes = occStartMinutes - lastEndTimeMinutes;
-                  const itemSpacerHeight = gapMinutes > 0 ? (gapMinutes * 2.5 - 8) : 0;
-                  
-                  // Update lastEndTimeMinutes
-                  lastEndTimeMinutes = occStartMinutes + (occ.duration || 30);
+                  const topPx = (occStartMinutes - dayBaselineMinutes) * 2.5;
                   
                   const displayNames = isGroup 
                     ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(', ')
@@ -2843,9 +3001,6 @@ export function ScheduleCalendarView({
 
                   return (
                     <React.Fragment key={group.key}>
-                      {itemSpacerHeight > 0 && (
-                        <div style={{ height: `${itemSpacerHeight}px`, flexShrink: 0 }} />
-                      )}
                       <div 
                         id={`occ-${occ.id}`}
                         draggable={!( (currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule ) && !isBreak && !isVacant}
@@ -2853,7 +3008,30 @@ export function ScheduleCalendarView({
                         onDragEnd={handleDragEnd}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
-                        title={isVacant ? displayNames : undefined}
+                        onMouseEnter={(e) => {
+                          const text = isGroup 
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join('\n')
+                            : (isBreak ? undefined : displayNames);
+                          if (text) {
+                            setHoveredTooltip({
+                              text,
+                              x: e.clientX,
+                              y: e.clientY,
+                              visible: true
+                            });
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          const text = isGroup 
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join('\n')
+                            : (isBreak ? undefined : displayNames);
+                          if (text) {
+                            setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredTooltip(null);
+                        }}
                         onClick={async () => {
                           if (isGroupModeActive) {
                             if (isBreak || isVacant) return;
@@ -2890,14 +3068,14 @@ export function ScheduleCalendarView({
                           border: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? `2px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : (isRescheduled 
-                              ? `1px solid ${finalColors.border}` 
+                              ? (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`) 
                               : isVacant 
                                 ? '1px dashed #10b981' 
                                 : isBreak 
                                   ? '1px dashed rgba(245, 158, 11, 0.3)' 
                                   : (isSick || isCancelled)
                                     ? '1px solid rgba(239, 68, 68, 0.15)' 
-                                    : `1px solid ${finalColors.border}22`),
+                                    : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}22`)),
                           borderLeft: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : (isRescheduled 
@@ -2913,7 +3091,10 @@ export function ScheduleCalendarView({
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
                           cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                           opacity: draggedId === occ.id ? 0.5 : 1,
-                          position: 'relative',
+                          position: 'absolute',
+                          top: `${topPx}px`,
+                          left: '8px',
+                          right: '8px',
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? `0 0 10px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
@@ -2971,7 +3152,18 @@ export function ScheduleCalendarView({
 
                                   {(isRescheduled || isResetPending) && (
                                     <span 
-                                      title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
+                                      className={isWaiting ? 'pulse-yellow-indicator' : ''}
+                                      onMouseEnter={(e) => {
+                                        onMouseEnterHelper(e, isResetPending, occ);
+                                      }}
+                                      onMouseMove={(e) => {
+                                        e.stopPropagation();
+                                        setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.stopPropagation();
+                                        setHoveredTooltip(null);
+                                      }}
                                       style={{ 
                                         width: '6px', 
                                         height: '6px', 
@@ -3065,17 +3257,28 @@ export function ScheduleCalendarView({
                                       </span>
                                     )}
                                     {(isRescheduled || isResetPending) && (
-                                      <span 
-                                        title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
-                                        style={{ 
-                                          width: '7px', 
-                                          height: '7px', 
-                                          borderRadius: '50%', 
-                                          background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
-                                          boxShadow: 'none',
-                                          display: 'inline-block' 
-                                        }} 
-                                      />
+                                     <span 
+                                       className={isWaiting ? 'pulse-yellow-indicator' : ''}
+                                       onMouseEnter={(e) => {
+                                         onMouseEnterHelper(e, isResetPending, occ);
+                                       }}
+                                       onMouseMove={(e) => {
+                                         e.stopPropagation();
+                                         setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                       }}
+                                       onMouseLeave={(e) => {
+                                         e.stopPropagation();
+                                         setHoveredTooltip(null);
+                                       }}
+                                       style={{ 
+                                         width: '8px', 
+                                         height: '8px', 
+                                         borderRadius: '50%', 
+                                         background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                         boxShadow: 'none',
+                                         display: 'inline-block' 
+                                       }} 
+                                     />
                                     )}
                                   </div>
                                   
@@ -3188,7 +3391,18 @@ export function ScheduleCalendarView({
                                   )}
                                   {(isRescheduled || isResetPending) && (
                                     <span 
-                                      title={isResetPending ? "Wartet auf Schüler-Bestätigung" : (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged ? "Termin verschoben und bestätigt" : "Termin verschoben (ausstehend)")}
+                                      className={isWaiting ? 'pulse-yellow-indicator' : ''}
+                                      onMouseEnter={(e) => {
+                                        onMouseEnterHelper(e, isResetPending, occ);
+                                      }}
+                                      onMouseMove={(e) => {
+                                        e.stopPropagation();
+                                        setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.stopPropagation();
+                                        setHoveredTooltip(null);
+                                      }}
                                       style={{ 
                                         width: '8px', 
                                         height: '8px', 
@@ -3925,12 +4139,35 @@ export function ScheduleCalendarView({
                       {isGroupOcc && (
                         <div style={{ width: '280px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                           <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            👥 Schüler in dieser Gruppe
+                            👥 {groupOccs.length} Schüler in dieser Gruppe
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px', paddingRight: '4px' }}>
                             {groupOccs.map(go => {
                               const isGoCancelled = go.status === 'cancelled';
                               const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
+                              const isConfirmed = go.student_acknowledged === true;
+
+                              let itemBg = 'rgba(0, 0, 0, 0.02)';
+                              let itemBorder = '1px solid rgba(0, 0, 0, 0.05)';
+                              let nameColor = '#1d1d1f';
+                              let subtextColor = '#86868b';
+
+                              if (isGoCancelled || isGoSick) {
+                                itemBg = 'rgba(239, 68, 68, 0.05)';
+                                itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
+                                nameColor = '#ef4444';
+                              } else if (isConfirmed) {
+                                itemBg = '#e6f4ea';
+                                itemBorder = '1px solid #137333';
+                                nameColor = '#137333';
+                                subtextColor = '#137333cc';
+                              } else {
+                                itemBg = '#fef7e0';
+                                itemBorder = '1px solid #f59e0b';
+                                nameColor = '#b45309';
+                                subtextColor = '#b45309cc';
+                              }
+
                               return (
                                 <div key={go.id} style={{ 
                                   display: 'flex', 
@@ -3938,19 +4175,19 @@ export function ScheduleCalendarView({
                                   alignItems: 'center', 
                                   padding: '10px 14px', 
                                   borderRadius: '10px', 
-                                  background: isGoCancelled || isGoSick ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                                  border: isGoCancelled || isGoSick ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)'
+                                  background: itemBg,
+                                  border: itemBorder
                                 }}>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ 
                                       fontSize: '0.88rem', 
                                       fontWeight: 700, 
-                                      color: isGoCancelled || isGoSick ? '#ef4444' : '#1d1d1f',
+                                      color: nameColor,
                                       textDecoration: isGoCancelled ? 'line-through' : 'none' 
                                     }}>
                                       {go.student?.first_name} {go.student?.last_name}
                                     </span>
-                                    <span style={{ fontSize: '0.72rem', color: '#86868b', marginTop: '2px' }}>
+                                    <span style={{ fontSize: '0.72rem', color: subtextColor, marginTop: '2px' }}>
                                       {go.student?.instrument || 'Kein Instrument'} • {go.duration || 30} Min
                                     </span>
                                   </div>
@@ -3965,7 +4202,20 @@ export function ScheduleCalendarView({
                                             setEditOccState(null);
                                           }
                                         }}
-                                        title="Termin absagen (Schüler fehlt)"
+                                        onMouseEnter={(e) => {
+                                          setHoveredTooltip({
+                                            text: "Termin absagen (Schüler fehlt)",
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            visible: true
+                                          });
+                                        }}
+                                        onMouseMove={(e) => {
+                                          setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                        }}
+                                        onMouseLeave={() => {
+                                          setHoveredTooltip(null);
+                                        }}
                                         style={{ 
                                           background: 'transparent', 
                                           border: 'none', 
@@ -4006,7 +4256,20 @@ export function ScheduleCalendarView({
                                             }
                                           }
                                         }}
-                                        title="Schüler entkoppeln (aus Gruppe entfernen)"
+                                        onMouseEnter={(e) => {
+                                          setHoveredTooltip({
+                                            text: "Schüler entkoppeln (aus Gruppe entfernen)",
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            visible: true
+                                          });
+                                        }}
+                                        onMouseMove={(e) => {
+                                          setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                        }}
+                                        onMouseLeave={() => {
+                                          setHoveredTooltip(null);
+                                        }}
                                         style={{ 
                                           background: 'transparent', 
                                           border: 'none', 
@@ -4592,6 +4855,42 @@ export function ScheduleCalendarView({
               </button>
             </div>
           </div>
+        </div>
+      );
+    })()}
+
+    {hoveredTooltip && hoveredTooltip.visible && (() => {
+      let left = hoveredTooltip.x + 12;
+      let top = hoveredTooltip.y + 12;
+      if (typeof window !== 'undefined') {
+        const tooltipEstimatedWidth = 200;
+        const tooltipEstimatedHeight = 120;
+        if (left + tooltipEstimatedWidth > window.innerWidth) {
+          left = Math.max(8, hoveredTooltip.x - tooltipEstimatedWidth - 12);
+        }
+        if (top + tooltipEstimatedHeight > window.innerHeight) {
+          top = Math.max(8, hoveredTooltip.y - tooltipEstimatedHeight - 12);
+        }
+      }
+      return (
+        <div style={{
+          position: 'fixed',
+          left: `${left}px`,
+          top: `${top}px`,
+          background: '#1d1d1f',
+          color: '#ffffff',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          fontSize: '0.8rem',
+          zIndex: 99999,
+          pointerEvents: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          whiteSpace: 'pre-line',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto',
+          fontWeight: 500,
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          {hoveredTooltip.text}
         </div>
       );
     })()}

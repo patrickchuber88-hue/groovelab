@@ -362,6 +362,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [onboardDpaAccepted, setOnboardDpaAccepted] = useState(false);
   const [onboardCreatedUser, setOnboardCreatedUser] = useState<any>(null);
   const [onboardIPAddress, setOnboardIPAddress] = useState('unknown');
+  const [loginConsentAccepted, setLoginConsentAccepted] = useState(false);
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk' | 'parentOnboarding'>(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
@@ -1905,6 +1906,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const handlePinLogin = async (pin: string) => {
     if (!pin.trim() || loading) return;
+    if (!loginConsentAccepted) {
+      alert("Bitte bestätige die Datenschutzerklärung vor dem Login.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -3453,43 +3458,57 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <User size={14} style={{ color: '#a7f3d0' }} /> Manueller Zugang über PIN / QR-Token
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text"
-            value={pinInput}
-            onChange={(e) => setPinInput(e.target.value)}
-            placeholder="Ausweis ID..."
-            style={{
-              flex: 1,
-              padding: '14px 18px',
-              borderRadius: '16px',
-              border: '1.5px solid rgba(255, 255, 255, 0.15)',
-              fontSize: '14px',
-              fontWeight: 700,
-              outline: 'none',
-              transition: 'all 0.2s',
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: '#ffffff'
-            }}
-          />
-          <button
-            type="submit"
-            disabled={loading || !pinInput.trim()}
-            style={{
-              padding: '14px 24px',
-              borderRadius: '16px',
-              border: 'none',
-              background: schoolData?.primary_color || '#a7f3d0',
-              color: schoolData?.primary_color ? '#ffffff' : '#062413',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              opacity: !pinInput.trim() ? 0.6 : 1
-            }}
-          >
-            Login
-          </button>
+        <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input
+              type="text"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder="Ausweis ID..."
+              style={{
+                flex: 1,
+                padding: '14px 18px',
+                borderRadius: '16px',
+                border: '1.5px solid rgba(255, 255, 255, 0.15)',
+                fontSize: '14px',
+                fontWeight: 700,
+                outline: 'none',
+                transition: 'all 0.2s',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#ffffff'
+              }}
+            />
+            <button
+              type="submit"
+              disabled={loading || !pinInput.trim()}
+              style={{
+                padding: '14px 24px',
+                borderRadius: '16px',
+                border: 'none',
+                background: schoolData?.primary_color || '#a7f3d0',
+                color: schoolData?.primary_color ? '#ffffff' : '#062413',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: !pinInput.trim() ? 0.6 : 1
+              }}
+            >
+              Login
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
+            <input 
+              type="checkbox" 
+              id="login-consent-checkbox" 
+              checked={loginConsentAccepted} 
+              onChange={(e) => setLoginConsentAccepted(e.target.checked)} 
+              style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+            />
+            <label htmlFor="login-consent-checkbox" style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)', textAlign: 'left', cursor: 'pointer', lineHeight: '1.4' }}>
+              Ich bin mit der <span style={{ textDecoration: 'underline', color: '#a7f3d0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); alert("Unsere Datenschutzerklärung finden Sie unter der Datenschutz-Schaltfläche im Hauptmenü."); }}>Datenschutzerklärung</span> einverstanden.
+            </label>
+          </div>
         </form>
         <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
           Zurück

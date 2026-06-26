@@ -1581,6 +1581,105 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleMouseOver = (e: MouseEvent) => {
+      let target = e.target as HTMLElement | null;
+      while (target && target !== document.body) {
+        const tagName = target.tagName?.toLowerCase();
+        const isButton = tagName === 'button' || target.getAttribute('role') === 'button' || target.style.cursor === 'pointer' || tagName === 'a';
+        if (isButton && !target.hasAttribute('title')) {
+          const text = target.innerText?.trim();
+          const ariaLabel = target.getAttribute('aria-label');
+          const desc = ariaLabel || text;
+
+          let tooltip = '';
+          if (desc) {
+            const descLower = desc.toLowerCase();
+            if (descLower.includes('speichern') || descLower.includes('save')) {
+              tooltip = 'Änderungen speichern und sichern';
+            } else if (descLower.includes('abbrechen') || descLower.includes('cancel')) {
+              tooltip = 'Vorgang abbrechen und Änderungen verwerfen';
+            } else if (descLower.includes('schließen') || descLower.includes('close') || descLower === 'x') {
+              tooltip = 'Dieses Fenster schließen';
+            } else if (descLower.includes('löschen') || descLower.includes('delete') || descLower.includes('entfernen')) {
+              tooltip = 'Diesen Eintrag unwiderruflich löschen';
+            } else if (descLower.includes('bearbeiten') || descLower.includes('edit')) {
+              tooltip = 'Diesen Eintrag bearbeiten';
+            } else if (descLower.includes('hinzufügen') || descLower.includes('neu') || descLower === '+') {
+              tooltip = 'Einen neuen Eintrag hinzufügen';
+            } else if (descLower.includes('abmelden') || descLower.includes('logout') || descLower.includes('ausloggen')) {
+              tooltip = 'Sicher vom System abmelden';
+            } else if (descLower.includes('profil')) {
+              tooltip = 'Benutzerprofil anzeigen und bearbeiten';
+            } else if (descLower.includes('einstellungen') || descLower.includes('settings')) {
+              tooltip = 'Systemeinstellungen öffnen';
+            } else if (descLower.includes('aktualisieren') || descLower.includes('refresh') || descLower.includes('neu laden')) {
+              tooltip = 'Daten neu laden und aktualisieren';
+            } else if (descLower.includes('suchen') || descLower.includes('search')) {
+              tooltip = 'Suche ausführen';
+            } else if (descLower.includes('stundenplan einreichen') || descLower.includes('einreichen')) {
+              tooltip = 'Diesen Stundenplan offiziell zur Prüfung einreichen';
+            } else if (descLower.includes('krankmelden') || descLower.includes('krank')) {
+              tooltip = 'Als krank melden und Termine für den Zeitraum absagen';
+            } else if (descLower.includes('raumzuteilung') || descLower.includes('raum')) {
+              tooltip = 'Räume für die heutigen Termine zuteilen';
+            } else if (descLower.includes('zurück')) {
+              tooltip = 'Zur vorherigen Ansicht zurückkehren';
+            } else if (descLower.includes('weiter')) {
+              tooltip = 'Zur nächsten Ansicht fortfahren';
+            } else if (descLower.includes('senden') || descLower.includes('abschicken')) {
+              tooltip = 'Nachricht oder Daten absenden';
+            } else if (descLower.includes('chat') || descLower.includes('nachricht')) {
+              tooltip = 'Chat-Nachrichten anzeigen';
+            } else if (descLower.includes('bestätigen') || descLower.includes('freigeben') || descLower.includes('akzeptieren')) {
+              tooltip = 'Aktion bestätigen und freigeben';
+            }
+          }
+
+          if (!tooltip) {
+            const svg = target.querySelector('svg');
+            if (svg) {
+              if (svg.classList.contains('lucide-trash') || svg.classList.contains('lucide-trash2')) {
+                tooltip = 'Diesen Eintrag löschen';
+              } else if (svg.classList.contains('lucide-pencil') || svg.classList.contains('lucide-edit')) {
+                tooltip = 'Diesen Eintrag bearbeiten';
+              } else if (svg.classList.contains('lucide-plus') || svg.classList.contains('lucide-plus-circle')) {
+                tooltip = 'Einen neuen Eintrag hinzufügen';
+              } else if (svg.classList.contains('lucide-x') || svg.classList.contains('lucide-x-circle')) {
+                tooltip = 'Schließen';
+              } else if (svg.classList.contains('lucide-settings')) {
+                tooltip = 'Einstellungen öffnen';
+              } else if (svg.classList.contains('lucide-chevron-left')) {
+                tooltip = 'Zurück / Vorherige Seite';
+              } else if (svg.classList.contains('lucide-chevron-right')) {
+                tooltip = 'Weiter / Nächste Seite';
+              } else if (svg.classList.contains('lucide-calendar')) {
+                tooltip = 'Kalender öffnen';
+              } else if (svg.classList.contains('lucide-user')) {
+                tooltip = 'Profil anzeigen';
+              } else if (svg.classList.contains('lucide-logout')) {
+                tooltip = 'Abmelden';
+              }
+            }
+          }
+
+          if (!tooltip && desc && desc.length < 50) {
+            tooltip = `${desc} ausführen`;
+          }
+
+          if (tooltip) {
+            target.setAttribute('title', tooltip);
+          }
+        }
+        target = target.parentElement;
+      }
+    };
+
+    document.body.addEventListener('mouseover', handleMouseOver);
+    return () => document.body.removeEventListener('mouseover', handleMouseOver);
+  }, []);
+
   const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
 
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {

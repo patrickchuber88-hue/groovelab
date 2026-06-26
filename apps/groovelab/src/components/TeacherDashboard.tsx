@@ -6917,7 +6917,7 @@ export function TeacherDashboard({
                             let dotComponent = null;
  
                             if (isBreak) {
-                              slotBg = 'rgba(254, 243, 199, 0.4)';
+                              slotBg = '#fffbeb';
                               slotBorder = '1.5px dashed rgba(245, 158, 11, 0.25)';
                               slotBorderLeft = '5px solid #f59e0b';
                               titleColor = '#b45309';
@@ -6953,15 +6953,15 @@ export function TeacherDashboard({
                               );
                             } else if (isCanceled || isRescheduledAway) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #8e8e93';
-                              titleColor = '#8e8e93';
+                              slotBorder = isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2';
+                              slotBorderLeft = isRescheduledAway ? '5px solid #fbbc05' : '5px solid #ef4444';
+                              titleColor = '#a1a1aa';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #8e8e93',
+                                  border: `3px solid ${isRescheduledAway ? '#fbbc05' : '#ef4444'}`,
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -6973,7 +6973,7 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#8e8e93'
+                                    background: isRescheduledAway ? '#fbbc05' : '#ef4444'
                                   }} />
                                 </div>
                               ) : (
@@ -6981,22 +6981,22 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #8e8e93',
+                                  border: `3px solid ${isRescheduledAway ? '#fbbc05' : '#ef4444'}`,
                                   background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else if (isCurrentSlot && !isFinished) {
-                              slotBg = 'linear-gradient(135deg, #e8f0fe 0%, #f4f8ff 100%)';
-                              slotBorder = '1.5px solid #8ab4f8';
-                              slotBorderLeft = '5px solid #1a73e8';
-                              titleColor = '#174ea6';
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #d1fae5';
+                              slotBorderLeft = '5px solid #137333';
+                              titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #1a73e8',
+                                  border: '3px solid #137333',
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -7008,37 +7008,52 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#1a73e8'
+                                    background: '#137333'
                                   }} />
                                 </div>
                               );
                             } else if (isFinished) {
                               slotBg = '#ffffff';
                               slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #cbd5e1';
+                              titleColor = '#94a3b8';
+                              dotComponent = (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #cbd5e1',
+                                  background: '#cbd5e1',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else if (slot.isGroup) {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #e6f4ea';
                               slotBorderLeft = '5px solid #22c55e';
-                              titleColor = '#1e293b';
+                              titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
                                   border: '3px solid #22c55e',
-                                  background: '#22c55e',
+                                  background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else if (isRescheduledConfirmed) {
-                              slotBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                              slotBorder = '1px solid rgba(16, 185, 129, 0.25)';
-                              slotBorderLeft = '5px solid #10b981';
-                              titleColor = '#713f12';
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #d1fae5';
+                              slotBorderLeft = '5px solid #137333';
+                              titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #10b981',
-                                  background: isFinished ? '#10b981' : '#ffffff',
+                                  border: '3px solid #137333',
+                                  background: isFinished ? '#137333' : '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -7048,7 +7063,7 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#10b981'
+                                    background: '#137333'
                                   }} />
                                 </div>
                               ) : (
@@ -7056,16 +7071,16 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #10b981',
-                                  background: isFinished ? '#10b981' : '#ffffff',
+                                  border: '3px solid #137333',
+                                  background: isFinished ? '#137333' : '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else if (isRescheduledPending) {
-                              slotBg = 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)';
-                              slotBorder = '1px dashed rgba(251, 188, 5, 0.25)';
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #fef3c7';
                               slotBorderLeft = '5px solid #fbbc05';
-                              titleColor = '#1e293b';
+                              titleColor = '#8e8e93';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
@@ -7096,10 +7111,10 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isResetPending) {
-                              slotBg = 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)';
-                              slotBorder = '1.5px dashed #fbbc05';
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #fef3c7';
                               slotBorderLeft = '5px solid #fbbc05';
-                              titleColor = '#1e293b';
+                              titleColor = '#8e8e93';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
@@ -7131,10 +7146,45 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isResetAcknowledged) {
-                              slotBg = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
-                              slotBorder = '1.5px solid #22c55e';
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #d1fae5';
+                              slotBorderLeft = '5px solid #137333';
+                              titleColor = '#0f172a';
+                              dotComponent = isCurrentSlot ? (
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #137333',
+                                  background: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
+                                }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#137333'
+                                  }} />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '50%',
+                                  border: '3px solid #137333',
+                                  background: '#137333',
+                                  boxSizing: 'border-box'
+                                }} />
+                              );
+                            } else {
+                              slotBg = '#ffffff';
+                              slotBorder = '1.5px solid #e6f4ea';
                               slotBorderLeft = '5px solid #22c55e';
-                              titleColor = '#14532d';
+                              titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
@@ -7145,8 +7195,7 @@ export function TeacherDashboard({
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxSizing: 'border-box',
-                                  animation: 'pulse 1.5s infinite'
+                                  boxSizing: 'border-box'
                                 }}>
                                   <div style={{
                                     width: '8px',
@@ -7161,40 +7210,6 @@ export function TeacherDashboard({
                                   height: '12px',
                                   borderRadius: '50%',
                                   border: '3px solid #22c55e',
-                                  background: '#22c55e',
-                                  boxSizing: 'border-box'
-                                }} />
-                              );
-                            } else {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #0b57d0';
-                              titleColor = '#1e293b';
-                              dotComponent = isCurrentSlot ? (
-                                <div style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #0b57d0',
-                                  background: '#ffffff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxSizing: 'border-box'
-                                }}>
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#0b57d0'
-                                  }} />
-                                </div>
-                              ) : (
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #0b57d0',
                                   background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
@@ -7249,7 +7264,7 @@ export function TeacherDashboard({
                                      borderLeft: slotBorderLeft,
                                      cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                     boxShadow: (idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 1.5px 4px rgba(0, 0, 0, 0.01)',
+                                     boxShadow: (idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)',
                                      minWidth: 0,
                                      opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1
                                    }}
@@ -7356,8 +7371,9 @@ export function TeacherDashboard({
                                                 style={{
                                                   fontSize: '0.72rem',
                                                   fontWeight: 700,
-                                                  background: ack ? '#e6f4ea' : '#fef3c7',
+                                                  background: ack ? '#e6f4ea' : '#fef7e0',
                                                   color: ack ? '#137333' : '#b45309',
+                                                  border: ack ? '1px solid rgba(19, 115, 51, 0.15)' : '1px solid rgba(245, 158, 11, 0.25)',
                                                   padding: '2px 8px',
                                                   borderRadius: '6px',
                                                   display: 'inline-flex',
@@ -7379,21 +7395,20 @@ export function TeacherDashboard({
                                           {isCanceled || isRescheduledAway ? (
                                             <>
                                               {isRescheduledAway ? (() => {
-                                                const matchRem = briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name);
                                                 return (
                                                   <span style={{ 
-                                                    color: '#b45309', 
+                                                    color: '#d97706', 
                                                     fontWeight: 700, 
                                                     fontSize: '0.72rem', 
-                                                    background: 'rgba(251, 188, 5, 0.12)', 
-                                                    padding: '2px 8px', 
+                                                    background: '#fff7ed', 
+                                                    padding: '4px 10px', 
                                                     borderRadius: '6px', 
                                                     marginLeft: 'auto',
                                                     fontFamily: 'Inter',
                                                     letterSpacing: '0.01em',
                                                     flexShrink: 0
                                                   }}>
-                                                    {matchRem ? `Termin: ${matchRem.weekdayShort}. ${matchRem.dateStr}.${matchRem.yearShort}, ${matchRem.time.replace(':', '.')} Uhr` : 'Termin verschoben'}
+                                                    Termin verschoben
                                                   </span>
                                                 );
                                               })() : (

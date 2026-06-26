@@ -23,6 +23,24 @@ import {
   Palmtree
 } from 'lucide-react';
 
+const timeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const minutesToTime = (mins: number): string => {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const getEndTime = (timeSlot: string, durationMin: number = 45): string => {
+  if (!timeSlot) return '';
+  const totalMin = timeToMinutes(timeSlot) + durationMin;
+  return minutesToTime(totalMin);
+};
+
 interface CampusTeacherDashboardProps {
   userId: string;
   onLogout?: () => void;
@@ -532,7 +550,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
     const staticBookings = mappedAllSchedData;
 
-    const dynamicBookings: any[] = [];
+    // Group dynamic bookings by teacher, room, and day of week to filter and merge
+    const dynamicGroups: { [key: string]: any[] } = {};
     (allOccurs || []).forEach(occ => {
       if (occ.teacher_id && approvedTeachers.has(occ.teacher_id)) {
         if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
@@ -560,21 +579,135 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           const roomId = occ.schedules?.room_id || null;
           if (!roomId) return;
 
-          dynamicBookings.push({
-            id: occ.id,
-            room_id: roomId,
-            day_of_week: dayOfWeek,
-            time_slot: occ.start_time.substring(0, 5),
-            student_id: occ.student_id,
-            teacher_id: occ.teacher_id,
-            student: occ.student,
-            teacher: occ.teacher,
-            status: occ.status,
-            is_dynamic_reschedule: true
+          const key = `${occ.teacher_id}-${roomId}-${dayOfWeek}`;
+          if (!dynamicGroups[key]) {
+            dynamicGroups[key] = [];
+          }
+          dynamicGroups[key].push({
+            ...occ,
+            dayOfWeek,
+            roomId
           });
         }
       }
     });
+
+    const dynamicBookings: any[] = [];
+
+    for (const key in dynamicGroups) {
+      const occs = dynamicGroups[key];
+      const firstOcc = occs[0];
+      const teacherId = firstOcc.teacher_id;
+      const roomId = firstOcc.roomId;
+      const dayOfWeek = firstOcc.dayOfWeek;
+
+      // Find regular block for this teacher, room, and day
+      const teacherStatic = staticBookings.filter(
+        s => s.teacher_id === teacherId && s.room_id === roomId && s.day_of_week === dayOfWeek
+      );
+
+      let regMin = Infinity;
+      let regMax = -Infinity;
+      teacherStatic.forEach(s => {
+        const start = timeToMinutes(s.time_slot);
+        const duration = s.duration || 45;
+        const end = start + duration;
+        if (start < regMin) regMin = start;
+        if (end > regMax) regMax = end;
+      });
+
+      const hasRegularBlock = regMin !== Infinity;
+
+      // Collect outside intervals
+      const outsideIntervals: { start: number; end: number; occs: any[] }[] = [];
+
+      occs.forEach(occ => {
+        const occStart = timeToMinutes(occ.start_time);
+        const occDuration = occ.duration || 45;
+        const occEnd = occStart + occDuration;
+
+        if (!hasRegularBlock) {
+          outsideIntervals.push({ start: occStart, end: occEnd, occs: [occ] });
+        } else {
+          // If entirely inside regular hours, skip
+          if (occStart >= regMin && occEnd <= regMax) {
+            return;
+          }
+          // Collect portions outside regular hours
+          if (occStart < regMin) {
+            outsideIntervals.push({
+              start: occStart,
+              end: Math.min(occEnd, regMin),
+              occs: [occ]
+            });
+          }
+          if (occEnd > regMax) {
+            outsideIntervals.push({
+              start: Math.max(occStart, regMax),
+              end: occEnd,
+              occs: [occ]
+            });
+          }
+        }
+      });
+
+      // Merge outside intervals
+      if (outsideIntervals.length > 0) {
+        outsideIntervals.sort((a, b) => a.start - b.start);
+
+        const merged: { start: number; end: number; occs: any[] }[] = [];
+        let current = { ...outsideIntervals[0] };
+
+        for (let i = 1; i < outsideIntervals.length; i++) {
+          const next = outsideIntervals[i];
+          if (next.start <= current.end) {
+            current.end = Math.max(current.end, next.end);
+            current.occs = [...current.occs, ...next.occs];
+          } else {
+            merged.push(current);
+            current = { ...next };
+          }
+        }
+        merged.push(current);
+
+        merged.forEach(interval => {
+          const startStr = minutesToTime(interval.start);
+          const duration = interval.end - interval.start;
+
+          // Collect unique students
+          const uniqueStudentsMap: { [id: string]: any } = {};
+          interval.occs.forEach(o => {
+            if (o.student) {
+              uniqueStudentsMap[o.student.id] = o.student;
+            }
+          });
+          const uniqueStudents = Object.values(uniqueStudentsMap);
+
+          let combinedStudent = null;
+          if (uniqueStudents.length > 0) {
+            combinedStudent = {
+              id: uniqueStudents.map(s => s.id).join(','),
+              first_name: uniqueStudents.map(s => s.first_name).join(', '),
+              last_name: ''
+            };
+          }
+
+          dynamicBookings.push({
+            id: interval.occs.map(o => o.id).join(','),
+            room_id: roomId,
+            day_of_week: dayOfWeek,
+            time_slot: startStr,
+            duration: duration,
+            student_id: combinedStudent ? combinedStudent.id : null,
+            student: combinedStudent,
+            teacher_id: teacherId,
+            teacher: firstOcc.teacher,
+            status: 'rescheduled_confirmed',
+            is_dynamic_reschedule: true
+          });
+        });
+      }
+    }
 
     setRawAllSchoolSchedules([...staticBookings, ...dynamicBookings]);
 
@@ -2127,6 +2260,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   key={student.id}
                   onClick={() => handleViewStudentHistory(student)}
                   className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all duration-200"
+                  style={{ contentVisibility: 'auto', containIntrinsicSize: '0 96px' }}
                 >
                   <div className="h-14 w-14 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700">
                     <img src={student.photo_url || '/avatar_ghost.jpg'} alt="" className="h-full w-full object-cover" />
@@ -2714,9 +2848,18 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                             <tr key={slot} className="border-b border-slate-900/40 hover:bg-slate-900/10">
                               <td className="p-4 font-mono text-xs font-bold text-slate-500 bg-slate-950/30">{slot}</td>
                               {weekDays.map(day => {
-                                const slotBookings = allSchoolSchedules.filter(
-                                  s => s.room_id === selectedRoom.id && s.day_of_week === day && s.time_slot === slot
-                                );
+                                const slotBookings = allSchoolSchedules.filter(s => {
+                                  if (s.room_id !== selectedRoom.id || s.day_of_week !== day) return false;
+                                  
+                                  const slotStart = timeToMinutes(slot);
+                                  const slotEnd = slotStart + 45;
+                                  
+                                  const bookingStart = timeToMinutes(s.time_slot);
+                                  const bookingDuration = s.duration || 45;
+                                  const bookingEnd = bookingStart + bookingDuration;
+                                  
+                                  return bookingStart < slotEnd && bookingEnd > slotStart;
+                                });
 
                                 return (
                                   <td key={`${day}-${slot}`} className="p-2 min-w-[130px] relative">
@@ -2726,8 +2869,23 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                           const isCurrentTeacherBooking = booking && booking.teacher_id === userId;
                                           const isRescheduled = booking.status === 'pending_reschedule' || booking.status === 'rescheduled_confirmed' || booking.is_dynamic_reschedule;
                                           const hasConflict = isRescheduled && slotBookings.length > 1;
+                                          
+                                          const bookingDuration = booking.duration || 45;
+                                          const endTimeStr = getEndTime(booking.time_slot, bookingDuration);
+                                          const bookingTimeDisplay = `${booking.time_slot} - ${endTimeStr}`;
+                                          
+                                          const studentDisplayName = booking.student 
+                                            ? (isCurrentTeacherBooking 
+                                                ? `${booking.student.first_name} ${booking.student.last_name[0] ? booking.student.last_name[0] + '.' : ''}` 
+                                                : 'Besetzt')
+                                            : 'Freie Buchung';
+
+                                          const displayTitle = booking.student 
+                                            ? `${booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : 'Unterricht'}: ${isCurrentTeacherBooking ? `${booking.student.first_name} ${booking.student.last_name}` : 'Besetzt'} (${bookingTimeDisplay}) - Coach: ${booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name}` : 'Unbekannt'}`
+                                            : `Freie Buchung (${bookingTimeDisplay})`;
+
                                           return (
-                                            <div key={booking.id} className={`flex-1 p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
+                                            <div key={booking.id} title={displayTitle} className={`flex-1 p-2.5 rounded-xl border flex flex-col justify-between h-full min-h-[72px] transition duration-200 relative overflow-hidden ${
                                               isRescheduled && isCurrentTeacherBooking
                                                 ? `bg-purple-950/25 ${hasConflict ? 'border-amber-500/80 shadow-md shadow-amber-500/10' : 'border-purple-500/40'} text-purple-200`
                                                 : isRescheduled
@@ -2753,15 +2911,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                                   </div>
                                                 )}
                                                 <p className="text-[10px] font-black uppercase tracking-wider opacity-75">
-                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : (booking.student ? 'Unterricht' : 'Eigennutzung')}
+                                                  {bookingTimeDisplay}
                                                 </p>
                                                 <p className="text-[11px] font-bold truncate mt-0.5 w-full">
-                                                  {booking.student 
-                                                    ? `${booking.student.first_name} ${booking.student.last_name[0]}.` 
-                                                    : 'Freie Buchung'}
+                                                  {studentDisplayName}
                                                 </p>
                                                 <p className="text-[9px] opacity-60 font-semibold mt-1">
-                                                  Coach: {booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name[0]}.` : 'Unbekannt'}
+                                                  {booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : (booking.student ? 'Unterricht' : 'Eigennutzung')}
                                                 </p>
                                               </div>
 

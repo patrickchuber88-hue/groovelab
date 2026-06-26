@@ -3918,7 +3918,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           gap: '4px'
         }}>
           <button
-            onClick={() => setLessonTab('upcoming')}
+            onClick={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setLessonTab('upcoming'));
+              } else {
+                setLessonTab('upcoming');
+              }
+            }}
             style={{
               flex: 1,
               border: 'none',
@@ -3936,7 +3942,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             Kommende
           </button>
           <button
-            onClick={() => setLessonTab('past')}
+            onClick={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setLessonTab('past'));
+              } else {
+                setLessonTab('past');
+              }
+            }}
             style={{
               flex: 1,
               border: 'none',
@@ -5061,7 +5073,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           gap: '4px'
         }}>
           <button
-            onClick={() => setPlanningEventTab('upcoming')}
+            onClick={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setPlanningEventTab('upcoming'));
+              } else {
+                setPlanningEventTab('upcoming');
+              }
+            }}
             style={{
               flex: 1,
               border: 'none',
@@ -5079,7 +5097,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             Aktuelle
           </button>
           <button
-            onClick={() => setPlanningEventTab('past')}
+            onClick={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setPlanningEventTab('past'));
+              } else {
+                setPlanningEventTab('past');
+              }
+            }}
             style={{
               flex: 1,
               border: 'none',

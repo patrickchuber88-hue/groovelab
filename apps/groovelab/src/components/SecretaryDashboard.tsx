@@ -2556,13 +2556,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       setLoading(true);
       fetchPendingBookings();
 
-      // Fetch school settings
-      const { data: schoolData, error: schoolErr } = await supabase
-        .from('schools')
-        .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
-        .eq('id', schoolId)
-        .single();
+      // Parallelized fetch of school settings, users, student contract statuses, pending students, activation days, and schedules
+      const [
+        schoolResult,
+        usersResult,
+        studentsDbResult,
+        pendingStudentsResult,
+        actDaysResult,
+        allSchedsResult
+      ] = await Promise.all([
+        supabase
+          .from('schools')
+          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+          .eq('id', schoolId)
+          .single(),
+        supabase
+          .from('users')
+          .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
+          .eq('school_id', schoolId),
+        supabase
+          .from('students')
+          .select('id, status')
+          .eq('school_id', schoolId),
+        supabase
+          .from('pending_students_decrypted')
+          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+          .eq('school_id', schoolId),
+        supabase
+          .from('activation_days')
+          .select('student_id, day_of_birth'),
+        supabase
+          .from('schedules')
+          .select('status, teacher_id, student_id')
+          .eq('school_id', schoolId)
+      ]);
 
+      const { data: schoolData, error: schoolErr } = schoolResult;
       if (schoolErr) throw schoolErr;
       if (schoolData) {
         setSchoolName(schoolData.name);
@@ -2654,18 +2683,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setPendingUserQuota(schoolData.pending_user_quota);
       }
 
-      const { data: allUsers, error: usersErr } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
-        .eq('school_id', schoolId);
-
+      const { data: allUsers, error: usersErr } = usersResult;
       if (usersErr) throw usersErr;
 
       // Fetch contract statuses for all students
-      const { data: studentsDb } = await supabase
-        .from('students')
-        .select('id, status')
-        .eq('school_id', schoolId);
+      const { data: studentsDb } = studentsDbResult;
 
       const statusMap: Record<string, string> = {};
       studentsDb?.forEach(st => {
@@ -2673,15 +2695,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       });
 
       // Fetch pending students (only in anonymized tables)
-      const { data: pendingStudents } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-        .eq('school_id', schoolId);
+      const { data: pendingStudents } = pendingStudentsResult;
 
       // Fetch activation days for student onboarding verification
-      const { data: actDays } = await supabase
-        .from('activation_days')
-        .select('student_id, day_of_birth');
+      const { data: actDays } = actDaysResult;
 
       const activationDaysMap: Record<string, number> = {};
       if (actDays) {
@@ -2693,10 +2710,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       }
 
       // Fetch all schedules for dynamic student counting
-      const { data: allScheds } = await supabase
-        .from('schedules')
-        .select('status, teacher_id, student_id')
-        .eq('school_id', schoolId);
+      const { data: allScheds } = allSchedsResult;
 
       const teacherStudentMap: Record<string, Set<string>> = {};
       if (allScheds) {
@@ -6062,7 +6076,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         minWidth: '850px',
                         cursor: 'grab',
                         userSelect: 'none',
-                        WebkitUserSelect: 'none'
+                        WebkitUserSelect: 'none',
+                        contentVisibility: 'auto',
+                        containIntrinsicSize: '0 62px'
                       }}
                       className="student-drag-card"
                     >
@@ -11335,7 +11351,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
               {/* ── TOP: KPI HEADER BAR ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }} className="animation-slide-up">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }} className="animation-slide-up">
                 {/* KPI 1: Kranke Lehrkräfte - Red */}
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
@@ -13741,7 +13757,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
                                 transition: 'all 0.25s ease',
                                 minWidth: '850px',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                contentVisibility: 'auto',
+                                containIntrinsicSize: '0 62px'
                               }}
                               className="hover-scale"
                             >
