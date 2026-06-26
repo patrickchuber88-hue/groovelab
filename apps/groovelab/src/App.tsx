@@ -3117,6 +3117,15 @@ function App() {
         }
         if (schoolId) {
           fetchActiveStudentCount(schoolId).catch(err => console.error('Error fetching student count:', err));
+          // Fetch teachers for staff including platform active columns
+          supabase.from('users')
+            .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active, is_observer')
+            .eq('school_id', schoolId)
+            .in('role', ['teacher', 'admin'])
+            .order('first_name')
+            .then(res => {
+              if (res.data) setTeachers(res.data);
+            });
         }
         return;
       }
@@ -3155,7 +3164,7 @@ function App() {
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
-        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active, is_observer').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
@@ -6154,10 +6163,31 @@ function App() {
   };
 
   const getTeacherPresenceList = () => {
-    const teacherSlots = globalPlannedSlots.filter((s: any) => 
-      s.profiles?.role?.toLowerCase() === 'teacher' || 
-      s.profiles?.role?.toLowerCase() === 'admin'
-    );
+    const schoolData = Array.isArray((user as any)?.schools) ? (user as any)?.schools[0] : (user as any)?.schools;
+    const hours = schoolData?.opening_hours || {};
+
+    const dayKeys: { [key: string]: string } = {
+      'Mo': 'monday',
+      'Di': 'tuesday',
+      'Mi': 'wednesday',
+      'Do': 'thursday',
+      'Fr': 'friday',
+      'Sa': 'saturday',
+      'So': 'sunday'
+    };
+
+    const teacherSlots = globalPlannedSlots.filter((s: any) => {
+      const isRoleMatch = s.profiles?.role?.toLowerCase() === 'teacher' || 
+                          s.profiles?.role?.toLowerCase() === 'admin';
+      if (!isRoleMatch) return false;
+
+      const dayKey = dayKeys[s.day];
+      if (!dayKey) return false;
+      const dayHours = hours[dayKey];
+      if (!dayHours || dayHours.active === false) return false;
+
+      return s.time >= dayHours.start && s.time < dayHours.end;
+    });
     
     if (teacherSlots.length === 0) return [];
 
@@ -7034,8 +7064,12 @@ function App() {
               gap: '10px', 
               padding: '16px', 
               borderRadius: '20px', 
-              border: activeStudentTab === 'profile' ? '2.5px solid #22c55e' : '1px solid #e2e8f0', 
-              background: activeStudentTab === 'profile' ? '#f0fdf4' : '#f8fafc',
+              border: activeStudentTab === 'profile'
+                ? (activePlatform === 'campus' ? '2.5px solid #137333' : '2.5px solid #eab308')
+                : '1px solid #e2e8f0', 
+              background: activeStudentTab === 'profile'
+                ? (activePlatform === 'campus' ? '#e6f4ea' : '#fefce8')
+                : '#f8fafc',
               cursor: 'pointer',
               textAlign: 'center',
               transition: 'all 0.2s ease',
@@ -7061,7 +7095,7 @@ function App() {
                   right: -2, 
                   width: '12px', 
                   height: '12px', 
-                  background: '#22c55e', 
+                  background: activePlatform === 'campus' ? '#22c55e' : '#eab308', 
                   borderRadius: '50%', 
                   border: '2px solid white' 
                 }} />
@@ -8051,7 +8085,7 @@ function App() {
                       <button 
                         onClick={() => setShowQR(true)}
                         style={{
-                          background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                          background: 'linear-gradient(135deg, #eab308, #ca8a04)',
                           color: 'white',
                           padding: '4px 12px',
                           borderRadius: '8px',
@@ -8062,7 +8096,7 @@ function App() {
                           gap: '6px',
                           border: 'none',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
+                          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
                         }}
                       >
                         <QrCode size={12} />
@@ -8654,38 +8688,46 @@ function App() {
                           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>Trage deine Präsenzzeiten ein, damit Schüler dich im Lab antreffen.</p>
                         </div>
                         {/* Legend */}
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '3px', 
-                              background: (user?.first_name || '').toLowerCase().includes('patrick') ? '#f59e0b' : 'rgba(245, 158, 11, 0.12)', 
-                              border: (user?.first_name || '').toLowerCase().includes('patrick') ? '1px solid #d97706' : '1px dashed rgba(245, 158, 11, 0.5)'
-                            }}></div> Patrick {(user?.first_name || '').toLowerCase().includes('patrick') ? '(Du)' : ''}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '3px', 
-                              background: (user?.first_name || '').toLowerCase().includes('boris') ? '#10b981' : 'rgba(16, 185, 129, 0.12)', 
-                              border: (user?.first_name || '').toLowerCase().includes('boris') ? '1px solid #059669' : '1px dashed rgba(16, 185, 129, 0.5)'
-                            }}></div> Boris {(user?.first_name || '').toLowerCase().includes('boris') ? '(Du)' : ''}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ 
-                              width: '12px', 
-                              height: '12px', 
-                              borderRadius: '3px', 
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)', 
-                              border: '1px solid #cbd5e1'
-                            }}></div> Beide
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
-                          </div>
-                        </div>
+                        {(() => {
+                          const activeTeachers = teachers.filter(t => {
+                            const isActiveOnPlatform = activePlatform === 'campus' ? t.is_campus_active : t.is_groovelab_active;
+                            return isActiveOnPlatform && t.is_observer !== true;
+                          });
+                          return (
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: '#f8fafc', padding: '10px 16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                              {activeTeachers.map(t => {
+                                const isMe = t.id === user?.id;
+                                const name = t.first_name || '';
+                                const theme = getTeacherTheme(name, t.id);
+                                return (
+                                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                    <div style={{ 
+                                      width: '12px', 
+                                      height: '12px', 
+                                      borderRadius: '3px', 
+                                      background: isMe ? theme.solidBg : theme.lightBg, 
+                                      border: isMe ? `1px solid ${theme.solidBorder}` : `1px dashed ${theme.lightBorder}`
+                                    }}></div> {name} {isMe ? '(Du)' : ''}
+                                  </div>
+                                );
+                              })}
+                              {activeTeachers.length > 1 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                  <div style={{ 
+                                    width: '12px', 
+                                    height: '12px', 
+                                    borderRadius: '3px', 
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)', 
+                                    border: '1px solid #cbd5e1'
+                                  }}></div> {activeTeachers.length === 2 ? 'Beide' : 'Mehrere'}
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                        {(() => {

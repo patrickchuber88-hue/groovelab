@@ -1,0 +1,1804 @@
+Fetching ALL schedule_occurrences from DB...
+Occurrences Count: 180
+Occurrences: [
+  {
+    "id": "d9bf8766-4989-4a34-b405-de8f71e3e7df",
+    "student_id": "87f169dc-fb1e-4310-bf47-518d27688aa7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-15",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "71b7ebf4-1b70-483d-99ae-54d116172d06",
+    "student_id": "87f169dc-fb1e-4310-bf47-518d27688aa7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-22",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "754375df-110c-4ff4-9221-ac981149d749",
+    "student_id": "87f169dc-fb1e-4310-bf47-518d27688aa7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-29",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "960bf952-cbfe-406a-815c-fa5d1c682229",
+    "student_id": "1618ea83-6a55-4443-ad9b-c44a71f5ded5",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-15",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "8bf7645c-658e-4fa3-97f1-0f1c1b15aa84",
+    "student_id": "9e7b667c-4bff-4ff5-982c-8423afc4e61d",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "13:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f3da7f48-5a84-495f-8bd7-8f2c28ad9f0b",
+    "student_id": "1618ea83-6a55-4443-ad9b-c44a71f5ded5",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-22",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fff75cd1-0018-4770-9ce2-5a2659a0c6d5",
+    "student_id": "37e59ea1-dbd0-4ec2-97c5-310e3f6b242d",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "14:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c615dac7-ff33-4903-a01d-7fdbade267d7",
+    "student_id": "1618ea83-6a55-4443-ad9b-c44a71f5ded5",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-29",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a99295c2-bda0-43ad-9175-cdf7d0fb6f8c",
+    "student_id": "b637fdd6-5bd0-46b6-9ae1-47a0a7a0a3a7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-15",
+    "start_time": "15:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "13ab5357-302d-4ee6-9b37-be331ee37393",
+    "student_id": "5e917604-9271-461c-bb4b-c856d015bf80",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4c845e6c-d118-466d-96a9-af7ee4421635",
+    "student_id": "7ecf29bc-b580-4974-9387-1eae9ac90515",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "13:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "aae8977a-256b-40cc-bc7e-35380143c58c",
+    "student_id": "8dcd5855-3de5-4ecb-9889-a4c79c1a3dd6",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "15:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e488208a-ab3b-4544-81df-ab8ea04d522d",
+    "student_id": "b637fdd6-5bd0-46b6-9ae1-47a0a7a0a3a7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-22",
+    "start_time": "15:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "bbe8ef3c-0918-43ff-b418-2995df3d3523",
+    "student_id": "b637fdd6-5bd0-46b6-9ae1-47a0a7a0a3a7",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-29",
+    "start_time": "15:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "45766946-7faf-4dd7-987c-7759e40caa68",
+    "student_id": "7eb0c902-a7bd-4235-b81f-4be96dbb1425",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "16:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "904696d9-fa30-41fe-a073-6d298cbdf000",
+    "student_id": "b73648f5-cdd1-4f8b-9725-0117fca515e2",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-15",
+    "start_time": "15:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1f21506d-9681-42e2-9518-21f06fa7e35d",
+    "student_id": "edb920b8-c377-4f86-aae3-a6175b0d0f07",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "16:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c95cb7dd-4145-495f-8a69-85006bbe5f8b",
+    "student_id": "b73648f5-cdd1-4f8b-9725-0117fca515e2",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-22",
+    "start_time": "15:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "2413ce5d-34df-4c9a-b617-44b9255592fe",
+    "student_id": "6d327845-17ef-4660-8998-b36c6ab2f852",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "17:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "bed55913-2d11-414c-9ae3-ed2a772c1425",
+    "student_id": "b73648f5-cdd1-4f8b-9725-0117fca515e2",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-29",
+    "start_time": "15:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "00d9b36b-8000-41e2-ba1f-c627100c972b",
+    "student_id": "898e8152-7890-4a8e-9e73-a23ad1a9eae3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-16",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "0052ad69-7169-469a-9385-e4c6a3b846d3",
+    "student_id": "4a847483-395f-48aa-903f-afb3df9bee37",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "17:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9cb6f10f-f868-4b7b-b5c9-b59a7d9b0dce",
+    "student_id": "898e8152-7890-4a8e-9e73-a23ad1a9eae3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-23",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "43eabbe8-9dd6-4a59-9956-388bf62433f9",
+    "student_id": "aaa5fd70-8337-48f1-b299-49f08142e4ee",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "18:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "dabda152-968e-4146-9a5b-3651cb447dfa",
+    "student_id": "898e8152-7890-4a8e-9e73-a23ad1a9eae3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-30",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "aeef36da-de70-438b-9b17-1e6a2b534c60",
+    "student_id": "2a49ae2f-35da-4171-a156-d586fd7c5554",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-15",
+    "start_time": "18:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e9bc3b7f-e1d6-4498-98ee-ddf724df02ec",
+    "student_id": "b6c645ca-a9d4-4ad1-a832-be4964932511",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-16",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "d72a7e8d-95c4-4a77-8549-a8aa0ecf2bd8",
+    "student_id": "28800e64-18e5-44ff-b2c3-8487591d0a02",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-16",
+    "start_time": "13:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e08ce034-d3f0-4501-bb5c-6a30476e35fe",
+    "student_id": "b6c645ca-a9d4-4ad1-a832-be4964932511",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-23",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "2a3860f9-6ec1-4843-9020-18bb856466d1",
+    "student_id": "b6c645ca-a9d4-4ad1-a832-be4964932511",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-30",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "40eafe4d-643c-44da-8a98-dd9bc0fa52df",
+    "student_id": "90493f8f-7ec9-41a0-802f-2255194139ad",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-16",
+    "start_time": "15:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "dac35f3f-6e2e-4773-bfe2-f8679f4e8f81",
+    "student_id": "8a5ed0e2-eff8-417a-a839-1efc515a751c",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-17",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ff1e520c-7003-495c-8e8e-d0c236151e6f",
+    "student_id": "d038356e-92aa-469c-b63f-b2ccc8888baa",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-16",
+    "start_time": "15:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a81866de-9f87-4f81-9346-1eb1cb73dc9c",
+    "student_id": "8a5ed0e2-eff8-417a-a839-1efc515a751c",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-24",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e8de0c7f-7c32-44ac-8f7a-755efffac368",
+    "student_id": "8a5ed0e2-eff8-417a-a839-1efc515a751c",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-01",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a7892890-8b02-432c-a5c1-505f43f24c8d",
+    "student_id": "d123de58-c9f2-416b-a9d0-02bd679d22e7",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-16",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "998e9164-02c2-4606-bfcb-7aef489b71af",
+    "student_id": "1f934f53-1d05-4f05-a885-b1c49347f7be",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-17",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9c06ddb6-09a5-4a28-887d-f174dda1d47b",
+    "student_id": "1f934f53-1d05-4f05-a885-b1c49347f7be",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-24",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "0b9b0df0-96ad-4639-8c75-66933d611ce2",
+    "student_id": "4fbbb1d4-b930-4e61-b1a2-3dc8cf6f3a9d",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-17",
+    "start_time": "13:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "83d67a10-edc8-451e-b470-d62e0af60649",
+    "student_id": "7ecf29bc-b580-4974-9387-1eae9ac90515",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "61b95758-393a-41a4-af53-0b2fdc1f41e3",
+    "student_id": "1f934f53-1d05-4f05-a885-b1c49347f7be",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-01",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "8eb0d349-e54d-484b-b45e-5ac8e0efc6c6",
+    "student_id": "d2b60019-8993-4e59-9be9-b870eec41df1",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-17",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a465a5f1-9b81-41ff-b2aa-66de87d726c8",
+    "student_id": "2a49ae2f-35da-4171-a156-d586fd7c5554",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "e13a2aa0-019b-4e52-b4bc-d43edbcc8678",
+    "student_id": "2ee6ada5-1917-4469-a9de-9eb4bffed1fb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-17",
+    "start_time": "16:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "bf14aef8-86aa-4f15-9a22-bca7fd4de093",
+    "student_id": "2ee6ada5-1917-4469-a9de-9eb4bffed1fb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-24",
+    "start_time": "16:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fcf2019c-86ea-4e86-a4f3-fc8cc27c00de",
+    "student_id": "bd595091-0144-4a67-b164-e52b09a725f3",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-17",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "7d86785c-251a-45bd-9e5c-62f2344da0e7",
+    "student_id": "62d156b4-f433-4139-ad30-089abb6d4e56",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "9eb2b350-bae8-44eb-8763-f05de44b2688",
+    "student_id": "2ee6ada5-1917-4469-a9de-9eb4bffed1fb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-01",
+    "start_time": "16:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6fcdb893-7f04-4901-8d1f-9655ff6a2772",
+    "student_id": "f194be38-9b1a-4a7a-b849-bd3f105783f3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-17",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "54904a08-47b3-4a5f-b493-fda87a83c8c8",
+    "student_id": "7708550d-8a9c-48c3-b4ee-5b866bf236f5",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-17",
+    "start_time": "15:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "63c4c1f0-17d0-4928-8a1a-47c9bdb6eb9d",
+    "student_id": "edb920b8-c377-4f86-aae3-a6175b0d0f07",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-30",
+    "start_time": "17:15:00",
+    "duration": 30,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "af57f3ec-31b4-4b4d-9e2e-e4431c214495",
+    "student_id": "f194be38-9b1a-4a7a-b849-bd3f105783f3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-24",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9543db43-f23e-4d4a-880a-be08dfc595bb",
+    "student_id": "f194be38-9b1a-4a7a-b849-bd3f105783f3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-01",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9db05434-d4fe-4f2e-9961-ada753202bf6",
+    "student_id": "62d156b4-f433-4139-ad30-089abb6d4e56",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "13:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "30fa300b-50e6-4581-987f-bd2947aeb22d",
+    "student_id": "61c7c335-2976-477c-afee-b01607b41896",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-17",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "11f19a62-37f7-4c2b-b671-d28dee0cac79",
+    "student_id": "61c7c335-2976-477c-afee-b01607b41896",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-24",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "152cb68b-ea03-47f5-8261-252606f9701e",
+    "student_id": "f45198ae-dea0-4623-8e8b-33cbe9238b51",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "13:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "0ec7784f-eade-4110-b176-65583f1c989e",
+    "student_id": "61c7c335-2976-477c-afee-b01607b41896",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-01",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ce50be47-f88d-44e0-944c-378cfecab134",
+    "student_id": "b0de547c-543a-4fd9-8a2c-441b79ea15d3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "2b5532a9-68bc-4196-9f63-98c52b980fe4",
+    "student_id": "fb02123d-6041-40a8-9819-40aad725ad4c",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "14:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1926b8a0-afa1-4a7e-bf64-327c8db8fe04",
+    "student_id": "b0de547c-543a-4fd9-8a2c-441b79ea15d3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "03f0d26d-71e5-4c40-b2bc-31e5575e4db0",
+    "student_id": "a9b4154b-67be-4082-9c07-218163b36190",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "cb43c8cd-a58c-4032-80ad-74bc9caf893a",
+    "student_id": "b0de547c-543a-4fd9-8a2c-441b79ea15d3",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ab435a86-1c58-4169-b8b7-3cc52b070a0f",
+    "student_id": "40b56480-5fd1-4252-b4e6-f6027519bbde",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f1b66437-1bf2-49ce-91e5-5f313207acf7",
+    "student_id": "0f22f0ba-df3c-457e-b600-7c4c2bce745c",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "15:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1e7bdbf7-8d3c-49cf-81f1-a7ba91dd3df0",
+    "student_id": "f7f83cc3-6900-4388-8290-a4d99a9fb383",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-11",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "09c5b1ed-fc10-4e33-b580-c38c58bb49b2",
+    "student_id": "40b56480-5fd1-4252-b4e6-f6027519bbde",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "5bf1203a-3b4e-4cf4-a082-8bdaca704d1a",
+    "student_id": "f7f83cc3-6900-4388-8290-a4d99a9fb383",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-04",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "36121a5b-6ce2-44a0-9fbb-6f3bf04b8dc6",
+    "student_id": "62d156b4-f433-4139-ad30-089abb6d4e56",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-04",
+    "start_time": "13:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e3fb3b8d-2489-454b-b0e6-8df69eadc64c",
+    "student_id": "40b56480-5fd1-4252-b4e6-f6027519bbde",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "14:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4ecfc18b-e9d8-40e9-bcee-4d12ed47b88c",
+    "student_id": "efa8380b-ff10-4c86-8f9f-3dff7a57bebb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "17374979-19db-4950-90d6-cdfe6895bc2a",
+    "student_id": "7eb0c902-a7bd-4235-b81f-4be96dbb1425",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "6fb393d5-8ffb-45a0-bbfb-9284d24c63dd",
+    "student_id": "efa8380b-ff10-4c86-8f9f-3dff7a57bebb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "527ed8fb-743f-46ba-9bbd-5244b629d123",
+    "student_id": "efa8380b-ff10-4c86-8f9f-3dff7a57bebb",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4e535f46-054d-49ba-b5e3-fa6b33adfe98",
+    "student_id": "5037915e-a203-4709-89ee-8df72fa8b638",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "16:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "3d4ee647-8938-49f2-97d5-c1d649a4d42c",
+    "student_id": "d2b60019-8993-4e59-9be9-b870eec41df1",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "16:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "f868f222-c49c-4cab-83b4-e16f46ac6b8a",
+    "student_id": "5037915e-a203-4709-89ee-8df72fa8b638",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "16:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "2322ba0d-9fd2-4f5c-a22f-c0fc86001702",
+    "student_id": "5037915e-a203-4709-89ee-8df72fa8b638",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "16:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "77a50808-d6dc-45d5-91e2-88a8107b7c00",
+    "student_id": "a1a3f173-c8fd-4e0d-b3e0-550b6ebeb934",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "17:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "3b71d623-733c-455a-a4d5-c6e5279ae232",
+    "student_id": "a1a3f173-c8fd-4e0d-b3e0-550b6ebeb934",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "17:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "52e64cc7-2a7a-4168-b6e3-66aa4addfc51",
+    "student_id": "a1a3f173-c8fd-4e0d-b3e0-550b6ebeb934",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "17:30:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "af324293-a6e1-4c79-9dc9-abacf41f45d8",
+    "student_id": "03af71b1-5b6f-4cc0-83c3-197c35248211",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-18",
+    "start_time": "18:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fe1579ad-ee35-4683-bbe9-75319bc92257",
+    "student_id": "03af71b1-5b6f-4cc0-83c3-197c35248211",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-25",
+    "start_time": "18:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1f7a0c70-37ea-4560-9a73-7ee190037dd2",
+    "student_id": "03af71b1-5b6f-4cc0-83c3-197c35248211",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-02",
+    "start_time": "18:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "24e75c92-02fa-4a47-bd64-3cf1b692b91c",
+    "student_id": "84f7214c-b8b8-415b-bd95-6f3ffd494b69",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f7434e0c-04b7-4f2c-ba43-f0adb462a922",
+    "student_id": "84f7214c-b8b8-415b-bd95-6f3ffd494b69",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fa2bd8fc-d215-49cd-9551-c82f15fd6af2",
+    "student_id": "84f7214c-b8b8-415b-bd95-6f3ffd494b69",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "b14ab68e-5fcf-4d09-aa82-705d5c0cd4b1",
+    "student_id": "acf22cc4-9311-452b-8d46-6448a1f94795",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "14:45:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "20922940-f9f6-40e1-8de3-99d4a74473ba",
+    "student_id": "acf22cc4-9311-452b-8d46-6448a1f94795",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "14:45:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "89adcfef-c5eb-4114-877c-90a77ad2a371",
+    "student_id": "acf22cc4-9311-452b-8d46-6448a1f94795",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "14:45:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "b5545318-fd07-4bd1-a7e1-7132434bacf7",
+    "student_id": "65208ed2-5683-4e74-9462-ffd1b1f03600",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e855cb7b-0a3a-40ae-9cbc-9b2a43799039",
+    "student_id": "65208ed2-5683-4e74-9462-ffd1b1f03600",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "5fc72309-1c8a-4b92-83d7-5cd141f1a0aa",
+    "student_id": "65208ed2-5683-4e74-9462-ffd1b1f03600",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e9cd94a1-eca5-4018-b90f-8bfb2afb4c76",
+    "student_id": "b8f7913e-8392-4665-890a-aecbb9a021e1",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "d6e04c80-bf73-4cab-bfb6-175fa1027c35",
+    "student_id": "b8f7913e-8392-4665-890a-aecbb9a021e1",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "77466c94-b896-4fc8-b01c-d5204bd8d17e",
+    "student_id": "b8f7913e-8392-4665-890a-aecbb9a021e1",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "53244173-dcc7-4115-9500-86f1fca4ee0f",
+    "student_id": "64e54fef-e644-43cc-8071-eac432bb7fee",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "16:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "2205a121-cc30-4857-b453-a7e47fefabeb",
+    "student_id": "64e54fef-e644-43cc-8071-eac432bb7fee",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "16:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "31248ae0-d261-484a-8273-d69a83277c76",
+    "student_id": "a9b4154b-67be-4082-9c07-218163b36190",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "8fa1ab8a-f2ae-4955-bd99-13fdf80cfe40",
+    "student_id": "64e54fef-e644-43cc-8071-eac432bb7fee",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "16:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "818b3fa8-67d7-4c21-a6aa-0d417412d19a",
+    "student_id": "0326d56b-28b1-4dd9-8fde-387bb1ac3e49",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-26",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "8cde5016-21a3-4bd3-9603-89b8773df02a",
+    "student_id": "5d5a89b4-9c2d-4537-a738-876650404c96",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-26",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "d7ebbb63-3173-4cc0-b3eb-bff4128b957f",
+    "student_id": "6d327845-17ef-4660-8998-b36c6ab2f852",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "5284006d-76fe-461c-8d58-0754a0a471fa",
+    "student_id": "061e7c8f-cbb6-40e3-aa85-92e65dd39ab9",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-19",
+    "start_time": "17:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "caeafa75-af22-4c00-8439-3f1f5535bf95",
+    "student_id": "061e7c8f-cbb6-40e3-aa85-92e65dd39ab9",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-06-26",
+    "start_time": "17:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "b2f15b6c-fc7a-41a9-8494-e89cfefa32a1",
+    "student_id": "061e7c8f-cbb6-40e3-aa85-92e65dd39ab9",
+    "teacher_id": "ff30d2e9-43ae-432b-bba7-c4766bd57ca4",
+    "date": "2026-07-03",
+    "start_time": "17:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1c183a82-3fe1-4258-8def-dc4b8931ff40",
+    "student_id": "f7f83cc3-6900-4388-8290-a4d99a9fb383",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-18",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "dac1e17b-b12e-4a81-abee-91d0deb390f5",
+    "student_id": "0f22f0ba-df3c-457e-b600-7c4c2bce745c",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-11",
+    "start_time": "15:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "558d78c8-634a-4e43-8c31-b7351d193f4d",
+    "student_id": "90493f8f-7ec9-41a0-802f-2255194139ad",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "16:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "003e4d37-5386-4ee5-86fc-75df5d0df1f6",
+    "student_id": "5381793b-6459-426a-982f-02b77d6c4031",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ea5c12c6-47dd-4d0d-a337-23402974fe32",
+    "student_id": "5381793b-6459-426a-982f-02b77d6c4031",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f257ac7d-03f3-4dad-8376-c69011597a5a",
+    "student_id": "c6ce6cbc-b6fe-4966-9620-99f807abc366",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-25",
+    "start_time": "17:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "67ae4a9a-e273-4f49-a1ca-99f2144027ac",
+    "student_id": "b3f1d672-e6c2-4ce5-8cc6-4c1bfa3cc1b1",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "14:45:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "25edc598-b14c-41b5-8b02-758ef5b5291f",
+    "student_id": "b3f1d672-e6c2-4ce5-8cc6-4c1bfa3cc1b1",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "14:45:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e50cca86-e1ec-454b-a152-5a7ea35d32eb",
+    "student_id": "a35f1f95-8624-4501-b841-25af013f9812",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "86cf3baf-234f-49ec-97e5-c1b1742b418d",
+    "student_id": "a35f1f95-8624-4501-b841-25af013f9812",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "5b00617c-c11c-433e-8d99-2df92089ae82",
+    "student_id": "924c7773-90f1-4c04-a001-134a5ac00b99",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "16:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "45082464-c6aa-49ed-a4e2-44f43c702987",
+    "student_id": "924c7773-90f1-4c04-a001-134a5ac00b99",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "16:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "7f82082e-9a70-4cf9-b134-9d124888f7b4",
+    "student_id": "91ecff20-4379-4f28-bc76-a6683a440dda",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "17:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f2f4b724-b7d7-4100-877a-d5c2a734a667",
+    "student_id": "91ecff20-4379-4f28-bc76-a6683a440dda",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "17:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "480130aa-bc1c-4064-86b3-0cda5fc3437d",
+    "student_id": "5ef9cd10-cccd-49d6-bb95-5ef80b266436",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-29",
+    "start_time": "17:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "7c4b57a8-4ff2-4cd1-b8e2-3317af05a3db",
+    "student_id": "5ef9cd10-cccd-49d6-bb95-5ef80b266436",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-06",
+    "start_time": "17:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9a01f9ec-8455-4e19-860c-3e960ef1c97a",
+    "student_id": "e8066eb2-af3b-4b44-8a07-6e18c8c864ba",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1ab5ba9b-1910-46a2-b4b8-353d3e3e537c",
+    "student_id": "e8066eb2-af3b-4b44-8a07-6e18c8c864ba",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fa4e5890-1bf5-48c9-8f1c-3a3a9e52502f",
+    "student_id": "c89c36ff-6043-46d7-8f28-2161f3f25127",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "14:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a443050b-58bb-4230-a6fa-3d24ac97226e",
+    "student_id": "c89c36ff-6043-46d7-8f28-2161f3f25127",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "14:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ac058ae4-9db1-42a5-a6d8-5ca6407cb06d",
+    "student_id": "ba94e4d7-dd5c-4781-88d3-beb3ad158ccc",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "15:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1880de8e-284a-4372-bd55-09f0deb3a4d7",
+    "student_id": "ba94e4d7-dd5c-4781-88d3-beb3ad158ccc",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "15:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "99476a17-da8c-4c05-93a5-d461bfbd5f84",
+    "student_id": "ec70d9e2-f9c5-4a73-b4d1-734a3ec3a5da",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "15:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "157e9eaf-6ae7-4c48-9fb0-b82e76c0a22a",
+    "student_id": "ec70d9e2-f9c5-4a73-b4d1-734a3ec3a5da",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "15:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "3213f197-0d62-41d5-acbc-94026bdacc4a",
+    "student_id": "eb69924f-da5b-4f92-b282-84c91438e151",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "16:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e847bf50-064c-4193-87ec-a674e7a11847",
+    "student_id": "eb69924f-da5b-4f92-b282-84c91438e151",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "16:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "19da8416-f8d7-465a-9d15-ff65444b258d",
+    "student_id": "b1f442e7-ab95-45bc-9bad-f9cb65f1ab8e",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "17:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f5f4c5d5-3f28-4184-bd77-9b1f86f42fe6",
+    "student_id": "b1f442e7-ab95-45bc-9bad-f9cb65f1ab8e",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "17:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "42031e86-1690-437f-b96b-899933390afd",
+    "student_id": "e6e23c37-6fad-4629-a24a-787e71810471",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "17:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "dcbb7855-6e51-44c4-b6d1-683a7c3dae65",
+    "student_id": "e6e23c37-6fad-4629-a24a-787e71810471",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "17:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c9114ee6-48e9-4cb2-842b-e2ba14c32ad5",
+    "student_id": "dcdb4693-6813-4cd3-a989-b0dc8e22efe1",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4f505481-1e1d-4552-8b32-d3e2e6eda2ae",
+    "student_id": "dcdb4693-6813-4cd3-a989-b0dc8e22efe1",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "bd9a3970-8e83-499e-9f7b-9d9211adabc1",
+    "student_id": "7fc87d92-8932-4376-a644-ccc5aaf89116",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-30",
+    "start_time": "18:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c2302d04-b936-4fde-94f8-f87773440b01",
+    "student_id": "7fc87d92-8932-4376-a644-ccc5aaf89116",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-07",
+    "start_time": "18:45:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4de458bb-5344-46f7-9c0e-61c1b0fc1c29",
+    "student_id": "3fcabb72-9ff1-486a-a2de-14f0dd745a4b",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "40dfe213-fa44-452a-8663-1999ccd6feb4",
+    "student_id": "3fcabb72-9ff1-486a-a2de-14f0dd745a4b",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "14:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "8d429aba-e28c-4434-b02c-643f7f157643",
+    "student_id": "e851d528-d58f-47fd-bbe4-3097dd57fcdc",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6742bc60-1ccc-48f4-a14b-04bb7adc297e",
+    "student_id": "e851d528-d58f-47fd-bbe4-3097dd57fcdc",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "14:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c4061280-17be-400f-84e4-89e165ed0dd1",
+    "student_id": "b2065e20-d16c-4bbc-8004-b3226e5908d6",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "15:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "c7495bf9-19a2-4a11-9029-2ce7b06aa75a",
+    "student_id": "b2065e20-d16c-4bbc-8004-b3226e5908d6",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "15:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "676cbb66-d192-438e-9e02-f55cbf844c3d",
+    "student_id": "d123de58-c9f2-416b-a9d0-02bd679d22e7",
+    "teacher_id": "03564b1c-e2bb-4ccb-be95-b9fd1ef34829",
+    "date": "2026-06-29",
+    "start_time": "16:00:00",
+    "duration": 60,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "f7d27586-5884-4672-83dd-851c5df53042",
+    "student_id": "bdd77b37-b337-464a-bcc5-a576bc479d3d",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "34fc4079-37f6-46e2-8dce-ce2188f86a3e",
+    "student_id": "bdd77b37-b337-464a-bcc5-a576bc479d3d",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "16:15:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "09536f52-c286-4db1-83de-1cbc1bc2d184",
+    "student_id": "b3f1d672-e6c2-4ce5-8cc6-4c1bfa3cc1b1",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-06-22",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "pending_reschedule",
+    "student": null
+  },
+  {
+    "id": "680ef449-6ad2-4bfb-a725-cfde89ed4225",
+    "student_id": "101f68fc-005c-4bce-b1e0-ed568ca05a37",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "16:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fa6443ce-584c-4c9a-b904-bd0c5c564429",
+    "student_id": "101f68fc-005c-4bce-b1e0-ed568ca05a37",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "16:45:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e4e5d1af-e136-45c4-bce5-e8f90df63c73",
+    "student_id": "3bb37dd9-771c-4e9a-903b-8e795efcb592",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6cea47a0-e317-42d6-871b-0355a633e291",
+    "student_id": "3bb37dd9-771c-4e9a-903b-8e795efcb592",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a1323bae-19b6-49fe-a0e3-ebd6c88a50bc",
+    "student_id": "80b7e570-8f1f-46f8-ad6b-79d0854ffde8",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-01",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6c906687-0586-4312-9e85-6bd2b4af334a",
+    "student_id": "80b7e570-8f1f-46f8-ad6b-79d0854ffde8",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-08",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6597c522-a4fe-4b1c-a94f-94c4f1a997ce",
+    "student_id": "423744af-8cbc-4b46-989e-c5cd1b43aedb",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-02",
+    "start_time": "14:00:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "33452afc-b7b5-4a39-ab9a-77394ecb9145",
+    "student_id": "423744af-8cbc-4b46-989e-c5cd1b43aedb",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-09",
+    "start_time": "14:00:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6372dfdb-5723-433d-b44f-566f3493a530",
+    "student_id": "535fb4cf-b872-49b4-8bfa-7231d42f99e7",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-02",
+    "start_time": "15:00:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "0a480354-94b1-477e-9068-086445639763",
+    "student_id": "535fb4cf-b872-49b4-8bfa-7231d42f99e7",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-09",
+    "start_time": "15:00:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e951a55a-b4eb-4904-9e75-2ce92fe718fb",
+    "student_id": "1eacabb9-fb50-4ea8-8b12-c6c0c9376227",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-02",
+    "start_time": "16:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "4fdfda86-3dfa-4a0e-8b35-6b6a75986c1b",
+    "student_id": "1eacabb9-fb50-4ea8-8b12-c6c0c9376227",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-09",
+    "start_time": "16:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1670a9fa-d854-4936-8633-cea17d8fb39f",
+    "student_id": "c6ce6cbc-b6fe-4966-9620-99f807abc366",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-02",
+    "start_time": "16:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "fe99d272-b5c3-4200-aaa8-d24c8dabefe8",
+    "student_id": "c6ce6cbc-b6fe-4966-9620-99f807abc366",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-09",
+    "start_time": "16:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "a7373b5b-10e0-40fd-aa35-627212f56c67",
+    "student_id": "f5d179de-b8fa-4083-bb19-6e78473df124",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-02",
+    "start_time": "17:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "d9b4ada8-6f3e-421e-a726-3c6d0259520c",
+    "student_id": "f5d179de-b8fa-4083-bb19-6e78473df124",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-09",
+    "start_time": "17:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "7330c9a4-b06d-4f00-94e3-af3213654735",
+    "student_id": "02b976e8-0893-443b-a41a-5e7010fd05f3",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "714a9eea-e87b-4ac8-928a-22d8b15da957",
+    "student_id": "02b976e8-0893-443b-a41a-5e7010fd05f3",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "14:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "e15194be-ca11-43fc-87af-01f5cde6e1b5",
+    "student_id": "0326d56b-28b1-4dd9-8fde-387bb1ac3e49",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "f8624463-5b79-4198-9d03-0ece09f8f0f6",
+    "student_id": "0326d56b-28b1-4dd9-8fde-387bb1ac3e49",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "14:30:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ceae84f4-a88c-47cd-b53f-c8573935ba05",
+    "student_id": "5d5a89b4-9c2d-4537-a738-876650404c96",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "15:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "5cab673a-8b47-41cd-b449-092a6680b61a",
+    "student_id": "5d5a89b4-9c2d-4537-a738-876650404c96",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "15:00:00",
+    "duration": 30,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "7d1c4062-028c-4695-8c00-cdf4fe7a1cc8",
+    "student_id": "0b270db2-672f-41c6-a75c-73ba231cae81",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6dcdae1b-65dd-40c1-b23f-8ca2467f53b5",
+    "student_id": "0b270db2-672f-41c6-a75c-73ba231cae81",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "15:30:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "ff2c63f9-e2eb-449e-adaa-9fd31c812249",
+    "student_id": "23946ca9-5f69-4ffa-a514-c617a6bbbcba",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "16:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "6b906a85-2923-4a02-9107-a98fff4f2624",
+    "student_id": "23946ca9-5f69-4ffa-a514-c617a6bbbcba",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "16:15:00",
+    "duration": 60,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "9dcfacde-d39f-46fa-a6c4-dfd0164dc99a",
+    "student_id": "56d29d19-f09b-4b8b-a02c-706cf4355e30",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "918a839e-d54b-4f72-9b63-23bb43cacc15",
+    "student_id": "56d29d19-f09b-4b8b-a02c-706cf4355e30",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "17:15:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "1b0fc14d-b2ad-465e-ab4c-9f89443e2346",
+    "student_id": "9378cab6-068a-4e05-84c8-20411be8e29e",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-03",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  },
+  {
+    "id": "bb65bed3-88f4-4007-996e-65cdad0f468f",
+    "student_id": "9378cab6-068a-4e05-84c8-20411be8e29e",
+    "teacher_id": "97e73f5d-b6d6-47d5-bb47-18ad02bae725",
+    "date": "2026-07-10",
+    "start_time": "18:00:00",
+    "duration": 45,
+    "status": "scheduled",
+    "student": null
+  }
+]

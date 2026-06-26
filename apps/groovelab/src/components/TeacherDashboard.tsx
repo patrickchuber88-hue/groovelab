@@ -665,8 +665,8 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
 const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 12px #22c55e' }}></span>
+      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 12px #eab308' }}></span>
         Coaches vor Ort
       </div>
       <div style={{ 
@@ -703,7 +703,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
             >
               <div 
                 onClick={() => c.users && onProfileSelect(c.users)}
-                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #22c55e' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.2)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #eab308' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(234,179,8,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
@@ -6987,9 +6987,9 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isCurrentSlot && !isFinished) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #d1fae5';
-                              slotBorderLeft = '5px solid #137333';
+                              slotBg = '#f0fdf4';
+                              slotBorder = '1.5px solid #bbf7d0';
+                              slotBorderLeft = '5px solid #22c55e';
                               titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
@@ -7257,14 +7257,14 @@ export function TeacherDashboard({
                                      display: 'flex',
                                      alignItems: 'center',
                                      gap: '12px',
-                                     padding: '12px 16px', // taller padding for a premium card feel
-                                     background: slotBg,
+                                     padding: '12px 16px',
+                                     background: isCurrentSlot ? '#f0fdf4' : slotBg,
                                      borderRadius: '12px',
                                      border: slotBorder,
                                      borderLeft: slotBorderLeft,
                                      cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                     boxShadow: (idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)',
+                                     boxShadow: isCurrentSlot ? '0 8px 24px rgba(19, 115, 51, 0.12), 0 2px 6px rgba(19, 115, 51, 0.06)' : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
                                      minWidth: 0,
                                      opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1
                                    }}
@@ -7283,15 +7283,15 @@ export function TeacherDashboard({
                                       <div style={{
                                         fontSize: '0.8rem',
                                         fontWeight: 900,
-                                        color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#1a73e8' : '#0f172a',
+                                        color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#137333' : '#0f172a',
                                         fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         whiteSpace: 'nowrap',
                                         flexShrink: 0,
-                                        background: '#ffffff',
+                                        background: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#ffffff' : 'transparent',
                                         padding: '4px 8px',
                                         borderRadius: '6px',
-                                        border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #1a73e8' : 'none',
-                                        boxShadow: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '0 1px 3px rgba(0,0,0,0.02)' : 'none',
+                                        border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #137333' : 'none',
+                                        boxShadow: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '0 1px 3px rgba(19,115,51,0.08)' : 'none',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -7302,7 +7302,7 @@ export function TeacherDashboard({
                                             width: '6px',
                                             height: '6px',
                                             borderRadius: '50%',
-                                            background: '#1a73e8',
+                                            background: '#137333',
                                             display: 'inline-block'
                                           }} />
                                         )}

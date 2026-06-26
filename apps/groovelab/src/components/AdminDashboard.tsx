@@ -1951,11 +1951,29 @@ export function AdminDashboard({
           .order('check_in_time', { ascending: false });
         setActiveSessions(sData || []);
       } else if (activeTab === 'students') {
+        // ─── STRICT GUARD: Teacher-Isolation ───────────────────────────────────
+        // ONLY admin and secretary may see ALL students of the school.
+        // Every other role (teacher, coach, etc.) is ALWAYS filtered to their
+        // own assigned students by teacher_id. This can never be bypassed.
+        //
+        // NOTE: Teachers do NOT get the platform-activation filter — they should
+        // see ALL their assigned students regardless of is_campus_active status.
+        // Admins/secretaries DO get the platform filter (they manage the full list).
+        // ───────────────────────────────────────────────────────────────────────
+        const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
         let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus' && adminData.role !== 'teacher') sq = sq.eq('is_campus_active', true);
-        else if (activePlatform !== 'campus') sq = sq.eq('is_groovelab_active', true);
-        const isStaffAdminOrSec = adminData.role === 'admin' || adminData.role === 'secretary' || (adminData.roles && (adminData.roles.includes('admin') || adminData.roles.includes('secretary')));
-        if (adminData.role === 'teacher' && !isStaffAdminOrSec) sq = sq.eq('teacher_id', adminData.id);
+
+        if (canSeeAllStudents) {
+          // Admins / secretaries: filter by platform activation to show relevant students
+          if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
+          else sq = sq.eq('is_groovelab_active', true);
+        } else {
+          // Teachers (and any other role): show only their own assigned students,
+          // no platform-activation filter — they are responsible for all their pupils.
+          console.warn('[GUARD] Applying teacher_id filter for non-admin user:', adminData.role, adminData.id);
+          sq = sq.eq('teacher_id', adminData.id);
+        }
+
         const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
@@ -6109,8 +6127,16 @@ export function AdminDashboard({
                  occ.original_date !== occ.date && 
                  !holidays.some((h: any) => occ.original_date >= h.start && occ.original_date <= h.end);
         });
-        // We DO return combinedManuals (manual room bookings) during holidays!
-        return [...combinedManuals, ...allowedDynamics, ...draftPreviewBooking];
+        // We DO return manual room bookings (filtered for own-schedule coverage) during holidays!
+        return [...combinedManuals.filter((manual: any) => {
+          const toM = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+          return !mappedSchedules.some((sched: any) =>
+            sched.roomId === manual.roomId &&
+            sched.teacherId === manual.teacherId &&
+            toM(manual.startTime) >= toM(sched.startTime) &&
+            toM(manual.endTime) <= toM(sched.endTime)
+          );
+        }), ...allowedDynamics, ...draftPreviewBooking];
       }
 
       if (dayIdx === 4 && hourStr.startsWith('16:00')) {
@@ -6124,7 +6150,29 @@ export function AdminDashboard({
         });
       }
 
-      return [...combinedManuals, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
+      // Filter out manual bookings that are fully covered by the same teacher's own schedule block.
+      // If a teacher's schedule already "owns" the room for e.g. 14:00–18:45, a manual booking
+      // for 17:15–18:00 by the same teacher is redundant and must not be rendered as a separate card.
+      const toMinLocal = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+
+      const filteredManuals = combinedManuals.filter((manual: any) => {
+        const manualStart = toMinLocal(manual.startTime);
+        const manualEnd   = toMinLocal(manual.endTime);
+
+        // Check if this manual booking is fully covered by any of the teacher's own schedule slots
+        const coveredByOwnSchedule = mappedSchedules.some((sched: any) => {
+          if (sched.roomId !== manual.roomId) return false;
+          const isOwnTeacher = sched.teacherId === manual.teacherId;
+          if (!isOwnTeacher) return false;
+          const schedStart = toMinLocal(sched.startTime);
+          const schedEnd   = toMinLocal(sched.endTime);
+          return manualStart >= schedStart && manualEnd <= schedEnd;
+        });
+
+        return !coveredByOwnSchedule;
+      });
+
+      return [...filteredManuals, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
@@ -6138,17 +6186,37 @@ export function AdminDashboard({
       const targetDay = DAYS_MAP[dayVal];
       const targetDayInt = dayVal === 0 ? 7 : dayVal; // 1 = Monday, 7 = Sunday
 
+      // Helper: convert "HH:MM" to minutes
+      const toMin = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+      const newStart = toMin(bookingStartTime);
+      const newEnd   = toMin(bookingEndTime);
+
+      // Returns true if the new booking is *fully contained within* an existing own block
+      const isCoveredByOwnBlock = (blockStart: number, blockEnd: number, ownerId: string | null) => {
+        const isOwn = ownerId === userId || (admin && ownerId && ownerId === userId);
+        return isOwn && newStart >= blockStart && newEnd <= blockEnd;
+      };
+
       const hasDbBooking = dbRoomBookings.some((b: any) => {
         if (b.roomId !== roomId) return false;
         if (b.date !== bookingDate) return false;
         if (selectedBooking && b.id === selectedBooking.id) return false;
-        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
+        if (!(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime)) {
+          // Overlap detected — but allow if new booking is fully inside own block
+          if (isCoveredByOwnBlock(toMin(b.startTime), toMin(b.endTime), b.teacherId)) return false;
+          return true;
+        }
+        return false;
       });
 
       const hasBooking = dateBookings.some((b: any) => {
         if (b.roomId !== roomId) return false;
         if (selectedBooking && b.id === selectedBooking.id) return false;
-        return !(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime);
+        if (!(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime)) {
+          if (isCoveredByOwnBlock(toMin(b.startTime), toMin(b.endTime), b.teacherId)) return false;
+          return true;
+        }
+        return false;
       }) || hasDbBooking;
 
       const hasSchedule = isHoliday ? false : mergedSchedules.some((s: any) => {
@@ -6164,25 +6232,17 @@ export function AdminDashboard({
 
         const durationMin = s.duration || s.duration_minutes || 45;
 
-        // User booking range in minutes
-        const [uShStr, uSmStr] = bookingStartTime.split(':');
-        const uSh = parseInt(uShStr) || 0;
-        const uSm = parseInt(uSmStr) || 0;
-        const userStartMin = uSh * 60 + uSm;
+        const schedStart = toMin(startTimeStr);
+        const schedEnd   = schedStart + durationMin;
 
-        const [uEhStr, uEmStr] = bookingEndTime.split(':');
-        const uEh = parseInt(uEhStr) || 0;
-        const uEm = parseInt(uEmStr) || 0;
-        const userEndMin = uEh * 60 + uEm;
+        // Check overlap
+        if (!(schedStart < newEnd && schedEnd > newStart)) return false;
 
-        // Schedule range in minutes
-        const [shStr, smStr] = startTimeStr.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const schedStartMin = sh * 60 + sm;
-        const schedEndMin = schedStartMin + durationMin;
+        // Allow if new booking is fully inside the teacher's own schedule block
+        const schedTeacherId = s.teacher_id || null;
+        if (isCoveredByOwnBlock(schedStart, schedEnd, schedTeacherId)) return false;
 
-        return schedStartMin < userEndMin && schedEndMin > userStartMin;
+        return true;
       });
 
       const hasDynamic = scheduleOccurrences.some((occ: any) => {
@@ -6223,25 +6283,16 @@ export function AdminDashboard({
         }
 
         const durationMin = occ.duration || 45;
+        const occStart = toMin(occ.start_time);
+        const occEnd   = occStart + durationMin;
 
-        // User booking range in minutes
-        const [uShStr, uSmStr] = bookingStartTime.split(':');
-        const uSh = parseInt(uShStr) || 0;
-        const uSm = parseInt(uSmStr) || 0;
-        const userStartMin = uSh * 60 + uSm;
+        if (!(occStart < newEnd && occEnd > newStart)) return false;
 
-        const [uEhStr, uEmStr] = bookingEndTime.split(':');
-        const uEh = parseInt(uEhStr) || 0;
-        const uEm = parseInt(uEmStr) || 0;
-        const userEndMin = uEh * 60 + uEm;
+        // Allow if new booking is fully inside own teacher's dynamic occurrence window
+        const occTeacherId = occ.schedules?.teacher_id || null;
+        if (isCoveredByOwnBlock(occStart, occEnd, occTeacherId)) return false;
 
-        const [shStr, smStr] = occ.start_time.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const occStartMin = sh * 60 + sm;
-        const occEndMin = occStartMin + durationMin;
-
-        return occStartMin < userEndMin && occEndMin > userStartMin;
+        return true;
       });
 
       return hasBooking || hasSchedule || hasDynamic;
@@ -7620,6 +7671,7 @@ export function AdminDashboard({
                                   const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
                                   const hasConflict = isRescheduled && slotBookings.length > 1;
                                   const isPending = b.status === 'pending';
+                                  const isUnapprovedSchedule = isSchedule && !b.isApproved;
                                   
                                   // Apple Calendar Color Schemes
                                   let bg = 'rgba(142, 142, 147, 0.12)';
@@ -7646,9 +7698,9 @@ export function AdminDashboard({
                                       textColor = '#1e7a44';
                                       leftAccentColor = '#34c759';
                                     } else {
-                                      bg = 'rgba(255, 204, 0, 0.15)';
-                                      textColor = '#946600';
-                                      leftAccentColor = '#ffcc00';
+                                      bg = 'rgba(52, 199, 89, 0.12)';
+                                      textColor = '#1e7a44';
+                                      leftAccentColor = '#34c759';
                                     }
                                   } else {
                                     bg = 'rgba(175, 82, 222, 0.12)';
@@ -7706,24 +7758,30 @@ export function AdminDashboard({
                                       style={{
                                         background: b.isPreview 
                                           ? '#f0f9ff' 
-                                          : (isPending 
-                                            ? `repeating-linear-gradient(135deg, rgba(175, 82, 222, 0.04), rgba(175, 82, 222, 0.04) 10px, rgba(175, 82, 222, 0.12) 10px, rgba(175, 82, 222, 0.12) 20px)`
-                                            : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg)),
+                                          : (isUnapprovedSchedule
+                                            ? `repeating-linear-gradient(-45deg, rgba(52, 199, 89, 0.18) 0px, rgba(52, 199, 89, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
+                                            : (isPending 
+                                              ? `repeating-linear-gradient(-45deg, rgba(175, 82, 222, 0.14) 0px, rgba(175, 82, 222, 0.14) 8px, #ffffff 8px, #ffffff 16px)`
+                                              : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg))),
                                         border: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isPending 
-                                            ? `1.5px dashed ${leftAccentColor}` 
-                                            : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`),
+                                          : (isUnapprovedSchedule
+                                            ? `1.5px solid ${leftAccentColor}50`
+                                            : (isPending 
+                                              ? `1.5px dashed ${leftAccentColor}` 
+                                              : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`)),
                                         borderLeft: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isPending 
-                                            ? `3.5px dashed ${leftAccentColor}` 
-                                            : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`),
+                                          : (isUnapprovedSchedule
+                                            ? `3px solid ${leftAccentColor}`
+                                            : (isPending 
+                                              ? `3.5px dashed ${leftAccentColor}` 
+                                              : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`)),
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
                                         fontWeight: 800,
-                                        color: b.isPreview ? '#0369a1' : (isOwnSchedule && !b.isPreview ? '#ffffff' : textColor),
+                                        color: b.isPreview ? '#0369a1' : (isOwnSchedule && !b.isPreview && !isUnapprovedSchedule ? '#ffffff' : textColor),
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
                                         left: `calc(${colLeft}% + 4px)`,
@@ -8487,38 +8545,43 @@ export function AdminDashboard({
                   </div>
                 )}
 
-                {/* Overlap Warning Badge */}
+                {/* Overlap Block — hard block, not a warning */}
                 {selectedRoom && isRoomOccupied(selectedRoom.id) && (
                   <div style={{
-                    background: '#fff9e6',
-                    border: '1px solid #ffeeba',
+                    background: '#fff1f0',
+                    border: '1px solid #fca5a5',
                     borderRadius: '10px',
-                    padding: '6px 10px',
-                    fontSize: '0.68rem',
+                    padding: '8px 12px',
+                    fontSize: '0.7rem',
                     fontWeight: 700,
-                    color: '#b45309',
+                    color: '#b91c1c',
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    lineHeight: '1.2'
+                    alignItems: 'flex-start',
+                    gap: '6px',
+                    lineHeight: '1.4'
                   }}>
-                    <span>⚠️ Raum im Zeitraum belegt. Buchung wird parallel angezeigt.</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <span>Dieser Raum ist im gewählten Zeitraum bereits von einer anderen Person gebucht. Bitte wähle einen anderen Raum oder eine andere Zeit.</span>
                   </div>
                 )}
 
                 <button
-                  onClick={() => selectedRoom && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
-                  disabled={!selectedRoom}
+                  onClick={() => selectedRoom && !isRoomOccupied(selectedRoom.id) && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
+                  disabled={!selectedRoom || isRoomOccupied(selectedRoom.id)}
                   style={{
-                    background: brandColor,
+                    background: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? '#94a3b8' : brandColor,
                     color: 'white',
                     border: 'none',
                     borderRadius: '10px',
                     padding: '10px 12px',
                     fontSize: '0.8rem',
                     fontWeight: 800,
-                    cursor: (!selectedRoom) ? 'not-allowed' : 'pointer',
-                    opacity: (!selectedRoom) ? 0.45 : 1,
+                    cursor: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 'not-allowed' : 'pointer',
+                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.55 : 1,
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     marginTop: '2px',
                     display: 'flex',

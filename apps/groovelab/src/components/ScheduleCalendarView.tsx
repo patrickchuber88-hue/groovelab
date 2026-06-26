@@ -1409,6 +1409,23 @@ export function ScheduleCalendarView({
           .not('room_id', 'is', null);
         if (schedData) setCachedWeekSchedules(schedData);
 
+        // Separately load the current teacher's OWN schedule slots (without room_id filter)
+        // so we can reliably compute regMin/regMax for the fixed grey/white background and purple card logic.
+        const { data: mySchedData } = await supabase
+          .from('schedules')
+          .select('time_slot, duration, day_of_week')
+          .eq('teacher_id', userId)
+          .eq('school_id', schoolId);
+        if (mySchedData && mySchedData.length > 0) {
+          // Merge teacher's own slots into cachedWeekSchedules under teacher_id so the rendering loop can filter them
+          const mySlots = mySchedData.map((s: any) => ({ ...s, teacher_id: userId, _ownSlot: true }));
+          setCachedWeekSchedules(prev => {
+            // Replace any existing own slots and add new ones
+            const withoutOwn = prev.filter((s: any) => !s._ownSlot);
+            return [...withoutOwn, ...mySlots];
+          });
+        }
+
         const { data: evData } = await supabase
           .from('campus_events')
           .select('room_id, event_date, start_time, end_time, title')
@@ -1851,9 +1868,40 @@ export function ScheduleCalendarView({
     const m = clampedMinutes % 60;
     const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     
+    // Determine if the current drop position is outside the teacher's regular schedule window.
+    // Compute regMin/regMax for the target day from cachedWeekSchedules (same as the rendering loop does).
+    const targetDate = new Date(targetDateStr + 'T00:00:00');
+    const targetDayOfWeek = targetDate.getDay() || 7; // 1=Mon … 7=Sun
+    let dragRegMin = Infinity;
+    let dragRegMax = -Infinity;
+    (cachedWeekSchedules || []).forEach((s: any) => {
+      if (s.day_of_week !== targetDayOfWeek) return;
+      if (s.teacher_id !== userId) return; // only own schedule slots
+      const sStart = timeToMinutes(s.time_slot);
+      const sEnd = sStart + (s.duration || 45);
+      if (sStart < dragRegMin) dragRegMin = sStart;
+      if (sEnd > dragRegMax) dragRegMax = sEnd;
+    });
+    const hasRegularDragBlock = dragRegMin !== Infinity;
+    const dropEnd = clampedMinutes + duration;
+    const isDropOutsideSchedule = hasRegularDragBlock && (clampedMinutes < dragRegMin || dropEnd > dragRegMax);
+
+    // Choose ghost color: purple if outside schedule (room booking needed), normal platform color otherwise
     const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-    const highlightColor = isCampus ? '#137333' : '#007aff';
-    const highlightBg = isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)';
+    let highlightColor: string;
+    let highlightBg: string;
+    let ghostBorder: string;
+    
+    if (isDropOutsideSchedule) {
+      // Purple/white diagonal — signals that a room booking will be required
+      highlightColor = '#7c3aed';
+      highlightBg = 'repeating-linear-gradient(-45deg, rgba(237, 233, 254, 0.85) 0px, rgba(237, 233, 254, 0.85) 8px, rgba(255,255,255,0.85) 8px, rgba(255,255,255,0.85) 16px)';
+      ghostBorder = '2px dashed #7c3aed';
+    } else {
+      highlightColor = isCampus ? '#137333' : '#007aff';
+      highlightBg = isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)';
+      ghostBorder = `2px dashed ${highlightColor}`;
+    }
     
     let ghost = document.getElementById('drag-preview-ghost');
     if (!ghost) {
@@ -1877,15 +1925,19 @@ export function ScheduleCalendarView({
     ghost.style.top = `${previewTopPx}px`;
     ghost.style.height = `${previewHeightPx}px`;
     ghost.style.background = highlightBg;
-    ghost.style.border = `2px dashed ${highlightColor}`;
+    ghost.style.border = ghostBorder;
     ghost.style.transform = 'scale(0.97)';
     
     const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${sourceOcc.student.last_name}` : 'Pause';
+    const outsideHint = isDropOutsideSchedule 
+      ? `<div style="font-size: 0.60rem; font-weight: 800; color: #7c3aed; background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.2); padding: 1px 5px; border-radius: 3px; display: inline-block; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em;">🔔 Raum buchen</div>`
+      : '';
     ghost.innerHTML = `
       <div style="font-size: 0.72rem; font-weight: 800; color: ${highlightColor};">${timeStr} Uhr</div>
       <div style="font-size: 0.78rem; font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
         ${studentName}
       </div>
+      ${outsideHint}
     `;
     
     if (ghost.parentNode !== e.currentTarget) {
@@ -2783,7 +2835,7 @@ export function ScheduleCalendarView({
           const dateStr = toLocalYYYYMMDD(dayDate);
           
           const dayOfWeek = dayDate.getDay() || 7;
-          const daySchedules = cachedWeekSchedules.filter((s: any) => s.day_of_week === dayOfWeek);
+          const daySchedules = cachedWeekSchedules.filter((s: any) => s.day_of_week === dayOfWeek && s.teacher_id === userId);
           let regMin = Infinity;
           let regMax = -Infinity;
           daySchedules.forEach(s => {
@@ -2918,7 +2970,9 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
-                {/* Column Background Layout: White from first to last appointment, gray outside */}
+                {/* Column Background Layout: White = teacher's regular schedule block (regMin–regMax), gray outside.
+                    The white area is FIXED to the Stundenplan-Designer schedule — it never changes when
+                    appointments are dragged in or out of the window. */}
                 {(() => {
                   const activeOccs = dayOccurrences.filter(o => {
                     const isBreak = !o.student_id;
@@ -2926,7 +2980,17 @@ export function ScheduleCalendarView({
                     return o.status !== 'cancelled';
                   });
 
-                  if (activeOccs.length === 0) {
+                  // Use the regular schedule block (regMin/regMax) as the FIXED white area anchor.
+                  // Fall back to dynamic earliest/latest only when no Stundenplan block exists for this day.
+                  let whiteStart: number;
+                  let whiteEnd: number;
+
+                  if (hasRegularBlock) {
+                    // Fixed: anchored to the teacher's submitted schedule (e.g. 14:00–18:45)
+                    whiteStart = regMin;
+                    whiteEnd = regMax;
+                  } else if (activeOccs.length === 0) {
+                    // No schedule, no appointments → full grey column
                     return (
                       <div 
                         style={{
@@ -2941,37 +3005,40 @@ export function ScheduleCalendarView({
                         }}
                       />
                     );
+                  } else {
+                    // No submitted schedule: fall back to dynamic earliest/latest of actual appointments
+                    let earliestStart = 1440;
+                    let latestEnd = 0;
+                    activeOccs.forEach((o: any) => {
+                      const start = timeToMinutes(o.start_time);
+                      const end = start + (o.duration || 45);
+                      if (start < earliestStart) earliestStart = start;
+                      if (end > latestEnd) latestEnd = end;
+                    });
+                    whiteStart = earliestStart;
+                    whiteEnd = latestEnd;
                   }
 
-                  let earliestStart = 1440;
-                  let latestEnd = 0;
-                  activeOccs.forEach((o: any) => {
-                    const start = timeToMinutes(o.start_time);
-                    const end = start + (o.duration || 45);
-                    if (start < earliestStart) earliestStart = start;
-                    if (end > latestEnd) latestEnd = end;
-                  });
-
-                  const topGrayHeight = Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5);
-                  const bottomGrayTop = Math.max(0, (latestEnd - dayBaselineMinutes) * 2.5);
-                  const bottomGrayHeight = Math.max(0, (1440 - latestEnd) * 2.5);
+                  const topGrayHeight = Math.max(0, (whiteStart - dayBaselineMinutes) * 2.5);
+                  const bottomGrayTop = Math.max(0, (whiteEnd - dayBaselineMinutes) * 2.5);
+                  const bottomGrayHeight = Math.max(0, (1440 - whiteEnd) * 2.5);
 
                   return (
                     <>
-                      {/* White background for the entire range of appointments */}
+                      {/* White background for the teacher's regular schedule window */}
                       <div 
                         style={{
                           position: 'absolute',
                           left: 0,
                           right: 0,
-                          top: `${Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5)}px`,
-                          height: `${Math.max(0, (latestEnd - earliestStart) * 2.5)}px`,
+                          top: `${Math.max(0, (whiteStart - dayBaselineMinutes) * 2.5)}px`,
+                          height: `${Math.max(0, (whiteEnd - whiteStart) * 2.5)}px`,
                           background: '#ffffff',
                           zIndex: 0,
                           pointerEvents: 'none'
                         }}
                       />
-                      {/* Gray overlay BEFORE first appointment */}
+                      {/* Gray overlay BEFORE schedule block */}
                       {topGrayHeight > 0 && (
                         <div 
                           style={{
@@ -2986,7 +3053,7 @@ export function ScheduleCalendarView({
                           }}
                         />
                       )}
-                      {/* Gray overlay AFTER last appointment */}
+                      {/* Gray overlay AFTER schedule block */}
                       {bottomGrayHeight > 0 && (
                         <div 
                           style={{
@@ -3180,14 +3247,27 @@ export function ScheduleCalendarView({
 
                   if (!isBreak && !isVacant && !isSick && !isCancelled) {
                     if (isGroup) {
-                      if (isWaiting) {
-                        cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#0b57d0';
-                        finalColors.text = '#174ea6';
+                      const isGruppenunterricht = occurrencesInGroup.length === 2;
+                      if (isGruppenunterricht) {
+                        if (isWaiting) {
+                          cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
+                          finalColors.border = '#10b981';
+                          finalColors.text = '#137333';
+                        } else {
+                          cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
+                          finalColors.border = '#10b981';
+                          finalColors.text = '#137333';
+                        }
                       } else {
-                        cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
-                        finalColors.border = '#0b57d0';
-                        finalColors.text = '#174ea6';
+                        if (isWaiting) {
+                          cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
+                          finalColors.border = '#0b57d0';
+                          finalColors.text = '#174ea6';
+                        } else {
+                          cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
+                          finalColors.border = '#0b57d0';
+                          finalColors.text = '#174ea6';
+                        }
                       }
                     } else if (isGroovelab) {
                       if (isWaiting) {
@@ -3214,10 +3294,40 @@ export function ScheduleCalendarView({
                   }
  
                   const occStartMinutes = timeToMinutes(occ.start_time);
+                  const occEndMinutes = occStartMinutes + (occ.duration || 45);
                   const topPx = (occStartMinutes - dayBaselineMinutes) * 2.5;
+
+                  // Determine if this occurrence is outside the teacher's regular schedule window.
+                  // If so, it needs a separate room booking → show in purple.
+                  const isOutsideSchedule = !isBreak && !isVacant && !isSick && !isCancelled &&
+                    hasRegularBlock && (occStartMinutes < regMin || occEndMinutes > regMax);
+
+                  // Room booking approved = occ has a confirmed manual room booking for this slot.
+                  // We detect this via occ.room_booking_approved flag (set by backend/AdminDashboard).
+                  const roomBookingApproved = isOutsideSchedule && (occ.room_booking_approved === true);
+
+                  // Override card color to purple for outside-schedule occurrences
+                  if (isOutsideSchedule) {
+                    if (roomBookingApproved) {
+                      // Solid purple — room booking confirmed by secretary
+                      cardBackground = 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)';
+                      finalColors.border = '#7c3aed';
+                      finalColors.text = '#5b21b6';
+                    } else {
+                      // Purple/white diagonal — room booking pending
+                      cardBackground = 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 8px, #ffffff 8px, #ffffff 16px)';
+                      finalColors.border = '#7c3aed';
+                      finalColors.text = '#5b21b6';
+                    }
+                  }
                   
+                  const isGruppenunterricht = isGroup && occurrencesInGroup.length === 2;
+                  const isEnsemble = isGroup && occurrencesInGroup.length > 2;
+
                   const displayNames = isGroup 
-                    ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(', ')
+                    ? (isGruppenunterricht 
+                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(' & ')
+                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(', '))
                     : `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim();
 
                   return (
@@ -3367,7 +3477,10 @@ export function ScheduleCalendarView({
                                     textOverflow: 'ellipsis'
                                   }}>
                                     {isGroup 
-                                      ? (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name[0]}. (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`) 
+                                      ? (isGruppenunterricht
+                                          ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name[0] || ''}.`).join(' & ')
+                                          : (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name[0]}. (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`)
+                                        ) 
                                       : (isBreak ? 'Pause' : displayNames)
                                     }
                                   </span>
@@ -3548,22 +3661,28 @@ export function ScheduleCalendarView({
 
                                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
                                   {isGroup ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
-                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
-                                      </span>
-                                      <span style={{ 
-                                        background: 'rgba(0, 0, 0, 0.05)', 
-                                        color: finalColors.text, 
-                                        padding: '1px 4px', 
-                                        borderRadius: '4px', 
-                                        fontSize: '0.58rem', 
-                                        fontWeight: 700,
-                                        whiteSpace: 'nowrap'
-                                      }}>
-                                        {occurrencesInGroup.length} Sch.
-                                      </span>
-                                    </div>
+                                    isGruppenunterricht ? (
+                                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {displayNames}
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
+                                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                        </span>
+                                        <span style={{ 
+                                          background: 'rgba(0, 0, 0, 0.05)', 
+                                          color: finalColors.text, 
+                                          padding: '1px 4px', 
+                                          borderRadius: '4px', 
+                                          fontSize: '0.58rem', 
+                                          fontWeight: 700,
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {occurrencesInGroup.length} Sch.
+                                        </span>
+                                      </div>
+                                    )
                                   ) : (
                                     <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {displayNames}
@@ -3680,54 +3799,65 @@ export function ScheduleCalendarView({
                               </div>
 
                               {isGroup ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
+                                isGruppenunterricht ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                      {displayNames}
                                     </div>
                                     <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                      Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
+                                      Gruppenunterricht (2 Schüler)
                                     </div>
                                   </div>
-                                  
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    flexWrap: 'wrap', 
-                                    gap: '4px', 
-                                    overflowY: 'auto', 
-                                    maxHeight: `${(occ.duration || 30) * 2.5 - 52}px`,
-                                    scrollbarWidth: 'none'
-                                  }}>
-                                    {occurrencesInGroup.map(o => {
-                                      const name = `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim();
-                                      const acknowledged = o.student_acknowledged;
-                                      return (
-                                        <span 
-                                          key={o.id} 
-                                          style={{ 
-                                            background: 'rgba(255, 255, 255, 0.65)', 
-                                            border: `1px solid ${finalColors.border}22`,
-                                            color: finalColors.text, 
-                                            fontSize: '0.68rem', 
-                                            fontWeight: 700, 
-                                            padding: '2px 8px', 
-                                            borderRadius: '6px', 
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            whiteSpace: 'nowrap',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                          }}
-                                        >
-                                          <span>{name}</span>
-                                          <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>
-                                            {acknowledged ? '✓' : '🕒'}
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                      </div>
+                                      <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                        Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
+                                      </div>
+                                    </div>
+                                    
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      flexWrap: 'wrap', 
+                                      gap: '4px', 
+                                      overflowY: 'auto', 
+                                      maxHeight: `${(occ.duration || 30) * 2.5 - 52}px`,
+                                      scrollbarWidth: 'none'
+                                    }}>
+                                      {occurrencesInGroup.map(o => {
+                                        const name = `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim();
+                                        const acknowledged = o.student_acknowledged;
+                                        return (
+                                          <span 
+                                            key={o.id} 
+                                            style={{ 
+                                              background: 'rgba(255, 255, 255, 0.65)', 
+                                              border: `1px solid ${finalColors.border}22`,
+                                              color: finalColors.text, 
+                                              fontSize: '0.68rem', 
+                                              fontWeight: 700, 
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              whiteSpace: 'nowrap',
+                                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                            }}
+                                          >
+                                            <span>{name}</span>
+                                            <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>
+                                              {acknowledged ? '✓' : '🕒'}
+                                            </span>
                                           </span>
-                                        </span>
-                                      );
-                                    })}
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
+                                )
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -3741,6 +3871,11 @@ export function ScheduleCalendarView({
                                         {occ.student.instrument}
                                       </span>
                                     )
+                                  )}
+                                  {isOutsideSchedule && !roomBookingApproved && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(124, 58, 237, 0.10)', border: '1px solid rgba(124, 58, 237, 0.25)', color: '#5b21b6', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
+                                      🔔 Raumbuchung ausstehend
+                                    </span>
                                   )}
                                 </div>
                               )}
@@ -3869,11 +4004,23 @@ export function ScheduleCalendarView({
           (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
         ) : [];
 
+        const isEnsembleOcc = isGroupOcc && groupOccs.length > 2;
+        const isGruppenunterrichtOcc = isGroupOcc && groupOccs.length === 2;
+
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status === 'cancelled';
         const canDiscard = isMoved || isCancelled;
         const studentName = occ ? `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim() : 'Schüler';
-        const modalTitle = occ?.student_id ? (isGroupOcc ? `Gruppentermin bearbeiten` : `Termin bearbeiten: ${studentName}`) : 'Pause bearbeiten';
+        
+        const modalTitle = occ?.student_id 
+          ? (isGruppenunterrichtOcc 
+              ? groupOccs.map(go => `${go.student?.first_name || ''} ${go.student?.last_name || ''}`.trim()).join(' & ')
+              : isEnsembleOcc 
+                ? 'Ensemble/Band Termin' 
+                : `Termin bearbeiten: ${studentName}`
+            ) 
+          : 'Pause bearbeiten';
+
         const formattedDateLabel = occ ? new Date(editOccState.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
         const formattedTimeLabel = editOccState.start_time.substring(0, 5);
 
@@ -3901,7 +4048,7 @@ export function ScheduleCalendarView({
               background: '#ffffff', 
               borderRadius: '24px', 
               boxShadow: '0 20px 50px rgba(0,0,0,0.12)', 
-              width: isGroupOcc ? '1120px' : '780px', 
+              width: isEnsembleOcc ? '1120px' : '780px', 
               maxWidth: '95vw', 
               border: '1px solid rgba(0,0,0,0.08)', 
               display: 'flex', 
@@ -3911,7 +4058,7 @@ export function ScheduleCalendarView({
               
               {/* Premium Green Header Banner */}
               <div style={{ 
-                background: isGroupOcc 
+                background: isEnsembleOcc 
                   ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
                   : 'linear-gradient(135deg, #118a44 0%, #15803d 100%)', 
                 padding: '20px 28px', 
@@ -4059,7 +4206,7 @@ export function ScheduleCalendarView({
                         width: '100%',
                         padding: '11px 14px',
                         borderRadius: '12px',
-                        border: roomDropdownOpen ? `1px solid ${isGroupOcc ? '#007aff' : '#118a44'}` : '1px solid rgba(0, 0, 0, 0.15)',
+                        border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#118a44'}` : '1px solid rgba(0, 0, 0, 0.15)',
                         background: '#ffffff',
                         fontSize: '0.92rem',
                         fontFamily: 'inherit',
@@ -4067,7 +4214,7 @@ export function ScheduleCalendarView({
                         color: '#1d1d1f',
                         outline: 'none',
                         boxSizing: 'border-box',
-                        boxShadow: roomDropdownOpen ? `0 0 0 3px ${isGroupOcc ? 'rgba(0, 122, 255, 0.15)' : 'rgba(17, 138, 68, 0.12)'}` : '0 2px 4px rgba(0,0,0,0.02)',
+                        boxShadow: roomDropdownOpen ? `0 0 0 3px ${isEnsembleOcc ? 'rgba(0, 122, 255, 0.15)' : 'rgba(17, 138, 68, 0.12)'}` : '0 2px 4px rgba(0,0,0,0.02)',
                         transition: 'all 0.2s ease',
                         cursor: 'pointer',
                         display: 'flex',
@@ -4154,8 +4301,8 @@ export function ScheduleCalendarView({
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 cursor: 'pointer',
-                                background: isSelected ? (isGroupOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(17, 138, 68, 0.08)') : 'transparent',
-                                color: isSelected ? (isGroupOcc ? '#007aff' : '#118a44') : '#1d1d1f',
+                                background: isSelected ? (isEnsembleOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(17, 138, 68, 0.08)') : 'transparent',
+                                color: isSelected ? (isEnsembleOcc ? '#007aff' : '#118a44') : '#1d1d1f',
                                 fontWeight: isSelected ? 700 : 500,
                                 fontSize: '0.9rem',
                                 marginTop: '2px',
@@ -4163,7 +4310,7 @@ export function ScheduleCalendarView({
                               }}
                               onMouseEnter={e => {
                                 if (!isSelected) {
-                                  e.currentTarget.style.background = isGroupOcc ? 'rgba(0, 122, 255, 0.04)' : 'rgba(17, 138, 68, 0.04)';
+                                  e.currentTarget.style.background = isEnsembleOcc ? 'rgba(0, 122, 255, 0.04)' : 'rgba(17, 138, 68, 0.04)';
                                 }
                               }}
                               onMouseLeave={e => {
@@ -4177,7 +4324,7 @@ export function ScheduleCalendarView({
                                 <span>{r.name}</span>
                               </div>
                               {isSelected && (
-                                <span style={{ color: isGroupOcc ? '#007aff' : '#118a44', fontWeight: 'bold' }}>✓</span>
+                                <span style={{ color: isEnsembleOcc ? '#007aff' : '#118a44', fontWeight: 'bold' }}>✓</span>
                               )}
                             </div>
                           );
@@ -4337,9 +4484,9 @@ export function ScheduleCalendarView({
                       </button>
                       <button 
                         onClick={handleSaveEdit} 
-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isGroupOcc ? '#007aff' : '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                        onMouseOver={e => e.currentTarget.style.background = isGroupOcc ? '#0055d4' : '#15803d'}
-                        onMouseOut={e => e.currentTarget.style.background = isGroupOcc ? '#007aff' : '#118a44'}
+                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#15803d'}
+                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#118a44'}
                       >
                         Speichern
                       </button>
@@ -4357,8 +4504,8 @@ export function ScheduleCalendarView({
   
                   return (
                     <>
-                      {/* Third Column: Schülerliste (only for groups) */}
-                      {isGroupOcc && (
+                      {/* Third Column: Schülerliste (only for ensembles/bands) */}
+                      {isEnsembleOcc && (
                         <div style={{ width: '280px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                           <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             👥 {groupOccs.length} Schüler in dieser Gruppe
@@ -4588,7 +4735,7 @@ export function ScheduleCalendarView({
                                     </span>
                                   )}
                                   <div style={{ 
-                                    background: isMe ? (isGroupOcc ? '#007aff' : '#118a44') : '#f5f5f7', 
+                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#118a44') : '#f5f5f7', 
                                     color: isMe ? 'white' : '#1d1d1f', 
                                     padding: '8px 12px', 
                                     borderRadius: '12px', 
@@ -4620,7 +4767,7 @@ export function ScheduleCalendarView({
                             onChange={e => setChatTypedMessage(e.target.value)}
                             style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
                           />
-                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isGroupOcc ? '#007aff' : '#118a44'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#118a44'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
                             <Send size={14} />
                           </button>
                         </form>
@@ -4934,7 +5081,11 @@ export function ScheduleCalendarView({
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
                 }}
               >
-                Jetzt speichern
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                Speichern & Schüler informieren
               </button>
             </div>
           </div>
