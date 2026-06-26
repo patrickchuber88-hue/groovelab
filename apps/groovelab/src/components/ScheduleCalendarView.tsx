@@ -1430,7 +1430,7 @@ export function ScheduleCalendarView({
       try {
         const { data, error } = await supabase
           .from('schedule_occurrences')
-          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))')
+          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))')
           .eq('teacher_id', userId)
           .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
           .order('date')
@@ -2772,68 +2772,41 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
-                {/* Outside regular hours background highlight */}
-                {hasRegularBlock ? (
-                  <>
-                    {regMin > dayBaselineMinutes && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          height: `${(regMin - dayBaselineMinutes) * 2.5}px`,
-                          background: 'rgba(241, 245, 249, 0.35)',
-                          zIndex: 0,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    )}
-                    {regMax > regMin && (
-                      <>
-                        {/* Regular teaching hours white background */}
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            right: 0,
-                            top: `${(regMin - dayBaselineMinutes) * 2.5}px`,
-                            height: `${(regMax - regMin) * 2.5}px`,
-                            background: '#ffffff',
-                            zIndex: 0,
-                            pointerEvents: 'none'
-                          }}
-                        />
-                        {/* Outside regular hours below block */}
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            right: 0,
-                            top: `${(regMax - dayBaselineMinutes) * 2.5}px`,
-                            height: `${(1440 - regMax) * 2.5}px`,
-                            background: 'rgba(241, 245, 249, 0.35)',
-                            zIndex: 0,
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
-                      background: 'rgba(241, 245, 249, 0.35)',
-                      zIndex: 0,
-                      pointerEvents: 'none'
-                    }}
-                  />
-                )}
+                {/* Default light gray column background */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
+                    background: 'rgba(241, 245, 249, 0.35)',
+                    zIndex: 0,
+                    pointerEvents: 'none'
+                  }}
+                />
+                {/* White background only for individual regular scheduled blocks */}
+                {daySchedules.map((s: any, sIdx: number) => {
+                  const start = timeToMinutes(s.time_slot);
+                  const duration = s.duration || 45;
+                  const top = (start - dayBaselineMinutes) * 2.5;
+                  const height = duration * 2.5;
+                  return (
+                    <div 
+                      key={sIdx}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        background: '#ffffff',
+                        zIndex: 0,
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  );
+                })}
 
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
@@ -2964,31 +2937,39 @@ export function ScheduleCalendarView({
                       : (isResetPending || (isRescheduled && !(occ.status === 'rescheduled_confirmed' || occ.student_acknowledged)))
                   );
 
-                  if (isRescheduled) {
-                    if (isWaiting) {
-                      cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #fef9c3 8px, #fef9c3 16px)';
-                      finalColors.border = '#eab308';
-                      finalColors.text = '#713f12';
-                    } else {
-                      cardBackground = 'rgba(253, 224, 71, 0.35)';
-                      finalColors.border = '#facc15';
-                      finalColors.text = '#713f12';
-                    }
-                  } else if (isResetPending) {
-                    cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #fef9c3 8px, #fef9c3 16px)';
-                    finalColors.border = '#eab308';
-                    finalColors.text = '#713f12';
-                  }
+                  const isGroovelab = occ.student?.is_groovelab_active === true || 
+                    (!occ.student?.is_campus_active && localStorage.getItem('groovelab_active_platform') !== 'campus');
 
                   if (isGroup) {
                     if (isWaiting) {
-                      cardBackground = 'repeating-linear-gradient(-45deg, #f4f8ff 0px, #f4f8ff 8px, #e8f0fe 8px, #e8f0fe 16px)';
+                      cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
                       finalColors.border = '#0b57d0';
                       finalColors.text = '#174ea6';
                     } else {
                       cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
                       finalColors.border = '#0b57d0';
                       finalColors.text = '#174ea6';
+                    }
+                  } else if (isGroovelab) {
+                    if (isWaiting) {
+                      cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                      finalColors.border = '#eab308';
+                      finalColors.text = '#713f12';
+                    } else {
+                      cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                      finalColors.border = '#eab308';
+                      finalColors.text = '#713f12';
+                    }
+                  } else {
+                    // Campus: green confirmed / green-white diagonal unconfirmed
+                    if (isWaiting) {
+                      cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
+                      finalColors.border = '#10b981';
+                      finalColors.text = '#137333';
+                    } else {
+                      cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
+                      finalColors.border = '#10b981';
+                      finalColors.text = '#137333';
                     }
                   }
  
