@@ -129,6 +129,7 @@ export function ScheduleCalendarView({
   const [cachedWeekSchedules, setCachedWeekSchedules] = useState<any[]>([]);
   const [cachedWeekEvents, setCachedWeekEvents] = useState<any[]>([]);
   const [cachedWeekRoomBookings, setCachedWeekRoomBookings] = useState<any[]>([]);
+  const [cachedWeekOccurrences, setCachedWeekOccurrences] = useState<any[]>([]);
   const scrollIntervalRef = useRef<any>(null);
   const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number } | null>(null);
   const [freeRooms, setFreeRooms] = useState<any[]>([]);
@@ -136,6 +137,7 @@ export function ScheduleCalendarView({
   const [roomDropdownOpen, setRoomDropdownOpen] = useState(false);
   const [isGroupModeActive, setIsGroupModeActive] = useState(false);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
+  const [selectedRoomIdForXRay, setSelectedRoomIdForXRay] = useState<string | null>(null);
 
   const [localEndTime, setLocalEndTime] = useState<string>('');
   const [hoveredTooltip, setHoveredTooltip] = useState<{
@@ -1401,7 +1403,7 @@ export function ScheduleCalendarView({
       try {
         const { data: schedData } = await supabase
           .from('schedules')
-          .select('room_id, time_slot, duration, day_of_week, teacher:users(first_name, last_name)')
+          .select('room_id, time_slot, duration, day_of_week, teacher_id, teacher:users(first_name, last_name)')
           .eq('school_id', schoolId)
           .not('room_id', 'is', null);
         if (schedData) setCachedWeekSchedules(schedData);
@@ -1423,6 +1425,12 @@ export function ScheduleCalendarView({
           .lte('date', endDateStr)
           .not('room_id', 'is', null);
         if (rbData) setCachedWeekRoomBookings(rbData);
+
+        const { data: allOccsData } = await supabase
+          .from('schedule_occurrences')
+          .select('id, date, start_time, duration, status, teacher_id, student_id, schedule_id, schedules!schedule_occurrences_schedule_id_fkey(room_id)')
+          .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`);
+        if (allOccsData) setCachedWeekOccurrences(allOccsData);
       } catch (cacheErr) {
         console.warn('Error pre-loading week bookings cache:', cacheErr);
       }
@@ -2352,6 +2360,92 @@ export function ScheduleCalendarView({
     });
   };
 
+  const activeRooms = useMemo(() => {
+    const ids = new Set<string>();
+    occurrences.forEach((occ: any) => {
+      const rid = occ.schedules?.room_id || occ.room_id;
+      if (rid) ids.add(rid);
+    });
+    cachedWeekSchedules.forEach((s: any) => {
+      if (s.teacher_id === userId && s.room_id) {
+        ids.add(s.room_id);
+      }
+    });
+    const activeIds = Array.from(ids);
+    if (activeIds.length > 0) {
+      return rooms.filter(r => activeIds.includes(r.id));
+    }
+    return rooms;
+  }, [occurrences, cachedWeekSchedules, userId, rooms]);
+
+  const getOtherRoomOccupancies = (dateStr: string, roomId: string) => {
+    const dayDate = new Date(dateStr);
+    const dayOfWeek = dayDate.getDay() || 7;
+    const intervals: { start: number; end: number; type: string }[] = [];
+
+    // 1. Template schedules of other teachers
+    cachedWeekSchedules.forEach((s: any) => {
+      if (s.room_id === roomId && s.teacher_id !== userId && s.day_of_week === dayOfWeek) {
+        const start = timeToMinutes(s.time_slot);
+        const end = start + (s.duration || 45);
+        const hasCancelledOcc = cachedWeekOccurrences.some(o => 
+          o.schedule_id === s.id && 
+          o.date === dateStr && 
+          o.status === 'cancelled'
+        );
+        if (!hasCancelledOcc) {
+          intervals.push({ start, end, type: 'template' });
+        }
+      }
+    });
+
+    // 2. Room bookings of other teachers
+    cachedWeekRoomBookings.forEach((rb: any) => {
+      if (rb.room_id === roomId && rb.booked_by !== userId && rb.date === dateStr) {
+        const start = timeToMinutes(rb.start_time);
+        const end = timeToMinutes(rb.end_time || rb.start_time);
+        const duration = end > start ? (end - start) : 45;
+        intervals.push({ start, end: start + duration, type: 'booking' });
+      }
+    });
+
+    // 3. Occurrences of other teachers
+    cachedWeekOccurrences.forEach((o: any) => {
+      if (o.teacher_id !== userId && o.date === dateStr && o.status !== 'cancelled') {
+        const booking = cachedWeekRoomBookings.find(b => 
+          b.date === o.date && 
+          b.start_time.substring(0, 5) === o.start_time.substring(0, 5) &&
+          b.booked_by === o.teacher_id
+        );
+        const currentRoomId = booking ? booking.room_id : (o.schedules?.room_id);
+        if (currentRoomId === roomId) {
+          const start = timeToMinutes(o.start_time);
+          const end = start + (o.duration || 45);
+          if (!intervals.some(inv => inv.start === start && inv.type === 'template')) {
+            intervals.push({ start, end, type: 'occurrence' });
+          }
+        }
+      }
+    });
+
+    intervals.sort((a, b) => a.start - b.start);
+    const merged: typeof intervals = [];
+    intervals.forEach(inv => {
+      if (merged.length === 0) {
+        merged.push(inv);
+      } else {
+        const last = merged[merged.length - 1];
+        if (inv.start < last.end) {
+          last.end = Math.max(last.end, inv.end);
+        } else {
+          merged.push(inv);
+        }
+      }
+    });
+
+    return merged;
+  };
+
   const nonCancelledOccurrences = occurrences.filter(o => o.status !== 'cancelled');
   const weekMinMinutes = nonCancelledOccurrences.length > 0
     ? nonCancelledOccurrences.reduce((min, o) => {
@@ -2390,9 +2484,14 @@ export function ScheduleCalendarView({
             <CalendarIcon size={20} />
           </div>
           <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-              KW {weekNumber}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                KW {weekNumber}
+              </h2>
+              <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
+              </span>
+            </div>
             {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
@@ -2423,9 +2522,39 @@ export function ScheduleCalendarView({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <span style={{ color: '#86868b', fontSize: '0.94rem', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-            ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.03)', padding: '4px 12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              🔍 Röntgen-Ansicht:
+            </span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {activeRooms.map(room => {
+                const isActive = selectedRoomIdForXRay === room.id;
+                return (
+                  <button
+                    key={room.id}
+                    onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                    style={{
+                      background: isActive 
+                        ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                        : 'transparent',
+                      color: isActive ? '#ffffff' : '#64748b',
+                      border: `1px solid ${isActive 
+                        ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                        : 'rgba(0,0,0,0.15)'}`,
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {room.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {activeTab && setActiveTab && (
@@ -2859,6 +2988,48 @@ export function ScheduleCalendarView({
                   );
                 })()}
 
+                {selectedRoomIdForXRay && getOtherRoomOccupancies(dateStr, selectedRoomIdForXRay).map((inv, idx) => {
+                  const top = (inv.start - dayBaselineMinutes) * 2.5;
+                  const height = (inv.end - inv.start) * 2.5;
+                  return (
+                    <div
+                      key={`xray-${idx}`}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        background: 'repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.12) 0px, rgba(148, 163, 184, 0.12) 8px, transparent 8px, transparent 16px)',
+                        border: '1.5px dashed rgba(148, 163, 184, 0.4)',
+                        borderRadius: '8px',
+                        zIndex: 1,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        color: '#475569',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(148, 163, 184, 0.3)',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        🔒 Besetzt
+                      </span>
+                    </div>
+                  );
+                })}
+
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
                 {markers.map(m => (
@@ -3123,7 +3294,9 @@ export function ScheduleCalendarView({
                           borderRadius: '8px', 
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
                           cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
-                          opacity: draggedId === occ.id ? 0.5 : 1,
+                          opacity: draggedId === occ.id ? 0.5 : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
+                          filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
+                          transition: 'all 0.2s',
                           position: 'absolute',
                           top: `${topPx}px`,
                           left: '8px',
