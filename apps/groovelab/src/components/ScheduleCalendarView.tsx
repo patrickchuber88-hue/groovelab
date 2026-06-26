@@ -2772,41 +2772,88 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
-                {/* Default light gray column background */}
-                <div 
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
-                    background: 'rgba(241, 245, 249, 0.35)',
-                    zIndex: 0,
-                    pointerEvents: 'none'
-                  }}
-                />
-                {/* White background only for individual regular scheduled blocks */}
-                {daySchedules.map((s: any, sIdx: number) => {
-                  const start = timeToMinutes(s.time_slot);
-                  const duration = s.duration || 45;
-                  const top = (start - dayBaselineMinutes) * 2.5;
-                  const height = duration * 2.5;
+                {/* Column Background Layout: White inside terminblock, gray outside */}
+                {(() => {
+                  if (daySchedules.length === 0) {
+                    // No teaching schedule: entire day is outside terminblock (gray)
+                    return (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          height: `${(1440 - dayBaselineMinutes) * 2.5}px`,
+                          background: 'rgba(241, 245, 249, 0.35)',
+                          zIndex: 0,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    );
+                  }
+
+                  // Find earliest start and latest end minutes
+                  let earliestStart = 1440;
+                  let latestEnd = 0;
+                  daySchedules.forEach((s: any) => {
+                    const start = timeToMinutes(s.time_slot);
+                    const end = start + (s.duration || 45);
+                    if (start < earliestStart) earliestStart = start;
+                    if (end > latestEnd) latestEnd = end;
+                  });
+
+                  const topGrayHeight = Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5);
+                  const bottomGrayTop = Math.max(0, (latestEnd - dayBaselineMinutes) * 2.5);
+                  const bottomGrayHeight = Math.max(0, (1440 - latestEnd) * 2.5);
+
                   return (
-                    <div 
-                      key={sIdx}
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: `${top}px`,
-                        height: `${height}px`,
-                        background: '#ffffff',
-                        zIndex: 0,
-                        pointerEvents: 'none'
-                      }}
-                    />
+                    <>
+                      {/* White background for the entire terminblock area */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: `${Math.max(0, (earliestStart - dayBaselineMinutes) * 2.5)}px`,
+                          height: `${Math.max(0, (latestEnd - earliestStart) * 2.5)}px`,
+                          background: '#ffffff',
+                          zIndex: 0,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                      {/* Gray overlay BEFORE the terminblock */}
+                      {topGrayHeight > 0 && (
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            height: `${topGrayHeight}px`,
+                            background: 'rgba(241, 245, 249, 0.35)',
+                            zIndex: 0,
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                      {/* Gray overlay AFTER the terminblock */}
+                      {bottomGrayHeight > 0 && (
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: `${bottomGrayTop}px`,
+                            height: `${bottomGrayHeight}px`,
+                            background: 'rgba(241, 245, 249, 0.35)',
+                            zIndex: 0,
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                    </>
                   );
-                })}
+                })()}
 
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
@@ -2939,36 +2986,38 @@ export function ScheduleCalendarView({
 
                   const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
 
-                  if (isGroup) {
-                    if (isWaiting) {
-                      cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
-                      finalColors.border = '#0b57d0';
-                      finalColors.text = '#174ea6';
+                  if (!isBreak && !isVacant && !isSick && !isCancelled) {
+                    if (isGroup) {
+                      if (isWaiting) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#0b57d0';
+                        finalColors.text = '#174ea6';
+                      } else {
+                        cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
+                        finalColors.border = '#0b57d0';
+                        finalColors.text = '#174ea6';
+                      }
+                    } else if (isGroovelab) {
+                      if (isWaiting) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#eab308';
+                        finalColors.text = '#713f12';
+                      } else {
+                        cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                        finalColors.border = '#eab308';
+                        finalColors.text = '#713f12';
+                      }
                     } else {
-                      cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
-                      finalColors.border = '#0b57d0';
-                      finalColors.text = '#174ea6';
-                    }
-                  } else if (isGroovelab) {
-                    if (isWaiting) {
-                      cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                      finalColors.border = '#eab308';
-                      finalColors.text = '#713f12';
-                    } else {
-                      cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                      finalColors.border = '#eab308';
-                      finalColors.text = '#713f12';
-                    }
-                  } else {
-                    // Campus: green confirmed / green-white diagonal unconfirmed
-                    if (isWaiting) {
-                      cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
-                      finalColors.border = '#10b981';
-                      finalColors.text = '#137333';
-                    } else {
-                      cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
-                      finalColors.border = '#10b981';
-                      finalColors.text = '#137333';
+                      // Campus: green confirmed / green-white diagonal unconfirmed
+                      if (isWaiting) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#10b981';
+                        finalColors.text = '#137333';
+                      } else {
+                        cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
+                        finalColors.border = '#10b981';
+                        finalColors.text = '#137333';
+                      }
                     }
                   }
  
