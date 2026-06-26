@@ -13,7 +13,8 @@ import {
   Trash2,
   Palmtree,
   Users,
-  Link2Off
+  Link2Off,
+  Search
 } from 'lucide-react';
 
 interface ScheduleOccurrence {
@@ -2470,41 +2471,41 @@ export function ScheduleCalendarView({
       <div style={{ 
         background: 'rgba(255, 255, 255, 0.65)', 
         backdropFilter: 'blur(30px) saturate(210%)', 
-        borderRadius: '24px', 
-        padding: '20px', 
+        borderRadius: '16px', 
+        padding: '12px 16px', 
         border: '1px solid rgba(255, 255, 255, 0.6)', 
         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)', 
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '10px'
       }}>
         {/* Row 1: Title & Main Navigation */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ height: '44px', width: '44px', borderRadius: '14px', background: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <CalendarIcon size={22} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CalendarIcon size={16} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '26px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                   KW {weekNumber}
                 </h2>
-                <span style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
                 </span>
               </div>
               {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
                   <select
                     value={selectedTeacherId}
                     onChange={(e) => setSelectedTeacherId(e.target.value)}
                     style={{
                       background: '#ffffff',
                       border: '1px solid rgba(0, 0, 0, 0.08)',
-                      borderRadius: '8px',
-                      padding: '3px 8px',
-                      fontSize: '0.72rem',
+                      borderRadius: '6px',
+                      padding: '2px 6px',
+                      fontSize: '0.68rem',
                       fontWeight: 700,
                       color: '#1d1d1f',
                       outline: 'none',
@@ -2525,16 +2526,18 @@ export function ScheduleCalendarView({
 
           {/* Right: Tab switch */}
           {activeTab && setActiveTab && (
-            <div className="app-segmented-switch" style={{ margin: 0 }}>
+            <div className="app-segmented-switch" style={{ margin: 0, padding: '2px', gap: '2px' }}>
               <button 
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                style={{ padding: '3px 8px', fontSize: '0.72rem', lineHeight: '1.2' }}
               >
                 Stundenplan
               </button>
               <button 
                 onClick={() => setActiveTab('designer')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                style={{ padding: '3px 8px', fontSize: '0.72rem', lineHeight: '1.2' }}
               >
                 Stundenplan-Designer
               </button>
@@ -2546,12 +2549,12 @@ export function ScheduleCalendarView({
         <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
 
         {/* Row 2: Röntgen Filter & Utilities */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
           {/* Left: Röntgen selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.04)' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                🔍 Röntgen-Ansicht:
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
               </span>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {activeRooms.map(room => {
@@ -2568,9 +2571,9 @@ export function ScheduleCalendarView({
                         border: `1px solid ${isActive 
                           ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
                           : 'rgba(0,0,0,0.08)'}`,
-                        borderRadius: '6px',
-                        padding: '3px 8px',
-                        fontSize: '0.7rem',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        fontSize: '0.68rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'all 0.12s',
@@ -2586,11 +2589,11 @@ export function ScheduleCalendarView({
           </div>
 
           {/* Right: Actions */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
             {Object.keys(pendingChanges).length > 0 && (
               <button 
                 onClick={savePendingChanges}
-                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)' }}
+                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)' }}
                 onMouseOver={e => e.currentTarget.style.background = '#15803d'}
                 onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
               >
@@ -2613,17 +2616,17 @@ export function ScheduleCalendarView({
                   ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
                   : '#cbd5e1'}`,
                 fontWeight: 600,
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '0.75rem',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 transition: 'all 0.15s'
               }}
             >
-              <Users size={13} />
+              <Users size={11} />
               {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
             </button>
 
@@ -2636,13 +2639,13 @@ export function ScheduleCalendarView({
                   color: 'white',
                   border: 'none',
                   fontWeight: 650,
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.7rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '4px',
                   transition: 'all 0.15s',
                   boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(19, 115, 51, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
                 }}
@@ -2653,7 +2656,7 @@ export function ScheduleCalendarView({
 
             <button 
               onClick={handleResetWeek}
-              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
               title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
@@ -2663,7 +2666,7 @@ export function ScheduleCalendarView({
 
             <button 
               onClick={jumpToToday}
-              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
@@ -2672,16 +2675,16 @@ export function ScheduleCalendarView({
             
             <button 
               onClick={jumpToMonthStart}
-              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
               Zum Monatsanfang
             </button>
             
-            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', padding: '3px', border: '1px solid rgba(0,0,0,0.04)' }}>
-              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={16} /></button>
-              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={16} /></button>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(0,0,0,0.04)' }}>
+              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '3px', cursor: 'pointer', borderRadius: '4px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={13} /></button>
+              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '3px', cursor: 'pointer', borderRadius: '4px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={13} /></button>
             </div>
           </div>
         </div>
