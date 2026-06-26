@@ -2422,57 +2422,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 <Sparkles size={12} />
                 Automatisch zuteilen
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsGroupModeActive(prev => !prev);
-                  setSelectedForGroup([]);
-                }}
-                style={{
-                  background: isGroupModeActive 
-                    ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff') 
-                    : 'transparent',
-                  color: isGroupModeActive ? 'white' : '#64748b',
-                  border: `1px solid ${isGroupModeActive 
-                    ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff') 
-                    : '#cbd5e1'}`,
-                  fontWeight: 600,
-                  padding: '5px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <Users size={12} />
-                {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
-              </button>
-              {isGroupModeActive && selectedForGroup.length >= 2 && (
-                <button
-                  type="button"
-                  onClick={handleMergeSelectedIntoGroup}
-                  style={{
-                    background: '#16a34a',
-                    color: 'white',
-                    border: 'none',
-                    fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s',
-                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
-                  }}
-                >
-                  Zusammenführen ({selectedForGroup.length})
-                </button>
-              )}
+
               <button
                 type="button"
                 onClick={handleResetAllAssignments}
