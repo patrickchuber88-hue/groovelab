@@ -3296,7 +3296,6 @@ export function ScheduleCalendarView({
                           cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
                           opacity: draggedId === occ.id ? 0.5 : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
                           filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
-                          transition: 'all 0.2s',
                           position: 'absolute',
                           top: `${topPx}px`,
                           left: '8px',
