@@ -2565,11 +2565,11 @@ export function ScheduleCalendarView({
                       onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
                       style={{
                         background: isActive 
-                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#0b57d0')
                           : '#ffffff',
                         color: isActive ? '#ffffff' : '#475569',
                         border: `1px solid ${isActive 
-                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#0b57d0')
+                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#0b57d0')
                           : 'rgba(0,0,0,0.08)'}`,
                         borderRadius: '4px',
                         padding: '2px 6px',
