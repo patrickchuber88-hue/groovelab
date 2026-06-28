@@ -1951,27 +1951,27 @@ export function AdminDashboard({
           .order('check_in_time', { ascending: false });
         setActiveSessions(sData || []);
       } else if (activeTab === 'students') {
-        // ─── STRICT GUARD: Teacher-Isolation ───────────────────────────────────
-        // ONLY admin and secretary may see ALL students of the school.
-        // Every other role (teacher, coach, etc.) is ALWAYS filtered to their
-        // own assigned students by teacher_id. This can never be bypassed.
-        //
-        // NOTE: Teachers do NOT get the platform-activation filter — they should
-        // see ALL their assigned students regardless of is_campus_active status.
-        // Admins/secretaries DO get the platform filter (they manage the full list).
-        // ───────────────────────────────────────────────────────────────────────
+        // ─── Student Visibility Rules ──────────────────────────────────────────
+        //  • Admin / Secretary in Campus:    is_campus_active = true (all school)
+        //  • Admin / Secretary in GrooveLab: is_groovelab_active = true (all school)
+        //  • Teacher in Campus:              all own assigned pupils (teacher_id, no activation filter)
+        //  • Teacher in GrooveLab:           ALL groovelab-active students school-wide
+        //                                    (no teacher_id filter — GrooveLab is a shared platform)
+        // ──────────────────────────────────────────────────────────────────────
         const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
         let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
 
         if (canSeeAllStudents) {
-          // Admins / secretaries: filter by platform activation to show relevant students
+          // Admins / secretaries: filter by platform activation
           if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
           else sq = sq.eq('is_groovelab_active', true);
-        } else {
-          // Teachers (and any other role): show only their own assigned students,
-          // no platform-activation filter — they are responsible for all their pupils.
-          console.warn('[GUARD] Applying teacher_id filter for non-admin user:', adminData.role, adminData.id);
+        } else if (activePlatform === 'campus') {
+          // Teachers in Campus: see all their own assigned students (no activation filter needed)
           sq = sq.eq('teacher_id', adminData.id);
+        } else {
+          // Teachers in GrooveLab: see ALL groovelab-active students school-wide
+          // GrooveLab is a shared gamified platform — all active students participate together
+          sq = sq.eq('is_groovelab_active', true);
         }
 
         const { data: studentsData } = await sq.order('first_name');

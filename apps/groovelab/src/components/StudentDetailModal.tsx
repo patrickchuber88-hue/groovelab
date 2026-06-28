@@ -1051,154 +1051,236 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </div>
             </div>
 
-            {/* KPIs Grid */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
-              gap: '12px', 
-              marginTop: '8px',
-              alignItems: 'stretch'
-            }}>
-              {/* Card 1: XP (Blue) */}
-              <div style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 6px 15px rgba(29, 78, 216, 0.1)',
-                height: '100%',
-                boxSizing: 'border-box'
+            {/* KPIs Grid — tab-specific */}
+            {isPlatformCampus ? (
+              /* ---- CAMPUS KPIs: XP, Songs, Fokus, Streak ---- */
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+                gap: '12px', 
+                marginTop: '8px',
+                alignItems: 'stretch'
               }}>
+                {/* Card 1: Campus XP (Blue) */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.18)',
-                  borderRadius: '10px',
-                  width: '32px',
-                  height: '32px',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(29, 78, 216, 0.1)',
+                  height: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <Star size={18} fill="white" color="white" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                    {currentXP} XP
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Star size={18} fill="white" color="white" />
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                    XP GESAMMELT
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {currentXP} XP
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      XP GESAMMELT
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Card 2: Songs (Green) */}
-              <div style={{
-                background: 'linear-gradient(135deg, #10b981, #047857)',
-                color: 'white',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 6px 15px rgba(4, 120, 87, 0.1)',
-                height: '100%',
-                boxSizing: 'border-box'
-              }}>
+                {/* Card 2: Campus Songs (Green) */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.18)',
-                  borderRadius: '10px',
-                  width: '32px',
-                  height: '32px',
+                  background: 'linear-gradient(135deg, #10b981, #047857)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(4, 120, 87, 0.1)',
+                  height: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <Award size={18} fill="white" color="white" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                    {verifiedSongsCount} / 3
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Award size={18} fill="white" color="white" />
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                    SONGS VERIFIZIERT
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {verifiedSongsCount} / 3
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      SONGS GEMEISTERT
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Card 3: Fokus (Yellow) */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-                color: '#1e293b',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 6px 15px rgba(217, 119, 6, 0.1)',
-                height: '100%',
-                boxSizing: 'border-box'
-              }}>
+                {/* Card 3: Fokus (Yellow) */}
                 <div style={{
-                  background: 'rgba(30, 41, 59, 0.1)',
-                  borderRadius: '10px',
-                  width: '32px',
-                  height: '32px',
+                  background: 'linear-gradient(135deg, #fbbf24, #d97706)',
+                  color: '#1e293b',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(217, 119, 6, 0.1)',
+                  height: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <Clock size={18} color="#1e293b" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                    {focusMinutes} Min
+                  <div style={{
+                    background: 'rgba(30, 41, 59, 0.1)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Clock size={18} color="#1e293b" />
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                    FOKUS-ÜBEZEIT
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {focusMinutes} Min
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      FOKUS-ÜBEZEIT
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Card 4: Streak (Orange) */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f97316, #c2410c)',
-                color: 'white',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 6px 15px rgba(194, 65, 12, 0.1)',
-                height: '100%',
-                boxSizing: 'border-box'
-              }}>
+                {/* Card 4: Streak (Orange) */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.18)',
-                  borderRadius: '10px',
-                  width: '32px',
-                  height: '32px',
+                  background: 'linear-gradient(135deg, #f97316, #c2410c)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(194, 65, 12, 0.1)',
+                  height: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <span style={{ fontSize: '1.1rem' }}>🔥</span>
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                    {streakDays} {streakDays === 1 ? 'Tag' : 'Tage'}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <span style={{ fontSize: '1.1rem', filter: 'grayscale(100%)' }}>🔥</span>
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                    SERIE AM LAUFEN
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {streakDays} {streakDays === 1 ? 'Tag' : 'Tage'}
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      SERIE AM LAUFEN
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* ---- GROOVELAB KPIs: GrooveLab-XP, Anzahl Songs ---- */
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+                gap: '12px', 
+                marginTop: '8px',
+                alignItems: 'stretch'
+              }}>
+                {/* GL Card 1: GrooveLab XP (Orange/Red — GrooveLab brand) */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #f97316, #c2410c)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(194, 65, 12, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Star size={18} fill="white" color="white" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {verifiedSongsCount * 100} XP
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      GROOVELAB XP
+                    </div>
+                  </div>
+                </div>
+
+                {/* GL Card 2: Anzahl Songs (Purple) */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(109, 40, 217, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    borderRadius: '10px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Music size={18} fill="white" color="white" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {verifiedSongsCount}
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      SONGS GEMEISTERT
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* View Specific Left Content */}
             {isPlatformCampus ? (
@@ -1562,20 +1644,155 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             )}
           </div>
 
-          {/* RIGHT COLUMN: Permanent Sidebar Widgets pushed perfectly to the top */}
+          {/* RIGHT COLUMN: Pass first, then settings (campus only) */}
           <aside style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            
-            {/* Module & Einstellungen (Switched settings card) */}
-            <section style={{ 
-              background: '#ffffff', 
-              borderRadius: '24px', 
-              padding: '16px 20px', 
-              border: '1.5px solid #f1f5f9',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
-            }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={16} style={{ color: '#64748b' }} /> Module &amp; Einstellungen
-              </h4>
+
+            {isPlatformCampus ? (
+              /* ============ CAMPUS RIGHT COLUMN ============ */
+              <>
+                {/* 1. Ausweis (Campus Pass) — always on top */}
+                <div className="hover-scale" style={{ 
+                  background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+                  borderRadius: '32px', 
+                  padding: '28px', 
+                  color: 'white',
+                  boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
+                  border: '1.5px solid rgba(52, 168, 83, 0.3)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  width: '100%',
+                  height: 'auto',
+                  minHeight: '480px',
+                  boxSizing: 'border-box',
+                  gap: '20px'
+                }}>
+                  {/* Sheen effect */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
+                    pointerEvents: 'none'
+                  }} />
+
+                  {/* CAMPUS PASS Header */}
+                  <span style={{ 
+                    fontSize: '0.68rem', 
+                    fontWeight: 900, 
+                    color: '#fbbf24', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.2em',
+                    zIndex: 1,
+                    marginBottom: '-4px'
+                  }}>
+                    CAMPUS PASS
+                  </span>
+
+                  {/* Top Info Section: Details left, Avatar right */}
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
+                    {/* Right Side: Avatar Photo */}
+                    <img 
+                      src={displayAvatarSrc} 
+                      alt="Avatar" 
+                      style={{ 
+                        width: '92px', 
+                        height: '92px', 
+                        borderRadius: '22px', 
+                        objectFit: 'cover',
+                        border: '3px solid #22c55e',
+                        boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
+                        flexShrink: 0,
+                        marginTop: '2px'
+                      }} 
+                    />
+                    
+                    {/* Left Side: Identity Details */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                      <div>
+                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                          {student.first_name} {student.last_name}
+                        </div>
+                      </div>
+ 
+                      <div>
+                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
+                          {schoolName}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dashed divider line */}
+                  <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+
+                  {/* QR Code Scan area */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
+                    <div style={{ 
+                      background: '#ffffff', 
+                      padding: '16px', 
+                      borderRadius: '24px', 
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.35)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      border: '1.5px solid rgba(52, 168, 83, 0.3)'
+                    }}>
+                      <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* QR Code regenerate button — below pass for campus */}
+                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                  <button
+                    onClick={handleRegenerateQrToken}
+                    className="google-btn-secondary"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      fontSize: '0.8rem',
+                      fontWeight: 850,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      background: '#fff1f2',
+                      border: '1.5px solid #fecdd3',
+                      color: '#e11d48',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      marginTop: '-16px',
+                      boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#ffe4e6';
+                      e.currentTarget.style.borderColor = '#fda4af';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#fff1f2';
+                      e.currentTarget.style.borderColor = '#fecdd3';
+                    }}
+                  >
+                    <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
+                  </button>
+                )}
+
+                {/* 2. Module & Einstellungen — below the pass */}
+                <section style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '16px 20px', 
+                  border: '1.5px solid #f1f5f9',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+                }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sliders size={16} style={{ color: '#64748b' }} /> Module &amp; Einstellungen
+                  </h4>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -1703,72 +1920,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       </span>
                     )}
                   </div>
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                {/* Härtefall / Geschwisterrabatt (Direct Billing Exemption) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Härtefall / Geschwisterrabatt</span>
-                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Befreit diesen Schüler komplett von der Direktabrechnung.</span>
-                  </div>
-                  {activePlatform === 'secretary' ? (
-                    <div style={{ 
-                      background: '#f1f5f9', 
-                      padding: '2px', 
-                      borderRadius: '12px', 
-                      display: 'inline-flex', 
-                      border: 'none',
-                      alignItems: 'center'
-                    }}>
-                      <button
-                        onClick={() => handleToggleExemption(false)}
-                        style={{
-                          background: !exemptFromDirectBilling ? '#ffffff' : 'transparent',
-                          color: !exemptFromDirectBilling ? '#1e293b' : '#64748b',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: !exemptFromDirectBilling ? 800 : 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: !exemptFromDirectBilling ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                        }}
-                      >
-                        Nein
-                      </button>
-                      <button
-                        onClick={() => handleToggleExemption(true)}
-                        style={{
-                          background: exemptFromDirectBilling ? '#ea4335' : 'transparent',
-                          color: exemptFromDirectBilling ? '#ffffff' : '#64748b',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: exemptFromDirectBilling ? 800 : 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: exemptFromDirectBilling ? '0 1px 4px rgba(234, 67, 53, 0.3)' : 'none'
-                        }}
-                      >
-                        Ja
-                      </button>
-                    </div>
-                  ) : (
-                    <span style={{ 
-                      background: exemptFromDirectBilling ? '#fee2e2' : '#f1f5f9', 
-                      color: exemptFromDirectBilling ? '#ea4335' : '#64748b', 
-                      padding: '4px 10px', 
-                      borderRadius: '10px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 800 
-                    }}>
-                      {exemptFromDirectBilling ? 'Befreit' : 'Nein'}
-                    </span>
-                  )}
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
@@ -1938,142 +2089,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
               </div>
             </section>
-
-            {/* Action button for managers to regenerate QR Code (Placed above cards as requested) */}
-            {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-              <button
-                onClick={handleRegenerateQrToken}
-                className="google-btn-secondary"
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  fontSize: '0.8rem',
-                  fontWeight: 850,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  background: '#fff1f2',
-                  border: '1.5px solid #fecdd3',
-                  color: '#e11d48',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  marginBottom: '10px',
-                  boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
-                  transition: 'all 0.2s',
-                  zIndex: 10
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#ffe4e6';
-                  e.currentTarget.style.borderColor = '#fda4af';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#fff1f2';
-                  e.currentTarget.style.borderColor = '#fecdd3';
-                }}
-              >
-                <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
-              </button>
-            )}
-
-            {isPlatformCampus ? (
-              /* Wallet Pass (Green ID Card) - Forest green obsidian gradient, green outlines and accents */
-              <div className="hover-scale" style={{ 
-                background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
-                borderRadius: '32px', 
-                padding: '28px', 
-                color: 'white',
-                boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-                border: '1.5px solid rgba(52, 168, 83, 0.3)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-                width: '100%',
-                height: 'auto',
-                minHeight: '480px',
-                boxSizing: 'border-box',
-                gap: '20px'
-              }}>
-                {/* Sheen effect */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
-                  pointerEvents: 'none'
-                }} />
-
-                 {/* CAMPUS PASS Header */}
-                 <span style={{ 
-                   fontSize: '0.68rem', 
-                   fontWeight: 900, 
-                   color: '#fbbf24', 
-                   textTransform: 'uppercase', 
-                   letterSpacing: '0.2em',
-                   zIndex: 1,
-                   marginBottom: '-4px'
-                 }}>
-                   CAMPUS PASS
-                 </span>
-
-                 {/* Top Info Section: Details left, Avatar right */}
-                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
-                   {/* Right Side: Avatar Photo */}
-                   <img 
-                     src={displayAvatarSrc} 
-                     alt="Avatar" 
-                     style={{ 
-                       width: '92px', 
-                       height: '92px', 
-                       borderRadius: '22px', 
-                       objectFit: 'cover',
-                       border: '3px solid #22c55e',
-                       boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
-                       flexShrink: 0,
-                       marginTop: '2px'
-                     }} 
-                   />
-                   
-                   {/* Left Side: Identity Details */}
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                     <div>
-                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
-                       <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                         {student.first_name} {student.last_name}
-                       </div>
-                     </div>
- 
-                     <div>
-                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
-                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
-                         {schoolName}
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-
-                {/* Dashed divider line */}
-                <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
-
-                {/* QR Code Scan area */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
-                  <div style={{ 
-                    background: '#ffffff', 
-                    padding: '16px', 
-                    borderRadius: '24px', 
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: '1.5px solid rgba(52, 168, 83, 0.3)'
-                  }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
-                  </div>
-                </div>
-              </div>
+              </>
             ) : (
-              /* GrooveLab Member access card styling (vertical white card design with slots and circle avatar) */
+              /* ============ GROOVELAB RIGHT COLUMN — Pass only ============ */
+
+              /* GrooveLab Member access card — on top, no settings widget below */
               <div className="hover-scale" style={{
                 background: 'white',
                 borderRadius: '32px',
