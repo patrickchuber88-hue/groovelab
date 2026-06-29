@@ -104,6 +104,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [bookingSlot, setBookingSlot] = useState<string>('');
   const [bookingType, setBookingType] = useState<'solo' | 'lesson'>('solo');
   const [bookingStudentId, setBookingStudentId] = useState<string>('');
+  const [selectedLessonInstrument, setSelectedLessonInstrument] = useState<string>('');
   // Campus Event room bookings (from campus_events with room_id)
   const [campusEventBookings, setCampusEventBookings] = useState<any[]>([]);
 
@@ -261,7 +262,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   };
 
   const isTodayHoliday = useMemo(() => {
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
   }, [holidays]);
 
@@ -1628,6 +1629,37 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     if (!selectedRoom || !bookingDay || !bookingSlot) return;
 
     try {
+      let chosenInstrument = '';
+      if (bookingType === 'lesson' && bookingStudentId) {
+        const studentObj = students.find(s => s.id === bookingStudentId);
+        const insts = studentObj?.instrument ? studentObj.instrument.split(',').map((i: string) => i.trim()).filter(Boolean) : [];
+        if (insts.length > 1) {
+          chosenInstrument = selectedLessonInstrument || insts[0];
+        } else if (insts.length === 1) {
+          chosenInstrument = insts[0];
+        } else {
+          chosenInstrument = 'Klavier';
+        }
+      }
+
+      // Before inserting, validate that no other approved schedule exists for this student_id with the same instrument
+      if (bookingType === 'lesson' && bookingStudentId && chosenInstrument) {
+        const { data: existing, error: checkErr } = await supabase
+          .from('schedules')
+          .select('id')
+          .eq('student_id', bookingStudentId)
+          .eq('instrument', chosenInstrument)
+          .eq('status', 'approved')
+          .limit(1);
+
+        if (checkErr) {
+          console.error('Error checking existing schedules:', checkErr);
+        } else if (existing && existing.length > 0) {
+          alert(`Fehler: Für diesen Schüler existiert bereits ein genehmigter Stundenplan für das Instrument "${chosenInstrument}".`);
+          return;
+        }
+      }
+
       const payload: any = {
         school_id: teacher.school_id,
         teacher_id: userId,
@@ -1639,6 +1671,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
       if (bookingType === 'lesson' && bookingStudentId) {
         payload.student_id = bookingStudentId;
+        payload.instrument = chosenInstrument;
       }
 
       const { data, error } = await supabase
@@ -2089,7 +2122,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                           if (!isSick && sched.status !== 'pending_reschedule') {
                             handleOpenDocModal(sched);
                           }
-                          const clickDate = sched.date || new Date().toISOString().substring(0, 10);
+                          const clickDate = sched.date || new Date().toLocaleDateString('sv-SE');
                           setSickUntilDate(clickDate);
                         }}
                         style={{
@@ -3053,7 +3086,17 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   <label className="text-xs font-black uppercase tracking-wider text-slate-400">Schüler auswählen</label>
                   <select
                     value={bookingStudentId}
-                    onChange={(e) => setBookingStudentId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBookingStudentId(val);
+                      const studentObj = students.find(s => s.id === val);
+                      const insts = studentObj?.instrument ? studentObj.instrument.split(',').map((i: string) => i.trim()).filter(Boolean) : [];
+                      if (insts.length > 0) {
+                        setSelectedLessonInstrument(insts[0]);
+                      } else {
+                        setSelectedLessonInstrument('');
+                      }
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
                   >
                     <option value="">-- Schüler wählen --</option>
@@ -3065,6 +3108,28 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   </select>
                 </div>
               )}
+
+              {bookingType === 'lesson' && bookingStudentId && (() => {
+                const studentObj = students.find(s => s.id === bookingStudentId);
+                const insts = studentObj?.instrument ? studentObj.instrument.split(',').map((i: string) => i.trim()).filter(Boolean) : [];
+                if (insts.length > 1) {
+                  return (
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-400">Instrument für diese Stunde wählen</label>
+                      <select
+                        value={selectedLessonInstrument}
+                        onChange={(e) => setSelectedLessonInstrument(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
+                      >
+                        {insts.map((i: string) => (
+                          <option key={i} value={i}>{i}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             {/* Footer */}

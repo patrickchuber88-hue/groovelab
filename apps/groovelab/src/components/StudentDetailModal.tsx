@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -61,8 +61,9 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 };
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, onOpenTageskompass, activePlatform, onSwitchPlatform }) => {
-  const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(activePlatform === 'groovelab' ? 'groovelab' : 'campus');
-  const isPlatformCampus = localTab === 'campus';
+  const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+  const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(activePlatform === 'groovelab' && (student.is_groovelab_active ?? student.isGroovelabActive ?? false) ? 'groovelab' : 'campus');
+  const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
 
   let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
   if (isPlatformCampus) {
@@ -138,11 +139,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [avatar, setAvatar] = useState<any>(null);
   const [studentStats, setStudentStats] = useState<any>(null);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
-  const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groupStudents, setGroupStudents] = useState<any[]>([]);
+  const [schoolStudents, setSchoolStudents] = useState<any[]>([]);
+  const [selectedStudentToLink, setSelectedStudentToLink] = useState<string>('');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [campusRequestSent, setCampusRequestSent] = useState<boolean>(() => {
     return localStorage.getItem(`req_campus_${student.id}`) === 'true';
   });
@@ -170,6 +178,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [schoolName, setSchoolName] = useState<string>('Campus Musikschule');
   const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -267,6 +276,27 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     } catch (err: any) {
       console.error('Error updating qr_token:', err);
       alert('Fehler beim Aktualisieren: ' + (err.message || 'Unbekannter Fehler'));
+    }
+  };
+
+  const handleGenerateOnboardingLink = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('student_onboarding_tokens')
+        .insert({ student_id: student.id })
+        .select('token')
+        .single();
+
+      if (error) throw error;
+      
+      const inviteUrl = `${window.location.origin}/?onboarding=parent&token=${data.token}`;
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopiedOnboardingLink(true);
+      alert(`Personalisierter Onboarding-Link für ${student.first_name || 'Schüler'} wurde in die Zwischenablage kopiert!\n\nLink: ${inviteUrl}`);
+      setTimeout(() => setCopiedOnboardingLink(false), 3000);
+    } catch (err: any) {
+      console.error('Error generating onboarding token:', err);
+      alert('Der Onboarding-Link konnte nicht generiert werden: ' + err.message);
     }
   };
 
@@ -585,6 +615,47 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleLinkGroup = async () => {
+    if (!selectedStudentToLink) return;
+    try {
+      const newGroupId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
+      
+      const { error: err1 } = await supabase
+        .from('users')
+        .update({ group_id: newGroupId })
+        .eq('id', student.id);
+      if (err1) throw err1;
+
+      const { error: err2 } = await supabase
+        .from('users')
+        .update({ group_id: newGroupId })
+        .eq('id', selectedStudentToLink);
+      if (err2) throw err2;
+
+      alert('Gruppenunterricht erfolgreich eingerichtet!');
+      setSelectedStudentToLink('');
+      setStudentSearchQuery('');
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err: any) {
+      alert('Fehler beim Einrichten: ' + err.message);
+    }
+  };
+
+  const handleUnlinkGroup = async () => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ group_id: null })
+        .eq('id', student.id);
+      if (error) throw error;
+
+      alert('Schüler erfolgreich aus der Gruppe entfernt!');
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err: any) {
+      alert('Fehler beim Trennen: ' + err.message);
+    }
+  };
+
   const handleUpdateEvolutionLevel = async (level: number) => {
     try {
       const { error } = await supabase
@@ -636,11 +707,51 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch skills
+      // 1. Fetch latest user details (including group_id)
+      const { data: latestUser } = await supabase
+        .from('users')
+        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id')
+        .eq('id', student.id)
+        .single();
+
+      let groupStudentIds = [student.id];
+      if (latestUser) {
+        setIsCampusActive(latestUser.is_campus_active ?? false);
+        setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
+        setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
+        setLessonDuration(latestUser.lesson_duration || 30);
+        setAppUsageMode(latestUser.app_usage_mode || 'student_only');
+        
+        if (latestUser.group_id) {
+          setGroupId(latestUser.group_id);
+          const { data: grpUsers } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .eq('group_id', latestUser.group_id);
+          if (grpUsers) {
+            setGroupStudents(grpUsers.filter((u: any) => u.id !== student.id));
+            groupStudentIds = grpUsers.map((u: any) => u.id);
+          }
+        } else {
+          setGroupId(null);
+          setGroupStudents([]);
+        }
+      }
+
+      // Fetch other school students (for group setup dropdown list)
+      const { data: allSchoolStudents } = await supabase
+        .from('users')
+        .select('id, first_name, last_name')
+        .eq('school_id', student.school_id)
+        .eq('role', 'student')
+        .neq('id', student.id);
+      setSchoolStudents(allSchoolStudents || []);
+
+      // Fetch skills (shared for group if linked)
       const { data: skillsData } = await supabase
         .from('user_song_skills')
         .select('*, songs(*)')
-        .eq('user_id', student.id);
+        .in('user_id', groupStudentIds);
       setSkills(skillsData || []);
 
       // Fetch enriched bands
@@ -703,7 +814,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .eq('user_id', student.id);
       setPlanningList(planData || []);
 
-      // Fetch approved, review, and draft student schedules
+      // Fetch approved, review, and draft student schedules (shared for group if linked)
       const { data: schedData } = await supabase
         .from('schedules')
         .select(`
@@ -714,7 +825,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           rooms (name),
           teacher:users!schedules_teacher_id_fkey (first_name, last_name)
         `)
-        .eq('student_id', student.id)
+        .in('student_id', groupStudentIds)
         .in('status', ['approved', 'ready_for_admin_review', 'draft']);
       setSchedulesList(schedData || []);
 
@@ -725,20 +836,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .eq('student_id', student.id)
         .maybeSingle();
       setIsPremiumActive(premiumInfo?.is_premium_active ?? false);
-
-      // Fetch latest user details (e.g. is_campus_active, is_groovelab_active) directly to prevent stale dashboard props
-      const { data: latestUser } = await supabase
-        .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing')
-        .eq('id', student.id)
-        .single();
-      if (latestUser) {
-        setIsCampusActive(latestUser.is_campus_active ?? false);
-        setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
-        setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
-        setLessonDuration(latestUser.lesson_duration || 30);
-        setAppUsageMode(latestUser.app_usage_mode || 'student_only');
-      }
 
       // Fetch avatar details
       const { data: avatarRecord } = await supabase
@@ -759,7 +856,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       setLoading(false);
     };
     fetchData();
-  }, [student.id]);
+  }, [student.id, refreshTrigger]);
 
 
 
@@ -945,27 +1042,29 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               <GraduationCap size={16} />
               <span>Campus</span>
             </button>
-            <button
-              onClick={() => handleTabChange('groovelab')}
-              style={{
-                border: 'none',
-                borderRadius: '99px',
-                padding: '8px 20px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
-                color: localTab === 'groovelab' ? '#000000' : '#636366',
-                boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-              }}
-            >
-              <Music size={16} />
-              <span>GrooveLab</span>
-            </button>
+            {isGroovelabActive && (
+              <button
+                onClick={() => handleTabChange('groovelab')}
+                style={{
+                  border: 'none',
+                  borderRadius: '99px',
+                  padding: '8px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
+                  color: localTab === 'groovelab' ? '#000000' : '#636366',
+                  boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                <Music size={16} />
+                <span>GrooveLab</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1123,7 +1222,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {verifiedSongsCount} / 3
+                      {verifiedSongsCount} / {skills.length + vocalsSongIds.size}
                     </div>
                     <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
                       SONGS GEMEISTERT
@@ -1782,6 +1881,46 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </button>
                 )}
 
+                {/* Onboarding-Link button */}
+                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                  <button
+                    onClick={handleGenerateOnboardingLink}
+                    className="google-btn-secondary"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      fontSize: '0.8rem',
+                      fontWeight: 850,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      background: copiedOnboardingLink ? '#e6f4ea' : '#ffffff',
+                      border: copiedOnboardingLink ? '1.5px solid #a7f3d0' : '1.5px solid #cbd5e1',
+                      color: copiedOnboardingLink ? '#137333' : '#0f172a',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      marginTop: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      transition: 'all 0.2s',
+                      fontFamily: 'Urbanist'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!copiedOnboardingLink) {
+                        e.currentTarget.style.background = '#f8fafc';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!copiedOnboardingLink) {
+                        e.currentTarget.style.background = '#ffffff';
+                      }
+                    }}
+                  >
+                    <Link size={14} />
+                    {copiedOnboardingLink ? 'Onboarding-Link kopiert!' : 'Individuellen Onboarding-Link generieren'}
+                  </button>
+                )}
+
                 {/* 2. Module & Einstellungen — below the pass */}
                 <section style={{ 
                   background: '#ffffff', 
@@ -2029,65 +2168,283 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   )}
                 </div>
 
-                {isCampusActive && (
-                  <>
-                    <div style={{ height: '1px', background: '#f1f5f9' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
-                      {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                        <div style={{
-                          background: '#f1f5f9',
-                          padding: '2px',
-                          borderRadius: '12px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}>
-                          <button
-                            onClick={() => handleUpdateAppUsageMode('student_only')}
-                            style={{
-                              background: appUsageMode === 'student_only' ? '#ffffff' : 'transparent',
-                              color: appUsageMode === 'student_only' ? '#1e293b' : '#64748b',
-                              border: 'none',
-                              borderRadius: '10px',
-                              padding: '4px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: appUsageMode === 'student_only' ? 800 : 600,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              boxShadow: appUsageMode === 'student_only' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                            }}
-                          >
-                            📱 Selbstnutzer
-                          </button>
-                          <button
-                            onClick={() => handleUpdateAppUsageMode('parent_hybrid')}
-                            style={{
-                              background: appUsageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                              color: appUsageMode === 'parent_hybrid' ? '#1e293b' : '#64748b',
-                              border: 'none',
-                              borderRadius: '10px',
-                              padding: '4px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: appUsageMode === 'parent_hybrid' ? 800 : 600,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              boxShadow: appUsageMode === 'parent_hybrid' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                            }}
-                          >
-                            👪 Hybrid
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                          {appUsageMode === 'parent_hybrid' ? '👪 Hybrid' : '📱 Selbstnutzer'}
-                        </span>
-                      )}
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
+                  {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
+                    <div style={{
+                      background: '#f1f5f9',
+                      padding: '2px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      <button
+                        onClick={() => handleUpdateAppUsageMode('student_only')}
+                        style={{
+                          background: appUsageMode === 'student_only' ? '#ffffff' : 'transparent',
+                          color: appUsageMode === 'student_only' ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: appUsageMode === 'student_only' ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: appUsageMode === 'student_only' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        📱 Selbstnutzer
+                      </button>
+                      <button
+                        onClick={() => handleUpdateAppUsageMode('parent_hybrid')}
+                        style={{
+                          background: appUsageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                          color: appUsageMode === 'parent_hybrid' ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: appUsageMode === 'parent_hybrid' ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: appUsageMode === 'parent_hybrid' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        👪 Hybrid
+                      </button>
                     </div>
-                  </>
-                )}
+                  ) : (
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      {appUsageMode === 'parent_hybrid' ? '👪 Hybrid' : '📱 Selbstnutzer'}
+                    </span>
+                  )}
+                </div>
 
               </div>
+            </section>
+
+            {/* Sektion Gruppenunterricht */}
+            <section style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '16px 20px', 
+              border: '1.5px solid #f1f5f9',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              marginTop: '16px'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} style={{ color: '#64748b' }} /> Gruppenunterricht
+              </h4>
+
+              {groupId ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>
+                    Verknüpft im Gruppenunterricht mit:
+                    <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {groupStudents.map(s => (
+                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#64748b' }}></span>
+                          {s.first_name} {s.last_name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                    <button
+                      onClick={handleUnlinkGroup}
+                      style={{
+                        background: '#fff1f2',
+                        color: '#e11d48',
+                        border: '1px solid #fecdd3',
+                        borderRadius: '12px',
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        marginTop: '4px'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = '#ffe4e6';
+                        e.currentTarget.style.borderColor = '#fda4af';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = '#fff1f2';
+                        e.currentTarget.style.borderColor = '#fecdd3';
+                      }}
+                    >
+                      Verbindung trennen
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic' }}>
+                    Dieser Schüler hat aktuell Einzelunterricht.
+                  </div>
+
+                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                    <>
+                      {!showGroupSelector ? (
+                        <button
+                          onClick={() => setShowGroupSelector(true)}
+                          style={{
+                            background: '#f8fafc',
+                            color: '#1e293b',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '8px 12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                        >
+                          Gruppenunterricht einrichten
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Partner auswählen:</span>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              placeholder="Name des Schülers suchen..."
+                              value={studentSearchQuery}
+                              onChange={e => {
+                                setStudentSearchQuery(e.target.value);
+                                setSelectedStudentToLink('');
+                                setSearchDropdownOpen(true);
+                              }}
+                              onFocus={() => setSearchDropdownOpen(true)}
+                              onBlur={() => {
+                                setTimeout(() => setSearchDropdownOpen(false), 200);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #cbd5e1',
+                                fontSize: '0.8rem',
+                                color: '#1e293b',
+                                outline: 'none',
+                                background: '#ffffff',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            {searchDropdownOpen && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                background: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                borderRadius: '12px',
+                                marginTop: '4px',
+                                maxHeight: '150px',
+                                overflowY: 'auto',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                zIndex: 10
+                              }}>
+                                {schoolStudents
+                                  .filter(s => {
+                                    const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+                                    return fullName.includes(studentSearchQuery.toLowerCase());
+                                  })
+                                  .map(s => (
+                                    <div
+                                      key={s.id}
+                                      onClick={() => {
+                                        setSelectedStudentToLink(s.id);
+                                        setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`);
+                                        setSearchDropdownOpen(false);
+                                      }}
+                                      style={{
+                                        padding: '8px 12px',
+                                        fontSize: '0.8rem',
+                                        color: '#1e293b',
+                                        cursor: 'pointer',
+                                        background: selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff',
+                                        borderBottom: '1px solid #f1f5f9',
+                                        textAlign: 'left'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                                      onMouseLeave={e => e.currentTarget.style.background = selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff'}
+                                    >
+                                      {s.first_name} {s.last_name}
+                                    </div>
+                                  ))}
+                                {schoolStudents.filter(s => {
+                                  const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+                                  return fullName.includes(studentSearchQuery.toLowerCase());
+                                }).length === 0 && (
+                                  <div style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
+                                    Keine Schüler gefunden
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            <button
+                              onClick={handleLinkGroup}
+                              disabled={!selectedStudentToLink}
+                              style={{
+                                flex: 1,
+                                background: selectedStudentToLink ? '#10b981' : '#cbd5e1',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '6px 10px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: selectedStudentToLink ? 'pointer' : 'default',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              Verknüpfen
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowGroupSelector(false);
+                                setSelectedStudentToLink('');
+                                setStudentSearchQuery('');
+                              }}
+                              style={{
+                                flex: 1,
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '6px 10px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              Abbrechen
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </section>
               </>
             ) : (

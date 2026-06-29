@@ -2413,7 +2413,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const fetchLessons = async () => {
     setLoadingLessons(true);
     try {
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const todayStr = new Date().toLocaleDateString('sv-SE');
       // School year: September 1 to July 31 of the following year (August is excluded)
       const now = new Date();
       const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
@@ -2491,7 +2491,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
             // Skip dates in August (month index 7) — outside school year
             if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd && targetDate.getMonth() !== 7) {
-              const dateStr = targetDate.toISOString().substring(0, 10);
+              const dateStr = targetDate.toLocaleDateString('sv-SE');
 
               // Check if override exists
               const actual = occurrences?.find((occ: any) => 
@@ -2939,7 +2939,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Timeline Events merger (Column 2 merges custom + subscribed)
   const getMergedTimelineEvents = () => {
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     
     // Filter out subscribed events that have a customized copy (which overrides the subscription visibility/details)
     const filteredSubscribed = subscribedEvents.filter(sub => {
@@ -3020,7 +3020,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Split lesson list for Column 1
   const getFilteredLessons = () => {
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     const nowTimeStr = new Date().toTimeString().substring(0, 8);
 
     // Filter out holiday lessons
@@ -5019,7 +5019,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   };
 
   const renderTeacherEventPlanningColumn = () => {
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     const allPlanningEvents = customEvents.filter(ev => {
       if (ev.is_subscribed) return false;
       return ev.is_planning_active;

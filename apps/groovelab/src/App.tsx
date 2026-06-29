@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat } from 'lucide-react';
 import { useWindowSize } from 'react-use';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
+import { LandingPage } from './components/LandingPage';
 import { subscribeUserToPush } from './utils/webPush';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
@@ -1570,16 +1572,14 @@ const DashboardLoader = () => (
 );
 
 function App() {
-  const [isSignup, setIsSignup] = useState(() => typeof window !== 'undefined' && window.location.pathname === '/signup');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handlePopState = () => {
-      setIsSignup(window.location.pathname === '/signup');
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  const isSignup = location.pathname === '/signup';
+  const currentView = (location.pathname === '/login' || location.pathname === '/signup')
+    ? 'login'
+    : (location.pathname === '/' ? 'landing' : 'dashboard');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1680,13 +1680,15 @@ function App() {
     return () => document.body.removeEventListener('mouseover', handleMouseOver);
   }, []);
 
-  const qrPathMatch = typeof window !== 'undefined' ? window.location.pathname.match(/^\/qr\/([^/?#]+)/) : null;
+  const qrPathMatch = location.pathname.match(/^\/qr\/([^/?#]+)/);
 
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return sessionStorage.getItem('groovelab_user_id');
   });
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+
 
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
   const [deletionPromptUserId, setDeletionPromptUserId] = useState<string | null>(null);
@@ -1889,9 +1891,8 @@ function App() {
   // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
   // automatically resolve a station ID for that room and go directly to the QR-scanner.
   // When kiosk_setup=1 is present (= came from "Beenden" button), show DeviceSetupScreen instead.
-  const urlParamsForKiosk = new URLSearchParams(window.location.search);
-  const kioskRoomIdParam = urlParamsForKiosk.get('kiosk_room_id');
-  const kioskSetupParam = urlParamsForKiosk.get('kiosk_setup');
+  const kioskRoomIdParam = searchParams.get('kiosk_room_id');
+  const kioskSetupParam = searchParams.get('kiosk_setup');
 
   const [kioskBootstrapping, setKioskBootstrapping] = useState<boolean>(() => {
     // Only auto-bootstrap if kiosk_room_id is present AND kiosk_setup is NOT set
@@ -1899,7 +1900,6 @@ function App() {
   });
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
     const kioskRoomId = searchParams.get('kiosk_room_id');
     const isSetupMode = searchParams.get('kiosk_setup') === '1';
     // Skip auto-bootstrap when setup mode is requested
@@ -1954,6 +1954,29 @@ function App() {
       setUserRaw(val);
     });
   }, []);
+
+  useEffect(() => {
+    if (loading) return; // wait until supabase auth/session loading is complete
+    
+    const isAuth = !!loggedInUserId;
+    const isPublicRoute = 
+      location.pathname === '/' || 
+      location.pathname === '/login' || 
+      location.pathname === '/signup' || 
+      location.pathname.startsWith('/qr/');
+      
+    if (isAuth) {
+      // Redirect logged-in users at / or /login or /signup to /dashboard
+      if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup') {
+        navigate('/dashboard', { replace: true });
+      }
+    } else {
+      // Redirect unauthenticated users trying to access dashboard/protected routes to /
+      if (!isPublicRoute) {
+        navigate('/', { replace: true });
+      }
+    }
+  }, [loggedInUserId, location.pathname, loading, navigate]);
   const [session, setSession] = useState<any>(null);
   const [totalPresenceMins, setTotalPresenceMins] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -2670,10 +2693,9 @@ function App() {
   const [isSharedView, setIsSharedView] = useState(false);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlBandId = urlParams.get('band');
-    const isShared = urlParams.get('view') === 'shared';
-    const urlCampusPassToken = urlParams.get('campus_pass');
+    const urlBandId = searchParams.get('band');
+    const isShared = searchParams.get('view') === 'shared';
+    const urlCampusPassToken = searchParams.get('campus_pass');
     
     if (urlBandId) {
       if (isShared) setIsSharedView(true);
@@ -5451,7 +5473,7 @@ function App() {
     localStorage.removeItem('groovelab_active_tab');
   };
 
-  const hasInviteSchoolId = new URLSearchParams(window.location.search).has('invite_school_id');
+  const hasInviteSchoolId = searchParams.has('invite_school_id');
 
   const handleLogin = async (userId: string, isHome?: boolean) => {
     const { data: userToLogin } = await supabase.from('users').select('role, contract_ends_at, contract_decision_made, is_external_vocalist').eq('id', userId).single();
@@ -5654,8 +5676,7 @@ function App() {
     setActiveStudentsCount(count);
   };
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlBandId = urlParams.get('band');
+  const urlBandId = searchParams.get('band');
 
   // 1. PUBLIC BAND VIEW (Prioritized for sharing)
   if (urlBandId) {
@@ -5697,7 +5718,7 @@ function App() {
   }
 
   // 1.5 PUBLIC CAMPUS PASS VIEW
-  const urlCampusPassToken = urlParams.get('campus_pass');
+  const urlCampusPassToken = searchParams.get('campus_pass');
   if (urlCampusPassToken) {
     if (publicPassUser) {
       return (
@@ -5786,7 +5807,7 @@ function App() {
       window.open(externalUrl, '_blank');
       
       // Clean up the URL in the PWA so it returns to the dashboard
-      window.history.replaceState({}, '', '/');
+      navigate('/dashboard', { replace: true });
     } else {
       return (
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
@@ -5797,18 +5818,16 @@ function App() {
   }
 
   // 1. SIGNUP WIZARD
-  if (isSignup) {
+  if (location.pathname === '/signup') {
     return (
       <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Registrierung...</div>}>
         <SignupWizard 
           onBackToLogin={() => {
-            window.history.pushState({}, '', '/');
-            setIsSignup(false);
+            navigate('/login');
           }} 
           onSignupSuccess={(uid) => {
-            window.history.pushState({}, '', '/');
-            setIsSignup(false);
             setLoggedInUserId(uid);
+            navigate('/dashboard');
           }}
         />
       </Suspense>
@@ -5817,7 +5836,22 @@ function App() {
 
   // 2. AUTHENTICATION CHECK
   if (!loggedInUserId && !showDeletionPrompt) {
-    return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+    if (location.pathname === '/') {
+      const urlParams = new URLSearchParams(location.search);
+      const isParentOnboarding = urlParams.has('invite_school_id') || urlParams.get('onboarding') === 'parent';
+      if (isParentOnboarding) {
+        return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+      }
+      return (
+        <LandingPage 
+          onLogin={() => navigate('/login')} 
+          onRegister={() => navigate('/signup')} 
+        />
+      );
+    }
+    if (location.pathname === '/login') {
+      return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+    }
   }
 
   if (showDeletionPrompt && deletionPromptUserId) {

@@ -1,21 +1,23 @@
-# BRIEFING — 2026-06-21T10:38:44+02:00
+# BRIEFING — 2026-06-28T22:23:53+02:00
 
 ## Mission
-Fix the 4 remaining errors in the Real-Mode E2E-Test-Runner (T1_F1_2, T2_F8_4, T4_1, T4_5) to make all 123 tests pass under USE_MOCK=false, preserving 100% pass rate under USE_MOCK=true.
+Integrate the Trello-style landing page with real screenshots into the Campus-Groovelab application, implementing routing with react-router-dom, and session state toggling.
 
 ## 🔒 My Identity
 - Archetype: teamwork_preview_orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
 - Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator
 - Original parent: main agent
-- Original parent conversation ID: 9b328d29-140c-4d51-8a38-2800f4f0dbf3
+- Original parent conversation ID: 9d7c39c9-b188-48c2-9223-387e557dfb77
 
 ## 🔒 My Workflow
 - **Pattern**: Project
 - **Scope document**: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/PROJECT.md
-1. **Decompose**: Decompose the task into milestones/tasks to investigate and address the 4 failing tests.
-2. **Dispatch & Execute** (pick ONE):
-   - **Delegate (sub-orchestrator)**: Spawn a worker or sub-orchestrator to investigate, fix, and review changes.
+1. **Decompose**: Decompose the landing page integration and routing setup into milestones.
+2. **Dispatch & Execute**:
+   - Spawn Explorer to analyze package, entrypoints, and routing changes.
+   - Spawn Worker to implement package installation, LandingPage component, and routing configuration.
+   - Spawn Reviewer/Auditor to verify build, types, and functionality.
 3. **On failure** (in this order):
    - Retry: nudge stuck agent or re-send task
    - Replace: spawn fresh agent with partial progress
@@ -23,52 +25,68 @@ Fix the 4 remaining errors in the Real-Mode E2E-Test-Runner (T1_F1_2, T2_F8_4, T
    - Redistribute: split stuck agent's remaining work
    - Redesign: re-partition decomposition
    - Escalate: report to parent (sub-orchestrators only, last resort)
-4. **Succession**: Self-succeed after 16 spawns.
+4. **Succession**: Self-succeed at 16 spawns.
 - **Work items**:
-  1. Explore current codebase and failing tests [pending]
-  2. Implement fix for T1_F1_2 [pending]
-  3. Implement fix for T2_F8_4 [pending]
-  4. Implement fix for T4_1 [pending]
-  5. Implement fix for T4_5 [pending]
-  6. Final E2E test verification [pending]
-- **Current phase**: 1
-- **Current focus**: Exploration of codebase and failures
+  1. Explore current codebase, routing entry points, and install requirements [done]
+  2. Implement LandingPage component and add react-router-dom dependency [done]
+  3. Integrate react-router-dom in App.tsx / main.tsx with login/dashboard routing [done]
+  4. Perform build & type checks [done]
+  5. Run forensic auditing and quality checks [done]
+- **Current phase**: 4
+- **Current focus**: Completed
 
 ## 🔒 Key Constraints
-- CODE_ONLY network mode: no external web access, no curl/wget targeting external URLs.
-- Never write or edit code directly; delegate everything to subagents.
-- Never reuse a subagent after it has delivered its handoff.
-- Forensic Auditor is non-skippable; fails unconditionally if auditor vetoes.
+- Always refer to the platform precisely as "Campus-Groovelab".
+- Musician avatars only for teachers & students in groovelab module.
+- Admin & Secretariat must have briefing board chalkboard image `/campus_login_hero.png`.
+- Software license is 100% free of charge ("100% kostenlos").
+- Administration/Secretariat colors: red accents (e.g., `#ea4335`). Campus module colors: green accents (e.g., `#137333`).
+- Emojis/icons must be monochrome/single color in active UI components.
+- Never write, modify, or create source code files directly.
+- Never run build/test commands yourself — require workers to do so.
 
 ## Current Parent
-- Conversation ID: 9b328d29-140c-4d51-8a38-2800f4f0dbf3
+- Conversation ID: 9d7c39c9-b188-48c2-9223-387e557dfb77
 - Updated: not yet
 
 ## Key Decisions Made
-- Initializing agent environment
+- Initialized briefing and plan.
+- Dispatched M1 explorer.
+- Completed M1; copy screenshots to public folder and install react-router-dom.
+- Dispatched M2 worker.
+- Completed M2; created LandingPage component.
+- Dispatched M3 worker.
+- Completed M3; integrated routing and session redirection logic.
+- Dispatched M4 verification team.
+- Verification team successfully reviewed and validated all code, styles, builds, types, routing checks, and forensic audit requirements.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| explorer_e2efixes | teamwork_preview_explorer | Explore codebase and locate the 4 failing tests | completed | d7551158-1775-4827-b412-8cb8b6948b35 |
-| worker_e2efixes | teamwork_preview_worker | Implement database seeding in test runner | completed | 63fd4838-178c-4955-8b59-6976e70caa4b |
-| auditor_e2efixes | teamwork_preview_auditor | Perform forensic integrity audit on changes | completed | a6d607cd-be52-432f-ac41-5623819c512b |
+| explorer_m1 | teamwork_preview_explorer | Explore codebase, package structure, assets and routing | completed | 1450f7f0-db13-47db-b9b6-6611a96ef807 |
+| worker_m2 | teamwork_preview_worker | Copy assets, install packages, and create LandingPage.tsx | completed | 4b264762-9649-4ad7-b112-7962e4d3dc43 |
+| worker_m3 | teamwork_preview_worker | Implement routing and redirect logic with react-router-dom | completed | b69fbe88-233b-4682-8f85-dc2d80a5642c |
+| reviewer_m4_1 | teamwork_preview_reviewer | Verify type correctness, file presence, compile and build | completed | 199af3ec-9382-456b-9c24-ac4d43e47565 |
+| reviewer_m4_2 | teamwork_preview_reviewer | Verify responsive layout and style compliance in code | completed | eee201ac-978f-46ab-962e-937aa043ffde |
+| challenger_m4_1 | teamwork_preview_challenger | Validate session state redirects and login routes in tests | completed | 19a629fb-381e-4641-be51-8d4671b02d42 |
+| challenger_m4_2 | teamwork_preview_challenger | Run production build & verify all E2E tests pass | completed | fff324be-0403-4edb-b26c-8222eec0e164 |
+| auditor_m4_1 | teamwork_preview_auditor | Run forensic integrity audit on component and routes | completed | 2affa741-e6b1-4a6e-8c62-2ce04798f663 |
 
 ## Succession Status
-- Spawn count: 3 / 16
+- Succession required: no
+- Spawn count: 8 / 16
 - Pending subagents: none
 - Predecessor: none
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: b147e99c-e82c-425c-8577-30db3e1ceec6/task-17
-- Safety timer: b147e99c-e82c-425c-8577-30db3e1ceec6/task-160
+- Heartbeat cron: none
+- Safety timer: none
 - On succession: kill all timers before spawning successor
 - On context truncation: run `manage_task(Action="list")` — re-create if missing
 
 ## Artifact Index
-- ORIGINAL_REQUEST.md — original user request
+- ORIGINAL_REQUEST.md — verbatim request record
 - BRIEFING.md — briefing state
 - progress.md — checklist and heartbeat
 - plan.md — concrete step-by-step plan
-- context.md — key findings and context index

@@ -1041,42 +1041,30 @@ button, a, [role="button"], [onClick] {
   animation: card-shake 0.4s ease-in-out !important;
 }
 
-@keyframes roentgen-pulse {
-  0%, 100% {
-    opacity: 0.95;
-    background-color: rgba(34, 197, 94, 0.22);
-    border-color: rgba(34, 197, 94, 0.85);
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
-  }
-  50% {
-    opacity: 1;
-    background-color: rgba(34, 197, 94, 0.42);
-    border-color: rgba(34, 197, 94, 1);
-    box-shadow: 0 0 18px rgba(34, 197, 94, 0.65);
-  }
-}
-
 .roentgen-preferred {
-  animation: roentgen-pulse 2s infinite ease-in-out !important;
-  border: 1.5px solid rgba(34, 197, 94, 0.75) !important;
+  background: rgba(16, 185, 129, 0.31) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.6) !important;
+  border-left: 5px solid #10b981 !important;
   border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15), inset 0 0 8px rgba(16, 185, 129, 0.1) !important;
   pointer-events: none !important;
-  background-image: radial-gradient(circle at center, rgba(255,255,255,0.25) 0%, transparent 80%) !important;
+  box-sizing: border-box !important;
 }
 
 .roentgen-blocked {
   background: repeating-linear-gradient(
-    45deg,
-    rgba(239, 68, 68, 0.12),
-    rgba(239, 68, 68, 0.12) 10px,
-    rgba(239, 68, 68, 0.04) 10px,
-    rgba(239, 68, 68, 0.04) 20px
+    -45deg,
+    rgba(239, 68, 68, 0.28) 0px,
+    rgba(239, 68, 68, 0.28) 8px,
+    rgba(239, 68, 68, 0.18) 8px,
+    rgba(239, 68, 68, 0.18) 16px
   ) !important;
   border: 1.5px dashed rgba(239, 68, 68, 0.6) !important;
+  border-left: 5px solid #ef4444 !important;
   border-radius: 8px !important;
-  box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08), inset 0 0 8px rgba(239, 68, 68, 0.05) !important;
   pointer-events: none !important;
-  opacity: 0.95 !important;
+  box-sizing: border-box !important;
 }
 
 /* ── Premium Micro-Animations & Skeleton Loaders ── */

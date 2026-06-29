@@ -34,6 +34,8 @@ interface Student {
   status?: 'ausstehend' | 'verplant' | 'aktiv' | 'in_bearbeitung';
   isGroup?: boolean;
   groupStudents?: Student[];
+  sibling_group_id?: string;
+  group_id?: string | null;
 }
 
 interface DayBoard {
@@ -187,6 +189,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  // Drag-and-Drop Instrument Selector state
+  const [instrumentSelectorState, setInstrumentSelectorState] = useState<{
+    sourceId: string;
+    targetBoardId: string;
+    index?: number;
+    dragSource?: string | null;
+    dragSourceBoardId?: string | null;
+    instruments: string[];
+  } | null>(null);
+  const [selectedDropInstrument, setSelectedDropInstrument] = useState<string>('');
+
   // Drag-and-Drop Decision state
   const [dropDecisionState, setDropDecisionState] = useState<{ 
     sourceId: string, 
@@ -214,6 +227,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
+  const [siblingInfo, setSiblingInfo] = useState<any | null>(null);
 
   // ── Optimized Conflict Detection Caching (Map Lookups) ──
   const teacherBusyIntervals = useMemo(() => {
@@ -355,6 +369,210 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   }, [boards, drafts, activeDraftId, submittedDraftId, selectedTeacherId, isInitialLoadDone]);
 
+  const consolidateDatabaseGroups = (boardsList: DayBoard[], rawPool: Student[]): { boards: DayBoard[], pool: Student[] } => {
+    const allStudentsMap = new Map<string, Student>();
+    
+    // Initialize the map with fresh metadata from the database (rawPool)
+    rawPool.forEach(s => {
+      allStudentsMap.set(s.id, { ...s });
+    });
+    
+    const assignedStudentIds = new Set<string>();
+
+    // Step 1: Scan and clean boardsList of any duplicates. Keep only the first occurrence.
+    const cleanedBoards = boardsList.map(b => {
+      const nextStudents: Student[] = [];
+      b.students.forEach(s => {
+        if (s.isBreak) {
+          nextStudents.push(s);
+          return;
+        }
+        if (s.isGroup && s.groupStudents) {
+          const uniqueMembers = s.groupStudents.filter(gs => {
+            if (assignedStudentIds.has(gs.id)) {
+              return false;
+            }
+            assignedStudentIds.add(gs.id);
+            return true;
+          });
+          if (uniqueMembers.length >= 2) {
+            nextStudents.push({
+              ...s,
+              groupStudents: uniqueMembers
+            });
+          } else if (uniqueMembers.length === 1) {
+            nextStudents.push(uniqueMembers[0]);
+          }
+        } else {
+          if (assignedStudentIds.has(s.id)) {
+            // Already scheduled elsewhere -> remove duplicate card
+            return;
+          }
+          assignedStudentIds.add(s.id);
+          nextStudents.push(s);
+        }
+      });
+      return { ...b, students: nextStudents };
+    });
+
+    // Scan boards to mark which of these students are assigned
+    cleanedBoards.forEach(b => {
+      b.students.forEach(s => {
+        if (s.isBreak) return;
+        if (s.isGroup && s.groupStudents) {
+          s.groupStudents.forEach(gs => {
+            const existing = allStudentsMap.get(gs.id);
+            if (existing) {
+              existing.assignedDay = b.dayOfWeek;
+              existing.assignedTime = s.assignedTime;
+            } else {
+              // Fallback for students not in rawPool
+              allStudentsMap.set(gs.id, {
+                ...gs,
+                assignedDay: b.dayOfWeek,
+                assignedTime: s.assignedTime
+              });
+            }
+          });
+        } else {
+          const existing = allStudentsMap.get(s.id);
+          if (existing) {
+            existing.assignedDay = b.dayOfWeek;
+            existing.assignedTime = s.assignedTime;
+          } else {
+            // Fallback for students not in rawPool
+            allStudentsMap.set(s.id, {
+              ...s,
+              assignedDay: b.dayOfWeek,
+              assignedTime: s.assignedTime
+            });
+          }
+        }
+      });
+    });
+
+    const dbGroups: Record<string, Student[]> = {};
+    allStudentsMap.forEach(s => {
+      if (s.group_id) {
+        if (!dbGroups[s.group_id]) {
+          dbGroups[s.group_id] = [];
+        }
+        dbGroups[s.group_id].push(s);
+      }
+    });
+
+    const mergedGroupsMap = new Map<string, Student>();
+    const individualStudentIdsInGroups = new Set<string>();
+
+    Object.entries(dbGroups).forEach(([groupId, members]) => {
+      if (members.length >= 2) {
+        members.forEach(m => individualStudentIdsInGroups.add(m.id));
+        
+        const scheduledMember = members.find(m => m.assignedDay !== undefined);
+        const assignedDay = scheduledMember?.assignedDay;
+        const assignedTime = scheduledMember?.assignedTime;
+        
+        const merged: Student = {
+          id: `group-${groupId}`,
+          first_name: members.map(m => m.first_name).join(' & '),
+          last_name: '',
+          instrument: members.map(m => m.instrument || 'Musiker').filter((val, idx, arr) => arr.indexOf(val) === idx).join('/'),
+          duration: Math.max(...members.map(m => m.duration || 45)),
+          assignedDay,
+          assignedTime,
+          status: members.some(m => m.status === 'ausstehend') ? 'ausstehend' : 'verplant',
+          isGroup: true,
+          group_id: groupId,
+          groupStudents: members.map(m => ({
+            ...m,
+            assignedDay,
+            assignedTime
+          }))
+        };
+        mergedGroupsMap.set(`group-${groupId}`, merged);
+      }
+    });
+
+    const newBoards = cleanedBoards.map(b => {
+      const nextStudents: Student[] = [];
+      const addedGroupIds = new Set<string>();
+
+      b.students.forEach(s => {
+        if (s.isBreak) {
+          nextStudents.push(s);
+          return;
+        }
+        
+        if (s.isGroup && s.groupStudents) {
+          const nonGroupMembers = s.groupStudents.filter(gs => !individualStudentIdsInGroups.has(gs.id));
+          const groupMembers = s.groupStudents.filter(gs => individualStudentIdsInGroups.has(gs.id));
+
+          if (nonGroupMembers.length >= 2) {
+            nextStudents.push({
+              ...s,
+              groupStudents: nonGroupMembers
+            });
+          } else if (nonGroupMembers.length === 1) {
+            nextStudents.push(nonGroupMembers[0]);
+          }
+
+          groupMembers.forEach(gs => {
+            if (gs.group_id) {
+              const merged = mergedGroupsMap.get(`group-${gs.group_id}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(gs.group_id)) {
+                nextStudents.push(merged);
+                addedGroupIds.add(gs.group_id);
+              }
+            }
+          });
+        } else {
+          if (individualStudentIdsInGroups.has(s.id)) {
+            if (s.group_id) {
+              const merged = mergedGroupsMap.get(`group-${s.group_id}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(s.group_id)) {
+                nextStudents.push(merged);
+                addedGroupIds.add(s.group_id);
+              }
+            }
+          } else {
+            nextStudents.push(s);
+          }
+        }
+      });
+
+      mergedGroupsMap.forEach((merged) => {
+        const groupId = merged.group_id!;
+        if (merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(groupId)) {
+          nextStudents.push(merged);
+          addedGroupIds.add(groupId);
+        }
+      });
+
+      return {
+        ...b,
+        students: nextStudents
+      };
+    });
+
+    const newPool: Student[] = [];
+    allStudentsMap.forEach(s => {
+      if (individualStudentIdsInGroups.has(s.id)) {
+        if (s.group_id) {
+          const merged = mergedGroupsMap.get(`group-${s.group_id}`);
+          if (merged) {
+            if (!newPool.some(p => p.id === merged.id)) {
+              newPool.push(merged);
+            }
+          }
+        }
+      } else {
+        newPool.push(s);
+      }
+    });
+
+    return { boards: newBoards, pool: newPool };
+  };
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -428,11 +646,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       if (loadedRooms.length > 0) {
         setNewBoardRoom(loadedRooms[0].id);
       }
-
+      
       // 2. Fetch all students for the selected teacher who are in the school
       const { data: sData } = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration')
+        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id')
         .eq('school_id', schoolId)
         .eq('role', 'student')
         .eq('teacher_id', selectedTeacherId)
@@ -441,7 +659,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
         .from('pending_students_decrypted')
-        .select('id, first_name, last_name, instrument')
+        .select('id, first_name, last_name, instrument, sibling_group_id')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
@@ -464,7 +682,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           last_name: s.last_name,
           instrument: s.instrument || 'Musiker',
           duration: s.lesson_duration || 45, // Load lesson_duration from DB
-          status: (statusMap[s.id] || 'verplant') as any
+          status: (statusMap[s.id] || 'verplant') as any,
+          sibling_group_id: s.sibling_group_id,
+          group_id: s.group_id
         })),
         ...(pendingData || []).map(s => ({
           id: s.id,
@@ -472,7 +692,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           last_name: s.last_name,
           instrument: s.instrument || 'Musiker',
           duration: 45, // default duration
-          status: 'ausstehend' as const
+          status: 'ausstehend' as const,
+          sibling_group_id: s.sibling_group_id,
+          group_id: null
         }))
       ];
 
@@ -743,20 +965,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         });
       }
 
-      // Mark students as assigned or unassigned
-      const finalStudents = loadedStudents.map(s => {
-        const isAssigned = usedStudentIds.has(s.id);
-        if (isAssigned) {
-          const matchingBoard = reconstructedBoards.find(b => b.students.some(bs => bs.id === s.id));
-          const matchingStudent = matchingBoard?.students.find(bs => bs.id === s.id);
-          return {
-            ...s,
-            duration: matchingStudent?.duration || 45,
-            assignedDay: matchingBoard?.dayOfWeek,
-            assignedTime: matchingStudent?.assignedTime
-          };
-        }
-        return s;
+      // Consolidate database groups across all boards and pool
+      const consolidated = consolidateDatabaseGroups(reconstructedBoards, loadedStudents);
+      reconstructedBoards = consolidated.boards;
+      const finalGroupedStudents = consolidated.pool;
+
+      // Re-populate usedStudentIds set based on the grouped students
+      usedStudentIds.clear();
+      reconstructedBoards.forEach(b => {
+        b.students.forEach(s => {
+          if (!s.isBreak) {
+            if (s.isGroup && s.groupStudents) {
+              s.groupStudents.forEach(gs => usedStudentIds.add(gs.id));
+            } else {
+              usedStudentIds.add(s.id);
+            }
+          }
+        });
       });
 
       // Ensure Monday to Friday (1 to 5) are always present in the designer
@@ -776,8 +1001,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Sort boards by dayOfWeek so they are displayed chronologically (Monday to Friday, etc.)
       reconstructedBoards.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
 
+      // Make sure loaded drafts have recalculated times to set endAnchors properly
+      reconstructedBoards = reconstructedBoards.map(b => recalculateBoardTimes(b));
+
       setBoards(reconstructedBoards);
-      setStudents(finalStudents);
+      setStudents(finalGroupedStudents);
       setIsInitialLoadDone(true);
     } catch (err) {
       console.error('Error loading schedule board data:', err);
@@ -884,34 +1112,168 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setSelectedStudentId(null);
       setSelectedStudentPrefs([]);
       setSelectedStudentNote(null);
+      setSiblingInfo(null);
     } else {
       setSelectedStudentId(studentId);
       setSelectedStudentNote(null);
       try {
-        // Load preferences
-        const { data, error } = await supabase
+        let targetStudentIds = [studentId];
+        let grpId: string | null = null;
+        
+        if (studentId.startsWith('group-')) {
+          grpId = studentId.replace('group-', '');
+        } else {
+          const found = students.find(s => s.id === studentId);
+          if (found?.group_id) {
+            grpId = found.group_id;
+          }
+        }
+        
+        if (grpId) {
+          const { data: grpUsers } = await supabase
+            .from('users')
+            .select('id')
+            .eq('group_id', grpId);
+          if (grpUsers && grpUsers.length > 0) {
+            targetStudentIds = grpUsers.map((u: any) => u.id);
+          }
+        }
+
+        const { data: prefsData, error: prefsErr } = await supabase
           .from('student_schedule_preferences')
           .select('*')
-          .eq('student_id', studentId);
-        if (!error && data) {
-          setSelectedStudentPrefs(data);
+          .in('student_id', targetStudentIds);
+
+        if (!prefsErr && prefsData) {
+          const combinedPrefs: any[] = [];
+          
+          for (let day = 1; day <= 5; day++) {
+            const slotsCount = 24 * 4; 
+            const wunschCounts = Array(slotsCount).fill(0);
+            const isGesperrt = Array(slotsCount).fill(false);
+            
+            targetStudentIds.forEach(sId => {
+              const studentPrefs = prefsData.filter(p => p.student_id === sId && Number(p.day_of_week) === day);
+              studentPrefs.forEach(pref => {
+                const [sh, sm] = pref.start_time.split(':').map(Number);
+                const [eh, em] = pref.end_time.split(':').map(Number);
+                const startIdx = Math.floor((sh * 60 + sm) / 15);
+                const endIdx = Math.ceil((eh * 60 + em) / 15);
+                
+                for (let i = startIdx; i < endIdx; i++) {
+                  if (i >= 0 && i < slotsCount) {
+                    if (pref.preference_type === 'gesperrt') {
+                      isGesperrt[i] = true;
+                    } else if (pref.preference_type === 'wunsch') {
+                      wunschCounts[i]++;
+                    }
+                  }
+                }
+              });
+            });
+            
+            let currentType: 'wunsch' | 'gesperrt' | null = null;
+            let startIdx = -1;
+            
+            for (let i = 0; i < slotsCount; i++) {
+              let type: 'wunsch' | 'gesperrt' | null = null;
+              if (isGesperrt[i]) {
+                type = 'gesperrt';
+              } else if (wunschCounts[i] === targetStudentIds.length && targetStudentIds.length > 0) {
+                type = 'wunsch';
+              }
+              
+              if (type !== currentType) {
+                if (currentType && startIdx !== -1) {
+                  const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+                  const endTime = `${String(Math.floor((i * 15) / 60)).padStart(2, '0')}:${String((i * 15) % 60).padStart(2, '0')}:00`;
+                  combinedPrefs.push({
+                    day_of_week: day,
+                    start_time: startTime,
+                    end_time: endTime,
+                    preference_type: currentType
+                  });
+                }
+                currentType = type;
+                startIdx = type ? i : -1;
+              }
+            }
+            if (currentType && startIdx !== -1) {
+              const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+              const endTime = '24:00:00';
+              combinedPrefs.push({
+                day_of_week: day,
+                start_time: startTime,
+                end_time: endTime,
+                preference_type: currentType
+              });
+            }
+          }
+          
+          setSelectedStudentPrefs(combinedPrefs);
         } else {
           setSelectedStudentPrefs([]);
         }
 
-        // Load parent notes from students table
+        const firstStudentId = targetStudentIds[0];
+        
         const { data: studentData, error: studentError } = await supabase
           .from('students')
           .select('parent_notes')
-          .eq('id', studentId)
+          .eq('id', firstStudentId)
           .maybeSingle();
         if (!studentError && studentData) {
           setSelectedStudentNote(studentData.parent_notes || null);
+        }
+
+        const { data: curStudent } = await supabase
+          .from('users')
+          .select('sibling_group_id')
+          .eq('id', firstStudentId)
+          .single();
+
+        if (curStudent?.sibling_group_id) {
+          const { data: sibData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument, lesson_duration')
+            .eq('sibling_group_id', curStudent.sibling_group_id)
+            .neq('id', firstStudentId)
+            .maybeSingle();
+
+          if (sibData) {
+            const { data: sibSch } = await supabase
+              .from('schedules')
+              .select('day_of_week, start_time, room_id, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+              .eq('student_id', sibData.id)
+              .maybeSingle();
+
+            const { data: sibPrefs } = await supabase
+              .from('student_schedule_preferences')
+              .select('*')
+              .eq('student_id', sibData.id);
+
+            setSiblingInfo({
+              id: sibData.id,
+              first_name: sibData.first_name || '',
+              last_name: sibData.last_name || '',
+              instrument: sibData.instrument || '',
+              duration: sibData.lesson_duration || 45,
+              assignedDay: sibSch?.day_of_week,
+              assignedTime: sibSch?.start_time,
+              teacher_name: sibSch?.teacher ? `${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.first_name : (sibSch.teacher as any).first_name} ${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.last_name : (sibSch.teacher as any).last_name}` : undefined,
+              preferences: sibPrefs || []
+            });
+          } else {
+            setSiblingInfo(null);
+          }
+        } else {
+          setSiblingInfo(null);
         }
       } catch (err) {
         console.error("Error loading student preferences or notes:", err);
         setSelectedStudentPrefs([]);
         setSelectedStudentNote(null);
+        setSiblingInfo(null);
       }
     }
   };
@@ -1241,12 +1603,123 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   // Drag start handler for students (either from sidebar or day board)
-  const handleDragStart = (studentId: string, source: 'sidebar' | 'board', boardId?: string) => {
+  const handleDragStart = async (studentId: string, source: 'sidebar' | 'board', boardId?: string) => {
     setDraggedStudentId(studentId);
     setDragSource(source);
     if (boardId) setDragSourceBoardId(boardId);
     setDragOverBoardId(null);
     setDragOverIndex(null);
+
+    try {
+      let targetStudentIds = [studentId];
+      let grpId: string | null = null;
+      
+      if (studentId.startsWith('group-')) {
+        grpId = studentId.replace('group-', '');
+      } else {
+        const found = students.find(s => s.id === studentId);
+        if (found?.group_id) {
+          grpId = found.group_id;
+        }
+      }
+      
+      if (grpId) {
+        const { data: grpUsers } = await supabase
+          .from('users')
+          .select('id')
+          .eq('group_id', grpId);
+        if (grpUsers && grpUsers.length > 0) {
+          targetStudentIds = grpUsers.map((u: any) => u.id);
+        }
+      }
+
+      const { data: prefsData, error: prefsErr } = await supabase
+        .from('student_schedule_preferences')
+        .select('*')
+        .in('student_id', targetStudentIds);
+
+      if (!prefsErr && prefsData) {
+        const combinedPrefs: any[] = [];
+        
+        for (let day = 1; day <= 5; day++) {
+          const slotsCount = 24 * 4; 
+          const wunschCounts = Array(slotsCount).fill(0);
+          const isGesperrt = Array(slotsCount).fill(false);
+          
+          targetStudentIds.forEach(sId => {
+            const studentPrefs = prefsData.filter(p => p.student_id === sId && Number(p.day_of_week) === day);
+            studentPrefs.forEach(pref => {
+              const [sh, sm] = pref.start_time.split(':').map(Number);
+              const [eh, em] = pref.end_time.split(':').map(Number);
+              const startIdx = Math.floor((sh * 60 + sm) / 15);
+              const endIdx = Math.ceil((eh * 60 + em) / 15);
+              
+              for (let i = startIdx; i < endIdx; i++) {
+                if (i >= 0 && i < slotsCount) {
+                  if (pref.preference_type === 'gesperrt') {
+                    isGesperrt[i] = true;
+                  } else if (pref.preference_type === 'wunsch') {
+                    wunschCounts[i]++;
+                  }
+                }
+              }
+            });
+          });
+          
+          let currentType: 'wunsch' | 'gesperrt' | null = null;
+          let startIdx = -1;
+          
+          for (let i = 0; i < slotsCount; i++) {
+            let type: 'wunsch' | 'gesperrt' | null = null;
+            if (isGesperrt[i]) {
+              type = 'gesperrt';
+            } else if (wunschCounts[i] === targetStudentIds.length && targetStudentIds.length > 0) {
+              type = 'wunsch';
+            }
+            
+            if (type !== currentType) {
+              if (currentType && startIdx !== -1) {
+                const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+                const endTime = `${String(Math.floor((i * 15) / 60)).padStart(2, '0')}:${String((i * 15) % 60).padStart(2, '0')}:00`;
+                combinedPrefs.push({
+                  day_of_week: day,
+                  start_time: startTime,
+                  end_time: endTime,
+                  preference_type: currentType
+                });
+              }
+              currentType = type;
+              startIdx = type ? i : -1;
+            }
+          }
+          if (currentType && startIdx !== -1) {
+            const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+            const endTime = '24:00:00';
+            combinedPrefs.push({
+              day_of_week: day,
+              start_time: startTime,
+              end_time: endTime,
+              preference_type: currentType
+            });
+          }
+        }
+        
+        setSelectedStudentPrefs(combinedPrefs);
+      }
+    } catch (err) {
+      console.error("Error loading preferences on drag start:", err);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedStudentId(null);
+    setDragSource(null);
+    setDragSourceBoardId(null);
+    setDragOverBoardId(null);
+    setDragOverIndex(null);
+    if (!selectedStudentId) {
+      setSelectedStudentPrefs([]);
+    }
   };
 
   // Drag over handler to allow dropping
@@ -1384,9 +1857,31 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId);
   };
 
-  const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null) => {
+  const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null, chosenInstrument?: string) => {
     const isBreakDrag = sourceId.startsWith('break-') || sourceId === 'sidebar-pause';
-    const student = students.find(s => s.id === sourceId);
+    const studentObj = students.find(s => s.id === sourceId);
+
+    if (!isBreakDrag && studentObj && source === 'sidebar' && !chosenInstrument) {
+      const instruments = studentObj.instrument ? studentObj.instrument.split(',').map((i: string) => i.trim()).filter(Boolean) : [];
+      if (instruments.length > 1) {
+        setInstrumentSelectorState({
+          sourceId,
+          targetBoardId,
+          index,
+          dragSource: source,
+          dragSourceBoardId: sourceBoardId,
+          instruments
+        });
+        setSelectedDropInstrument(instruments[0]);
+        return;
+      }
+    }
+
+    const student = studentObj ? {
+      ...studentObj,
+      instrument: chosenInstrument || studentObj.instrument || 'Musiker',
+      customStartTime: undefined
+    } : null;
 
     // Validate if the timeframe overlaps with a 'gesperrt' (blocked) preference for the student
     if (!isBreakDrag && student) {
@@ -1396,7 +1891,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         let targetNextStudents = [...targetBoard.students];
         targetNextStudents = targetNextStudents.filter(s => s.id !== sourceId);
         
-        const studentToAssign = { ...student, assignedDay: targetBoard.dayOfWeek };
+        const studentToAssign = { ...student, assignedDay: targetBoard.dayOfWeek, customStartTime: undefined };
         if (index !== undefined) {
           targetNextStudents.splice(index, 0, studentToAssign);
         } else {
@@ -1463,6 +1958,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
     }
 
+    const removeStudentFromBoardsList = (boardsList: DayBoard[], studentId: string): DayBoard[] => {
+      return boardsList.map(b => {
+        const nextStudents: Student[] = [];
+        b.students.forEach(s => {
+          if (s.isBreak) {
+            if (s.id !== studentId) {
+              nextStudents.push(s);
+            }
+            return;
+          }
+          if (s.isGroup && s.groupStudents) {
+            if (s.id === studentId) {
+              // Dragging the whole group card -> remove it entirely
+              return;
+            }
+            const remaining = s.groupStudents.filter(gs => gs.id !== studentId);
+            if (remaining.length >= 2) {
+              nextStudents.push({
+                ...s,
+                groupStudents: remaining
+              });
+            } else if (remaining.length === 1) {
+              nextStudents.push(remaining[0]);
+            }
+          } else {
+            if (s.id !== studentId) {
+              nextStudents.push(s);
+            }
+          }
+        });
+        return recalculateBoardTimes({ ...b, students: nextStudents });
+      });
+    };
+
     setBoards(prev => {
       let sourceBoard = prev.find(b => b.id === sourceBoardId);
       let targetBoard = prev.find(b => b.id === targetBoardId);
@@ -1476,37 +2005,59 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const curIndex = nextStudents.findIndex(s => s.id === sourceId);
           if (curIndex !== -1) {
             const [moved] = nextStudents.splice(curIndex, 1);
+            const movedCleared = { ...moved, customStartTime: undefined };
             if (index !== undefined) {
-              nextStudents.splice(index, 0, moved);
+              nextStudents.splice(index, 0, movedCleared);
             } else {
-              nextStudents.push(moved);
+              nextStudents.push(movedCleared);
             }
-            return prev.map(b => b.id === targetBoardId ? recalculateBoardTimes({ ...b, students: nextStudents }) : b);
+            const updated = recalculateBoardTimes({ ...targetBoard, students: nextStudents });
+            
+            setStudents(currentStudents => currentStudents.map(s => {
+              if (s.id === sourceId) {
+                return {
+                  ...s,
+                  assignedDay: targetBoard.dayOfWeek,
+                  assignedTime: updated.students.find(bs => bs.id === sourceId)?.assignedTime
+                };
+              }
+              return s;
+            }));
+            
+            return prev.map(b => b.id === targetBoardId ? updated : b);
           }
           return prev;
         }
 
         // If moving to a DIFFERENT board
-        const sourceNextStudents = sourceBoard.students.filter(s => s.id !== sourceId);
-        const targetNextStudents = [...targetBoard.students];
-        
-        // Remove from source and recalculate
-        const updatedSource = recalculateBoardTimes({ ...sourceBoard, students: sourceNextStudents });
-        
-        // Add to target and recalculate
-        const movedStudent = sourceBoard.students.find(s => s.id === sourceId)!;
+        const rawMoved = sourceBoard.students.find(s => s.id === sourceId);
+        if (!rawMoved) return prev;
+
+        const cleaned = removeStudentFromBoardsList(prev, sourceId);
+        const targetBoardCleaned = cleaned.find(b => b.id === targetBoardId);
+        if (!targetBoardCleaned) return prev;
+
+        const targetNextStudents = [...targetBoardCleaned.students];
+        const movedStudent = { ...rawMoved, customStartTime: undefined };
         if (index !== undefined) {
           targetNextStudents.splice(index, 0, movedStudent);
         } else {
           targetNextStudents.push(movedStudent);
         }
-        const updatedTarget = recalculateBoardTimes({ ...targetBoard, students: targetNextStudents });
+        const updatedTarget = recalculateBoardTimes({ ...targetBoardCleaned, students: targetNextStudents });
 
-        return prev.map(b => {
-          if (b.id === sourceBoard!.id) return updatedSource;
-          if (b.id === targetBoardId) return updatedTarget;
-          return b;
-        });
+        setStudents(currentStudents => currentStudents.map(s => {
+          if (s.id === sourceId || (rawMoved.isGroup && rawMoved.groupStudents?.some(gs => gs.id === s.id))) {
+            return {
+              ...s,
+              assignedDay: targetBoardCleaned.dayOfWeek,
+              assignedTime: updatedTarget.students.find(bs => bs.id === s.id)?.assignedTime
+            };
+          }
+          return s;
+        }));
+
+        return cleaned.map(b => b.id === targetBoardId ? updatedTarget : b);
       }
 
       // 2. If moving from sidebar to board
@@ -1531,19 +2082,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         if (!student) return prev;
-        // Check if student is already in target board
-        if (targetBoard.students.some(s => s.id === sourceId)) return prev;
 
-        // Remove student from any other board if they were assigned
-        const cleanedBoards = prev.map(b => {
-          if (b.students.some(s => s.id === sourceId)) {
-            return recalculateBoardTimes({ ...b, students: b.students.filter(s => s.id !== sourceId) });
+        // Check if student is already in target board (either directly or inside a group)
+        const isAlreadyInTarget = targetBoard.students.some(s => {
+          if (s.isBreak) return false;
+          if (s.isGroup && s.groupStudents) {
+            return s.groupStudents.some(gs => gs.id === sourceId);
           }
-          return b;
+          return s.id === sourceId;
         });
+        if (isAlreadyInTarget) return prev;
 
-        const targetNextStudents = [...targetBoard.students];
-        const studentToAssign = { ...student, assignedDay: targetBoard.dayOfWeek };
+        const cleaned = removeStudentFromBoardsList(prev, sourceId);
+        const targetBoardCleaned = cleaned.find(b => b.id === targetBoardId);
+        if (!targetBoardCleaned) return prev;
+
+        const targetNextStudents = [...targetBoardCleaned.students];
+        const studentToAssign = { ...student, assignedDay: targetBoardCleaned.dayOfWeek };
 
         if (index !== undefined) {
           targetNextStudents.splice(index, 0, studentToAssign);
@@ -1551,22 +2106,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           targetNextStudents.push(studentToAssign);
         }
 
-        // Recalculate target board
-        const updatedTarget = recalculateBoardTimes({ ...targetBoard, students: targetNextStudents });
+        const updatedTarget = recalculateBoardTimes({ ...targetBoardCleaned, students: targetNextStudents });
 
-        // Update overall student list flags
         setStudents(currentStudents => currentStudents.map(s => {
           if (s.id === sourceId) {
             return {
               ...s,
-              assignedDay: targetBoard!.dayOfWeek,
+              assignedDay: targetBoardCleaned.dayOfWeek,
               assignedTime: updatedTarget.students.find(bs => bs.id === sourceId)?.assignedTime
             };
           }
           return s;
         }));
 
-        return cleanedBoards.map(b => b.id === targetBoardId ? updatedTarget : b);
+        return cleaned.map(b => b.id === targetBoardId ? updatedTarget : b);
       }
 
       return prev;
@@ -2026,7 +2579,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 time_slot: s.assignedTime,
                 room_id: board.roomId || null,
                 duration: s.duration,
-                status: 'ready_for_admin_review'
+                status: 'ready_for_admin_review',
+                instrument: gs.instrument || 'Musiker'
               });
             }
           } else {
@@ -2038,13 +2592,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               time_slot: s.assignedTime,
               room_id: board.roomId || null,
               duration: s.duration,
-              status: s.isBreak ? 'approved' : 'ready_for_admin_review' // A break/pause is auto-approved
+              status: s.isBreak ? 'approved' : 'ready_for_admin_review', // A break/pause is auto-approved
+              instrument: s.isBreak ? null : (s.instrument || 'Musiker')
             });
           }
         }
       }
 
       if (inserts.length > 0) {
+        // Before inserting, validate that no other approved schedule exists for this student_id with the same instrument column value.
+        const studentIds = inserts.map(i => i.student_id).filter(Boolean);
+        if (studentIds.length > 0) {
+          const { data: existingSchedules, error: checkError } = await supabase
+            .from('schedules')
+            .select('student_id, instrument, student:users!schedules_student_id_fkey(first_name, last_name)')
+            .eq('status', 'approved')
+            .neq('teacher_id', selectedTeacherId)
+            .in('student_id', studentIds);
+            
+          if (checkError) {
+            console.error("Error checking existing schedules:", checkError);
+          } else if (existingSchedules && existingSchedules.length > 0) {
+            for (const insert of inserts) {
+              if (!insert.student_id) continue;
+              const conflict = (existingSchedules as any[]).find((es: any) => es.student_id === insert.student_id && es.instrument === insert.instrument);
+              if (conflict) {
+                const studentObj = conflict.student;
+                const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : 'Schüler';
+                alert(`Fehler: Für ${studentName} existiert bereits ein genehmigter Stundenplan für das Instrument "${insert.instrument}".`);
+                setSubmitting(false);
+                return;
+              }
+            }
+          }
+        }
+
         const { data: insertedSchedules, error: insertErr } = await supabase
           .from('schedules')
           .insert(inserts)
@@ -2633,9 +3215,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     <div
                       onDragOver={(e) => {
                         e.preventDefault();
-                        if (dragOverBoardId !== board.id || dragOverIndex !== board.students.length) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clientY = e.clientY - rect.top;
+                        const dragMinutes = clientY / PX_PER_MIN;
+                        
+                        let accMin = 0;
+                        let targetIndex = 0;
+                        for (let i = 0; i < board.students.length; i++) {
+                          const s = board.students[i];
+                          const cardStart = accMin;
+                          const cardEnd = accMin + s.duration;
+                          if (dragMinutes < (cardStart + cardEnd) / 2) {
+                            break;
+                          }
+                          accMin += s.duration;
+                          targetIndex = i + 1;
+                        }
+                        
+                        if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex) {
                           setDragOverBoardId(board.id);
-                          setDragOverIndex(board.students.length);
+                          setDragOverIndex(targetIndex);
                         }
                       }}
                       onDragLeave={() => {
@@ -2684,7 +3283,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       })}
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
-                      {selectedStudentId && (() => {
+                       {(selectedStudentId || draggedStudentId) && (() => {
                         const blockCount = Math.floor((endMinutes - startMinutes) / 15);
                         const matchedTypes: ('wunsch' | 'gesperrt' | null)[] = Array(blockCount).fill(null);
                         
@@ -2721,9 +3320,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             if (currentType && startIndex !== -1) {
                               const top = startIndex * 15 * PX_PER_MIN;
                               const height = (i - startIndex) * 15 * PX_PER_MIN;
-                              const className = currentType === 'gesperrt' 
-                                ? 'roentgen-blocked opacity-40 pointer-events-none' 
-                                : 'roentgen-preferred';
+                              const className = currentType === 'gesperrt' ? 'roentgen-blocked' : 'roentgen-preferred';
                               
                               mergedBlocks.push(
                                 <div
@@ -2750,9 +3347,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         if (currentType && startIndex !== -1) {
                           const top = startIndex * 15 * PX_PER_MIN;
                           const height = (blockCount - startIndex) * 15 * PX_PER_MIN;
-                          const className = currentType === 'gesperrt' 
-                            ? 'roentgen-blocked opacity-40 pointer-events-none' 
-                            : 'roentgen-preferred';
+                          const className = currentType === 'gesperrt' ? 'roentgen-blocked' : 'roentgen-preferred';
                           
                           mergedBlocks.push(
                             <div
@@ -2771,6 +3366,127 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             />
                           );
                         }
+
+                        // Sibling visual enhancements
+                        if (siblingInfo) {
+                          // Scenario 1: Sibling is scheduled (we show parallel, before, after)
+                          if (siblingInfo.scheduled_slot && siblingInfo.scheduled_slot.day_of_week === board.dayOfWeek) {
+                            const [sh, sm] = siblingInfo.scheduled_slot.start_time.split(':').map(Number);
+                            const sibStartMin = sh * 60 + sm;
+                            const sibDuration = siblingInfo.duration || 45;
+                            const currentStudDuration = students.find(s => s.id === selectedStudentId)?.duration || 45;
+
+                            const recommendations = [
+                              {
+                                label: 'Geschwister-Empfehlung: Parallel',
+                                start: sibStartMin,
+                                duration: Math.min(sibDuration, currentStudDuration),
+                                bg: 'rgba(139, 92, 246, 0.15)',
+                                border: '1.5px dashed #8b5cf6'
+                              },
+                              {
+                                label: 'Geschwister-Empfehlung: Vorher',
+                                start: sibStartMin - currentStudDuration,
+                                duration: currentStudDuration,
+                                bg: 'rgba(139, 92, 246, 0.1)',
+                                border: '1.5px dashed #a78bfa'
+                              },
+                              {
+                                label: 'Geschwister-Empfehlung: Nachher',
+                                start: sibStartMin + sibDuration,
+                                duration: currentStudDuration,
+                                bg: 'rgba(139, 92, 246, 0.1)',
+                                border: '1.5px dashed #a78bfa'
+                              }
+                            ];
+
+                            recommendations.forEach((rec, idx) => {
+                              if (rec.start >= startMinutes && rec.start + rec.duration <= endMinutes) {
+                                const top = (rec.start - startMinutes) * PX_PER_MIN;
+                                const height = rec.duration * PX_PER_MIN;
+                                mergedBlocks.push(
+                                  <div
+                                    key={`sib-rec-${board.id}-${idx}`}
+                                    style={{
+                                      position: 'absolute',
+                                      left: '4px',
+                                      right: '4px',
+                                      top: `${top}px`,
+                                      height: `${height}px`,
+                                      background: rec.bg,
+                                      border: rec.border,
+                                      borderRadius: '8px',
+                                      zIndex: 4,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      pointerEvents: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  >
+                                    <span style={{
+                                      fontSize: '9px',
+                                      fontWeight: 800,
+                                      color: '#6d28d9',
+                                      background: '#ffffff',
+                                      padding: '2px 6px',
+                                      borderRadius: '6px',
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                                      textAlign: 'center'
+                                    }}>
+                                      {rec.label}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                            });
+                          }
+
+                          // Scenario 2: Sibling is not scheduled yet, we highlight common Wunschzeiten
+                          if (!siblingInfo.scheduled_slot) {
+                            selectedStudentPrefs.forEach(pref => {
+                              if (pref.preference_type === 'wunsch' && pref.day_of_week === board.dayOfWeek) {
+                                const [ph, pm] = pref.start_time.split(':').map(Number);
+                                const [peh, pem] = pref.end_time.split(':').map(Number);
+                                const prefStart = ph * 60 + pm;
+                                const prefEnd = peh * 60 + pem;
+
+                                const hasOverlap = siblingInfo.selected_slots?.some((sp: any) => {
+                                  if (sp.preference_type !== 'wunsch' || sp.day_of_week !== board.dayOfWeek) return false;
+                                  const [sph, spm] = sp.start_time.split(':').map(Number);
+                                  const [speh, spem] = sp.end_time.split(':').map(Number);
+                                  const sStart = sph * 60 + spm;
+                                  const sEnd = speh * 60 + spem;
+                                  return (prefStart < sEnd && prefEnd > sStart);
+                                });
+
+                                if (hasOverlap && prefStart >= startMinutes && prefEnd <= endMinutes) {
+                                  const top = (prefStart - startMinutes) * PX_PER_MIN;
+                                  const height = (prefEnd - prefStart) * PX_PER_MIN;
+
+                                  mergedBlocks.push(
+                                    <div
+                                      key={`sib-overlap-${board.id}-${prefStart}`}
+                                      style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        right: 0,
+                                        top: `${top}px`,
+                                        height: `${height}px`,
+                                        border: '2px solid #8b5cf6',
+                                        background: 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 8px, rgba(139, 92, 246, 0.1) 8px, rgba(139, 92, 246, 0.1) 16px)',
+                                        zIndex: 4,
+                                        pointerEvents: 'none',
+                                        boxSizing: 'border-box'
+                                      }}
+                                    />
+                                  );
+                                }
+                              }
+                            });
+                          }
+                        }
+
                         return mergedBlocks;
                       })()}
 
@@ -2794,6 +3510,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               key={bs.id}
                               draggable
                               onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              onDragEnd={handleDragEnd}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2841,20 +3558,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     style={{ width: '38px', background: 'transparent', border: 'none', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                   />
                                 </div>
-                                <select
-                                  value={bs.duration}
-                                  onChange={(e) => {
-                                    const newDur = parseInt(e.target.value) || 15;
-                                    setBoards(prev => prev.map(b => {
-                                      if (b.id !== board.id) return b;
-                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
-                                      return recalculateBoardTimes({ ...b, students: nextStudents });
-                                    }));
-                                  }}
-                                  style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', padding: '1px 3px', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', cursor: 'pointer' }}
-                                >
-                                  {[5,10,15,20,30,45,60].map(v => <option key={v} value={v}>{v}m</option>)}
-                                </select>
+                                 <span 
+                                   style={{ 
+                                     background: 'rgba(255,255,255,0.6)', 
+                                     borderRadius: '5px', 
+                                     padding: '1px 5px', 
+                                     fontSize: '0.62rem', 
+                                     fontWeight: 700, 
+                                     color: '#b45309' 
+                                   }}
+                                 >
+                                   {bs.duration}m
+                                 </span>
                                 <button 
                                   type="button" 
                                   onClick={(e) => {
@@ -3025,6 +3740,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               key={bs.id}
                               draggable
                               onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              onDragEnd={handleDragEnd}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -3053,50 +3769,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   👥 {bs.assignedTime}
                                 </span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUngroupBlock(board.id, bs.id)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: highlightColor,
-                                      fontSize: '0.62rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      padding: '2px 4px',
-                                      borderRadius: '4px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '2px'
-                                    }}
-                                    title="Gruppe aufteilen"
-                                  >
-                                    Aufteilen
-                                  </button>
-                                  <select
-                                    value={bs.duration}
-                                    onChange={(e) => {
-                                      const newDur = parseInt(e.target.value) || 15;
-                                      setBoards(prev => prev.map(b => {
-                                        if (b.id !== board.id) return b;
-                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDur } : s);
-                                        return recalculateBoardTimes({ ...b, students: nextStudents });
-                                      }));
-                                    }}
-                                    style={{
-                                      background: 'rgba(255,255,255,0.7)',
-                                      border: `1px solid ${highlightColor}20`,
-                                      borderRadius: '5px',
-                                      padding: '1px 3px',
-                                      fontSize: '0.62rem',
-                                      fontWeight: 700,
-                                      color: highlightColor,
-                                      outline: 'none',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    {[30, 45, 60, 75, 90, 120].map(v => <option key={v} value={v}>{v}m</option>)}
-                                  </select>
+                                  {!bs.group_id && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUngroupBlock(board.id, bs.id)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: highlightColor,
+                                        fontSize: '0.62rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        padding: '2px 4px',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '2px'
+                                      }}
+                                      title="Gruppe aufteilen"
+                                    >
+                                      Aufteilen
+                                    </button>
+                                  )}
+                                   <span 
+                                     style={{ 
+                                       background: 'rgba(255,255,255,0.7)', 
+                                       borderRadius: '5px', 
+                                       padding: '1px 5px', 
+                                       fontSize: '0.62rem', 
+                                       fontWeight: 700, 
+                                       color: highlightColor 
+                                     }}
+                                   >
+                                     {bs.duration}m
+                                   </span>
                                   <button 
                                     type="button" 
                                     onClick={(e) => {
@@ -3133,6 +3839,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             key={bs.id}
                             draggable={true}
                             onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                            onDragEnd={handleDragEnd}
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -3160,7 +3867,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
-                              opacity: selectedStudentId !== null ? (isSelected ? 1 : 0.8) : 1,
+                              opacity: (selectedStudentId !== null || draggedStudentId !== null)
+                                ? ((selectedStudentId === bs.id || draggedStudentId === bs.id) ? 1 : 0.6)
+                                : 1,
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
@@ -3308,6 +4017,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               <div
                 draggable
                 onDragStart={() => handleDragStart('sidebar-pause', 'sidebar')}
+                onDragEnd={handleDragEnd}
                 style={{
                   background: 'rgba(254, 243, 199, 0.5)',
                   backdropFilter: 'blur(12px)',
@@ -3393,6 +4103,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       key={s.id}
                       draggable={!isAssigned}
                       onDragStart={() => handleDragStart(s.id, 'sidebar')}
+                      onDragEnd={handleDragEnd}
                       onClick={() => handleSelectStudent(s.id)}
                       className={isShaking ? 'card-shake' : ''}
                       style={{ 
@@ -3670,18 +4381,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     padding: '12px 20px',
                     borderRadius: '12px',
                     border: 'none',
-                    background: primaryColor,
+                    background: '#0b57d0',
                     color: '#ffffff',
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(0, 122, 255, 0.2)'}`
+                    boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
                 >
-                  👥 Zusammenführen (Gruppenunterricht)
+                  👥 Zusammenführen (Ensembles/Bands)
                 </button>
 
                 <button
@@ -3837,6 +4548,93 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.color = '#86868b'}
                 >
                   Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {instrumentSelectorState && (() => {
+        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+        const primaryColor = isCampus ? '#137333' : '#ea4335';
+        const studentObj = students.find(s => s.id === instrumentSelectorState.sourceId);
+        const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : 'Schüler';
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              background: '#ffffff',
+              padding: '28px',
+              borderRadius: '24px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+              width: '400px',
+              maxWidth: '90vw',
+              border: '1px solid rgba(0,0,0,0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>
+                Instrument auswählen
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#515154', textAlign: 'center', lineHeight: 1.4 }}>
+                Bitte wähle das Instrument für diese Unterrichtsstunde von <strong>{studentName}</strong>:
+              </p>
+              <select
+                value={selectedDropInstrument}
+                onChange={(e) => setSelectedDropInstrument(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  color: '#1e293b'
+                }}
+              >
+                {instrumentSelectorState.instruments.map(i => (
+                  <option key={i} value={i}>{i}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button
+                  onClick={() => setInstrumentSelectorState(null)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #e2e8f0',
+                    background: 'transparent',
+                    color: '#64748b',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={() => {
+                    const { sourceId, targetBoardId, index, dragSource, dragSourceBoardId } = instrumentSelectorState;
+                    setInstrumentSelectorState(null);
+                    executeStandardDrop(sourceId, targetBoardId, index, dragSource, dragSourceBoardId, selectedDropInstrument);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: primaryColor,
+                    color: '#ffffff',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Zuweisen
                 </button>
               </div>
             </div>

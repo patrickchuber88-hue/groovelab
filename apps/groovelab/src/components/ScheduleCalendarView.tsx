@@ -14,7 +14,12 @@ import {
   Palmtree,
   Users,
   Link2Off,
-  Search
+  Search,
+  Copy,
+  Clipboard,
+  Download,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface ScheduleOccurrence {
@@ -34,6 +39,7 @@ interface ScheduleOccurrence {
     first_name: string;
     last_name: string;
     instrument: string;
+    group_id?: string | null;
   };
   template_room_id?: string | null;
   room_override_id?: string | null;
@@ -46,6 +52,8 @@ interface ScheduleOccurrence {
   } | null;
   isGroupBlock?: boolean;
   groupOccurrences?: any[];
+  instrument?: string | null;
+  notes?: string | null;
 }
 
 interface ScheduleCalendarViewProps {
@@ -81,6 +89,18 @@ export function ScheduleCalendarView({
   };
 
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentMinutes, setCurrentMinutes] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const d = new Date();
+      setCurrentMinutes(d.getHours() * 60 + d.getMinutes());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   interface CustomDialogConfig {
     type: 'confirm' | 'alert';
@@ -139,6 +159,7 @@ export function ScheduleCalendarView({
   const [isGroupModeActive, setIsGroupModeActive] = useState(false);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
   const [selectedRoomIdForXRay, setSelectedRoomIdForXRay] = useState<string | null>(null);
+  const [selectedStudentPrefs, setSelectedStudentPrefs] = useState<any[]>([]);
 
   const [localEndTime, setLocalEndTime] = useState<string>('');
   const [hoveredTooltip, setHoveredTooltip] = useState<{
@@ -691,6 +712,7 @@ export function ScheduleCalendarView({
     const schedConflict = cachedWeekSchedules.find(s => {
       if (s.room_id !== roomId) return false;
       if (s.day_of_week !== dayOfWeek) return false;
+      if (s.teacher_id === userId) return false;
       
       const sStart = (s.time_slot || '00:00').substring(0, 5);
       const sEnd = (() => {
@@ -727,11 +749,7 @@ export function ScheduleCalendarView({
     const rbConflict = cachedWeekRoomBookings.find(rb => {
       if (rb.room_id !== roomId) return false;
       if (rb.date !== targetDate) return false;
-
-      const isCurrentOwnBooking = rb.booked_by === userId && 
-        rb.date === targetDate && 
-        rb.start_time.substring(0, 5) === formattedTargetStart;
-      if (isCurrentOwnBooking) return false;
+      if (rb.booked_by === userId) return false;
 
       const rbStart = (rb.start_time || '00:00').substring(0, 5);
       const rbEnd = rb.end_time ? rb.end_time.substring(0, 5) : (() => {
@@ -1007,11 +1025,30 @@ export function ScheduleCalendarView({
             : (originalOcc?.schedules?.room_id || null);
           const currentRoomId = change.schedules?.room_id || null;
 
-          const timeChanged = change.date !== origDateStr || change.start_time.substring(0, 5) !== origTimeStr.substring(0, 5);
+           const timeChanged = change.date !== origDateStr || change.start_time.substring(0, 5) !== origTimeStr.substring(0, 5);
           const roomChanged = originalRoomId !== currentRoomId;
           const isCancelled = change.status === 'cancelled';
 
-          const needsRoomBooking = !isCancelled && currentRoomId && (timeChanged || roomChanged);
+          // Compute regular teaching range for this teacher in this room on target date's weekday
+          const targetDate = new Date(change.date + 'T00:00:00');
+          const targetDayOfWeek = targetDate.getDay() || 7; // 1=Mon … 7=Sun
+          let regMin = Infinity;
+          let regMax = -Infinity;
+          (cachedWeekSchedules || []).forEach((s: any) => {
+            if (s.day_of_week !== targetDayOfWeek) return;
+            if (s.teacher_id !== userId) return;
+            if (s.room_id !== currentRoomId) return; // Must be in the same room
+            const sStart = timeToMinutes(s.time_slot);
+            const sEnd = sStart + (s.duration || 45);
+            if (sStart < regMin) regMin = sStart;
+            if (sEnd > regMax) regMax = sEnd;
+          });
+
+          const occStartMinutes = timeToMinutes(change.start_time);
+          const occEndMinutes = occStartMinutes + (change.duration || 45);
+          const isInsideOwnRegularBlock = regMin !== Infinity && occStartMinutes >= regMin && occEndMinutes <= regMax;
+
+          const needsRoomBooking = !isCancelled && currentRoomId && (timeChanged || roomChanged) && !isInsideOwnRegularBlock;
 
           if (needsRoomBooking) {
             const startMins = timeToMinutes(change.start_time);
@@ -1456,7 +1493,7 @@ export function ScheduleCalendarView({
       try {
         const { data, error } = await supabase
           .from('schedule_occurrences')
-          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))')
+          .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))')
           .eq('teacher_id', userId)
           .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
           .order('date')
@@ -1676,6 +1713,270 @@ export function ScheduleCalendarView({
     }
   }
 
+  const handleCopyWeek = () => {
+    const activeOccs = baseOccurrences.filter(occ => 
+      occ.student_id && 
+      occ.student_id !== 'vacant' && 
+      !occ.id.startsWith('mock-') &&
+      occ.status !== 'cancelled'
+    );
+
+    if (activeOccs.length === 0) {
+      showAlert('Keine aktiven Unterrichtstermine in dieser Woche zum Kopieren gefunden.');
+      return;
+    }
+
+    const copiedEvents = activeOccs.map(occ => {
+      const occDate = new Date(occ.date);
+      const diffTime = occDate.getTime() - weekStart.getTime();
+      const dayOffset = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      
+      const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
+      const isRescheduled = (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)) || isRoomOverridden;
+
+      return {
+        student_id: occ.student_id,
+        student_first_name: occ.student?.first_name || '',
+        student_last_name: occ.student?.last_name || '',
+        schedule_id: occ.schedule_id || null,
+        duration: occ.duration || 45,
+        start_time: occ.start_time,
+        status: occ.status || 'scheduled',
+        instrument: occ.instrument || null,
+        notes: occ.notes || null,
+        rescheduled: isRescheduled,
+        activeRoomId: occ.schedules?.room_id || null,
+        dayOffset
+      };
+    });
+
+    localStorage.setItem('groovelab_copied_week_data', JSON.stringify(copiedEvents));
+    showAlert(`${copiedEvents.length} Termine kopiert. Wähle eine andere Woche und klicke auf "Woche einfügen".`);
+  };
+
+  const handlePasteWeek = async () => {
+    const rawData = localStorage.getItem('groovelab_copied_week_data');
+    if (!rawData) {
+      showAlert('Keine kopierte Woche im Zwischenspeicher gefunden. Bitte kopiere zuerst eine Woche.');
+      return;
+    }
+
+    const copiedEvents = JSON.parse(rawData);
+    if (!Array.isArray(copiedEvents) || copiedEvents.length === 0) {
+      showAlert('Der Zwischenspeicher ist leer oder ungültig.');
+      return;
+    }
+
+    const confirmPaste = await showConfirm(
+      `Möchtest du alle ${copiedEvents.length} kopierten Termine in diese Woche einfügen? Dies überschreibt alle bestehenden Terminanpassungen dieser Woche.`
+    );
+    if (!confirmPaste) return;
+
+    setLoading(true);
+
+    try {
+      const weekStartStr = toLocalYYYYMMDD(weekStart);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const weekEndStr = toLocalYYYYMMDD(weekEnd);
+
+      // 1. Delete existing occurrences in destination week
+      const { data: occurrencesToDelete } = await supabase
+        .from('schedule_occurrences')
+        .select('date, start_time')
+        .eq('teacher_id', userId)
+        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
+
+      const { error: deleteError } = await supabase
+        .from('schedule_occurrences')
+        .delete()
+        .eq('teacher_id', userId)
+        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
+
+      if (deleteError) throw deleteError;
+
+      // Clean up corresponding room bookings
+      if (occurrencesToDelete && occurrencesToDelete.length > 0) {
+        try {
+          await Promise.all(
+            occurrencesToDelete.map(occ =>
+              supabase.from('room_bookings')
+                .delete()
+                .eq('booked_by', userId)
+                .eq('date', occ.date)
+                .eq('start_time', occ.start_time)
+            )
+          );
+        } catch (roomErr) {
+          console.warn('Error deleting room bookings on paste week:', roomErr);
+        }
+      }
+
+      // 2. Insert new occurrences
+      const inserts = copiedEvents.map(evt => {
+        const destDate = new Date(weekStart);
+        destDate.setDate(destDate.getDate() + evt.dayOffset);
+        const destDateStr = toLocalYYYYMMDD(destDate);
+
+        return {
+          teacher_id: userId,
+          student_id: evt.student_id,
+          schedule_id: evt.schedule_id,
+          duration: evt.duration,
+          date: destDateStr,
+          start_time: evt.start_time,
+          status: evt.status,
+          instrument: evt.instrument,
+          notes: evt.notes,
+          original_date: destDateStr,
+          original_start_time: evt.start_time,
+          student_acknowledged: false
+        };
+      });
+
+      if (inserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('schedule_occurrences')
+          .insert(inserts);
+
+        if (insertError) throw insertError;
+
+        // Insert room bookings for any rescheduled appointments
+        const rescheduledInserts = copiedEvents.filter(evt => evt.rescheduled && evt.activeRoomId);
+        if (rescheduledInserts.length > 0) {
+          try {
+            await Promise.all(
+              rescheduledInserts.map(evt => {
+                const destDate = new Date(weekStart);
+                destDate.setDate(destDate.getDate() + evt.dayOffset);
+                const destDateStr = toLocalYYYYMMDD(destDate);
+
+                const startMins = timeToMinutes(evt.start_time);
+                const duration = evt.duration || 45;
+                const endMins = startMins + duration;
+
+                // Check if this falls inside the teacher's regular block in that room on that weekday
+                const targetDayOfWeek = destDate.getDay() || 7; // 1=Mon … 7=Sun
+                let regMin = Infinity;
+                let regMax = -Infinity;
+                (cachedWeekSchedules || []).forEach((s: any) => {
+                  if (s.day_of_week !== targetDayOfWeek) return;
+                  if (s.teacher_id !== userId) return;
+                  if (s.room_id !== evt.activeRoomId) return;
+                  const sStart = timeToMinutes(s.time_slot);
+                  const sEnd = sStart + (s.duration || 45);
+                  if (sStart < regMin) regMin = sStart;
+                  if (sEnd > regMax) regMax = sEnd;
+                });
+
+                const isInsideOwnRegularBlock = regMin !== Infinity && startMins >= regMin && endMins <= regMax;
+                if (isInsideOwnRegularBlock) {
+                  return Promise.resolve();
+                }
+
+                const eh = Math.floor(endMins / 60);
+                const em = endMins % 60;
+                const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
+
+                const studentName = `${evt.student_first_name || ''} ${evt.student_last_name || ''}`.trim() || 'Schüler';
+
+                return supabase.from('room_bookings').insert({
+                  school_id: schoolId,
+                  room_id: evt.activeRoomId,
+                  booked_by: userId,
+                  date: destDateStr,
+                  start_time: evt.start_time.length === 5 ? `${evt.start_time}:00` : evt.start_time,
+                  end_time: endTimeStr,
+                  title: `Unterricht: ${studentName}`
+                });
+              })
+            );
+            window.dispatchEvent(new CustomEvent('refresh-bookings'));
+          } catch (rbErr) {
+            console.warn('Error inserting room bookings on paste:', rbErr);
+          }
+        }
+      }
+
+      await loadOccurrences();
+      showAlert(`${inserts.length} Termine erfolgreich eingefügt.`);
+    } catch (err) {
+      console.error('Error pasting week:', err);
+      showAlert('Fehler beim Einfügen der kopierten Woche.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportICal = () => {
+    const activeOccs = baseOccurrences.filter(occ => 
+      occ.student_id && 
+      occ.student_id !== 'vacant' && 
+      !occ.id.startsWith('mock-') &&
+      occ.status !== 'cancelled'
+    );
+
+    if (activeOccs.length === 0) {
+      showAlert('Keine aktiven Termine in dieser Woche zum Exportieren.');
+      return;
+    }
+
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Campus-Groovelab//Stundenplan//DE',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH'
+    ];
+
+    activeOccs.forEach(occ => {
+      const studentName = `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim() || 'Schüler';
+      const instrument = occ.instrument || occ.student?.instrument || '';
+      
+      const startMins = timeToMinutes(occ.start_time);
+      const duration = occ.duration || 45;
+      const endMins = startMins + duration;
+      
+      const sh = Math.floor(startMins / 60);
+      const sm = startMins % 60;
+      const eh = Math.floor(endMins / 60);
+      const em = endMins % 60;
+
+      const dateParts = occ.date.split('-');
+      const yyyy = dateParts[0];
+      const mm = dateParts[1];
+      const dd = dateParts[2];
+
+      const startStr = `${yyyy}${mm}${dd}T${String(sh).padStart(2, '0')}${String(sm).padStart(2, '0')}00`;
+      const endStr = `${yyyy}${mm}${dd}T${String(eh).padStart(2, '0')}${String(em).padStart(2, '0')}00`;
+
+      icsContent.push('BEGIN:VEVENT');
+      icsContent.push(`UID:occ-${occ.id}@campus-groovelab`);
+      icsContent.push(`DTSTART:${startStr}`);
+      icsContent.push(`DTEND:${endStr}`);
+      icsContent.push(`SUMMARY:${instrument ? `${instrument}-Unterricht` : 'Unterricht'}: ${studentName}`);
+      
+      const roomName = occ.schedules?.room?.name || '';
+      if (roomName) {
+        icsContent.push(`LOCATION:${roomName}`);
+      }
+      if (occ.notes) {
+        icsContent.push(`DESCRIPTION:${occ.notes.replace(/\n/g, '\\n')}`);
+      }
+      icsContent.push('END:VEVENT');
+    });
+
+    icsContent.push('END:VCALENDAR');
+
+    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', `campus-groovelab-stundenplan-${toLocalYYYYMMDD(weekStart)}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleResetWeek = async () => {
     const weekStartStr = toLocalYYYYMMDD(weekStart);
     const weekEnd = new Date(weekStart);
@@ -1786,11 +2087,117 @@ export function ScheduleCalendarView({
     }
   };
 
+  const loadPreferencesForDrag = async (studentId: string) => {
+    try {
+      let targetStudentIds = [studentId];
+      let grpId: string | null = null;
+      
+      const { data: userObj } = await supabase
+        .from('users')
+        .select('group_id')
+        .eq('id', studentId)
+        .single();
+        
+      if (userObj?.group_id) {
+        grpId = userObj.group_id;
+      }
+      
+      if (grpId) {
+        const { data: grpUsers } = await supabase
+          .from('users')
+          .select('id')
+          .eq('group_id', grpId);
+        if (grpUsers && grpUsers.length > 0) {
+          targetStudentIds = grpUsers.map((u: any) => u.id);
+        }
+      }
+
+      const { data: prefsData, error: prefsErr } = await supabase
+        .from('student_schedule_preferences')
+        .select('*')
+        .in('student_id', targetStudentIds);
+
+      if (!prefsErr && prefsData) {
+        const combinedPrefs: any[] = [];
+        
+        for (let day = 1; day <= 5; day++) {
+          const slotsCount = 24 * 4; 
+          const wunschCounts = Array(slotsCount).fill(0);
+          const isGesperrt = Array(slotsCount).fill(false);
+          
+          targetStudentIds.forEach(sId => {
+            const studentPrefs = prefsData.filter(p => p.student_id === sId && Number(p.day_of_week) === day);
+            studentPrefs.forEach(pref => {
+              const [sh, sm] = pref.start_time.split(':').map(Number);
+              const [eh, em] = pref.end_time.split(':').map(Number);
+              const startIdx = Math.floor((sh * 60 + sm) / 15);
+              const endIdx = Math.ceil((eh * 60 + em) / 15);
+              
+              for (let i = startIdx; i < endIdx; i++) {
+                if (i >= 0 && i < slotsCount) {
+                  if (pref.preference_type === 'gesperrt') {
+                    isGesperrt[i] = true;
+                  } else if (pref.preference_type === 'wunsch') {
+                    wunschCounts[i]++;
+                  }
+                }
+              }
+            });
+          });
+          
+          let currentType: 'wunsch' | 'gesperrt' | null = null;
+          let startIdx = -1;
+          
+          for (let i = 0; i < slotsCount; i++) {
+            let type: 'wunsch' | 'gesperrt' | null = null;
+            if (isGesperrt[i]) {
+              type = 'gesperrt';
+            } else if (wunschCounts[i] === targetStudentIds.length && targetStudentIds.length > 0) {
+              type = 'wunsch';
+            }
+            
+            if (type !== currentType) {
+              if (currentType && startIdx !== -1) {
+                const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+                const endTime = `${String(Math.floor((i * 15) / 60)).padStart(2, '0')}:${String((i * 15) % 60).padStart(2, '0')}:00`;
+                combinedPrefs.push({
+                  day_of_week: day,
+                  start_time: startTime,
+                  end_time: endTime,
+                  preference_type: currentType
+                });
+              }
+              currentType = type;
+              startIdx = type ? i : -1;
+            }
+          }
+          if (currentType && startIdx !== -1) {
+            const startTime = `${String(Math.floor((startIdx * 15) / 60)).padStart(2, '0')}:${String((startIdx * 15) % 60).padStart(2, '0')}:00`;
+            const endTime = '24:00:00';
+            combinedPrefs.push({
+              day_of_week: day,
+              start_time: startTime,
+              end_time: endTime,
+              preference_type: currentType
+            });
+          }
+        }
+        setSelectedStudentPrefs(combinedPrefs);
+      }
+    } catch (err) {
+      console.error('Error loading preferences on drag start in calendar:', err);
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
     setDraggedId(id);
     const sourceOcc = occurrences.find(o => o.id === id);
     draggedOccRef.current = sourceOcc || null;
+    
+    if (sourceOcc && sourceOcc.student_id && sourceOcc.student_id !== 'vacant') {
+      loadPreferencesForDrag(sourceOcc.student_id);
+    }
     
     // Save the vertical offset where the card was grabbed
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1838,6 +2245,7 @@ export function ScheduleCalendarView({
     draggedOccRef.current = null;
     cleanupDragGhost();
     stopAutoScroll();
+    setSelectedStudentPrefs([]);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -2452,9 +2860,12 @@ export function ScheduleCalendarView({
       }
     });
 
-    // 2. Room bookings of other teachers
+    // 2. Room bookings (of other teachers and own manual reservations)
     cachedWeekRoomBookings.forEach((rb: any) => {
-      if (rb.room_id === roomId && rb.booked_by !== userId && rb.date === dateStr) {
+      if (rb.room_id === roomId && rb.date === dateStr) {
+        if (rb.booked_by === userId && rb.title?.startsWith('Unterricht:')) {
+          return;
+        }
         const start = timeToMinutes(rb.start_time);
         const end = timeToMinutes(rb.end_time || rb.start_time);
         const duration = end > start ? (end - start) : 45;
@@ -2706,6 +3117,101 @@ export function ScheduleCalendarView({
               </button>
             )}
 
+            {/* Datumsauswahl */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input 
+                type="date"
+                value={toLocalYYYYMMDD(currentDate)}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setCurrentDate(new Date(e.target.value));
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  opacity: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer',
+                  zIndex: 2
+                }}
+              />
+              <button 
+                style={{ 
+                  background: 'transparent', 
+                  color: '#2563eb', 
+                  border: '1px solid rgba(37, 99, 235, 0.15)', 
+                  padding: '4px 8px', 
+                  borderRadius: '6px', 
+                  fontSize: '0.7rem', 
+                  fontWeight: 600, 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  pointerEvents: 'none'
+                }}
+              >
+                <CalendarIcon size={11} />
+                Datum wählen
+              </button>
+            </div>
+
+            {/* Wochen-Kopierer */}
+            <button 
+              onClick={handleCopyWeek}
+              style={{ 
+                background: 'transparent', 
+                color: '#0891b2', 
+                border: '1px solid rgba(8, 145, 178, 0.15)', 
+                padding: '4px 8px', 
+                borderRadius: '6px', 
+                fontSize: '0.7rem', 
+                fontWeight: 600, 
+                cursor: 'pointer', 
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              title="Kopiert alle aktiven Unterrichtstermine dieser Woche"
+            >
+              <Copy size={11} />
+              Woche kopieren
+            </button>
+
+            <button 
+              onClick={handlePasteWeek}
+              style={{ 
+                background: 'transparent', 
+                color: localStorage.getItem('groovelab_copied_week_data') ? '#0891b2' : '#94a3b8', 
+                border: `1px solid ${localStorage.getItem('groovelab_copied_week_data') ? 'rgba(8, 145, 178, 0.15)' : 'rgba(148, 163, 184, 0.15)'}`, 
+                padding: '4px 8px', 
+                borderRadius: '6px', 
+                fontSize: '0.7rem', 
+                fontWeight: 600, 
+                cursor: localStorage.getItem('groovelab_copied_week_data') ? 'pointer' : 'not-allowed', 
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5
+              }}
+              onMouseOver={e => {
+                if (localStorage.getItem('groovelab_copied_week_data')) {
+                  e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)';
+                }
+              }}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              disabled={!localStorage.getItem('groovelab_copied_week_data')}
+              title="Fügt die kopierten Unterrichtstermine in diese Woche ein (überschreibt bestehende)"
+            >
+              <Clipboard size={11} />
+              Woche einfügen
+            </button>
+
             <button 
               onClick={handleResetWeek}
               style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
@@ -2941,8 +3447,37 @@ export function ScheduleCalendarView({
                 alignItems: 'center',
                 gap: '2px'
               }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dayName}</div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>
+                {(() => {
+                  const todayStr = toLocalYYYYMMDD(new Date());
+                  const isToday = dateStr === todayStr;
+                  return (
+                    <>
+                      <div style={{ 
+                        fontSize: '0.7rem', 
+                        fontWeight: 800, 
+                        color: isToday ? '#137333' : '#86868b', 
+                        textTransform: 'uppercase', 
+                        letterSpacing: '0.05em' 
+                      }}>
+                        {dayName}
+                      </div>
+                      <div style={{
+                        fontSize: '0.9rem',
+                        fontWeight: 900,
+                        color: isToday ? '#ffffff' : '#1d1d1f',
+                        background: isToday ? '#137333' : 'transparent',
+                        padding: isToday ? '3px 10px' : '0px',
+                        borderRadius: isToday ? '12px' : '0px',
+                        boxShadow: isToday ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none',
+                        marginTop: isToday ? '2px' : '0px',
+                        display: 'inline-block',
+                        lineHeight: isToday ? '1.4' : 'inherit'
+                      }}>
+                        {dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      </div>
+                    </>
+                  );
+                })()}
                 {activeHoliday && (
                   <div style={{
                     fontSize: '0.62rem',
@@ -2970,6 +3505,77 @@ export function ScheduleCalendarView({
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
+                {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
+                {draggedId && (() => {
+                  const dayOfWeek = dayDate.getDay() === 0 ? 7 : dayDate.getDay();
+                  const blockCount = Math.floor((1440 - dayBaselineMinutes) / 15);
+                  const matchedTypes: ('wunsch' | 'gesperrt' | null)[] = Array(blockCount).fill(null);
+                  
+                  for (let i = 0; i < blockCount; i++) {
+                    const blockStart = dayBaselineMinutes + i * 15;
+                    const blockEnd = blockStart + 15;
+                    
+                    selectedStudentPrefs.forEach(pref => {
+                      if (pref.day_of_week === dayOfWeek) {
+                        const [ph, pm] = pref.start_time.split(':').map(Number);
+                        const [peh, pem] = pref.end_time.split(':').map(Number);
+                        const prefStart = ph * 60 + pm;
+                        const prefEnd = peh * 60 + pem;
+                        
+                        if (blockStart < prefEnd && blockEnd > prefStart) {
+                          if (pref.preference_type === 'gesperrt') {
+                            matchedTypes[i] = 'gesperrt';
+                          } else if (pref.preference_type === 'wunsch' && matchedTypes[i] !== 'gesperrt') {
+                            matchedTypes[i] = 'wunsch';
+                          }
+                        }
+                      }
+                    });
+                  }
+
+                  const mergedBlocks = [];
+                  let currentType: 'wunsch' | 'gesperrt' | null = null;
+                  let startIndex = -1;
+
+                  for (let i = 0; i < blockCount; i++) {
+                    const type = matchedTypes[i];
+                    if (type !== currentType) {
+                      if (currentType && startIndex !== -1) {
+                        mergedBlocks.push({
+                          type: currentType,
+                          top: (startIndex * 15) * 2.5,
+                          height: ((i - startIndex) * 15) * 2.5
+                        });
+                      }
+                      currentType = type;
+                      startIndex = type ? i : -1;
+                    }
+                  }
+                  if (currentType && startIndex !== -1) {
+                    mergedBlocks.push({
+                      type: currentType,
+                      top: (startIndex * 15) * 2.5,
+                      height: ((blockCount - startIndex) * 15) * 2.5
+                    });
+                  }
+
+                  return mergedBlocks.map((b, idx) => (
+                    <div
+                      key={idx}
+                      className={b.type === 'gesperrt' ? 'roentgen-blocked' : 'roentgen-preferred'}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${b.top}px`,
+                        height: `${b.height}px`,
+                        zIndex: 3,
+                        boxSizing: 'border-box',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  ));
+                })()}
                 {/* Column Background Layout: White = teacher's regular schedule block (regMin–regMax), gray outside.
                     The white area is FIXED to the Stundenplan-Designer schedule — it never changes when
                     appointments are dragged in or out of the window. */}
@@ -3247,8 +3853,9 @@ export function ScheduleCalendarView({
 
                   if (!isBreak && !isVacant && !isSick && !isCancelled) {
                     if (isGroup) {
-                      const isGruppenunterricht = occurrencesInGroup.length === 2;
-                      if (isGruppenunterricht) {
+                      const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
+                      const isGruppenunterricht = occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
+                      if (isGruppenunterricht || !isGroovelab) {
                         if (isWaiting) {
                           cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
                           finalColors.border = '#10b981';
@@ -3296,11 +3903,27 @@ export function ScheduleCalendarView({
                   const occStartMinutes = timeToMinutes(occ.start_time);
                   const occEndMinutes = occStartMinutes + (occ.duration || 45);
                   const topPx = (occStartMinutes - dayBaselineMinutes) * 2.5;
+                  const currentRoomId = occ.schedules?.room_id || null;
+                  const roomDaySchedules = cachedWeekSchedules.filter((s: any) => 
+                    s.day_of_week === dayOfWeek && 
+                    s.teacher_id === userId &&
+                    s.room_id === currentRoomId
+                  );
+                  let roomRegMin = Infinity;
+                  let roomRegMax = -Infinity;
+                  roomDaySchedules.forEach(s => {
+                    const start = timeToMinutes(s.time_slot);
+                    const duration = s.duration || 45;
+                    const end = start + duration;
+                    if (start < roomRegMin) roomRegMin = start;
+                    if (end > roomRegMax) roomRegMax = end;
+                  });
+                  const hasRoomRegularBlock = roomRegMin !== Infinity;
 
-                  // Determine if this occurrence is outside the teacher's regular schedule window.
+                  // Determine if this occurrence is outside the teacher's regular schedule window for this room.
                   // If so, it needs a separate room booking → show in purple.
                   const isOutsideSchedule = !isBreak && !isVacant && !isSick && !isCancelled &&
-                    hasRegularBlock && (occStartMinutes < regMin || occEndMinutes > regMax);
+                    hasRoomRegularBlock && (occStartMinutes < roomRegMin || occEndMinutes > roomRegMax);
 
                   // Room booking approved = occ has a confirmed manual room booking for this slot.
                   // We detect this via occ.room_booking_approved flag (set by backend/AdminDashboard).
@@ -3321,8 +3944,9 @@ export function ScheduleCalendarView({
                     }
                   }
                   
-                  const isGruppenunterricht = isGroup && occurrencesInGroup.length === 2;
-                  const isEnsemble = isGroup && occurrencesInGroup.length > 2;
+                  const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
+                  const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
+                  const isEnsemble = isGroup && !isGruppenunterricht;
 
                   const displayNames = isGroup 
                     ? (isGruppenunterricht 
@@ -3421,7 +4045,9 @@ export function ScheduleCalendarView({
                           borderRadius: '8px', 
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
                           cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
-                          opacity: draggedId === occ.id ? 0.5 : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
+                          opacity: draggedId 
+                             ? (draggedId === occ.id ? 1 : 0.6) 
+                             : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
                           filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
                           position: 'absolute',
                           top: `${topPx}px`,
@@ -3888,6 +4514,43 @@ export function ScheduleCalendarView({
                 });
               })()
             }
+            {/* Rote Echtzeit-Linie (Current Time Indicator) */}
+            {(() => {
+              const todayStr = toLocalYYYYMMDD(new Date());
+              if (dateStr === todayStr && currentMinutes >= dayBaselineMinutes) {
+                const topPosition = (currentMinutes - dayBaselineMinutes) * 2.5;
+                if (topPosition >= 0 && topPosition <= columnHeight) {
+                  return (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${topPosition}px`,
+                        borderTop: '2px solid #ef4444',
+                        zIndex: 20,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div 
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#ef4444',
+                          position: 'absolute',
+                          left: '-4px',
+                          boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
+                        }} 
+                      />
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
               </div>
             </div>
           );
@@ -4004,8 +4667,10 @@ export function ScheduleCalendarView({
           (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
         ) : [];
 
-        const isEnsembleOcc = isGroupOcc && groupOccs.length > 2;
-        const isGruppenunterrichtOcc = isGroupOcc && groupOccs.length === 2;
+        const firstGroupId = groupOccs[0]?.student?.group_id;
+        const isDbLinkedGroup = isGroupOcc && !!firstGroupId && groupOccs.every(o => o.student?.group_id === firstGroupId);
+        const isGruppenunterrichtOcc = isDbLinkedGroup;
+        const isEnsembleOcc = isGroupOcc && !isGruppenunterrichtOcc;
 
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status === 'cancelled';
@@ -4932,18 +5597,18 @@ export function ScheduleCalendarView({
                     padding: '12px 20px',
                     borderRadius: '12px',
                     border: 'none',
-                    background: primaryColor,
+                    background: '#0b57d0',
                     color: '#ffffff',
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(0, 122, 255, 0.2)'}`
+                    boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
                 >
-                  👥 Zusammenführen (Gruppenunterricht)
+                  👥 Zusammenführen (Ensembles/Bands)
                 </button>
 
                 <button

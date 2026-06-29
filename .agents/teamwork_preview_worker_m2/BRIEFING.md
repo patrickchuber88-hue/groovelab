@@ -1,51 +1,54 @@
-# BRIEFING — 2026-06-21T10:23:00Z
+# BRIEFING — 2026-06-28T22:27:32+02:00
 
 ## Mission
-Investigate dummy school user roles and implement/test a realistic 15-minute load simulation script.
+Copy screenshots, install dependencies, and create the LandingPage React component for Campus-Groovelab with constraints.
 
 ## 🔒 My Identity
-- Archetype: preview_worker
+- Archetype: teamwork_preview_worker
 - Roles: implementer, qa, specialist
 - Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/teamwork_preview_worker_m2
-- Original parent: fdb74efc-ae01-4403-b586-27e9ccd426e2
-- Milestone: m2_load_simulation
+- Original parent: 4b264762-9649-4ad7-b112-7962e4d3dc43
+- Milestone: m2
 
 ## 🔒 Key Constraints
-- CODE_ONLY network mode: No external internet access, no downloading of packages, use local tools/scripts.
-- Connect to Postgres container via SSH at 178.105.10.2:22.
-- Direct Supabase REST calls using native `fetch`.
-- Query distribution: 70% Reads / 20% Session-Checkins / 10% Writes split.
+- Platform name must be precisely "Campus-Groovelab".
+- Software license is always 100% free of charge ("100% kostenlos").
+- Administration/Secretariat accents: Red (`#ea4335`, background `#fce8e6`).
+- Campus accents: Green (`#137333`, background `#e6f4ea`/`#d1fae5`).
+- Active UI icons/emojis must be monochrome/single color.
+- Layout: CSS Grid gap: 64px, flexbox flex-wrap.
+- No hardcoded heights. Use `height: auto` + padding.
 
 ## Current Parent
-- Conversation ID: fdb74efc-ae01-4403-b586-27e9ccd426e2
-- Updated: 2026-06-21T10:23:00Z
+- Conversation ID: 4b264762-9649-4ad7-b112-7962e4d3dc43
+- Updated: 2026-06-28T20:30:30Z
 
 ## Task Summary
-- **What to build**: A realistic 15-minute load simulation script with student, teacher, and admin paths maintaining a 70/20/10 read/session/write split, supporting a `--dry-run` flag.
-- **Success criteria**: Dry-run executes successfully and outputs correct logs. Postgres database queries return role information for the 10 dummy schools.
-- **Interface contracts**: Supabase PostgREST endpoints.
-- **Code layout**: scratch/simulate_load_realistic_15m.mjs.
+- **What to build**: Public screenshots directory, install react-router-dom, and build `LandingPage.tsx` React component.
+- **Success criteria**: LandingPage renders correctly, meets all styling/naming constraints, references screenshots correctly.
+- **Interface contracts**: apps/groovelab/src/components/LandingPage.tsx, landing_page_concept.md
+- **Code layout**: apps/groovelab/src/...
 
 ## Key Decisions Made
-- Dynamically assigned 1% of students as admins and 5% of students as teachers to satisfy the lack of admins and teachers in the database.
-- Created `band_songs` mappings at startup to support join slot operations on `band_song_slots`.
-- Used inner join to query sessions by school.
+- Used custom inline styles matching Swiss / Liquid Glass theme rather than introducing external styles to ensure portability and responsiveness.
+- Placed screenshots in `apps/groovelab/public/screenshots` to allow clean relative paths `/screenshots/*` in development and production builds.
 
 ## Artifact Index
-- scratch/simulate_load_realistic_15m.mjs — Load simulation script.
-- simulation_dryrun.log — Log output from dry-run execution.
-- .agents/teamwork_preview_worker_m2/handoff.md — Final handoff report.
+- `apps/groovelab/src/components/LandingPage.tsx` — The newly created responsive, branded landing page.
 
 ## Change Tracker
 - **Files modified**:
-  - `scratch/simulate_load_realistic_15m.mjs` — Created load simulation script.
-- **Build status**: N/A
+  - `apps/groovelab/package.json` — Added `react-router-dom` dependency.
+  - `apps/groovelab/src/App.tsx` — Integrated LandingPage as default unauthenticated view.
+  - `apps/groovelab/src/components/LandingPage.tsx` — Created the new LandingPage component.
+  - `apps/groovelab/public/screenshots/*` — Copied 4 screenshot image assets.
+- **Build status**: PASS
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Dry-run execution succeeded with 92% response success rate.
-- **Lint status**: 0 violations
-- **Tests added/modified**: N/A
+- **Build/test result**: PASS (all 123 E2E test cases passed)
+- **Lint status**: ESLint config missing in project, skipped.
+- **Tests added/modified**: Checked through existing E2E test cases.
 
 ## Loaded Skills
 - None

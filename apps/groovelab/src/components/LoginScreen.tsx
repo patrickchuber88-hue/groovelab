@@ -1,7 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
+
+const getInstrumentAvatarUrl = (instr: string) => {
+  const low = (instr || '').toLowerCase();
+  if (low.includes('gitarre') || low.includes('guitar')) return '/gitarre_avatar_new.png';
+  if (low.includes('bass') || low.includes('kontrabass') || low.includes('contrabass')) return '/bass_avatar.png';
+  if (low.includes('schlagzeug') || low.includes('drums')) return '/schlagzeug_avatar.png';
+  if (low.includes('klavier') || low.includes('piano')) return '/klavier_avatar_new.png';
+  if (low.includes('gesang') || low.includes('vocals') || low.includes('vocal')) return '/gesang_avatar.png';
+  if (low.includes('trompete') || low.includes('trumpet')) return '/trompete_avatar_new.png';
+  if (low.includes('posaune') || low.includes('trombone')) return '/posaune_avatar.png';
+  return '/avatar_ghost.jpg';
+};
 
 let jsQRInstance: any = null;
 async function loadJSQR() {
@@ -312,6 +325,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
 };
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
+  const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 800);
@@ -394,10 +408,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('email') || '';
   });
-  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'email' | 'preferences' | 'success'>('verify');
+  const [parentOnboardingStep, setParentOnboardingStep] = useState<'verify' | 'setup-pin' | 'pin' | 'frozen' | 'email' | 'preferences' | 'success'>('verify');
   const [studentPaymentMethod, setStudentPaymentMethod] = useState<'debit' | 'cash'>('debit');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [parentNotes, setParentNotes] = useState('');
+  
+  // Neue Onboarding-Sicherheitsstates
+  const [onboardingPin, setOnboardingPin] = useState<string[]>(['', '', '', '']);
+  const [tempStudentId, setTempStudentId] = useState<string | null>(null);
+  const [onboardingInviteToken, setOnboardingInviteToken] = useState<string | null>(null);
+  const [isPinSetupNeeded, setIsPinSetupNeeded] = useState(false);
+  const [newOnboardingPin, setNewOnboardingPin] = useState<string[]>(['', '', '', '']);
+  const [newOnboardingPinConfirm, setNewOnboardingPinConfirm] = useState<string[]>(['', '', '', '']);
+  const [isTimetableAssigned, setIsTimetableAssigned] = useState(false);
 
   const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
@@ -435,6 +458,117 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
   const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
   const [isAlreadyOnboarded, setIsAlreadyOnboarded] = useState(false);
+
+  useEffect(() => {
+    const checkInviteToken = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (token) {
+        setOnboardingInviteToken(token);
+        setParentOnboardingLoading(true);
+        try {
+          const { data, error } = await supabase.rpc('verify_onboarding_token', {
+            input_token: token
+          });
+          if (error) throw error;
+          const result = Array.isArray(data) ? data[0] : data;
+          if (result && result.success) {
+            setVerifiedStudentId(result.student_id);
+            setParentFirstName(result.first_name || '');
+            setParentLastName(result.last_name || '');
+            setParentInstrument(result.instrument || '');
+            
+            // Check student status and pre-load entries
+            const { data: studentRow } = await supabase
+              .from('students')
+              .select('status, parent_notes')
+              .eq('id', result.student_id)
+              .single();
+
+            const isAlreadyDone = studentRow ? studentRow.status !== 'ausstehend' : false;
+            setIsAlreadyOnboarded(isAlreadyDone);
+            setParentNotes(studentRow?.parent_notes || '');
+
+            const { data: prefSlots } = await supabase
+              .from('student_schedule_preferences')
+              .select('day_of_week, start_time, end_time, preference_type')
+              .eq('student_id', result.student_id);
+
+            const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
+            if (prefSlots && prefSlots.length > 0) {
+              prefSlots.forEach(slot => {
+                const startTimeClean = slot.start_time.substring(0, 5);
+                const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+                loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+              });
+              setSelectedSlots(loadedSlots);
+            } else {
+              setSelectedSlots({});
+            }
+
+            const { data: mainStudentData } = await supabase
+              .from('users')
+              .select('school_id, sibling_group_id, birth_date')
+              .eq('id', result.student_id)
+              .single();
+
+            setSchoolId(mainStudentData?.school_id || null);
+
+            const initialChildren = [{
+              id: result.student_id,
+              first_name: result.first_name || '',
+              last_name: result.last_name || '',
+              instrument: result.instrument || '',
+              birth_date: mainStudentData?.birth_date || undefined,
+              selectedSlots: loadedSlots,
+              isNew: false
+            }];
+            setParentChildren(initialChildren);
+            setActiveParentChildIndex(0);
+            setSibLastName(result.last_name || '');
+
+            setVerifiedStudentDetails({
+              first_name: result.first_name,
+              last_name: result.last_name,
+              instrument: result.instrument,
+              id: result.student_id
+            });
+
+            // Since they used a cryptographic invite link, we bypass PIN verification and prompt to set up a new PIN in step 2
+            setIsPinSetupNeeded(true);
+            setParentOnboardingStep('setup-pin');
+          } else {
+            setParentOnboardingError(result?.message || 'Ungültiger oder abgelaufener Einladungs-Link.');
+          }
+        } catch (err: any) {
+          console.error('Error verifying token:', err);
+          setParentOnboardingError(err.message || 'Fehler beim Laden des Einladungs-Links.');
+        } finally {
+          setParentOnboardingLoading(false);
+        }
+      }
+    };
+    checkInviteToken();
+  }, []);
+
+  // Geschwister-Zustände im Onboarding
+  interface SiblingChild {
+    id?: string;
+    first_name: string;
+    last_name: string;
+    instrument: string;
+    birth_date?: string;
+    selectedSlots: {[key: string]: 'wunsch' | 'gesperrt'};
+    isNew?: boolean;
+  }
+  const [parentChildren, setParentChildren] = useState<SiblingChild[]>([]);
+  const [activeParentChildIndex, setActiveParentChildIndex] = useState<number>(0);
+  const [showSiblingForm, setShowSiblingForm] = useState(false);
+  const [sibFirstName, setSibFirstName] = useState('');
+  const [sibLastName, setSibLastName] = useState('');
+  const [sibInstrument, setSibInstrument] = useState('Gitarre');
+  const [sibBirthDate, setSibBirthDate] = useState('');
+  const [schoolId, setSchoolId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!kioskMapRef.current) return;
@@ -1648,8 +1782,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           .select('day_of_week, start_time, end_time, preference_type')
           .eq('student_id', result.student_id);
 
+        const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
         if (prefSlots && prefSlots.length > 0) {
-          const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
           prefSlots.forEach(slot => {
             const startTimeClean = slot.start_time.substring(0, 5);
             const cellKey = `${slot.day_of_week}-${startTimeClean}`;
@@ -1660,6 +1794,79 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           setSelectedSlots({});
         }
 
+        // Get school_id and sibling_group_id
+        const { data: mainStudentData } = await supabase
+          .from('users')
+          .select('school_id, sibling_group_id, birth_date')
+          .eq('id', result.student_id)
+          .single();
+
+        const currentSchoolId = mainStudentData?.school_id || null;
+        setSchoolId(currentSchoolId);
+
+        const initialChildren: SiblingChild[] = [{
+          id: result.student_id,
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          birth_date: mainStudentData?.birth_date || undefined,
+          selectedSlots: loadedSlots,
+          isNew: false
+        }];
+
+        if (mainStudentData?.sibling_group_id) {
+          const { data: siblingsData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument, birth_date')
+            .eq('sibling_group_id', mainStudentData.sibling_group_id)
+            .neq('id', result.student_id);
+
+          if (siblingsData && siblingsData.length > 0) {
+            for (const s of siblingsData) {
+              const { data: sAvails } = await supabase
+                .from('student_schedule_preferences')
+                .select('day_of_week, start_time, end_time, preference_type')
+                .eq('student_id', s.id);
+
+              const sSlots: {[key: string]: 'wunsch' | 'gesperrt'} = {};
+              sAvails?.forEach(slot => {
+                const startTimeClean = slot.start_time.substring(0, 5);
+                const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+                sSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+              });
+
+              initialChildren.push({
+                id: s.id,
+                first_name: s.first_name || '',
+                last_name: s.last_name || '',
+                instrument: s.instrument || '',
+                birth_date: s.birth_date || undefined,
+                selectedSlots: sSlots,
+                isNew: false
+              });
+            }
+          }
+        }
+
+        setParentChildren(initialChildren);
+        setActiveParentChildIndex(0);
+        setSibLastName(parentLastName.trim());
+
+        setVerifiedStudentDetails({
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          id: result.student_id,
+          qr_token: result.qr_token
+        });
+
+        // Since verify_onboarding returned success and we don't have a PIN set yet, they go to setup-pin step
+        setIsPinSetupNeeded(true);
+        setParentOnboardingStep('setup-pin');
+      } else if (result && result.message === 'pin_required') {
+        setVerifiedStudentId(result.student_id);
+        setIsPinSetupNeeded(false);
+        setParentOnboardingStep('pin');
         setVerifiedStudentDetails({
           first_name: parentFirstName.trim(),
           last_name: parentLastName.trim(),
@@ -1667,13 +1874,178 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           id: result.student_id
         });
 
-        setParentOnboardingStep('preferences');
+        // 2-Wochen-Sicherheitsregel prüfen
+        const { data: studentRow } = await supabase
+          .from('students')
+          .select('timetable_assigned_at')
+          .eq('id', result.student_id)
+          .single();
+        if (studentRow?.timetable_assigned_at) {
+          const assignedDate = new Date(studentRow.timetable_assigned_at);
+          const diffTime = Math.abs(new Date().getTime() - assignedDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 14) {
+            setIsResetAllowed(false);
+          } else {
+            setIsResetAllowed(true);
+          }
+        } else {
+          setIsResetAllowed(true);
+        }
+      } else if (result && result.message === 'frozen') {
+        setVerifiedStudentId(result.student_id);
+        setParentOnboardingStep('frozen');
       } else {
         setParentOnboardingError(result?.message || 'Eingabe überprüfen.');
       }
     } catch (err: any) {
       console.error('Verification error:', err);
       setParentOnboardingError(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const [isResetAllowed, setIsResetAllowed] = useState(true);
+
+  const handleVerifyPin = async () => {
+    if (!verifiedStudentId) return;
+    const pinStr = onboardingPin.join('');
+    if (pinStr.length < 4) {
+      setParentOnboardingError('Bitte gib die 4-stellige PIN vollständig ein.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_onboarding_pin', {
+        input_student_id: verifiedStudentId,
+        input_pin: pinStr
+      });
+
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (result && result.success) {
+        const { data: studentRow } = await supabase
+          .from('students')
+          .select('status, parent_notes')
+          .eq('id', verifiedStudentId)
+          .single();
+
+        const isAlreadyDone = studentRow ? studentRow.status !== 'ausstehend' : false;
+        setIsAlreadyOnboarded(isAlreadyDone);
+        setParentNotes(studentRow?.parent_notes || '');
+
+        const { data: prefSlots } = await supabase
+          .from('student_schedule_preferences')
+          .select('day_of_week, start_time, end_time, preference_type')
+          .eq('student_id', verifiedStudentId);
+
+        const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
+        if (prefSlots && prefSlots.length > 0) {
+          prefSlots.forEach(slot => {
+            const startTimeClean = slot.start_time.substring(0, 5);
+            const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+            loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+          });
+          setSelectedSlots(loadedSlots);
+        } else {
+          setSelectedSlots({});
+        }
+
+        const { data: mainStudentData } = await supabase
+          .from('users')
+          .select('school_id, sibling_group_id, birth_date')
+          .eq('id', verifiedStudentId)
+          .single();
+
+        const currentSchoolId = mainStudentData?.school_id || null;
+        setSchoolId(currentSchoolId);
+
+        const initialChildren: SiblingChild[] = [{
+          id: verifiedStudentId,
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          birth_date: mainStudentData?.birth_date || undefined,
+          selectedSlots: loadedSlots,
+          isNew: false
+        }];
+
+        if (mainStudentData?.sibling_group_id) {
+          const { data: siblingsData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument, birth_date')
+            .eq('sibling_group_id', mainStudentData.sibling_group_id)
+            .neq('id', verifiedStudentId);
+
+          if (siblingsData && siblingsData.length > 0) {
+            for (const s of siblingsData) {
+              const { data: sAvails } = await supabase
+                .from('student_schedule_preferences')
+                .select('day_of_week, start_time, end_time, preference_type')
+                .eq('student_id', s.id);
+
+              const sSlots: {[key: string]: 'wunsch' | 'gesperrt'} = {};
+              sAvails?.forEach(slot => {
+                const startTimeClean = slot.start_time.substring(0, 5);
+                const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+                sSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+              });
+
+              initialChildren.push({
+                id: s.id,
+                first_name: s.first_name || '',
+                last_name: s.last_name || '',
+                instrument: s.instrument || '',
+                birth_date: s.birth_date || undefined,
+                selectedSlots: sSlots,
+                isNew: false
+              });
+            }
+          }
+        }
+
+        setParentChildren(initialChildren);
+        setActiveParentChildIndex(0);
+        setSibLastName(parentLastName.trim());
+
+        setVerifiedStudentDetails({
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          id: verifiedStudentId
+        });
+
+        setIsPinSetupNeeded(false);
+        setParentOnboardingStep('preferences');
+      } else {
+        setParentOnboardingError(result?.message || 'Falsche PIN. Bitte überprüfe deine Eingabe.');
+      }
+    } catch (err: any) {
+      console.error('Verify PIN error:', err);
+      setParentOnboardingError(err.message || 'Ein Fehler ist aufgetreten.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleFreezeProfile = async () => {
+    if (!verifiedStudentId) return;
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+    try {
+      const { data, error } = await supabase.rpc('freeze_onboarding_profile', {
+        input_student_id: verifiedStudentId
+      });
+      if (error) throw error;
+      setParentOnboardingStep('frozen');
+    } catch (err: any) {
+      console.error('Freeze error:', err);
+      setParentOnboardingError('Konto konnte nicht gesperrt werden.');
     } finally {
       setParentOnboardingLoading(false);
     }
@@ -1749,81 +2121,167 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   };
 
   const handleSavePreferences = async () => {
-    if (!verifiedStudentId) {
-      setParentOnboardingError('Schüler-ID fehlt.');
+    if (!verifiedStudentId || parentChildren.length === 0) {
+      setParentOnboardingError('Schüler-ID oder Kinderdaten fehlen.');
       return;
     }
 
-    // Convert selectedSlots object to array of slot objects
-    const slotsArray = Object.entries(selectedSlots).map(([key, val]) => {
-      // Key format: "day_of_week-start_time" (e.g. "1-14:00")
-      const [dayStr, startTime] = key.split('-');
-      const day = parseInt(dayStr);
-      
-      // Calculate end_time by adding 30 minutes to start_time
-      const [hourStr, minStr] = startTime.split(':');
-      let hour = parseInt(hourStr);
-      let min = parseInt(minStr) + 30;
-      if (min >= 60) {
-        hour += 1;
-        min -= 60;
+    let finalPin: string | null = null;
+    if (isPinSetupNeeded) {
+      const pinStr = newOnboardingPin.join('');
+      const confirmStr = newOnboardingPinConfirm.join('');
+      if (pinStr.length < 4 || confirmStr.length < 4) {
+        setParentOnboardingError('Bitte erstelle eine vollständige 4-stellige PIN und bestätige sie.');
+        return;
       }
-      const endTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-
-      return {
-        day_of_week: day,
-        start_time: startTime,
-        end_time: endTime,
-        preference_type: val
-      };
-    });
-
-    // Validate on frontend first
-    const wunschSlots = slotsArray.filter(s => s.preference_type === 'wunsch');
-    if (wunschSlots.length < 2) {
-      setParentOnboardingError('Bitte wähle mindestens zwei Wunschzeit-Slots (grün) aus.');
-      return;
+      if (pinStr !== confirmStr) {
+        setParentOnboardingError('Die eingegebenen PINs stimmen nicht überein.');
+        return;
+      }
+      finalPin = pinStr;
     }
 
-    const totalDurationMinutes = wunschSlots.length * 30;
-    if (totalDurationMinutes < 120) {
-      setParentOnboardingError('Die Gesamtdauer der Wunschzeiten muss mindestens 2 Stunden (4 Slots) betragen.');
-      return;
+    // Validate each child first
+    for (let i = 0; i < parentChildren.length; i++) {
+      const child = parentChildren[i];
+      const childSlots = Object.entries(child.selectedSlots).map(([key, val]) => {
+        const [dayStr, startTime] = key.split('-');
+        const day = parseInt(dayStr);
+        const [hourStr, minStr] = startTime.split(':');
+        let hour = parseInt(hourStr);
+        let min = parseInt(minStr) + 30;
+        if (min >= 60) {
+          hour += 1;
+          min -= 60;
+        }
+        const endTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+        return { day_of_week: day, start_time: startTime, end_time: endTime, preference_type: val };
+      });
+
+      const wunschSlots = childSlots.filter(s => s.preference_type === 'wunsch');
+      if (wunschSlots.length < 2) {
+        setParentOnboardingError(`Bitte wähle für ${child.first_name} mindestens zwei Wunschzeit-Slots (grün) aus.`);
+        return;
+      }
+
+      const totalDurationMinutes = wunschSlots.length * 30;
+      if (totalDurationMinutes < 120) {
+        setParentOnboardingError(`Die Gesamtdauer der Wunschzeiten für ${child.first_name} muss mindestens 2 Stunden betragen.`);
+        return;
+      }
     }
 
     setParentOnboardingLoading(true);
     setParentOnboardingError(null);
 
     try {
-      if (!isAlreadyOnboarded) {
+      let siblingGroupId: string | null = null;
+
+      // If we have siblings, create a new sibling group if not exists
+      if (parentChildren.length > 1) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('sibling_group_id')
+          .eq('id', parentChildren[0].id)
+          .single();
+        
+        siblingGroupId = userRow?.sibling_group_id || crypto.randomUUID();
+        
+        // Update first sibling group id if it was null
+        if (!userRow?.sibling_group_id) {
+          await supabase.from('users_raw').update({ sibling_group_id: siblingGroupId }).eq('id', parentChildren[0].id);
+        }
+      }
+
+      // 2. Process each child
+      for (let i = 0; i < parentChildren.length; i++) {
+        const child = parentChildren[i];
+        let currentUserId = child.id;
+
+        // If it's a newly added sibling, insert into database first
+        if (child.isNew && !currentUserId) {
+          const qrToken = crypto.randomUUID();
+          const avatarUrl = getInstrumentAvatarUrl(child.instrument);
+
+          const { data: newStud, error: insertError } = await supabase
+            .from('users_raw')
+            .insert({
+              school_id: schoolId,
+              role: 'student',
+              first_name: child.first_name,
+              last_name: child.last_name,
+              birth_date: child.birth_date || null,
+              photo_url: '/avatar_ghost.jpg',
+              avatar_url: avatarUrl,
+              qr_token: qrToken,
+              instrument: child.instrument,
+              sibling_group_id: siblingGroupId,
+              is_campus_active: true,
+              is_groovelab_active: true,
+              app_usage_mode: 'student_only'
+            })
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+          currentUserId = newStud.id;
+
+          // Create avatar for new student
+          await supabase.from('avatars').upsert({
+            user_id: currentUserId,
+            avatar_style: 'Premium_Hero',
+            instrument_type: child.instrument,
+            evolution_level: 1,
+            xp: 0,
+            asset_path: avatarUrl,
+            streak_flame: 0
+          });
+
+          // Copy encrypted parent email from Sibling 1
+          const { data: emailPref } = await supabase.from('user_email_prefixes').select('*').eq('user_id', parentChildren[0].id).maybeSingle();
+          const { data: emailSuff } = await supabase.from('user_email_suffixes').select('*').eq('user_id', parentChildren[0].id).maybeSingle();
+          
+          if (emailPref) {
+            await supabase.from('user_email_prefixes').insert({ user_id: currentUserId, prefix: emailPref.prefix });
+          }
+          if (emailSuff) {
+            await supabase.from('user_email_suffixes').insert({ user_id: currentUserId, suffix: emailSuff.suffix });
+          }
+        }
+
+        if (!currentUserId) continue;
+
+        // Onboard the student profile
         const { error: completeErr } = await supabase.rpc('complete_onboarding', {
-          input_student_id: verifiedStudentId,
-          input_email: ''
+          input_student_id: currentUserId,
+          input_email: '',
+          input_pin: finalPin
         });
         if (completeErr) throw completeErr;
+
+        // Save preferences
+        const childSlots = Object.entries(child.selectedSlots).map(([key, val]) => {
+          const [dayStr, startTime] = key.split('-');
+          const day = parseInt(dayStr);
+          const [hourStr, minStr] = startTime.split(':');
+          let hour = parseInt(hourStr);
+          let min = parseInt(minStr) + 30;
+          if (min >= 60) {
+            hour += 1;
+            min -= 60;
+          }
+          const endTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+          return { day_of_week: day, start_time: startTime, end_time: endTime, preference_type: val };
+        });
+
+        const { error: savePrefErr } = await supabase.rpc('save_schedule_preferences', {
+          input_student_id: currentUserId,
+          slots: childSlots
+        });
+        if (savePrefErr) throw savePrefErr;
       }
 
-      const { data, error } = await supabase.rpc('save_schedule_preferences', {
-        input_student_id: verifiedStudentId,
-        slots: slotsArray
-      });
-
-      if (error) throw error;
-
-      const result = Array.isArray(data) ? data[0] : data;
-
-      if (result && result.success) {
-        if (parentNotes.trim()) {
-          const { error: notesError } = await supabase
-            .from('students')
-            .update({ parent_notes: parentNotes.trim() })
-            .eq('id', verifiedStudentId);
-          if (notesError) console.error("Error saving parent notes:", notesError);
-        }
-        setParentOnboardingStep('success');
-      } else {
-        setParentOnboardingError(result?.message || 'Fehler beim Speichern der Präferenzen.');
-      }
+      setParentOnboardingStep('success');
     } catch (err: any) {
       console.error('Save preferences error:', err);
       setParentOnboardingError(err.message || 'Die Termine konnten nicht gespeichert werden.');
@@ -3204,8 +3662,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <div style={{ marginTop: '12px', width: '100%' }}>
             <button 
               onClick={() => {
-                window.history.pushState({}, '', '/signup');
-                window.dispatchEvent(new PopStateEvent('popstate'));
+                navigate('/signup');
               }}
               style={{
                 width: '100%',
@@ -3546,7 +4003,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 850, background: '#f1f5f9', color: '#475569', padding: '5px 12px', borderRadius: '100px', fontFamily: 'Urbanist' }}>
             {parentOnboardingStep === 'verify' && 'Schritt 1 von 3'}
-            {parentOnboardingStep === 'preferences' && 'Schritt 2 von 3'}
+            {(parentOnboardingStep === 'setup-pin' || parentOnboardingStep === 'pin') && 'Schritt 2 von 3'}
+            {parentOnboardingStep === 'preferences' && 'Schritt 3 von 3'}
             {parentOnboardingStep === 'success' && 'Fertig! 🎉'}
           </span>
         </div>
@@ -3665,6 +4123,278 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
 
+        {parentOnboardingStep === 'setup-pin' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Sicherheits-PIN einrichten
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                Bitte erstelle eine selbstgewählte 4-stellige PIN. Mit dieser PIN kannst du deinen Stundenplan später jederzeit anpassen oder einsehen.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>PIN eingeben *</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[0, 1, 2, 3].map((idx) => (
+                    <input
+                      key={`setup-pin-${idx}`}
+                      id={`setup-pin-${idx}`}
+                      type="password"
+                      maxLength={1}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={newOnboardingPin[idx]}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        const nextPin = [...newOnboardingPin];
+                        nextPin[idx] = val;
+                        setNewOnboardingPin(nextPin);
+                        if (val && idx < 3) {
+                          const nextInput = document.getElementById(`setup-pin-${idx + 1}`);
+                          if (nextInput) nextInput.focus();
+                        }
+                      }}
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        textAlign: 'center',
+                        fontSize: '20px',
+                        fontWeight: 800,
+                        borderRadius: '12px',
+                        border: '2px solid #cbd5e1',
+                        background: '#ffffff'
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>PIN bestätigen *</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[0, 1, 2, 3].map((idx) => (
+                    <input
+                      key={`setup-confirm-pin-${idx}`}
+                      id={`setup-confirm-pin-${idx}`}
+                      type="password"
+                      maxLength={1}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={newOnboardingPinConfirm[idx]}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        const nextPin = [...newOnboardingPinConfirm];
+                        nextPin[idx] = val;
+                        setNewOnboardingPinConfirm(nextPin);
+                        if (val && idx < 3) {
+                          const nextInput = document.getElementById(`setup-confirm-pin-${idx + 1}`);
+                          if (nextInput) nextInput.focus();
+                        }
+                      }}
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        textAlign: 'center',
+                        fontSize: '20px',
+                        fontWeight: 800,
+                        borderRadius: '12px',
+                        border: '2px solid #cbd5e1',
+                        background: '#ffffff'
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const pinStr = newOnboardingPin.join('');
+                  const confirmStr = newOnboardingPinConfirm.join('');
+                  if (pinStr.length < 4 || confirmStr.length < 4) {
+                    setParentOnboardingError('Bitte erstelle eine vollständige 4-stellige PIN und bestätige sie.');
+                    return;
+                  }
+                  if (pinStr !== confirmStr) {
+                    setParentOnboardingError('Die eingegebenen PINs stimmen nicht überein.');
+                    return;
+                  }
+                  setParentOnboardingError(null);
+                  setParentOnboardingStep('preferences');
+                }}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                  background: '#10b981',
+                  color: '#ffffff',
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                PIN festlegen & Weiter zu Wunschzeiten
+              </button>
+            </div>
+          </div>
+        )}
+
+
+
+        {parentOnboardingStep === 'pin' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                Sicherheits-PIN erforderlich
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                Dieses Schüler-Profil wurde bereits eingerichtet und mit einer Sicherheits-PIN geschützt. Bitte gib die PIN ein, um fortzufahren.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[0, 1, 2, 3].map((idx) => (
+                  <input
+                    key={`pin-input-${idx}`}
+                    id={`pin-input-${idx}`}
+                    type="password"
+                    maxLength={1}
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    value={onboardingPin[idx]}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      const nextPin = [...onboardingPin];
+                      nextPin[idx] = val;
+                      setOnboardingPin(nextPin);
+                      if (val && idx < 3) {
+                        const nextInput = document.getElementById(`pin-input-${idx + 1}`);
+                        if (nextInput) nextInput.focus();
+                      }
+                    }}
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      textAlign: 'center',
+                      fontSize: '22px',
+                      fontWeight: 800,
+                      borderRadius: '14px',
+                      border: '2px solid #cbd5e1',
+                      background: '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={handleVerifyPin}
+                disabled={parentOnboardingLoading}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                  background: '#10b981',
+                  color: '#ffffff',
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                {parentOnboardingLoading ? 'Prüfe PIN...' : 'PIN bestätigen'}
+              </button>
+
+              {isResetAllowed ? (
+                <button
+                  type="button"
+                  onClick={handleFreezeProfile}
+                  disabled={parentOnboardingLoading}
+                  style={{
+                    width: '100%', padding: '10px', borderRadius: '16px', border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#dc2626',
+                    fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  PIN vergessen oder Konflikt melden
+                </button>
+              ) : (
+                <div style={{
+                  padding: '10px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0',
+                  color: '#64748b', fontSize: '11px', textAlign: 'center', lineHeight: '1.4'
+                }}>
+                  ℹ️ Eine PIN-Zurücksetzung ist nur bis zu 2 Wochen nach der Stundenplan-Zuteilung möglich. Bitte wende dich direkt an deine Musikschule.
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setParentOnboardingStep('verify')}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center', marginTop: '4px' }}
+              >
+                Zurück
+              </button>
+            </div>
+          </div>
+        )}
+
+        {parentOnboardingStep === 'frozen' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '50%', background: '#fee2e2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444',
+              alignSelf: 'center', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
+            }}>
+              🔒
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: '#dc2626', fontFamily: 'Outfit' }}>
+                Profil vorübergehend gesperrt
+              </h3>
+              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.5' }}>
+                Der Konflikt wurde erfolgreich an das Sekretariat der Musikschule gemeldet. Aus Sicherheitsgründen wurde dieses Konto eingefroren und alle alten Logins entwertet.
+              </p>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px',
+              fontSize: '0.8rem',
+              color: '#334155',
+              lineHeight: '1.45'
+            }}>
+              <strong>Wie geht es weiter?</strong>
+              <ol style={{ margin: '8px 0 0 16px', padding: 0 }}>
+                <li>Das Sekretariat prüft den Onboarding-Konflikt.</li>
+                <li>Du erhältst einen personalisierten, kryptografischen Einmal-Link per E-Mail an deine registrierte E-Mail-Adresse.</li>
+                <li>Über diesen Link kannst du dein Onboarding sicher abschließen und eine neue PIN vergeben.</li>
+              </ol>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setExpandedSection('none');
+                setParentOnboardingStep('verify');
+              }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: '16px', border: 'none',
+                background: '#475569',
+                color: '#ffffff',
+                fontWeight: 800, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+            >
+              Schließen
+            </button>
+          </div>
+        )}
+
         {parentOnboardingStep === 'preferences' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             {isAlreadyOnboarded && (
@@ -3673,229 +4403,397 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 <span>Du hast deinen Stundenplan bereits eingerichtet. Wenn du fortfährst, werden deine bisherigen Wunschzeiten und Notizen überschrieben.</span>
               </div>
             )}
-            <div style={{ textAlign: 'left' }}>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
-                Terminwünsche angeben
-              </h3>
-              <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
-                Wähle deine bevorzugten Unterrichtszeiten und sperre Zeiten, die absolut unmöglich sind.
-              </p>
-            </div>
-
-            {/* Legend & Controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '12px', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ fontWeight: 700, color: '#475569' }}>Klick-Modus wählen:</span>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
+            
+            {/* Sibling Tabs */}
+            {parentChildren.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderBottom: '1.5px solid #e2e8f0', paddingBottom: '12px', marginBottom: '4px' }}>
+                {parentChildren.map((child, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveParentChildIndex(index)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '12px',
+                        border: activeParentChildIndex === index ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
+                        background: activeParentChildIndex === index ? '#ecfdf5' : '#ffffff',
+                        color: activeParentChildIndex === index ? '#047857' : '#475569',
+                        fontWeight: 800,
+                        fontSize: '11.5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Users size={12} />
+                      {child.first_name} ({child.instrument})
+                    </button>
+                    {child.isNew && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = parentChildren.filter((_, i) => i !== index);
+                          setParentChildren(filtered);
+                          setActiveParentChildIndex(0);
+                        }}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #fecdd3',
+                          background: '#fff1f2',
+                          color: '#e11d48',
+                          fontSize: '11.5px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                
+                {!showSiblingForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSiblingForm(true)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px dashed #64748b',
+                      background: '#ffffff',
+                      color: '#64748b',
+                      fontWeight: 800,
+                      fontSize: '11.5px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={12} /> Geschwisterkind verknüpfen
+                  </button>
+                )}
               </div>
+            )}
 
-              {/* Apple style segmented control */}
-              <div style={{
-                display: 'flex',
-                background: '#e2e8f0',
-                padding: '3px',
-                borderRadius: '12px',
-                position: 'relative'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setPreferenceMode('wunsch')}
-                  style={{
-                    flex: 1,
-                    padding: '8px 10px',
-                    borderRadius: '9px',
-                    border: 'none',
-                    background: preferenceMode === 'wunsch' ? '#10b981' : 'transparent',
-                    color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
-                    fontWeight: 800,
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+            {/* Sibling Form Inline */}
+            {showSiblingForm && (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} style={{ color: '#10b981' }} /> Geschwisterkind hinzufügen
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>Vorname *</label>
+                    <input
+                      type="text"
+                      value={sibFirstName}
+                      onChange={e => setSibFirstName(e.target.value)}
+                      placeholder="z.B. Jonas"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>Nachname *</label>
+                    <input
+                      type="text"
+                      value={sibLastName}
+                      onChange={e => setSibLastName(e.target.value)}
+                      placeholder="Müller"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>Instrument *</label>
+                    <select
+                      value={sibInstrument}
+                      onChange={e => setSibInstrument(e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', cursor: 'pointer' }}
+                    >
+                      <option value="Gitarre">Gitarre</option>
+                      <option value="Klavier">Klavier</option>
+                      <option value="Schlagzeug">Schlagzeug</option>
+                      <option value="Gesang">Gesang</option>
+                      <option value="Geige">Geige</option>
+                      <option value="Flöte">Flöte</option>
+                      <option value="Trompete">Trompete</option>
+                      <option value="Saxophon">Saxophon</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>Geburtstag (Tag 1-31) (optional)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={sibBirthDate}
+                      onChange={e => setSibBirthDate(e.target.value)}
+                      placeholder="z.B. 24"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowSiblingForm(false)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '11px', cursor: 'pointer' }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!sibFirstName.trim() || !sibLastName.trim()) return;
+                      const sourceSlots = parentChildren[0]?.selectedSlots || {};
+                      const copiedSlots = { ...sourceSlots };
+                      
+                      const newSib: SiblingChild = {
+                        first_name: sibFirstName.trim(),
+                        last_name: sibLastName.trim(),
+                        instrument: sibInstrument,
+                        birth_date: sibBirthDate ? sibBirthDate : undefined,
+                        selectedSlots: copiedSlots,
+                        isNew: true
+                      };
+                      setParentChildren([...parentChildren, newSib]);
+                      setActiveParentChildIndex(parentChildren.length);
+                      setShowSiblingForm(false);
+                      setSibFirstName('');
+                      setSibBirthDate('');
+                    }}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Hinzufügen
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {parentChildren[activeParentChildIndex] && (
+              <>
+                <div style={{ textAlign: 'left' }}>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+                    Terminwünsche für {parentChildren[activeParentChildIndex].first_name} ({parentChildren[activeParentChildIndex].instrument})
+                  </h3>
+                  <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
+                    Wähle die bevorzugten Unterrichtszeiten und sperre Zeiten, die absolut unmöglich sind.
+                  </p>
+                </div>
+
+                {/* Legend & Controls */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '12px', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 700, color: '#475569' }}>Klick-Modus wählen:</span>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
+                  </div>
+
+                  {/* Apple style segmented control */}
+                  <div style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                  Wunschzeit 🟢
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreferenceMode('gesperrt')}
-                  style={{
-                    flex: 1,
-                    padding: '8px 10px',
-                    borderRadius: '9px',
-                    border: 'none',
-                    background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
-                    color: preferenceMode === 'gesperrt' ? '#ffffff' : '#475569',
-                    fontWeight: 800,
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                  Sperrzeit 🔴
-                </button>
-              </div>
+                    background: '#e2e8f0',
+                    padding: '3px',
+                    borderRadius: '12px',
+                    position: 'relative'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setPreferenceMode('wunsch')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 10px',
+                        borderRadius: '9px',
+                        border: 'none',
+                        background: preferenceMode === 'wunsch' ? '#10b981' : 'transparent',
+                        color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
+                        fontWeight: 800,
+                        fontSize: '12.5px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                      Wunschzeit 🟢
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreferenceMode('gesperrt')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 10px',
+                        borderRadius: '9px',
+                        border: 'none',
+                        background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
+                        color: preferenceMode === 'gesperrt' ? '#ffffff' : '#475569',
+                        fontWeight: 800,
+                        fontSize: '12.5px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
+                      Sperrzeit 🔴
+                    </button>
+                  </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                <span style={{ color: '#475569', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
-                <button
-                  type="button"
-                  onClick={() => setShowSaturday(!showSaturday)}
-                  style={{
-                    background: showSaturday ? '#10b981' : '#cbd5e1',
-                    border: 'none',
-                    padding: '4px 12px',
-                    borderRadius: '100px',
-                    color: '#ffffff',
-                    fontWeight: 800,
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {showSaturday ? 'Ja' : 'Nein'}
-                </button>
-              </div>
-            </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSaturday(!showSaturday)}
+                      style={{
+                        background: showSaturday ? '#10b981' : '#cbd5e1',
+                        border: 'none',
+                        padding: '4px 12px',
+                        borderRadius: '100px',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {showSaturday ? 'Ja' : 'Nein'}
+                    </button>
+                  </div>
+                </div>
 
-            {/* Visual Calendar Grid Weekspective */}
-            <div style={{
-              background: '#f8fafc',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              maxHeight: '320px',
-              overflowY: 'auto'
-            }}>
-              {/* Header Row */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
-                gap: '3px',
-                textAlign: 'center',
-                fontWeight: 800,
-                fontSize: '10px',
-                color: '#64748b',
-                paddingBottom: '6px',
-                borderBottom: '1px solid #e2e8f0',
-                position: 'sticky',
-                top: 0,
-                background: '#f8fafc',
-                zIndex: 2
-              }}>
-                <div>Zeit</div>
-                <div>Mo</div>
-                <div>Di</div>
-                <div>Mi</div>
-                <div>Do</div>
-                <div>Fr</div>
-                {showSaturday && <div>Sa</div>}
-              </div>
-
-              {/* Rows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                {['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'].map(time => (
-                  <div key={time} style={{
+                {/* Visual Calendar Grid Weekspective */}
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  maxHeight: '320px',
+                  overflowY: 'auto'
+                }}>
+                  {/* Header Row */}
+                  <div style={{
                     display: 'grid',
                     gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
                     gap: '3px',
-                    alignItems: 'center'
+                    textAlign: 'center',
+                    fontWeight: 800,
+                    fontSize: '10px',
+                    color: '#64748b',
+                    paddingBottom: '6px',
+                    borderBottom: '1px solid #e2e8f0',
+                    position: 'sticky',
+                    top: 0,
+                    background: '#f8fafc',
+                    zIndex: 2
                   }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
-                      {time}
-                    </div>
-                    {[1, 2, 3, 4, 5, 6].slice(0, showSaturday ? 6 : 5).map(dayNum => {
-                      const cellKey = `${dayNum}-${time}`;
-                      const selection = selectedSlots[cellKey];
-                      let bg = '#ffffff';
-                      let border = '1px solid #e2e8f0';
-                      let labelColor = 'transparent';
-                      
-                      if (selection === 'wunsch') {
-                        bg = '#10b981';
-                        border = '1px solid #059669';
-                        labelColor = '#ffffff';
-                      } else if (selection === 'gesperrt') {
-                        bg = '#ef4444';
-                        border = '1px solid #dc2626';
-                        labelColor = '#ffffff';
-                      }
-                      
-                      return (
-                        <div
-                          key={cellKey}
-                          onClick={() => {
-                            setSelectedSlots(prev => {
-                              const copy = { ...prev };
-                              if (copy[cellKey] === preferenceMode) {
-                                delete copy[cellKey];
-                              } else {
-                                copy[cellKey] = preferenceMode;
-                              }
-                              return copy;
-                            });
-                          }}
-                          style={{
-                            background: bg,
-                            border: border,
-                            borderRadius: '6px',
-                            height: '24px',
-                            cursor: 'pointer',
-                            transition: 'all 0.1s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '9px',
-                            color: labelColor,
-                            fontWeight: 900
-                          }}
-                          className="hover-scale-mini"
-                        >
-                          {selection === 'wunsch' && '✓'}
-                          {selection === 'gesperrt' && '✗'}
-                        </div>
-                      );
-                    })}
+                    <div>Zeit</div>
+                    <div>Mo</div>
+                    <div>Di</div>
+                    <div>Mi</div>
+                    <div>Do</div>
+                    <div>Fr</div>
+                    {showSaturday && <div>Sa</div>}
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Live Progress Info */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#065f46', textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={16} />
-                <span>
-                  Ausgewählte Wunschzeit: <strong>{((Object.values(selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
-                </span>
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857' }}>
-                (mind. 2,0 Std. benötigt)
-              </span>
-            </div>
+                  {/* Rows */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'].map(time => (
+                      <div key={time} style={{
+                        display: 'grid',
+                        gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
+                        gap: '3px',
+                        alignItems: 'center'
+                      }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
+                          {time}
+                        </div>
+                        {[1, 2, 3, 4, 5, 6].slice(0, showSaturday ? 6 : 5).map(dayNum => {
+                          const cellKey = `${dayNum}-${time}`;
+                          const selection = parentChildren[activeParentChildIndex].selectedSlots[cellKey];
+                          let bg = '#ffffff';
+                          let border = '1px solid #e2e8f0';
+                          let labelColor = 'transparent';
+                          
+                          if (selection === 'wunsch') {
+                            bg = '#10b981';
+                            border = '1px solid #059669';
+                            labelColor = '#ffffff';
+                          } else if (selection === 'gesperrt') {
+                            bg = '#ef4444';
+                            border = '1px solid #dc2626';
+                            labelColor = '#ffffff';
+                          }
+                          
+                          return (
+                            <div
+                              key={cellKey}
+                              onClick={() => {
+                                const updated = [...parentChildren];
+                                const activeChild = updated[activeParentChildIndex];
+                                const copy = { ...activeChild.selectedSlots };
+                                if (copy[cellKey] === preferenceMode) {
+                                  delete copy[cellKey];
+                                } else {
+                                  copy[cellKey] = preferenceMode;
+                                }
+                                updated[activeParentChildIndex] = {
+                                  ...activeChild,
+                                  selectedSlots: copy
+                                };
+                                setParentChildren(updated);
+                              }}
+                              style={{
+                                background: bg,
+                                border: border,
+                                borderRadius: '6px',
+                                height: '24px',
+                                cursor: 'pointer',
+                                transition: 'all 0.1s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '9px',
+                                color: labelColor,
+                                fontWeight: 900
+                              }}
+                              className="hover-scale-mini"
+                            >
+                              {selection === 'wunsch' && '✓'}
+                              {selection === 'gesperrt' && '✗'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Free text note */}
-            <div style={{ textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.02em' }}>Zusätzliche Notizen an die Musikschule / Lehrkraft</label>
-              <textarea
-                value={parentNotes}
-                onChange={(e) => setParentNotes(e.target.value)}
-                placeholder="z.B. Geschwisterkind hat am selben Nachmittag Unterricht; bitte möglichst nacheinander legen; Mitfahrgelegenheiten berücksichtigen..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', outline: 'none', fontSize: '13px', fontWeight: 500, minHeight: '80px', fontFamily: 'inherit', resize: 'vertical' }}
-              />
-            </div>
+                {/* Live Progress Info */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#065f46', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={16} />
+                    <span>
+                      Ausgewählte Wunschzeit: <strong>{((Object.values(parentChildren[activeParentChildIndex].selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857' }}>
+                    (mind. 2,0 Std. benötigt)
+                  </span>
+                </div>
+              </>
+            )}
 
             {/* Action buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

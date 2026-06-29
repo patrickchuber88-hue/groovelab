@@ -1,26 +1,29 @@
-# BRIEFING — 2026-06-21T10:13:41Z
+# BRIEFING — 2026-06-28T22:47:00+02:00
 
 ## Mission
-Execute a 15-minute real-time realistic load simulation with ca. 6,500 active users on Supabase, evaluate results with a 5-member expert team, and generate a consolidated report `simulation_reports_15m_realistic.md`.
+Fully integrate the Trello-style landing page with real screenshots into the Campus-Groovelab React application, configure URL routing, and handle auth session redirection logic.
 
 ## 🔒 My Identity
 - Archetype: sentinel
-- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/
-- Orchestrator: c20c2c3a-0ea6-4619-9246-9fc69af57e45
-- Victory Auditor: 0e45234a-d35c-4b9f-a400-492dfdb0f3d6
+- Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents
+- Orchestrator: 9f63751e-97d1-4177-8723-3f96b5bbfc89
+- Victory Auditor: 00718fd1-653e-493f-83fe-d844a47ccbcc
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
-- Integrity mode: development
-- Simulation must run for exactly 15 minutes, covering all 10 newly created dummy schools with realistic pathways and comprehensive coverage of all application features (progress tracking, help requests, bands matching-board, and lab planning).
-- A script execution log must be saved in `simulation_realistic_15m.log`.
-- Report must cover precision latency metrics (p50, p95, p99), RLS policies/vulnerabilities, and database/code optimization recommendations with SQL/code examples in `simulation_reports_15m_realistic.md`.
+- Must use react-router-dom for URL routing between `/` (LandingPage), `/login` (LoginScreen), and dashboard views
+- Session state passing: authenticated users redirect from `/` and `/login` to dashboard; unauthenticated users redirect to `/`
+- Proper branding and design guidelines as defined in AGENTS.md (e.g., Campus-Groovelab naming, green accents for Campus module, red accents for Admin/Secretariat, monochrome icons)
 
 ## User Context
-- **Last user request**: Execute a 15-minute realistic load simulation with 6,500 active users and write `simulation_reports_15m_realistic.md` evaluated by a 5-member expert team.
+- **Last user request**: Fully integrate Trello-style landing page with real screenshots, URL routing, and session redirection logic.
 - **Pending clarifications**: none
-- **Delivered results**: simulation_reports_15m_realistic.md, simulation_realistic_15m.log
+- **Delivered results**:
+  - Integrated LandingPage component
+  - react-router-dom configured with session state redirects
+  - Build and TypeScript verification verified 100% clean
+  - Victory confirmed by independent auditor
 
 ## Project Status
 - **Phase**: complete
@@ -31,7 +34,5 @@ Execute a 15-minute real-time realistic load simulation with ca. 6,500 active us
 - **Retry count**: 0
 
 ## Artifact Index
-- ORIGINAL_REQUEST.md — Verbatim user request history
-- BRIEFING.md — Sentinel memory and status tracker
-- simulation_realistic_15m.log — Execution logs from the 15-minute realistic load test
-- simulation_reports_15m_realistic.md — Consolidated expert team evaluation report
+- /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/ORIGINAL_REQUEST.md — Verbatim user request history
+- /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/BRIEFING.md — Active briefing and tracking memory for the project sentinel

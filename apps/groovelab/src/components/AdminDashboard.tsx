@@ -5843,7 +5843,39 @@ export function AdminDashboard({
         const em = parseInt(emStr) || 0;
         const bEndMin = eh * 60 + em;
         
-        return bStartMin < slotEndMin && bEndMin > slotStartMin;
+        const matchesSlot = bStartMin < slotEndMin && bEndMin > slotStartMin;
+        if (!matchesSlot) return false;
+
+        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
+        const teacherSchedules = (schedules || []).filter((s: any) => {
+          const matchesTeacher = s.teacher_id === b.teacherId;
+          const matchesRoom = s.room_id === selectedRoom.id;
+          const matchesDay = s.day_of_week === targetDay || 
+                             s.day_of_week === targetDayInt || 
+                             String(s.day_of_week) === String(targetDayInt);
+          return matchesTeacher && matchesRoom && matchesDay;
+        });
+
+        let regMin = Infinity;
+        let regMax = -Infinity;
+        teacherSchedules.forEach((s: any) => {
+          const startTimeStr = s.time_slot || s.start_time;
+          if (!startTimeStr) return;
+          const [sshStr, ssmStr] = startTimeStr.split(':');
+          const ssh = parseInt(sshStr) || 0;
+          const ssm = parseInt(ssmStr) || 0;
+          const startMin = ssh * 60 + ssm;
+          const durationMin = s.duration || s.duration_minutes || 45;
+          const endMin = startMin + durationMin;
+          if (startMin < regMin) regMin = startMin;
+          if (endMin > regMax) regMax = endMin;
+        });
+
+        if (regMin !== Infinity && bStartMin >= regMin && bEndMin <= regMax) {
+          return false;
+        }
+
+        return true;
       });
 
       // 1b. Database manual bookings
@@ -5881,6 +5913,35 @@ export function AdminDashboard({
           (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed')
         );
         if (hasRescheduledOcc) return false;
+
+        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
+        const teacherSchedules = (schedules || []).filter((s: any) => {
+          const matchesTeacher = s.teacher_id === b.teacherId;
+          const matchesRoom = s.room_id === selectedRoom.id;
+          const matchesDay = s.day_of_week === targetDay || 
+                             s.day_of_week === targetDayInt || 
+                             String(s.day_of_week) === String(targetDayInt);
+          return matchesTeacher && matchesRoom && matchesDay;
+        });
+
+        let regMin = Infinity;
+        let regMax = -Infinity;
+        teacherSchedules.forEach((s: any) => {
+          const startTimeStr = s.time_slot || s.start_time;
+          if (!startTimeStr) return;
+          const [sshStr, ssmStr] = startTimeStr.split(':');
+          const ssh = parseInt(sshStr) || 0;
+          const ssm = parseInt(ssmStr) || 0;
+          const startMin = ssh * 60 + ssm;
+          const durationMin = s.duration || s.duration_minutes || 45;
+          const endMin = startMin + durationMin;
+          if (startMin < regMin) regMin = startMin;
+          if (endMin > regMax) regMax = endMin;
+        });
+
+        if (regMin !== Infinity && bStartMin >= regMin && bEndMin <= regMax) {
+          return false;
+        }
 
         return true;
       });
@@ -6038,7 +6099,39 @@ export function AdminDashboard({
         const occStartMin = sh * 60 + sm;
         const occEndMin = occStartMin + durationMin;
 
-        return occStartMin < slotEndMin && occEndMin > slotStartMin;
+        const matchesSlot = occStartMin < slotEndMin && occEndMin > slotStartMin;
+        if (!matchesSlot) return false;
+
+        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
+        const teacherSchedules = (schedules || []).filter((s: any) => {
+          const matchesTeacher = s.teacher_id === occ.teacher_id;
+          const matchesRoom = s.room_id === selectedRoom.id;
+          const matchesDay = s.day_of_week === targetDay || 
+                             s.day_of_week === targetDayInt || 
+                             String(s.day_of_week) === String(targetDayInt);
+          return matchesTeacher && matchesRoom && matchesDay;
+        });
+
+        let regMin = Infinity;
+        let regMax = -Infinity;
+        teacherSchedules.forEach((s: any) => {
+          const startTimeStr = s.time_slot || s.start_time;
+          if (!startTimeStr) return;
+          const [sshStr, ssmStr] = startTimeStr.split(':');
+          const ssh = parseInt(sshStr) || 0;
+          const ssm = parseInt(ssmStr) || 0;
+          const startMin = ssh * 60 + ssm;
+          const sDurationMin = s.duration || s.duration_minutes || 45;
+          const endMin = startMin + sDurationMin;
+          if (startMin < regMin) regMin = startMin;
+          if (endMin > regMax) regMax = endMin;
+        });
+
+        if (regMin !== Infinity && occStartMin >= regMin && occEndMin <= regMax) {
+          return false;
+        }
+
+        return true;
       });
 
       const mappedDynamics = dynamicForSlot.map((occ: any) => {
@@ -17094,12 +17187,14 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
   );
 };
 
-const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
+const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () => void }> = ({ url, label, onDelete }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const togglePlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -17110,51 +17205,53 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onEnded = () => setIsPlaying(false);
-    audio.addEventListener('ended', onEnded);
-    return () => {
-      audio.removeEventListener('ended', onEnded);
+    const handleLoadedMetadata = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(Math.round(audio.duration));
+      }
     };
-  }, []);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    if (audio.duration && isFinite(audio.duration)) {
+      setDuration(Math.round(audio.duration));
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [url]);
 
   return (
-    <div 
-      onClick={togglePlay}
-      style={{ 
-        position: 'relative',
-        width: '160px',
-        height: '95px',
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        border: '2px solid #334155',
-        borderRadius: '8px',
-        padding: '4px',
-        boxShadow: isPlaying 
-          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
-          : '0 4px 12px rgba(0,0,0,0.12)',
-        cursor: 'pointer',
-        userSelect: 'none',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        transform: isPlaying ? 'scale(1.02)' : 'none',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = isPlaying ? 'scale(1.04)' : 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = isPlaying
-          ? '0 10px 24px rgba(217, 119, 6, 0.25), 0 0 14px rgba(217, 119, 6, 0.15)'
-          : '0 6px 16px rgba(0,0,0,0.18)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = isPlaying ? 'scale(1.02)' : 'none';
-        e.currentTarget.style.boxShadow = isPlaying
-          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
-          : '0 4px 12px rgba(0,0,0,0.12)';
-      }}
-    >
+    <div style={{
+      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
+      borderRadius: '16px',
+      padding: '16px',
+      width: '320px',
+      border: '4px solid #0f0e0d',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      fontFamily: 'monospace',
+      color: '#fff',
+      alignSelf: 'center',
+      position: 'relative',
+      userSelect: 'none'
+    }}>
       <audio ref={audioRef} src={url} />
       
       {/* 4 Screws in corners */}
@@ -17172,222 +17269,160 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
 
       {/* Sticker Label Area */}
       <div style={{
-        flex: 1,
-        margin: '3px 4px',
-        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-        border: '1.2px solid #cbd5e1',
-        borderRadius: '5px',
-        padding: '4px',
+        background: 'linear-gradient(to bottom, #dbeafe 0%, #eff6ff 100%)',
+        border: '2px solid #000',
+        borderRadius: '6px',
+        padding: '8px',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'relative',
-        overflow: 'hidden'
+        gap: '4px',
+        position: 'relative'
       }}>
-        {/* Retro Accent Stripes */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, #ef4444 33%, #3b82f6 33%, #3b82f6 66%, #10b981 66%)', opacity: 0.8 }} />
-
-        {/* Tape Reel Window */}
-        <div style={{
-          width: '74px',
-          height: '22px',
-          background: '#0f172a',
-          border: '1.2px solid #475569',
-          borderRadius: '3px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          position: 'relative',
-          marginTop: '2px',
-          padding: '0 6px',
-          boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.5)'
-        }}>
-          {/* Transparent window pane effect */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 50%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* Left Reel Hub */}
-          <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            border: '1.5px solid #64748b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#1e293b',
-            position: 'relative',
-            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-          }}>
-            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
-          </div>
-
-          {/* Magnetic tape roll representation (left) */}
-          <div style={{
-            position: 'absolute',
-            left: '4px',
-            width: isPlaying ? '14px' : '16px',
-            height: isPlaying ? '14px' : '16px',
-            borderRadius: '50%',
-            border: '1px dashed #78350f',
-            opacity: 0.35,
-            transition: 'all 5s ease'
-          }} />
-
-          {/* Center Play Button Overlay */}
-          <div 
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
-              border: '2px solid #ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
-              zIndex: 20,
-              color: 'white',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              pointerEvents: 'none'
-            }}
-          >
-            {isPlaying ? (
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
-                <rect x="5" y="5" width="4" height="14" rx="1" />
-                <rect x="15" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ marginLeft: '1.5px' }}>
-                <path d="M7 4v16l13-8z" />
-              </svg>
-            )}
-          </div>
-
-          {/* Right Reel Hub */}
-          <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            border: '1.5px solid #64748b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#1e293b',
-            position: 'relative',
-            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-          }}>
-            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
-          </div>
-          
-          {/* Magnetic tape roll representation (right) */}
-          <div style={{
-            position: 'absolute',
-            right: '4px',
-            width: isPlaying ? '16px' : '14px',
-            height: isPlaying ? '16px' : '14px',
-            borderRadius: '50%',
-            border: '1px dashed #78350f',
-            opacity: 0.35,
-            transition: 'all 5s ease'
-          }} />
+        <div style={{ height: '3px', background: '#ef4444', width: '100%' }} />
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#1e3a8a', fontWeight: 900 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
+            {label.toUpperCase()}
+          </span>
+          <span>{Math.round(currentTime)}s / {duration || '9'}s</span>
         </div>
 
-        {/* Text/Song Title Sticker Writing */}
         <div style={{
-          fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '0.7rem',
-          fontWeight: 800,
-          color: '#1e293b',
-          textAlign: 'center',
-          marginTop: '3px',
-          width: '100%',
-          borderTop: '1px dashed #cbd5e1',
-          paddingTop: '2px',
-          letterSpacing: '-0.5px',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden'
+          background: '#000',
+          borderRadius: '4px',
+          height: '28px',
+          margin: '4px 0',
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          padding: '0 20px',
+          position: 'relative'
         }}>
-          {label}
+          <div 
+            className={isPlaying ? 'spinning' : ''}
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#94a3b8',
+              border: '3px dashed #334155',
+              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
+            }} 
+          />
+          <div 
+            className={isPlaying ? 'spinning' : ''}
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#94a3b8',
+              border: '3px dashed #334155',
+              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
+            }} 
+          />
         </div>
       </div>
 
-      {/* Cassette Bottom Run / Exposed Tape details */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '0 10px',
-        marginBottom: '1px'
-      }}>
-        {/* Play Status Flashing Indicator LED */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-          <div style={{
-            width: '5px',
-            height: '5px',
-            borderRadius: '50%',
-            background: isPlaying ? '#ef4444' : '#475569',
-            boxShadow: isPlaying ? '0 0 6px #ef4444' : 'none',
-            animation: isPlaying ? 'pulse 1s infinite alternate' : 'none'
-          }} />
-          <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
-            {isPlaying ? 'PLAY' : 'STOP'}
-          </span>
-        </div>
-
-        {/* Small Stop Button */}
+      {/* Control Buttons */}
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => togglePlay()}
+          style={{
+            background: '#d97706',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px'
+          }}
+        >
+          {isPlaying ? (
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <rect x="5" y="5" width="4" height="14" rx="1" />
+              <rect x="15" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          )}
+          <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
             if (audioRef.current) {
               audioRef.current.pause();
               audioRef.current.currentTime = 0;
               setIsPlaying(false);
+              setCurrentTime(0);
             }
           }}
           style={{
-            background: '#ef4444',
+            background: '#475569',
+            color: '#fff',
             border: 'none',
-            borderRadius: '3px',
-            width: '18px',
-            height: '18px',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
-            padding: 0,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            transition: 'transform 0.1s ease',
-            zIndex: 10
+            gap: '4px'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          title="Stop"
         >
-          <div style={{ width: '7px', height: '7px', background: 'white', borderRadius: '1px' }} />
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="1.5"/>
+          </svg>
+          <span>STOP</span>
         </button>
-        
-        {/* Exposed tape path shapes */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-        </div>
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            style={{
+              background: '#ef4444',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+            </svg>
+            <span>LÖSCHEN</span>
+          </button>
+        )}
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}} />
     </div>
   );
 };

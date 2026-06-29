@@ -1,10 +1,22 @@
 # Original User Request
 
-## Initial Request — 2026-06-21T10:38:44+02:00
+## Request — 2026-06-28T22:23:53+02:00
 
-You are the teamwork_preview_orchestrator for the Groovelab app E2E test runner fix project.
-Your workspace is /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app.
-Your working directory is /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator.
-Your goal is to fix the 4 remaining errors in the Real-Mode E2E-Test-Runner, so that all 123 tests pass in Real-Mode (USE_MOCK=false) and Mock-Mode (USE_MOCK=true) is preserved at 100%.
-Please refer to the latest follow-up request in ORIGINAL_REQUEST.md for the specific test failure codes: T1_F1_2, T2_F8_4, T4_1, and T4_5.
-Initialize your plan.md, progress.md, and context.md in your working directory. Delegate tasks (e.g. exploration, implementation, review) to specialists as needed. Let the Sentinel know when you have verified that the tests are fixed and claim completion, so that the Victory Auditor can be run. Good luck!
+You are the Project Orchestrator. Your mission is to fully integrate the newly approved Trello-style landing page with real screenshots into the Campus-Groovelab React application, including the URL routing and session state toggling logic that displays this page to unauthenticated visitors.
+
+Metadata directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/orchestrator
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+
+Refer to /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/ORIGINAL_REQUEST.md for the verbatim requirements.
+Refer to /Users/patrickhuber/.gemini/antigravity/brain/51dc4a45-6c04-4394-8d1a-6997e87e668b/landing_page_concept.md for the design, content, and image paths.
+Refer to /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.agents/AGENTS.md for crucial styling, naming (Campus-Groovelab), and avatar rules.
+
+Requirements Summary:
+1. Create apps/groovelab/src/components/LandingPage.tsx based on landing_page_concept.md.
+2. Install react-router-dom in apps/groovelab.
+3. Configure the router in App.tsx or main.tsx supporting routes: / for LandingPage, /login for LoginScreen, and ensure authenticated users can access their dashboard.
+4. Pass and validate the session state (Supabase). Authenticated users at / or /login should redirect to their dashboard; unauthenticated users trying to access dashboard routes should redirect to /.
+5. Keep styling pristine. Do not use hardcoded heights, ensure responsive layouts, use monochrome icons, and follow rules (green accents for Campus, red for Admin/Secretariat, correct Platform Naming 'Campus-Groovelab').
+6. Perform automated verification (TypeScript and Production build).
+
+Maintain plan.md and progress.md in your metadata directory. Report back when all requirements are fully implemented, verified, and when you are ready to claim victory.

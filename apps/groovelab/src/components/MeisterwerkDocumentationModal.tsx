@@ -1,28 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 
 export const ALL_STICKERS = [
   // Meilensteine / Üben
-  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 250 Minuten fleißiges Üben.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', auto: true },
-  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 1000 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
-  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 3000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', auto: true },
+  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
+  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
 
   // XP
-  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '500 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
-  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1500 XP auf dem Profil gesammelt.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true },
-  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 3000 XP auf dem Profil gesammelt.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true },
+  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
+  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1000 XP auf dem Profil gesammelt.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true },
+  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 2500 XP auf dem Profil gesammelt.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true },
 
   // Streaks
   { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true },
   { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true },
-  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 14 Tagen gehalten!', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true },
+  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 21 Tagen gehalten!', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true },
 
   // Songs
   { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
-  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 5 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
-  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', auto: true },
+  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
+  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', auto: true },
 
   // Manuell
   { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
@@ -223,8 +223,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [homeworkNotes, setHomeworkNotes] = useState('');
   const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>([]);
   const [isNotesFocused, setIsNotesFocused] = useState(false);
-  const [isPresetsCollapsed, setIsPresetsCollapsed] = useState<boolean>(true);
-  const [isStackHovered, setIsStackHovered] = useState<boolean>(false);
   const isNotesExpanded = isNotesFocused || !!homeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const lastClickRef = React.useRef<{ pageNum: number; timestamp: number } | null>(null);
@@ -362,6 +360,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [studentStreak, setStudentStreak] = useState<number>(0);
   const [studentPracticeMinutes, setStudentPracticeMinutes] = useState<number>(0);
 
+  // Developer simulation states
+  const [simulatedSongsCount, setSimulatedSongsCount] = useState<number | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [selectedSimSticker, setSelectedSimSticker] = useState<string>('fleiss-pionier');
+  const [simStickerContext, setSimStickerContext] = useState<string>('Simulation');
+  const [selectedPreviewSticker, setSelectedPreviewSticker] = useState<any | null>(null);
+  const [isDevSimulationActive, setIsDevSimulationActive] = useState<boolean>(false);
+  const [awardedStickerToAnimate, setAwardedStickerToAnimate] = useState<any | null>(null);
+  const [schoolName, setSchoolName] = useState<string>('Campus-Groovelab');
+  const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
   // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
@@ -370,6 +378,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioLabel, setAudioLabel] = useState('');
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -487,13 +496,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         const saveAudioMetadata = async (audioUrlString: string) => {
           try {
-            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}`;
+            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}${audioLabel.trim() ? `|${audioLabel.trim()}` : ''}`;
             setHomeworkNotesList(prev => [...prev, audioMetaStr]);
             
             const updatedList = [...homeworkNotesList, audioMetaStr];
             await syncHomeworkNotes(updatedList);
             await fetchProgress();
             notifyHomeworkChange();
+            setAudioLabel('');
           } catch (saveErr) {
             console.error("Failed to save audio metadata:", saveErr);
             alert("Fehler beim Speichern der Audio-Bemerkung im Protokoll.");
@@ -573,7 +583,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       
       await fetchProgress();
       notifyHomeworkChange();
-      alert(`Sticker "${ALL_STICKERS.find(s => s.id === stickerId)?.title}" erfolgreich vergeben! 🎉`);
+      
+      // Trigger visual confetti animation modal
+      const st = ALL_STICKERS.find(s => s.id === stickerId);
+      if (st) {
+        setAwardedStickerToAnimate(st);
+      }
     } catch (e) {
       console.error("Error awarding sticker:", e);
     }
@@ -934,6 +949,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             if (data.school_id) {
               setStudentSchoolId(data.school_id);
               loadLehrwerke(data.school_id);
+              
+              // Fetch school name
+              const { data: schoolData } = await supabase
+                .from('schools')
+                .select('name')
+                .eq('id', data.school_id)
+                .single();
+              if (schoolData && schoolData.name) {
+                setSchoolName(schoolData.name);
+              }
             }
           }
 
@@ -1021,6 +1046,336 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (e) {
       console.error("Error silently awarding sticker:", e);
     }
+  };
+
+  const resetStickerAlbum = async () => {
+    try {
+      const itemsToUpdate = progressItems.filter(item => item.homework_notes);
+      
+      for (const item of itemsToUpdate) {
+        if (!item.id || !item.homework_notes) continue;
+        try {
+          const notesArray = item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')
+            ? JSON.parse(item.homework_notes)
+            : [item.homework_notes];
+            
+          if (Array.isArray(notesArray)) {
+            const filteredArray = notesArray.filter((note: string) => !note.startsWith("STICKER:"));
+            const updatedNotesJson = JSON.stringify(filteredArray);
+            
+            await supabase
+              .from('progress_matrix')
+              .update({ homework_notes: updatedNotesJson, updated_at: new Date().toISOString() })
+              .eq('id', item.id);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      
+      setSimulatedSongsCount(null);
+      await fetchProgress();
+      notifyHomeworkChange();
+      alert("Sticker-Sammelalbum wurde erfolgreich zurückgesetzt! 🧹");
+    } catch (e) {
+      console.error("Error resetting sticker album:", e);
+      alert("Fehler beim Zurücksetzen des Sticker-Albums.");
+    }
+  };
+
+  const downloadShareCard = (sticker: any) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 1200;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const medalCenterY = 440;
+    const tX = 180;
+    const tY = 80;
+    const tW = 840;
+    const tH = 1040;
+
+    if (shareCardLayout === 'dark') {
+      // 1. Draw premium dark obsidian studio background
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, 1200, 1200);
+
+      // 1. Draw solid dark grey background
+      ctx.fillStyle = '#181a1e';
+      ctx.fillRect(tX, tY, tW, tH);
+
+      // 2. Draw brick wall seams for urban texture
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+      ctx.lineWidth = 2.5;
+      for (let brickY = tY; brickY < tY + tH; brickY += 80) {
+        ctx.beginPath();
+        ctx.moveTo(tX, brickY);
+        ctx.lineTo(tX + tW, brickY);
+        ctx.stroke();
+        
+        const shift = Math.floor((brickY - tY) / 80) % 2 === 0 ? 0 : 120;
+        for (let brickX = tX + shift; brickX < tX + tW; brickX += 240) {
+          ctx.beginPath();
+          ctx.moveTo(brickX, brickY);
+          ctx.lineTo(brickX, brickY + 80);
+          ctx.stroke();
+        }
+      }
+
+      // 3. Draw concrete sand grain noise texture
+      for (let i = 0; i < 600; i++) {
+        const px = tX + Math.random() * tW;
+        const py = tY + Math.random() * tH;
+        const size = Math.random() * 2 + 1;
+        const opacity = Math.random() * 0.06;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`;
+        ctx.fillRect(px, py, size, size);
+      }
+
+      // 4. Draw spray paint blowout behind sticker
+      const sprayGrad = ctx.createRadialGradient(600, tY + 360, 40, 600, tY + 360, 260);
+      sprayGrad.addColorStop(0, sticker.color ? `${sticker.color}35` : 'rgba(16, 185, 129, 0.35)');
+      sprayGrad.addColorStop(0.6, sticker.color ? `${sticker.color}10` : 'rgba(16, 185, 129, 0.10)');
+      sprayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sprayGrad;
+      ctx.beginPath();
+      ctx.arc(600, tY + 360, 260, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 5. Draw glowing colored border matching sticker color
+      ctx.save();
+      ctx.shadowColor = sticker.color || '#10b981';
+      ctx.shadowBlur = 40;
+      ctx.strokeStyle = sticker.color || '#10b981';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(tX, tY, tW, tH);
+      ctx.restore();
+
+      // 6. Header Action Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'black 40px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CHALLENGE GEMEISTERT!', 600, tY + 90);
+
+      // 7. Student Details
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
+
+      if (studentInstrument) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '800 22px "Helvetica Neue", Inter, sans-serif';
+        ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
+      }
+
+      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.font = 'black 48px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.desc, 600, tY + 845);
+
+      // 8. Translucent Badge Pill for School Name
+      const badgeText = schoolName.toUpperCase();
+      ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
+      const textWidth = ctx.measureText(badgeText).width;
+      const badgeW = textWidth + 60;
+      const badgeH = 54;
+      const badgeX = 600 - badgeW / 2;
+      const badgeY = tY + 915;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 27);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
+      ctx.textBaseline = 'alphabetic'; // reset
+    } else if (shareCardLayout === 'light') {
+      // 1. Draw premium light background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 1200, 1200);
+
+      // 1. Draw solid light grey background
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(tX, tY, tW, tH);
+
+      // 2. Draw brick wall seams for urban texture (light mode)
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.02)';
+      ctx.lineWidth = 2.5;
+      for (let brickY = tY; brickY < tY + tH; brickY += 80) {
+        ctx.beginPath();
+        ctx.moveTo(tX, brickY);
+        ctx.lineTo(tX + tW, brickY);
+        ctx.stroke();
+        
+        const shift = Math.floor((brickY - tY) / 80) % 2 === 0 ? 0 : 120;
+        for (let brickX = tX + shift; brickX < tX + tW; brickX += 240) {
+          ctx.beginPath();
+          ctx.moveTo(brickX, brickY);
+          ctx.lineTo(brickX, brickY + 80);
+          ctx.stroke();
+        }
+      }
+
+      // 3. Draw concrete sand grain noise texture (light mode)
+      for (let i = 0; i < 600; i++) {
+        const px = tX + Math.random() * tW;
+        const py = tY + Math.random() * tH;
+        const size = Math.random() * 2 + 1;
+        const opacity = Math.random() * 0.04;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`;
+        ctx.fillRect(px, py, size, size);
+      }
+
+      // 4. Draw spray paint blowout behind sticker (light mode)
+      const sprayGrad = ctx.createRadialGradient(600, tY + 360, 40, 600, tY + 360, 260);
+      sprayGrad.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(16, 185, 129, 0.25)');
+      sprayGrad.addColorStop(0.6, sticker.color ? `${sticker.color}08` : 'rgba(16, 185, 129, 0.08)');
+      sprayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sprayGrad;
+      ctx.beginPath();
+      ctx.arc(600, tY + 360, 260, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 5. Draw glowing colored border matching sticker color (light mode)
+      ctx.save();
+      ctx.shadowColor = sticker.color || '#10b981';
+      ctx.shadowBlur = 30;
+      ctx.strokeStyle = sticker.color || '#10b981';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(tX, tY, tW, tH);
+      ctx.restore();
+
+      // 6. Header Action Title
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'black 40px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CHALLENGE GEMEISTERT!', 600, tY + 90);
+
+      // 7. Student Details
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
+
+      if (studentInstrument) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '800 22px "Helvetica Neue", Inter, sans-serif';
+        ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
+      }
+
+      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.font = 'black 48px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.desc, 600, tY + 845);
+
+      // 8. Translucent Badge Pill for School Name
+      const badgeText = schoolName.toUpperCase();
+      ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
+      const textWidth = ctx.measureText(badgeText).width;
+      const badgeW = textWidth + 60;
+      const badgeH = 54;
+      const badgeX = 600 - badgeW / 2;
+      const badgeY = tY + 915;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 27);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
+      ctx.textBaseline = 'alphabetic'; // reset
+    }
+
+    // Helper stenciled/slapped sticker asset loader
+    const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
+      ctx.save();
+      ctx.translate(600, medalCenterY);
+
+      // Sticker drop shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetX = -5;
+      ctx.shadowOffsetY = 8;
+
+      const stickerRad = 180;
+
+      if (isImg && typeof imgOrEmoji !== 'string') {
+        // Draw backing white border for ripped/slapped vinyl sticker effect
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 0, stickerRad + 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, stickerRad, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(imgOrEmoji, -stickerRad, -stickerRad, stickerRad * 2, stickerRad * 2);
+        ctx.restore();
+
+        // Sticker outline border
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, stickerRad, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Fallback emoji
+        ctx.shadowColor = 'transparent';
+        ctx.font = '220px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sticker.emoji || '🏆', 0, 0);
+      }
+      ctx.restore();
+      triggerDownload(canvas, sticker.id);
+    };
+
+    // Load sticker asset
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = `/stickers/${sticker.id}.png?v=1`;
+    img.onload = () => {
+      drawStickerAsset(img, true);
+    };
+    img.onerror = () => {
+      drawStickerAsset(sticker.emoji || '🏆', false);
+    };
+  };
+
+  const triggerDownload = (canvas: HTMLCanvasElement, filename: string) => {
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `campus_sticker_${filename}.png`;
+    link.href = dataUrl;
+    link.click();
   };
 
   useEffect(() => {
@@ -1644,24 +1999,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     const runAutoStickerCheck = async () => {
       const collectedIds = new Set(Object.keys(collectedStickers).filter(id => collectedStickers[id].count > 0));
-      const completedSongsCount = activeSongSkills.filter(s => s.progress === 100 || s.status === 'MASTERED').length;
+      const completedSongsCount = simulatedSongsCount !== null 
+        ? simulatedSongsCount 
+        : activeSongSkills.filter(s => s.progress === 100 || s.status === 'MASTERED').length;
 
       const autoAwards = [
-        { id: 'fleiss-pionier', value: 250, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-meister', value: 1000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-legende', value: 3000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'fleiss-pionier', value: isDemoMode ? 5 : 50, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-meister', value: isDemoMode ? 15 : 250, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-legende', value: isDemoMode ? 30 : 1000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
 
-        { id: 'xp-sammler', value: 500, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-champion', value: 1500, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-meister', value: 3000, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-sammler', value: isDemoMode ? 50 : 250, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-champion', value: isDemoMode ? 150 : 1000, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-meister', value: isDemoMode ? 300 : 2500, current: studentXP, context: `${studentXP} XP erreicht` },
 
-        { id: 'dranbleiber', value: 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
-        { id: 'wochen-held', value: 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
-        { id: 'streak-koenig', value: 14, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'dranbleiber', value: isDemoMode ? 1 : 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'wochen-held', value: isDemoMode ? 2 : 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'streak-koenig', value: isDemoMode ? 3 : 21, current: studentStreak, context: `${studentStreak} Tage Streak` },
 
         { id: 'erster-erfolg', value: 1, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'song-sammler', value: 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'repertoire-riese', value: 10, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
+        { id: 'song-sammler', value: isDemoMode ? 2 : 3, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
+        { id: 'repertoire-riese', value: isDemoMode ? 3 : 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
       ];
 
       for (const award of autoAwards) {
@@ -1673,7 +2030,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     };
 
     runAutoStickerCheck();
-  }, [student.id, progressItems, activeSongSkills, studentPracticeMinutes, studentXP, studentStreak, loading, collectedStickers]);
+  }, [student.id, progressItems, activeSongSkills, studentPracticeMinutes, studentXP, studentStreak, loading, collectedStickers, isDemoMode, simulatedSongsCount]);
 
   const triggerDirectSave = async (
     lehrwerkId: string, 
@@ -5439,33 +5796,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               <div key={item.idx} style={{ position: 'relative', display: 'inline-block' }}>
                                                 <InlineAudioPlayer 
                                                   url={parts[0]} 
-                                                  label={`Play-Along #${index + 1}`}
+                                                  label={parts[3] || `Play-Along #${index + 1}`}
+                                                  onDelete={() => handleDeleteNote(item.idx)}
                                                 />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleDeleteNote(item.idx)}
-                                                  style={{
-                                                    position: 'absolute',
-                                                    top: '-4px',
-                                                    right: '-4px',
-                                                    width: '18px',
-                                                    height: '18px',
-                                                    borderRadius: '50%',
-                                                    background: '#ef4444',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    fontSize: '9px',
-                                                    fontWeight: 900,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                                                    zIndex: 20
-                                                  }}
-                                                >
-                                                  ✕
-                                                </button>
                                               </div>
                                             );
                                           })}
@@ -5640,299 +5973,148 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                         />
-                        {isPresetsCollapsed ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                ⚡ Schnellbaukasten Presets:
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setIsPresetsCollapsed(false)}
-                                style={{
-                                  background: 'none', border: 'none', color: '#3b82f6', fontSize: '0.65rem', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: 0
-                                }}
-                              >
-                                <span>Ausklappen</span> <ChevronRight size={10} />
-                              </button>
-                            </div>
+                        <style dangerouslySetInnerHTML={{__html: `
+                          .presets-scrollbar-container::-webkit-scrollbar {
+                            height: 6px;
+                          }
+                          .presets-scrollbar-container::-webkit-scrollbar-track {
+                            background: #f1f5f9;
+                            border-radius: 9999px;
+                          }
+                          .presets-scrollbar-container::-webkit-scrollbar-thumb {
+                            background: #cbd5e1;
+                            border-radius: 9999px;
+                          }
+                          .presets-scrollbar-container::-webkit-scrollbar-thumb:hover {
+                            background: #94a3b8;
+                          }
+                          .preset-chip-card {
+                            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+                          }
+                          .preset-chip-card:hover {
+                            transform: translateY(-1px);
+                            border-color: #3b82f6 !important;
+                            background: #ffffff !important;
+                            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+                          }
+                          .preset-chip-card:active {
+                            transform: translateY(0);
+                            background: #f1f5f9 !important;
+                          }
+                        `}} />
 
-                            <div
-                              onClick={() => setIsPresetsCollapsed(false)}
-                              onMouseEnter={() => setIsStackHovered(true)}
-                              onMouseLeave={() => setIsStackHovered(false)}
-                              style={{
-                                height: '90px',
-                                position: 'relative',
-                                background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
-                                border: '1.5px dashed #cbd5e1',
-                                borderRadius: '16px',
-                                cursor: 'pointer',
-                                overflow: 'hidden',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginTop: '4px',
-                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: isStackHovered ? '0 6px 16px rgba(0, 0, 0, 0.06)' : 'none',
-                                borderColor: isStackHovered ? '#94a3b8' : '#cbd5e1',
-                                transform: isStackHovered ? 'scale(1.01)' : 'scale(1)'
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              ⚡ Schnellbaukasten Presets:
+                            </span>
+                            <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>
+                              Wische für mehr ➔
+                            </span>
+                          </div>
+
+                          <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
+                            <div 
+                              style={{ 
+                                display: 'flex', 
+                                gap: '8px', 
+                                overflowX: 'auto', 
+                                padding: '4px 2px 8px 2px', 
+                                scrollbarWidth: 'thin',
+                                WebkitOverflowScrolling: 'touch',
                               }}
+                              className="presets-scrollbar-container"
                             >
-                              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                {(() => {
-                                  const stackItems = [
-                                    { type: 'card', label: '⏱️ Tempo halten', desc: 'Metronom BPM', color: '#1e293b', bg: '#f8fafc' },
-                                    { type: 'card', label: '✨ Sauber spielen', desc: 'Klarer Klang', color: '#1e293b', bg: '#f8fafc' },
-                                    { type: 'card', label: '🥁 Rhythmus-Metronom', desc: 'Timing & Takt', color: '#1e293b', bg: '#f8fafc' },
-                                    { type: 'card', label: '🖖 Fingersatz üben', desc: 'Fingersatz einhalten', color: '#1e293b', bg: '#f8fafc' },
-                                    ...textbausteine.filter((tb: any) => tb.active).map(tb => ({
-                                      type: 'chip', label: tb.label, desc: '', color: '#475569', bg: '#ffffff'
-                                    }))
-                                  ];
-
-                                  return stackItems.slice(0, 10).map((item, idx) => {
-                                    const baseRotation = ((idx * 17) % 24) - 12;
-                                    const hoverRotation = baseRotation * 0.45;
-                                    const rotation = isStackHovered ? hoverRotation : baseRotation;
-
-                                    const baseOffsetVal = 20;
-                                    const baseOffsetX = ((idx * 27) % (baseOffsetVal * 2)) - baseOffsetVal;
-                                    const baseOffsetY = ((idx * 13) % 14) - 7;
-
-                                    const offsetX = isStackHovered ? baseOffsetX * 2.8 : baseOffsetX;
-                                    const offsetY = isStackHovered ? baseOffsetY * 1.6 : baseOffsetY;
-                                    const zIndex = idx + 1;
-
-                                    if (item.type === 'card') {
-                                      return (
-                                        <div
-                                          key={idx}
-                                          style={{
-                                            position: 'absolute',
-                                            left: '50%',
-                                            top: '50%',
-                                            width: '125px',
-                                            height: '40px',
-                                            marginLeft: '-62px',
-                                            marginTop: '-20px',
-                                            background: item.bg,
-                                            color: item.color,
-                                            border: '1px solid #cbd5e1',
-                                            borderRadius: '10px',
-                                            padding: '4px 8px',
-                                            fontSize: '0.62rem',
-                                            fontWeight: 700,
-                                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'center',
-                                            pointerEvents: 'none',
-                                            transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
-                                            transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                                            zIndex: zIndex
-                                          }}
-                                        >
-                                          <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                                          <span style={{ fontSize: '0.52rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</span>
-                                        </div>
-                                      );
-                                    } else {
-                                      return (
-                                        <div
-                                          key={idx}
-                                          style={{
-                                            position: 'absolute',
-                                            left: '50%',
-                                            top: '50%',
-                                            height: '22px',
-                                            background: item.bg,
-                                            color: item.color,
-                                            border: '1px solid #cbd5e1',
-                                            borderRadius: '9999px',
-                                            padding: '2px 8px',
-                                            fontSize: '0.58rem',
-                                            fontWeight: 700,
-                                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            pointerEvents: 'none',
-                                            transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
-                                            transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                                            zIndex: zIndex,
-                                            whiteSpace: 'nowrap'
-                                          }}
-                                        >
-                                          {item.label}
-                                        </div>
-                                      );
+                              {(() => {
+                                const allPresets = [
+                                  {
+                                    label: '⏱️ Tempo halten',
+                                    desc: 'Metronom BPM',
+                                    onClick: () => {
+                                      const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                                      const bpmText = bpm ? `${bpm} BPM` : "X BPM";
+                                      const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                      setIsCurrentHomework(true);
+                                      setHasChanges(true);
                                     }
-                                  });
-                                })()}
-                                
-                                <div style={{
-                                  position: 'absolute',
-                                  bottom: '6px',
-                                  right: '8px',
-                                  fontSize: '0.58rem',
-                                  fontWeight: 800,
-                                  color: '#475569',
-                                  background: 'rgba(255, 255, 255, 0.9)',
-                                  padding: '3px 8px',
-                                  borderRadius: '8px',
-                                  backdropFilter: 'blur(4px)',
-                                  zIndex: 50,
-                                  pointerEvents: 'none',
-                                  border: '1px solid #cbd5e1',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                                }}>
-                                  ⚡ Stapel anklicken zum Öffnen
-                                </div>
-                              </div>
+                                  },
+                                  {
+                                    label: '✨ Sauber spielen',
+                                    desc: 'Klarer Klang',
+                                    onClick: () => {
+                                      const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
+                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                      setIsCurrentHomework(true);
+                                      setHasChanges(true);
+                                    }
+                                  },
+                                  {
+                                    label: '🥁 Rhythmus-Metronom',
+                                    desc: 'Timing & Takt',
+                                    onClick: () => {
+                                      const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
+                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                      setIsCurrentHomework(true);
+                                      setHasChanges(true);
+                                    }
+                                  },
+                                  {
+                                    label: '🖖 Fingersatz üben',
+                                    desc: 'Fingersatz einhalten',
+                                    onClick: () => {
+                                      const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
+                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                      setIsCurrentHomework(true);
+                                      setHasChanges(true);
+                                    }
+                                  },
+                                  ...textbausteine
+                                    .filter((tb: any) => tb.active)
+                                    .map((tpl: any) => ({
+                                      label: `📝 ${tpl.label}`,
+                                      desc: 'Textbaustein',
+                                      onClick: () => {
+                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                        setHasChanges(true);
+                                      }
+                                    }))
+                                ];
+
+                                return allPresets.map((item, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={item.onClick}
+                                    style={{
+                                      flexShrink: 0,
+                                      background: '#f8fafc',
+                                      color: '#1e293b',
+                                      border: '1px solid #cbd5e1',
+                                      padding: '6px 12px',
+                                      borderRadius: '12px',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'flex-start',
+                                      gap: '1px',
+                                      textAlign: 'left',
+                                      outline: 'none'
+                                    }}
+                                    className="preset-chip-card preset-btn"
+                                  >
+                                    <span style={{ fontWeight: 800, fontSize: '0.70rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                      {item.label}
+                                    </span>
+                                    <span style={{ fontSize: '0.56rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                      {item.desc}
+                                    </span>
+                                  </button>
+                                ));
+                              })()}
                             </div>
                           </div>
-                        ) : (
-                          <>
-                            {/* Schnellbaukasten Presets */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                  ⚡ Schnellbaukasten Presets (Aktiviert Hausaufgabe):
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setIsPresetsCollapsed(true)}
-                                  style={{
-                                    background: 'none', border: 'none', color: '#64748b', fontSize: '0.62rem', fontWeight: 750, cursor: 'pointer', padding: 0
-                                  }}
-                                >
-                                  Stapel einklappen
-                                </button>
-                              </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                    const bpmText = bpm ? `${bpm} BPM` : "X BPM";
-                                    const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                    setIsCurrentHomework(true);
-                                    setHasChanges(true);
-                                  }}
-                                  style={{
-                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  className="hover-scale preset-btn"
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span>⏱️</span>
-                                    <span style={{ fontWeight: 800 }}>Tempo halten</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Metronom BPM</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
-                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                    setIsCurrentHomework(true);
-                                    setHasChanges(true);
-                                  }}
-                                  style={{
-                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  className="hover-scale preset-btn"
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span>✨</span>
-                                    <span>Sauber spielen</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Klarer Klang</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
-                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                    setIsCurrentHomework(true);
-                                    setHasChanges(true);
-                                  }}
-                                  style={{
-                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  className="hover-scale preset-btn"
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span>🥁</span>
-                                    <span style={{ fontWeight: 800 }}>Rhythmus-Metronom</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Timing & Takt</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
-                                    setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                    setIsCurrentHomework(true);
-                                    setHasChanges(true);
-                                  }}
-                                  style={{
-                                    background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1',
-                                    padding: '8px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  className="hover-scale preset-btn"
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span>🖖</span>
-                                    <span style={{ fontWeight: 800 }}>Fingersatz üben</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.6rem', color: '#64748b' }}>Fingersatz einhalten</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Schnell-Textbausteine */}
-                            {/* Schnell-Textbausteine & Submit button side-by-side */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                {textbausteine
-                                  .filter((tb: any) => tb.active)
-                                  .map((tpl, i) => (
-                                  <button
-                                    key={tpl.id || i}
-                                    type="button"
-                                    onClick={() => {
-                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
-                                      setHasChanges(true);
-                                    }}
-                                    style={{
-                                      background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
-                                      padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
-                                    }}
-                                  >
-                                    {tpl.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
+                        </div>
                       </div>
 
                         {/* Audio Play-Along Cassette Widget */}
@@ -5948,7 +6130,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             gap: '12px'
                           }}>
                             {(() => {
-                              const currentWeek = getISOWeek();
                               const audios = homeworkNotesList
                                 .map((note, originalIdx) => ({ note, originalIdx }))
                                 .filter(item => item.note.startsWith("AUDIO:"))
@@ -5958,70 +6139,111 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     url: parts[0],
                                     duration: parseInt(parts[1] || '0', 10),
                                     date: parts[2],
+                                    label: parts[3],
                                     originalIdx: item.originalIdx
                                   };
                                 });
-                              const currentWeekAudios = audios.filter(aud => {
+                              
+                              const now = new Date();
+                              const currentMonth = now.getMonth();
+                              const currentYear = now.getFullYear();
+                              const currentMonthAudios = audios.filter(aud => {
                                 if (!aud.date) return false;
-                                return getISOWeek(aud.date) === currentWeek;
+                                const d = new Date(aud.date);
+                                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
                               });
-                              const isLimitReached = currentWeekAudios.length >= 1;
+                              const totalUsedSeconds = currentMonthAudios.reduce((sum, aud) => sum + aud.duration, 0);
+                              const monthlyLimitSeconds = 240;
+                              const isLimitReached = totalUsedSeconds >= monthlyLimitSeconds;
 
                               return (
                                 <>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span>📼</span> Play-Along Aufnahme (max. 60s)
-                                    </span>
-                                    {!isRecordingAudio ? (
-                                      <button
-                                        type="button"
-                                        onClick={startRecordingAudio}
-                                        disabled={isUploadingAudio || isLimitReached}
-                                        style={{
-                                          background: isLimitReached ? '#94a3b8' : '#000',
-                                          color: '#fff',
-                                          border: 'none',
-                                          padding: '6px 12px',
-                                          borderRadius: '12px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 800,
-                                          cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}
-                                      >
-                                        🔴 Aufnahme starten
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => stopRecordingAudio()}
-                                        style={{
-                                          background: '#ef4444',
-                                          color: '#fff',
-                                          border: 'none',
-                                          padding: '6px 12px',
-                                          borderRadius: '12px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 800,
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}
-                                      >
-                                        ⏹️ Stopp ({audioDuration}s / 60s)
-                                      </button>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>📼</span> Play-Along Aufnahme (max. 60s)
+                                      </span>
+                                      {!isRecordingAudio ? (
+                                        <button
+                                          type="button"
+                                          onClick={startRecordingAudio}
+                                          disabled={isUploadingAudio || isLimitReached}
+                                          style={{
+                                            background: isLimitReached ? '#94a3b8' : '#000',
+                                            color: '#fff',
+                                            border: 'none',
+                                            padding: '6px 12px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 800,
+                                            cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          🔴 Aufnahme starten
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => stopRecordingAudio()}
+                                          style={{
+                                            background: '#ef4444',
+                                            color: '#fff',
+                                            border: 'none',
+                                            padding: '6px 12px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          ⏹️ Stopp ({audioDuration}s / 60s)
+                                        </button>
+                                      )}
+                                    </div>
+                                    
+                                    {!isRecordingAudio && !isLimitReached && (
+                                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                        <input
+                                          type="text"
+                                          placeholder="Kassetten-Beschriftung (z.B. Tonleiter G-Dur)"
+                                          value={audioLabel}
+                                          onChange={(e) => setAudioLabel(e.target.value)}
+                                          style={{
+                                            flex: 1,
+                                            fontSize: '0.74rem',
+                                            padding: '6px 12px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #cbd5e1',
+                                            background: '#fff',
+                                            outline: 'none',
+                                            fontFamily: 'monospace'
+                                          }}
+                                        />
+                                      </div>
                                     )}
                                   </div>
 
-                                  {isLimitReached && (
-                                    <div style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 800, marginTop: '2px' }}>
-                                      ⚠️ Maximale Anzahl an Aufnahmen (1) für diese Kalenderwoche erreicht. Lösche die alte Aufnahme der aktuellen Woche, um eine neue zu machen.
-                                    </div>
-                                  )}
+                                  <div style={{ 
+                                    fontSize: '0.72rem', 
+                                    color: isLimitReached ? '#ef4444' : '#475569', 
+                                    fontWeight: 700, 
+                                    marginTop: '2px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                  }}>
+                                    <span>
+                                      {isLimitReached 
+                                        ? '⚠️ Monatliches Aufnahme-Limit (240 Sek.) erreicht. Lösche alte Aufnahmen, um Platz zu schaffen.'
+                                        : `Aufnahmezeit diesen Monat: ${totalUsedSeconds}s / ${monthlyLimitSeconds}s verbraucht.`}
+                                    </span>
+                                  </div>
 
                                   {isUploadingAudio && (
                                     <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -6038,6 +6260,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           url={aud.url} 
                                           duration={aud.duration} 
                                           index={aIdx} 
+                                          label={aud.label}
                                           onDelete={() => handleDeleteNote(aud.originalIdx)}
                                         />
                                       ))}
@@ -6141,6 +6364,76 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           >
             <span>← Zurück zum Hub</span>
           </button>
+
+          {/* SIMULATOR TOGGLE BAR (Compact) */}
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '12px 20px',
+            border: '1.5px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+            zIndex: 20
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sliders size={15} color="#64748b" />
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                Entwickler-Modus (Simulation)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {/* Checkbox Toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
+                <input
+                  type="checkbox"
+                  checked={isDevSimulationActive}
+                  onChange={(e) => setIsDevSimulationActive(e.target.checked)}
+                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#10b981' }}
+                />
+                <span>Klick-Vergabe simulieren</span>
+              </label>
+
+              {/* Demo Mode Toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
+                <input
+                  type="checkbox"
+                  checked={isDemoMode}
+                  onChange={(e) => setIsDemoMode(e.target.checked)}
+                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#10b981' }}
+                />
+                <span>Demo-Limits</span>
+              </label>
+
+              {/* Reset Album Button */}
+              <button
+                type="button"
+                onClick={resetStickerAlbum}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ef4444',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  transition: 'background 0.1s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+              >
+                <RotateCcw size={12} color="#ef4444" />
+                Album leeren
+              </button>
+            </div>
+          </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <span style={{ fontSize: '1.25rem' }}>🏆</span>
@@ -6168,6 +6461,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               return (
                 <div
                   key={st.id}
+                  onClick={() => {
+                    if (isDevSimulationActive) {
+                      awardSticker(st.id, "Simulation");
+                    } else {
+                      setSelectedPreviewSticker(st);
+                    }
+                  }}
                   style={{
                     background: isCollected ? 'white' : 'rgba(241, 245, 249, 0.6)',
                     border: isCollected ? `2px solid ${st.color}` : '2px dashed #cbd5e1',
@@ -6182,7 +6482,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     boxShadow: isCollected ? '0 10px 25px rgba(0,0,0,0.05)' : 'none',
                     transition: 'all 0.3s ease',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    cursor: 'pointer'
                   }}
                 >
                   {st.id !== 'song-master' && !st.auto && (
@@ -6251,9 +6552,55 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     border: isCollected ? `2px solid ${st.color}` : '2px solid transparent',
                     filter: isCollected ? 'none' : 'grayscale(100%)',
                     boxShadow: isCollected ? `0 8px 20px ${st.bg}` : 'none',
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s ease',
+                    overflow: 'hidden'
                   }}>
-                    {st.emoji}
+                    {isCollected ? (
+                      <img 
+                        src={`/stickers/${st.id}.png?v=1`} 
+                        alt={st.title} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const existingSpan = parent.querySelector('.emoji-fallback');
+                            if (!existingSpan) {
+                              const span = document.createElement('span');
+                              span.className = 'emoji-fallback';
+                              span.innerText = st.emoji;
+                              parent.appendChild(span);
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <img 
+                        src={`/stickers/${st.id}.png?v=1`} 
+                        alt={st.title} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover', 
+                          filter: 'grayscale(100%) opacity(0.35) blur(1px)' 
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const existingSpan = parent.querySelector('.emoji-fallback');
+                            if (!existingSpan) {
+                              const span = document.createElement('span');
+                              span.className = 'emoji-fallback';
+                              span.style.fontSize = '2.5rem';
+                              span.style.filter = 'grayscale(100%) opacity(0.35)';
+                              span.innerText = st.emoji;
+                              parent.appendChild(span);
+                            }
+                          }
+                        }}
+                      />
+                    )}
                   </div>
 
                   <div>
@@ -6292,6 +6639,533 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               );
             })}
           </div>
+
+          {/* STICKER PREVIEW & SOCIAL MEDIA SHARE CARD MODAL */}
+          {selectedPreviewSticker && (() => {
+            const st = selectedPreviewSticker;
+            const info = collectedStickers[st.id] || { count: 0, details: [] };
+            const isCollected = info.count > 0;
+            const displayDate = info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
+            const displayTopic = info.details?.[0]?.topic || 'Herausforderung gemeistert';
+
+            return (
+              <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.9)',
+                backdropFilter: 'blur(12px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                padding: '20px',
+                animation: 'fadeIn 0.25s ease-out'
+              }} onClick={() => setSelectedPreviewSticker(null)}>
+                <div 
+                  style={{
+                    width: '100%',
+                    maxWidth: '460px',
+                    background: '#1e293b',
+                    borderRadius: '32px',
+                    border: '1.5px solid #334155',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    padding: '32px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '24px',
+                    color: 'white',
+                    position: 'relative'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Close button */}
+                  <button
+                    onClick={() => setSelectedPreviewSticker(null)}
+                    style={{
+                      position: 'absolute',
+                      top: '20px',
+                      right: '20px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981' }}>
+                      Sticker Details
+                    </span>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
+                      {st.title}
+                    </h3>
+                  </div>
+
+                  {/* Layout Selector Switch */}
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', padding: '4px', borderRadius: '12px', gap: '4px', width: '320px', marginTop: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShareCardLayout('dark')}
+                      style={{
+                        flex: 1,
+                        background: shareCardLayout === 'dark' ? '#10b981' : 'transparent',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Dunkler Beton
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShareCardLayout('light')}
+                      style={{
+                        flex: 1,
+                        background: shareCardLayout === 'light' ? '#10b981' : 'transparent',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Heller Beton
+                    </button>
+                  </div>
+
+                  {/* PREVIEW POST CARD (Concrete Glow Poster format - Dark or Light) */}
+                  {shareCardLayout === 'dark' ? (
+                    <div style={{
+                      width: '320px',
+                      height: '460px',
+                      background: '#121316', // street corner black
+                      borderRadius: '24px',
+                      border: '1.5px solid rgba(255,255,255,0.06)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '16px',
+                      boxShadow: '0 20px 45px rgba(0,0,0,0.5)',
+                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                      {/* Concrete Wall Grid backdrop representation */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: `
+                          linear-gradient(rgba(255,255,255,0.008) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(255,255,255,0.008) 1px, transparent 1px)
+                        `,
+                        backgroundSize: '24px 24px',
+                        opacity: 0.8
+                      }} />
+
+                      {/* Spray Paint Mist behind sticker */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '40%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '200px',
+                        height: '200px',
+                        background: `radial-gradient(circle, ${st.color || '#10b981'}30 0%, transparent 70%)`,
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }} />
+
+                      {/* Core Poster Box with Glowing colored border matching sticker */}
+                      <div style={{
+                        width: '288px',
+                        height: '428px',
+                        background: '#1a1c22', // textured dark slate
+                        borderRadius: '20px',
+                        border: `3px solid ${st.color || '#10b981'}`,
+                        boxShadow: `0 0 20px ${(st.color || '#10b981')}40`,
+                        padding: '16px 12px 12px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'relative',
+                        zIndex: 2
+                      }}>
+                        {/* Action Headline */}
+                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ffffff', letterSpacing: '0.04em', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', textAlign: 'center' }}>
+                          CHALLENGE GEMEISTERT!
+                        </span>
+
+                        {/* Giant Sticker Display */}
+                        <div style={{
+                          width: '160px',
+                          height: '160px',
+                          borderRadius: '50%',
+                          border: '3px solid #ffffff',
+                          boxShadow: `0 0 25px ${(st.color || '#10b981')}80`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '18px 0',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          animation: 'floatSticker 4s ease-in-out infinite'
+                        }}>
+                          <img 
+                            src={`/stickers/${st.id}.png?v=1`} 
+                            alt={st.title} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = '3.5rem';
+                                span.innerText = st.emoji;
+                                parent.appendChild(span);
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {/* Student Name */}
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#ffffff', textAlign: 'center' }}>
+                          {student.first_name} {student.last_name}
+                        </span>
+
+                        {/* Student Instrument */}
+                        {studentInstrument && (
+                          <span style={{ fontSize: '0.45rem', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.08em', marginTop: '1px', textTransform: 'uppercase' }}>
+                            {studentInstrument}
+                          </span>
+                        )}
+
+                        {/* Sticker Milestone Title */}
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: st.color || '#10b981', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', marginTop: '4px', textAlign: 'center' }}>
+                          {st.title}
+                        </span>
+
+                        {/* Challenge Description */}
+                        <p style={{ fontSize: '0.56rem', color: '#cbd5e1', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 8px', lineHeight: '1.3' }}>
+                          {st.desc}
+                        </p>
+
+                        {/* School Badge Pill at the bottom */}
+                        <div style={{
+                          marginTop: 'auto',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '12px',
+                          padding: '4px 10px',
+                          fontSize: '0.44rem',
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase'
+                        }}>
+                          {schoolName}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: '320px',
+                      height: '460px',
+                      background: '#ffffff', // pure white frame card
+                      borderRadius: '24px',
+                      border: '1.5px solid rgba(0,0,0,0.06)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '16px',
+                      boxShadow: '0 20px 45px rgba(0,0,0,0.1)',
+                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                      {/* Concrete Wall Grid backdrop representation in light color */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: `
+                          linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px)
+                        `,
+                        backgroundSize: '24px 24px',
+                        opacity: 0.8
+                      }} />
+
+                      {/* Spray Paint Mist behind sticker (light background style) */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '40%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '200px',
+                        height: '200px',
+                        background: `radial-gradient(circle, ${st.color || '#10b981'}25 0%, transparent 70%)`,
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }} />
+
+                      {/* Core Poster Box with Glowing colored border matching sticker */}
+                      <div style={{
+                        width: '288px',
+                        height: '428px',
+                        background: '#f9fafb', // textured light slate
+                        borderRadius: '20px',
+                        border: `3px solid ${st.color || '#10b981'}`,
+                        boxShadow: `0 0 20px ${(st.color || '#10b981')}20`,
+                        padding: '16px 12px 12px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'relative',
+                        zIndex: 2
+                      }}>
+                        {/* Action Headline */}
+                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#1e293b', letterSpacing: '0.04em', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', textAlign: 'center' }}>
+                          CHALLENGE GEMEISTERT!
+                        </span>
+
+                        {/* Giant Sticker Display */}
+                        <div style={{
+                          width: '160px',
+                          height: '160px',
+                          borderRadius: '50%',
+                          border: '3px solid #ffffff',
+                          boxShadow: `0 0 25px ${(st.color || '#10b981')}60`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '18px 0',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          animation: 'floatSticker 4s ease-in-out infinite'
+                        }}>
+                          <img 
+                            src={`/stickers/${st.id}.png?v=1`} 
+                            alt={st.title} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = '3.5rem';
+                                span.innerText = st.emoji;
+                                parent.appendChild(span);
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {/* Student Name */}
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', textAlign: 'center' }}>
+                          {student.first_name} {student.last_name}
+                        </span>
+
+                        {/* Student Instrument */}
+                        {studentInstrument && (
+                          <span style={{ fontSize: '0.45rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', marginTop: '1px', textTransform: 'uppercase' }}>
+                            {studentInstrument}
+                          </span>
+                        )}
+
+                        {/* Sticker Milestone Title */}
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: st.color || '#10b981', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', marginTop: '4px', textAlign: 'center' }}>
+                          {st.title}
+                        </span>
+
+                        {/* Challenge Description */}
+                        <p style={{ fontSize: '0.56rem', color: '#475569', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 8px', lineHeight: '1.3' }}>
+                          {st.desc}
+                        </p>
+
+                        {/* School Badge Pill at the bottom */}
+                        <div style={{
+                          marginTop: 'auto',
+                          background: 'rgba(0, 0, 0, 0.03)',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '12px',
+                          padding: '4px 10px',
+                          fontSize: '0.44rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase'
+                        }}>
+                          {schoolName}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ width: '100%', textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: '0.78rem', color: '#cbd5e1', margin: '0 0 4px 0', lineHeight: '1.4', fontWeight: 600 }}>
+                      {st.desc}
+                    </p>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
+                      {isCollected ? `Freigeschaltet! (Gesammelt: ${info.count}x)` : 'Noch nicht freigeschaltet'}
+                    </span>
+                  </div>
+
+                  {/* Share button action */}
+                  <button
+                    type="button"
+                    onClick={() => downloadShareCard(st)}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      fontSize: '0.86rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    Als Share-Card teilen (PNG herunterladen)
+                  </button>
+                </div>
+
+                <style dangerouslySetInnerHTML={{__html: `
+                  @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                  }
+                  @keyframes scaleIn {
+                    from { transform: scale(0.9); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                  }
+                  @keyframes floatSticker {
+                    0% { transform: translateY(0px) rotate(0deg); }
+                    50% { transform: translateY(-6px) rotate(2deg); }
+                    100% { transform: translateY(0px) rotate(0deg); }
+                  }
+                `}} />
+              </div>
+            );
+          })()}
+
+          {/* STICKER AWARD CELEBRATION ANIMATION POPUP */}
+          {awardedStickerToAnimate && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.92)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 20000,
+              animation: 'fadeIn 0.25s ease-out'
+            }}>
+              <Confetti recycle={false} numberOfPieces={300} />
+              <div 
+                style={{
+                  background: 'white',
+                  borderRadius: '32px',
+                  padding: '40px',
+                  textAlign: 'center',
+                  maxWidth: '420px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '24px',
+                  boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                  animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em' }}>
+                  Sticker freigeschaltet!
+                </span>
+                <div style={{
+                  width: '160px',
+                  height: '160px',
+                  borderRadius: '50%',
+                  background: awardedStickerToAnimate.bg,
+                  border: `6px solid ${awardedStickerToAnimate.color}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: `0 12px 30px ${awardedStickerToAnimate.bg}`,
+                  overflow: 'hidden',
+                  animation: 'spinStickerAward 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}>
+                  <img 
+                    src={`/stickers/${awardedStickerToAnimate.id}.png?v=1`} 
+                    alt={awardedStickerToAnimate.title} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const span = document.createElement('span');
+                        span.style.fontSize = '4.5rem';
+                        span.innerText = awardedStickerToAnimate.emoji;
+                        parent.appendChild(span);
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0' }}>
+                    {awardedStickerToAnimate.title}
+                  </h2>
+                  <p style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600, margin: 0 }}>
+                    {awardedStickerToAnimate.desc}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAwardedStickerToAnimate(null)}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '12px 32px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  Großartig!
+                </button>
+              </div>
+              <style dangerouslySetInnerHTML={{__html: `
+                @keyframes spinStickerAward {
+                  from { transform: scale(0) rotate(-180deg); }
+                  to { transform: scale(1) rotate(0deg); }
+                }
+              `}} />
+            </div>
+          )}
         </div>
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
@@ -6897,12 +7771,14 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
   );
 };
 
-const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
+const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () => void }> = ({ url, label, onDelete }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const togglePlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -6913,51 +7789,53 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onEnded = () => setIsPlaying(false);
-    audio.addEventListener('ended', onEnded);
-    return () => {
-      audio.removeEventListener('ended', onEnded);
+    const handleLoadedMetadata = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(Math.round(audio.duration));
+      }
     };
-  }, []);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    if (audio.duration && isFinite(audio.duration)) {
+      setDuration(Math.round(audio.duration));
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [url]);
 
   return (
-    <div 
-      onClick={togglePlay}
-      style={{ 
-        position: 'relative',
-        width: '160px',
-        height: '95px',
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        border: '2px solid #334155',
-        borderRadius: '8px',
-        padding: '4px',
-        boxShadow: isPlaying 
-          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
-          : '0 4px 12px rgba(0,0,0,0.12)',
-        cursor: 'pointer',
-        userSelect: 'none',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        transform: isPlaying ? 'scale(1.02)' : 'none',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = isPlaying ? 'scale(1.04)' : 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = isPlaying
-          ? '0 10px 24px rgba(217, 119, 6, 0.25), 0 0 14px rgba(217, 119, 6, 0.15)'
-          : '0 6px 16px rgba(0,0,0,0.18)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = isPlaying ? 'scale(1.02)' : 'none';
-        e.currentTarget.style.boxShadow = isPlaying
-          ? '0 8px 20px rgba(217, 119, 6, 0.15), 0 0 10px rgba(217, 119, 6, 0.1)'
-          : '0 4px 12px rgba(0,0,0,0.12)';
-      }}
-    >
+    <div style={{
+      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
+      borderRadius: '16px',
+      padding: '16px',
+      width: '320px',
+      border: '4px solid #0f0e0d',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      fontFamily: 'monospace',
+      color: '#fff',
+      alignSelf: 'center',
+      position: 'relative',
+      userSelect: 'none'
+    }}>
       <audio ref={audioRef} src={url} />
       
       {/* 4 Screws in corners */}
@@ -6975,279 +7853,6 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string }> = ({ url, labe
 
       {/* Sticker Label Area */}
       <div style={{
-        flex: 1,
-        margin: '3px 4px',
-        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-        border: '1.2px solid #cbd5e1',
-        borderRadius: '5px',
-        padding: '4px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Retro Accent Stripes */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, #ef4444 33%, #3b82f6 33%, #3b82f6 66%, #10b981 66%)', opacity: 0.8 }} />
-
-        {/* Tape Reel Window */}
-        <div style={{
-          width: '74px',
-          height: '22px',
-          background: '#0f172a',
-          border: '1.2px solid #475569',
-          borderRadius: '3px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          position: 'relative',
-          marginTop: '2px',
-          padding: '0 6px',
-          boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.5)'
-        }}>
-          {/* Transparent window pane effect */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 50%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* Left Reel Hub */}
-          <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            border: '1.5px solid #64748b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#1e293b',
-            position: 'relative',
-            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-          }}>
-            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
-          </div>
-
-          {/* Magnetic tape roll representation (left) */}
-          <div style={{
-            position: 'absolute',
-            left: '4px',
-            width: isPlaying ? '14px' : '16px',
-            height: isPlaying ? '14px' : '16px',
-            borderRadius: '50%',
-            border: '1px dashed #78350f',
-            opacity: 0.35,
-            transition: 'all 5s ease'
-          }} />
-
-          {/* Center Play Button Overlay */}
-          <div 
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
-              border: '2px solid #ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
-              zIndex: 20,
-              color: 'white',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              pointerEvents: 'none' // Clicks bubble up to trigger togglePlay on parent
-            }}
-          >
-            {isPlaying ? (
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
-                <rect x="5" y="5" width="4" height="14" rx="1" />
-                <rect x="15" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ marginLeft: '1.5px' }}>
-                <path d="M7 4v16l13-8z" />
-              </svg>
-            )}
-          </div>
-
-          {/* Right Reel Hub */}
-          <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            border: '1.5px solid #64748b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#1e293b',
-            position: 'relative',
-            animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none'
-          }}>
-            <div style={{ width: '1.5px', height: '9px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '9px', height: '1.5px', background: '#e2e8f0', position: 'absolute' }} />
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0f172a', zIndex: 1 }} />
-          </div>
-          
-          {/* Magnetic tape roll representation (right) */}
-          <div style={{
-            position: 'absolute',
-            right: '4px',
-            width: isPlaying ? '16px' : '14px',
-            height: isPlaying ? '16px' : '14px',
-            borderRadius: '50%',
-            border: '1px dashed #78350f',
-            opacity: 0.35,
-            transition: 'all 5s ease'
-          }} />
-        </div>
-
-        {/* Text/Song Title Sticker Writing */}
-        <div style={{
-          fontFamily: '"Courier New", Courier, monospace',
-          fontSize: '0.7rem',
-          fontWeight: 800,
-          color: '#1e293b',
-          textAlign: 'center',
-          marginTop: '3px',
-          width: '100%',
-          borderTop: '1px dashed #cbd5e1',
-          paddingTop: '2px',
-          letterSpacing: '-0.5px',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden'
-        }}>
-          {label}
-        </div>
-      </div>
-
-      {/* Cassette Bottom Run / Exposed Tape details */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '0 10px',
-        marginBottom: '1px'
-      }}>
-        {/* Play Status Flashing Indicator LED */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-          <div style={{
-            width: '5px',
-            height: '5px',
-            borderRadius: '50%',
-            background: isPlaying ? '#ef4444' : '#475569',
-            boxShadow: isPlaying ? '0 0 6px #ef4444' : 'none',
-            animation: isPlaying ? 'pulse 1s infinite alternate' : 'none'
-          }} />
-          <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
-            {isPlaying ? 'PLAY' : 'STOP'}
-          </span>
-        </div>
-
-        {/* Small Stop Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-              setIsPlaying(false);
-            }
-          }}
-          style={{
-            background: '#ef4444',
-            border: 'none',
-            borderRadius: '3px',
-            width: '18px',
-            height: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            padding: 0,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            transition: 'transform 0.1s ease',
-            zIndex: 10
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          title="Stop"
-        >
-          <div style={{ width: '7px', height: '7px', background: 'white', borderRadius: '1px' }} />
-        </button>
-        
-        {/* Exposed tape path shapes */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-          <div style={{ width: '5px', height: '3px', background: '#334155', borderRadius: '0.5px' }} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number; onDelete?: () => void }> = ({ url, duration, index, onDelete }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
-  };
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const onEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('ended', onEnded);
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('ended', onEnded);
-    };
-  }, []);
-
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
-      borderRadius: '16px',
-      padding: '16px',
-      width: '100%',
-      maxWidth: '340px',
-      border: '4px solid #0f0e0d',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      fontFamily: 'monospace',
-      color: '#fff',
-      alignSelf: 'center',
-      position: 'relative'
-    }}>
-      <audio ref={audioRef} src={url} />
-      
-      <div style={{
         background: 'linear-gradient(to bottom, #dbeafe 0%, #eff6ff 100%)',
         border: '2px solid #000',
         borderRadius: '6px',
@@ -7258,11 +7863,14 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
         position: 'relative'
       }}>
         <div style={{ height: '3px', background: '#ef4444', width: '100%' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#1e3a8a', fontWeight: 900 }}>
-          <span>A / PLAY-ALONG #{index + 1}</span>
-          <span>{Math.round(currentTime)}s / {duration}s</span>
-        </div>
         
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#1e3a8a', fontWeight: 900 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
+            {label.toUpperCase()}
+          </span>
+          <span>{Math.round(currentTime)}s / {duration || '9'}s</span>
+        </div>
+
         <div style={{
           background: '#000',
           borderRadius: '4px',
@@ -7271,10 +7879,11 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
           display: 'flex',
           justifyContent: 'space-around',
           alignItems: 'center',
-          padding: '0 20px'
+          padding: '0 20px',
+          position: 'relative'
         }}>
           <div 
-            className={isPlaying ? 'spinning' : ''} 
+            className={isPlaying ? 'spinning' : ''}
             style={{
               width: '18px',
               height: '18px',
@@ -7285,7 +7894,7 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
             }} 
           />
           <div 
-            className={isPlaying ? 'spinning' : ''} 
+            className={isPlaying ? 'spinning' : ''}
             style={{
               width: '18px',
               height: '18px',
@@ -7298,27 +7907,40 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
         </div>
       </div>
 
+      {/* Control Buttons */}
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
         <button
           type="button"
-          onClick={togglePlay}
+          onClick={() => togglePlay()}
           style={{
             background: '#d97706',
             color: '#fff',
             border: 'none',
-            borderRadius: '6px',
-            padding: '6px 12px',
+            borderRadius: '8px',
+            padding: '8px 16px',
             fontSize: '0.72rem',
             fontWeight: 800,
             cursor: 'pointer',
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '4px'
           }}
         >
-          {isPlaying ? '⏸️ PAUSE' : '▶️ PLAY'}
+          {isPlaying ? (
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <rect x="5" y="5" width="4" height="14" rx="1" />
+              <rect x="15" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          )}
+          <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
         </button>
+
         <button
           type="button"
           onClick={() => {
@@ -7333,19 +7955,24 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
             background: '#475569',
             color: '#fff',
             border: 'none',
-            borderRadius: '6px',
-            padding: '6px 12px',
+            borderRadius: '8px',
+            padding: '8px 16px',
             fontSize: '0.72rem',
             fontWeight: 800,
             cursor: 'pointer',
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '4px'
           }}
         >
-          ⏹️ STOP
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="1.5"/>
+          </svg>
+          <span>STOP</span>
         </button>
+
         {onDelete && (
           <button
             type="button"
@@ -7354,18 +7981,22 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
               background: '#ef4444',
               color: '#fff',
               border: 'none',
-              borderRadius: '6px',
-              padding: '6px 12px',
+              borderRadius: '8px',
+              padding: '8px 16px',
               fontSize: '0.72rem',
               fontWeight: 800,
               cursor: 'pointer',
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '4px'
             }}
           >
-            🗑️ LÖSCHEN
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+            </svg>
+            <span>LÖSCHEN</span>
           </button>
         )}
       </div>
@@ -7377,5 +8008,15 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
         }
       `}} />
     </div>
+  );
+};
+
+const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number; label?: string; onDelete?: () => void }> = ({ url, duration, index, label, onDelete }) => {
+  return (
+    <InlineAudioPlayer 
+      url={url} 
+      label={label || `Play-Along #${index + 1}`} 
+      onDelete={onDelete}
+    />
   );
 };

@@ -224,7 +224,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       return;
     }
 
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
 
     // Fetch occurrences for today for this teacher
     const { data: occurrences } = await supabase
@@ -402,8 +402,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       sunday.setDate(monday.getDate() + 6);
       sunday.setHours(23, 59, 59, 999);
 
-      const mondayStr = monday.toISOString().substring(0, 10);
-      const sundayStr = sunday.toISOString().substring(0, 10);
+      const mondayStr = monday.toLocaleDateString('sv-SE');
+      const sundayStr = sunday.toLocaleDateString('sv-SE');
 
       const { data: weekOccurrences } = await supabase
         .from('schedule_occurrences')

@@ -1462,7 +1462,7 @@ export function TeacherDashboard({
     if (!confirm('Möchtest du dich wirklich für heute krankmelden? Alle heutigen Stunden werden storniert und die Verwaltung benachrichtigt.')) return;
 
     try {
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const todayStr = new Date().toLocaleDateString('sv-SE');
       const resp = await fetch('/api/teacher/report-sick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2149,7 +2149,7 @@ export function TeacherDashboard({
   }, [teacher?.schools?.calendar_url]);
 
   const isTodayHoliday = useMemo(() => {
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
   }, [holidays]);
 
@@ -2225,7 +2225,7 @@ export function TeacherDashboard({
   });
   const [sickStartDate, setSickStartDate] = useState<string>(() => {
     const today = new Date();
-    return today.toISOString().substring(0, 10);
+    return today.toLocaleDateString('sv-SE');
   });
   const [sickUntilDate, setSickUntilDate] = useState<string>(() => {
     const saved = localStorage.getItem('selected_sick_date');
@@ -2235,7 +2235,7 @@ export function TeacherDashboard({
     }
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().substring(0, 10);
+    return tomorrow.toLocaleDateString('sv-SE');
   });
   const [showCustomStart, setShowCustomStart] = useState(false);
   const [reportingSick, setReportingSick] = useState(false);
@@ -3006,6 +3006,7 @@ export function TeacherDashboard({
               duration,
               status,
               day_of_week,
+              instrument,
               rooms (id, name),
               student:users!schedules_student_id_fkey (
                 id,
@@ -3020,7 +3021,7 @@ export function TeacherDashboard({
             .eq('teacher_id', userId)
             .eq('day_of_week', todayWeekday);
 
-          const todayStr = new Date().toISOString().substring(0, 10);
+          const todayStr = new Date().toLocaleDateString('sv-SE');
 
           // Fetch occurrences for today for fallback
           const { data: occurrences } = await supabase
@@ -3036,6 +3037,7 @@ export function TeacherDashboard({
               student_acknowledged,
               schedules (
                 duration,
+                instrument,
                 rooms (id, name)
               ),
               student:users!schedule_occurrences_student_id_fkey (
@@ -3064,7 +3066,7 @@ export function TeacherDashboard({
               status: slot.status,
               roomId: slot.rooms?.id || null,
               room: slot.rooms?.name || 'Hauptraum',
-              instrument: student?.instrument || 'Klavier',
+              instrument: slot.instrument || student?.instrument || 'Klavier',
               student_acknowledged: true,
               original_date: null,
               student: student ? {
@@ -3102,7 +3104,7 @@ export function TeacherDashboard({
                   status: occ.status,
                   roomId: occ.schedules?.rooms?.id || null,
                   room: occ.schedules?.rooms?.name || 'Hauptraum',
-                  instrument: student?.instrument || 'Klavier',
+                  instrument: occ.schedules?.instrument || student?.instrument || 'Klavier',
                   student_acknowledged: occ.student_acknowledged,
                   original_date: occ.original_date,
                   student: student ? {
@@ -7014,56 +7016,57 @@ export function TeacherDashboard({
                               );
                             } else if (isFinished) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #cbd5e1';
+                              slotBorder = '1.5px solid #e6f4ea';
+                              slotBorderLeft = '5px solid #22c55e';
                               titleColor = '#94a3b8';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#cbd5e1',
+                                  border: '3px solid #22c55e',
+                                  background: '#22c55e',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else if (slot.isGroup) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e6f4ea';
-                              slotBorderLeft = '5px solid #22c55e';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #cbd5e1';
                               titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #22c55e',
+                                  border: '3px solid #cbd5e1',
                                   background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else if (isRescheduledConfirmed) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #d1fae5';
-                              slotBorderLeft = '5px solid #137333';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #cbd5e1';
                               titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #137333',
-                                  background: isFinished ? '#137333' : '#ffffff',
+                                  border: '3px solid #cbd5e1',
+                                  background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxSizing: 'border-box'
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
                                 }}>
                                   <div style={{
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#137333'
+                                    background: '#cbd5e1'
                                   }} />
                                 </div>
                               ) : (
@@ -7071,8 +7074,8 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #137333',
-                                  background: isFinished ? '#137333' : '#ffffff',
+                                  border: '3px solid #cbd5e1',
+                                  background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
@@ -7147,15 +7150,15 @@ export function TeacherDashboard({
                               );
                             } else if (isResetAcknowledged) {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #d1fae5';
-                              slotBorderLeft = '5px solid #137333';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #cbd5e1';
                               titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #137333',
+                                  border: '3px solid #cbd5e1',
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -7167,7 +7170,7 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#137333'
+                                    background: '#cbd5e1'
                                   }} />
                                 </div>
                               ) : (
@@ -7175,33 +7178,34 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #137333',
-                                  background: '#137333',
+                                  border: '3px solid #cbd5e1',
+                                  background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
                               );
                             } else {
                               slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e6f4ea';
-                              slotBorderLeft = '5px solid #22c55e';
+                              slotBorder = '1.5px solid #e2e8f0';
+                              slotBorderLeft = '5px solid #cbd5e1';
                               titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #22c55e',
+                                  border: '3px solid #cbd5e1',
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxSizing: 'border-box'
+                                  boxSizing: 'border-box',
+                                  animation: 'pulse 1.5s infinite'
                                 }}>
                                   <div style={{
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#22c55e'
+                                    background: '#cbd5e1'
                                   }} />
                                 </div>
                               ) : (
@@ -7209,7 +7213,7 @@ export function TeacherDashboard({
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #22c55e',
+                                  border: '3px solid #cbd5e1',
                                   background: '#ffffff',
                                   boxSizing: 'border-box'
                                 }} />
@@ -7248,7 +7252,7 @@ export function TeacherDashboard({
                                        });
                                      }
                                      // Log the date of the clicked appointment (today's date)
-                                     const todayStr = new Date().toISOString().substring(0, 10);
+                                     const todayStr = new Date().toLocaleDateString('sv-SE');
                                      setSickUntilDate(todayStr);
                                      setIsSickWidgetExpanded(true);
                                    }}
@@ -7896,7 +7900,7 @@ export function TeacherDashboard({
                               onClick={() => {
                                 setShowCustomStart(false);
                                 const today = new Date();
-                                setSickStartDate(today.toISOString().substring(0, 10));
+                                setSickStartDate(today.toLocaleDateString('sv-SE'));
                               }}
                               style={{
                                 background: 'none',
@@ -10249,11 +10253,31 @@ export function TeacherDashboard({
                 onClick={async () => {
                   if (window.confirm('Alle Schüler ausloggen?')) {
                     const now = new Date().toISOString();
+                    
+                    // Fetch all active student sessions in this school
+                    const { data: activeSess, error: fetchError } = await supabase
+                      .from('sessions')
+                      .select('user_id, users!inner(role, school_id)')
+                      .is('check_out_time', null)
+                      .eq('users.school_id', teacher.school_id)
+                      .eq('users.role', 'student');
+
+                    if (fetchError) {
+                      alert('Fehler beim Abrufen der aktiven Schüler: ' + fetchError.message);
+                      return;
+                    }
+
+                    if (!activeSess || activeSess.length === 0) {
+                      alert('Keine aktiven Schüler-Sessions gefunden.');
+                      return;
+                    }
+
+                    const studentUserIds = Array.from(new Set(activeSess.map(s => s.user_id)));
                     const { error } = await supabase
                       .from('sessions')
                       .update({ check_out_time: now })
                       .is('check_out_time', null)
-                      .in('user_id', allStudents.map(s => s.id));
+                      .in('user_id', studentUserIds);
                     
                     if (error) alert('Fehler beim Ausloggen: ' + error.message);
                     else fetchData();

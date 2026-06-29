@@ -100,3 +100,47 @@ Ein zusammenfassender Report im Format von `simulation_reports_15m.md` soll erst
 
 ## Verification
 - Der Erfolg der Simulation wird durch das Vorhandensein des Ausführungsprotokolls (Log-Datei) und die Datei `simulation_reports_15m.md` im Projektverzeichnis verifiziert.
+
+## Follow-up — 2026-06-28T22:23:17+02:00
+
+Fully integrate the newly approved Trello-style landing page with real screenshots into the Campus-Groovelab React application, including the view state toggling logic that displays this page to unauthenticated visitors before they click 'Log In'.
+
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Landing Page UI Component
+Create a new React component at `apps/groovelab/src/components/LandingPage.tsx` based on the design, layout, content, and integrated screenshot assets specified in [landing_page_concept.md](file:///Users/patrickhuber/.gemini/antigravity/brain/51dc4a45-6c04-4394-8d1a-6997e87e668b/landing_page_concept.md).
+
+### R2. URL-based Routing Integration
+Install `react-router-dom` in the `apps/groovelab` workspace. Configure a router in the application entrypoint (e.g., `App.tsx` or `main.tsx`) supporting these routes:
+- `/` renders the new `LandingPage` for all public visitors.
+- `/login` renders the existing `LoginScreen` component.
+- Logged-in users should access their corresponding dashboard view correctly.
+
+### R3. Session State Passing
+Ensure that authentication sessions (managed via Supabase) are properly validated, routed, and passed down. Entering `/` when already authenticated should redirect the user to their active dashboard, while accessing dashboard routes without authentication should redirect to `/`.
+
+## Verification Plan
+
+### Automated Verification
+- Run `npm run build:groovelab` to ensure there are no compilation errors or linter warnings.
+- Run `npx tsc -p apps/groovelab` to verify strict TypeScript compilation passes.
+
+### Manual Verification
+- Deploy/start local server and verify that visiting `/` displays the Landing Page.
+- Click "Anmelden" on `/` and confirm URL updates to `/login` and renders the Login screen.
+- Authenticate and confirm redirect to the dashboard.
+
+## Acceptance Criteria
+
+### Compilation & Build
+- [ ] TypeScript compilation passes with zero errors: `npx tsc -p apps/groovelab`
+- [ ] Production build succeeds without errors: `npm run build:groovelab`
+
+### Routing & Authentication
+- [ ] Accessing `/` when unauthenticated renders `LandingPage`.
+- [ ] Accessing `/login` when unauthenticated renders `LoginScreen`.
+- [ ] Clicking "Anmelden" on the landing page routes to `/login`.
+- [ ] If already authenticated, accessing `/` or `/login` redirects automatically to the respective dashboard.

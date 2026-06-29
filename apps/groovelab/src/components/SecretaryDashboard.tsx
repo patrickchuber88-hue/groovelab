@@ -1524,6 +1524,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // School Data & Subscription
   const [schoolName, setSchoolName] = useState<string>('');
+  const [frozenStudents, setFrozenStudents] = useState<any[]>([]);
   const [schoolSubdomain, setSchoolSubdomain] = useState<string>('');
   const [openingHours, setOpeningHours] = useState<any>(null);
   const [schoolZipCode, setSchoolZipCode] = useState<string>('');
@@ -2576,7 +2577,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           .eq('school_id', schoolId),
         supabase
           .from('students')
-          .select('id, status')
+          .select('id, status, onboarding_frozen, onboarding_pin, timetable_assigned_at')
           .eq('school_id', schoolId),
         supabase
           .from('pending_students_decrypted')
@@ -2696,6 +2697,26 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
       // Fetch pending students (only in anonymized tables)
       const { data: pendingStudents } = pendingStudentsResult;
+
+      // Extrahiere eingefrorene Profile
+      const frozenList: any[] = [];
+      studentsDb?.forEach(st => {
+        if (st.onboarding_frozen) {
+          const pending = pendingStudents?.find(p => p.id === st.id);
+          const activeUser = allUsers?.find(u => u.id === st.id);
+          const first_name = pending?.first_name || activeUser?.first_name || 'Unbekannt';
+          const last_name = pending?.last_name || activeUser?.last_name || 'Schüler';
+          const instrument = pending?.instrument || activeUser?.instrument || 'Instrument';
+          frozenList.push({
+            id: st.id,
+            first_name,
+            last_name,
+            instrument,
+            timetable_assigned_at: st.timetable_assigned_at
+          });
+        }
+      });
+      setFrozenStudents(frozenList);
 
       // Fetch activation days for student onboarding verification
       const { data: actDays } = actDaysResult;
@@ -3776,6 +3797,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
+    }
+  };
+
+  const handleGenerateInviteToken = async (studentId: string, studentName: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('student_onboarding_tokens')
+        .insert({ student_id: studentId })
+        .select('token')
+        .single();
+
+      if (error) throw error;
+      
+      const inviteUrl = `${window.location.origin}/?onboarding=parent&token=${data.token}`;
+      await navigator.clipboard.writeText(inviteUrl);
+      alert(`Personalisierter Onboarding-Link für ${studentName} wurde in die Zwischenablage kopiert!\n\nLink: ${inviteUrl}`);
+    } catch (err: any) {
+      console.error('Error generating invite token:', err);
+      alert('Der Einladungs-Link konnte nicht generiert werden: ' + err.message);
     }
   };
 
@@ -6628,16 +6668,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Hauptinstrument</label>
-                    <input 
-                      type="text" 
-                      value={newStudentInstrument}
-                      onChange={(e) => setNewStudentInstrument(e.target.value)}
-                      placeholder="z.B. E-Gitarre"
-                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                    />
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                      {INSTRUMENT_TAGS.map((tag) => {
+                        const checked = newStudentInstrument.split(',').map(s => s.trim()).includes(tag);
+                        return (
+                          <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const currentChecked = newStudentInstrument ? newStudentInstrument.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                let nextChecked: string[];
+                                if (e.target.checked) {
+                                  nextChecked = [...currentChecked, tag];
+                                } else {
+                                  nextChecked = currentChecked.filter(s => s !== tag);
+                                }
+                                setNewStudentInstrument(nextChecked.join(', '));
+                              }}
+                              style={{ accentColor: '#ea4335', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {tag}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Unterrichtsdauer</label>
@@ -13111,6 +13169,71 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       Willkommen in der Campus-Verwaltung. Hier koordinierst du die Lehrkräfte, das Onboarding neuer Kolleginnen und Kollegen sowie die Stundenplan-Freigaben für deine Musikschule.
                     </p>
                   </div>
+
+                  {/* Sicherheitswarnung: Onboarding-Konflikte */}
+                  {frozenStudents.length > 0 && (
+                    <div style={{
+                      background: '#fef2f2',
+                      border: '1.5px solid #dc2626',
+                      borderRadius: '20px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px',
+                      boxShadow: '0 4px 20px rgba(220, 38, 38, 0.08)',
+                      textAlign: 'left'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#991b1b', fontFamily: 'Outfit' }}>
+                          Sicherheitswarnung: Onboarding-Konflikte ({frozenStudents.length})
+                        </h4>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#7f1d1d', lineHeight: '1.4', fontFamily: 'Inter' }}>
+                        Mehrere Schüler-Onboardings wurden von den Eltern als blockiert gemeldet. Die Profile wurden zum Schutz vor unbefugtem Zugriff automatisch eingefroren. Bitte verifiziere die Eltern und lasse ihnen den Einladungs-Link zukommen.
+                      </p>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {frozenStudents.map((stud) => (
+                          <div key={stud.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: '#ffffff',
+                            border: '1px solid #fee2e2',
+                            padding: '10px 14px',
+                            borderRadius: '12px'
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <strong style={{ fontSize: '0.82rem', color: '#1e293b' }}>
+                                {stud.first_name} {stud.last_name}
+                              </strong>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                                Instrument: {stud.instrument}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateInviteToken(stud.id, `${stud.first_name} ${stud.last_name}`)}
+                              style={{
+                                padding: '8px 12px',
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Einladungs-Link kopieren
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Overdue Activation Invoice Alerts */}
                   {(() => {
