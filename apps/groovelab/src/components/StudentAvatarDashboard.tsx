@@ -195,14 +195,14 @@ const getLevelProgress = (level: number, xp: number, instrumentType: string): Le
   const currentXp = xp || 0;
   const levelTitle = LEVEL_NAMES[instrumentType]?.[currentLevel] || `Stufe ${currentLevel}`;
 
-  let nextThreshold = 100;
+  let nextThreshold = 500;
   let prevThreshold = 0;
   if (currentLevel === 2) {
-    prevThreshold = 100;
-    nextThreshold = 300;
+    prevThreshold = 500;
+    nextThreshold = 2500;
   } else if (currentLevel === 3) {
-    prevThreshold = 300;
-    nextThreshold = 9999;
+    prevThreshold = 2500;
+    nextThreshold = 99999;
   }
 
   const xpInCurrentLevel = Math.max(0, currentXp - prevThreshold);
@@ -4074,7 +4074,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       let totalFocus = totalMinutes;
       let monthlyFocus = totalMinutes;
-      let currentXp = totalMinutes * 10;
+      let currentXp = totalMinutes;
       let streakFlame = streak;
       let lastPracticeDate = null;
       let lastSecuredDate = null;
@@ -4082,7 +4082,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (stats) {
         totalFocus = (stats.total_focus_minutes || 0) + totalMinutes;
         monthlyFocus = (stats.monthly_focus_minutes || 0) + totalMinutes;
-        currentXp = (stats.current_xp || 0) + (totalMinutes * 10);
+        currentXp = (stats.current_xp || 0) + totalMinutes;
         streakFlame = stats.streak_flame || 0;
         lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : null;
         lastSecuredDate = lastPracticeDate;
@@ -4192,7 +4192,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       setCelebrationDetails({
-        xpGained: totalMinutes * 10,
+        xpGained: totalMinutes,
         streakFlame: streakFlame,
         sessionCompletedTarget: sessionCompletedTarget,
         usedJokerThisSession: usedJokerThisSession,
@@ -5010,7 +5010,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       if (!resp.ok) {
         // Fallback local update if server completed offline
-        const newXp = (avatar?.xp || 0) + 100;
+        const newXp = (avatar?.xp || 0) + 10;
         const currentStreak = (avatar?.streak_flame || 0) + 1;
         await supabase.from('avatars').update({
           xp: newXp,
@@ -11857,7 +11857,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'white' }}>Fokus abgeschlossen!</h2>
               <p style={{ color: '#a1a1aa', fontSize: '0.9rem', marginTop: '8px', maxWidth: '280px' }}>
                 {xpActive 
-                  ? `Sehr gut! Du warst ${detoxMinutes} Minuten voll konzentriert. Dir wurden +100 XP auf deinen Avatar gebucht.`
+                  ? `Sehr gut! Du warst ${detoxMinutes} Minuten voll konzentriert. Dir wurden +10 XP auf deinen Avatar gebucht.`
                   : `Sehr gut! Du warst ${detoxMinutes} Minuten voll konzentriert. Dein Fokus war erfolgreich!`}
               </p>
               

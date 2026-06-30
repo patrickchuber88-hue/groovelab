@@ -8,25 +8,31 @@ export const ALL_STICKERS = [
   { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', auto: true },
   { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
   { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
+  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', color: '#137333', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
 
   // XP
   { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
   { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1000 XP auf dem Profil gesammelt.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true },
   { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 2500 XP auf dem Profil gesammelt.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true },
+  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: 'Unglaubliche 5000 XP auf dem Profil gesammelt.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.1)', auto: true },
 
   // Streaks
   { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true },
   { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true },
   { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 21 Tagen gehalten!', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true },
+  { id: 'streak-kaiser', emoji: '👑', title: 'Streak-Kaiser', desc: 'Legendäre Übe-Streak von 30 Tagen gehalten!', color: '#7c2d12', bg: 'rgba(124, 45, 18, 0.1)', auto: true },
 
   // Songs
   { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
   { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
   { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', auto: true },
+  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#0f766e', bg: 'rgba(15, 118, 110, 0.1)', auto: true },
 
   // Manuell
   { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
-  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false }
+  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false },
+  { id: 'creative-mind', emoji: '💡', title: 'Kreativ-Kopf', desc: 'Für eigene Kompositionen, Improvisation oder kreative Ideen.', color: '#db2777', bg: 'rgba(219, 39, 119, 0.1)', auto: false },
+  { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Für das freiwillige Erarbeiten von Zusatzaufgaben.', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false }
 ];
 
 interface Student {
@@ -1098,50 +1104,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     if (shareCardLayout === 'dark') {
       // 1. Draw premium dark obsidian studio background
-      ctx.fillStyle = '#0a0a0f';
+      ctx.fillStyle = '#09090b';
       ctx.fillRect(0, 0, 1200, 1200);
 
-      // 1. Draw solid dark grey background
-      ctx.fillStyle = '#181a1e';
+      // Draw Spotify Wrapped slanted color splash in canvas
+      ctx.save();
+      ctx.translate(600, 600);
+      ctx.rotate(-12 * Math.PI / 180);
+      const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
+      gradient.addColorStop(0, sticker.color ? `${sticker.color}45` : 'rgba(16, 185, 129, 0.45)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(-800, -800, 1600, 600);
+      ctx.restore();
+
+      // Draw large slanted backdrop text overlay
+      ctx.save();
+      ctx.translate(600, 600);
+      ctx.rotate(-12 * Math.PI / 180);
+      ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
+      ctx.fillStyle = sticker.color ? `${sticker.color}15` : 'rgba(16, 185, 129, 0.15)';
+      ctx.textAlign = 'center';
+      ctx.fillText(sticker.title.toUpperCase(), 0, 20);
+      ctx.restore();
+
+      // 1. Draw solid dark grey background card container
+      ctx.fillStyle = '#121216';
       ctx.fillRect(tX, tY, tW, tH);
-
-      // 2. Draw brick wall seams for urban texture
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
-      ctx.lineWidth = 2.5;
-      for (let brickY = tY; brickY < tY + tH; brickY += 80) {
-        ctx.beginPath();
-        ctx.moveTo(tX, brickY);
-        ctx.lineTo(tX + tW, brickY);
-        ctx.stroke();
-        
-        const shift = Math.floor((brickY - tY) / 80) % 2 === 0 ? 0 : 120;
-        for (let brickX = tX + shift; brickX < tX + tW; brickX += 240) {
-          ctx.beginPath();
-          ctx.moveTo(brickX, brickY);
-          ctx.lineTo(brickX, brickY + 80);
-          ctx.stroke();
-        }
-      }
-
-      // 3. Draw concrete sand grain noise texture
-      for (let i = 0; i < 600; i++) {
-        const px = tX + Math.random() * tW;
-        const py = tY + Math.random() * tH;
-        const size = Math.random() * 2 + 1;
-        const opacity = Math.random() * 0.06;
-        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`;
-        ctx.fillRect(px, py, size, size);
-      }
-
-      // 4. Draw spray paint blowout behind sticker
-      const sprayGrad = ctx.createRadialGradient(600, tY + 360, 40, 600, tY + 360, 260);
-      sprayGrad.addColorStop(0, sticker.color ? `${sticker.color}35` : 'rgba(16, 185, 129, 0.35)');
-      sprayGrad.addColorStop(0.6, sticker.color ? `${sticker.color}10` : 'rgba(16, 185, 129, 0.10)');
-      sprayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = sprayGrad;
-      ctx.beginPath();
-      ctx.arc(600, tY + 360, 260, 0, Math.PI * 2);
-      ctx.fill();
 
       // 5. Draw glowing colored border matching sticker color
       ctx.save();
@@ -1152,25 +1141,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.strokeRect(tX, tY, tW, tH);
       ctx.restore();
 
-      // 6. Header Action Title
+      // 6. Header Action Title Pill (slanted)
+      ctx.save();
+      ctx.translate(600, tY + 90);
+      ctx.rotate(-2 * Math.PI / 180);
+      ctx.fillStyle = sticker.color || '#10b981';
+      const pillText = 'GEMEISTERT!';
+      ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
+      const pillTextWidth = ctx.measureText(pillText).width;
+      const pillW = pillTextWidth + 40;
+      const pillH = 46;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
+      } else {
+        ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
+      }
+      ctx.fill();
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'black 40px "Arial Black", "Helvetica Neue", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('CHALLENGE GEMEISTERT!', 600, tY + 90);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pillText, 0, 0);
+      ctx.restore();
 
       // 7. Student Details
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
 
       if (studentInstrument) {
         ctx.fillStyle = '#94a3b8';
-        ctx.font = '800 22px "Helvetica Neue", Inter, sans-serif';
+        ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
         ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
       }
 
       ctx.fillStyle = sticker.color || '#10b981';
-      ctx.font = 'black 48px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
 
       ctx.fillStyle = '#cbd5e1';
@@ -1184,9 +1191,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const badgeW = textWidth + 60;
       const badgeH = 54;
       const badgeX = 600 - badgeW / 2;
-      const badgeY = tY + 915;
+      const badgeY = tY + 900;
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1203,52 +1210,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.textBaseline = 'middle';
       ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
       ctx.textBaseline = 'alphabetic'; // reset
+
+      // 9. Website URL footer (Dark Mode)
+      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('campus-groovelab.de', 600, tY + 985);
     } else if (shareCardLayout === 'light') {
       // 1. Draw premium light background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1200, 1200);
 
-      // 1. Draw solid light grey background
-      ctx.fillStyle = '#f3f4f6';
+      // Draw Spotify Wrapped slanted color splash (light mode)
+      ctx.save();
+      ctx.translate(600, 600);
+      ctx.rotate(-12 * Math.PI / 180);
+      const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
+      gradient.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(16, 185, 129, 0.25)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(-800, -800, 1600, 600);
+      ctx.restore();
+
+      // Draw large slanted backdrop text overlay (light mode)
+      ctx.save();
+      ctx.translate(600, 600);
+      ctx.rotate(-12 * Math.PI / 180);
+      ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
+      ctx.fillStyle = sticker.color ? `${sticker.color}10` : 'rgba(16, 185, 129, 0.10)';
+      ctx.textAlign = 'center';
+      ctx.fillText(sticker.title.toUpperCase(), 0, 20);
+      ctx.restore();
+
+      // 1. Draw solid light grey background card container
+      ctx.fillStyle = '#f8fafc';
       ctx.fillRect(tX, tY, tW, tH);
-
-      // 2. Draw brick wall seams for urban texture (light mode)
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.02)';
-      ctx.lineWidth = 2.5;
-      for (let brickY = tY; brickY < tY + tH; brickY += 80) {
-        ctx.beginPath();
-        ctx.moveTo(tX, brickY);
-        ctx.lineTo(tX + tW, brickY);
-        ctx.stroke();
-        
-        const shift = Math.floor((brickY - tY) / 80) % 2 === 0 ? 0 : 120;
-        for (let brickX = tX + shift; brickX < tX + tW; brickX += 240) {
-          ctx.beginPath();
-          ctx.moveTo(brickX, brickY);
-          ctx.lineTo(brickX, brickY + 80);
-          ctx.stroke();
-        }
-      }
-
-      // 3. Draw concrete sand grain noise texture (light mode)
-      for (let i = 0; i < 600; i++) {
-        const px = tX + Math.random() * tW;
-        const py = tY + Math.random() * tH;
-        const size = Math.random() * 2 + 1;
-        const opacity = Math.random() * 0.04;
-        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`;
-        ctx.fillRect(px, py, size, size);
-      }
-
-      // 4. Draw spray paint blowout behind sticker (light mode)
-      const sprayGrad = ctx.createRadialGradient(600, tY + 360, 40, 600, tY + 360, 260);
-      sprayGrad.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(16, 185, 129, 0.25)');
-      sprayGrad.addColorStop(0.6, sticker.color ? `${sticker.color}08` : 'rgba(16, 185, 129, 0.08)');
-      sprayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = sprayGrad;
-      ctx.beginPath();
-      ctx.arc(600, tY + 360, 260, 0, Math.PI * 2);
-      ctx.fill();
 
       // 5. Draw glowing colored border matching sticker color (light mode)
       ctx.save();
@@ -1259,25 +1255,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.strokeRect(tX, tY, tW, tH);
       ctx.restore();
 
-      // 6. Header Action Title
-      ctx.fillStyle = '#1e293b';
-      ctx.font = 'black 40px "Arial Black", "Helvetica Neue", sans-serif';
+      // 6. Header Action Title Pill (slanted - light mode)
+      ctx.save();
+      ctx.translate(600, tY + 90);
+      ctx.rotate(-2 * Math.PI / 180);
+      ctx.fillStyle = sticker.color || '#10b981';
+      const pillText = 'GEMEISTERT!';
+      ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
+      const pillTextWidth = ctx.measureText(pillText).width;
+      const pillW = pillTextWidth + 40;
+      const pillH = 46;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
+      } else {
+        ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
+      }
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText('CHALLENGE GEMEISTERT!', 600, tY + 90);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pillText, 0, 0);
+      ctx.restore();
 
       // 7. Student Details
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
 
       if (studentInstrument) {
         ctx.fillStyle = '#64748b';
-        ctx.font = '800 22px "Helvetica Neue", Inter, sans-serif';
+        ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
         ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
       }
 
       ctx.fillStyle = sticker.color || '#10b981';
-      ctx.font = 'black 48px "Arial Black", "Helvetica Neue", sans-serif';
+      ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
 
       ctx.fillStyle = '#475569';
@@ -1291,9 +1305,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const badgeW = textWidth + 60;
       const badgeH = 54;
       const badgeX = 600 - badgeW / 2;
-      const badgeY = tY + 915;
+      const badgeY = tY + 900;
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1310,6 +1324,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.textBaseline = 'middle';
       ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
       ctx.textBaseline = 'alphabetic'; // reset
+
+      // 9. Website URL footer (Light Mode)
+      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('campus-groovelab.de', 600, tY + 985);
     }
 
     // Helper stenciled/slapped sticker asset loader
@@ -2007,18 +2027,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         { id: 'fleiss-pionier', value: isDemoMode ? 5 : 50, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
         { id: 'uebe-meister', value: isDemoMode ? 15 : 250, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
         { id: 'uebe-legende', value: isDemoMode ? 30 : 1000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-grossmeister', value: isDemoMode ? 40 : 2000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
 
         { id: 'xp-sammler', value: isDemoMode ? 50 : 250, current: studentXP, context: `${studentXP} XP erreicht` },
         { id: 'xp-champion', value: isDemoMode ? 150 : 1000, current: studentXP, context: `${studentXP} XP erreicht` },
         { id: 'xp-meister', value: isDemoMode ? 300 : 2500, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-legende', value: isDemoMode ? 500 : 5000, current: studentXP, context: `${studentXP} XP erreicht` },
 
         { id: 'dranbleiber', value: isDemoMode ? 1 : 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
         { id: 'wochen-held', value: isDemoMode ? 2 : 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
         { id: 'streak-koenig', value: isDemoMode ? 3 : 21, current: studentStreak, context: `${studentStreak} Tage Streak` },
+        { id: 'streak-kaiser', value: isDemoMode ? 4 : 30, current: studentStreak, context: `${studentStreak} Tage Streak` },
 
         { id: 'erster-erfolg', value: 1, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
         { id: 'song-sammler', value: isDemoMode ? 2 : 3, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'repertoire-riese', value: isDemoMode ? 3 : 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
+        { id: 'repertoire-riese', value: isDemoMode ? 3 : 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
+        { id: 'repertoire-gigant', value: isDemoMode ? 4 : 10, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
       ];
 
       for (const award of autoAwards) {
@@ -6449,12 +6473,80 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </span>
           </div>
 
+          {/* XP-Legende Panel */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: '20px',
-            width: '100%'
+            background: useNotebookLayout ? '#fefcf6' : 'white',
+            border: useNotebookLayout ? '1.5px solid #e5e0d4' : '1px solid #e2e8f0',
+            borderRadius: '20px',
+            padding: '20px',
+            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            marginBottom: '8px',
+            fontFamily: useNotebookLayout ? '"Kalam", "Comic Sans MS", cursive' : 'inherit',
+            zIndex: 10
           }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>🎮</span>
+              <strong style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
+                Campus-Groovelab XP-Legende (Wie du Punkte sammelst)
+              </strong>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '12px'
+            }}>
+              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>⏱️</span>
+                <div>
+                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Übe-Fokus</strong>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Pro Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
+                </div>
+              </div>
+              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>🎯</span>
+                <div>
+                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Tägliches Fokus-Ziel</strong>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus.</span>
+                </div>
+              </div>
+              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>🏆</span>
+                <div>
+                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Song meistern</strong>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <style>{`
+            .sticker-album-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 20px;
+              width: 100%;
+            }
+            @media (max-width: 1100px) {
+              .sticker-album-grid {
+                grid-template-columns: repeat(3, 1fr);
+              }
+            }
+            @media (max-width: 800px) {
+              .sticker-album-grid {
+                grid-template-columns: repeat(2, 1fr);
+              }
+            }
+            @media (max-width: 500px) {
+              .sticker-album-grid {
+                grid-template-columns: 1fr;
+              }
+            }
+          `}</style>
+
+          <div className="sticker-album-grid">
             {ALL_STICKERS.map(st => {
               const info = collectedStickers[st.id] || { count: 0, details: [] };
               const isCollected = info.count > 0;
@@ -6522,7 +6614,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </button>
                   )}
 
-                  {isCollected && (
+                  {isCollected && (!st.auto || ['dranbleiber', 'wochen-held', 'streak-koenig', 'streak-kaiser'].includes(st.id)) && info.count > 1 && (
                     <div style={{
                       position: 'absolute',
                       top: '12px',
@@ -6757,9 +6849,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <div style={{
                       width: '320px',
                       height: '460px',
-                      background: '#121316', // street corner black
+                      background: '#09090b', // ultra dark zinc
                       borderRadius: '24px',
-                      border: '1.5px solid rgba(255,255,255,0.06)',
+                      border: '1.5px solid rgba(255,255,255,0.08)',
                       position: 'relative',
                       overflow: 'hidden',
                       display: 'flex',
@@ -6767,191 +6859,79 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       alignItems: 'center',
                       justifyContent: 'center',
                       padding: '16px',
-                      boxShadow: '0 20px 45px rgba(0,0,0,0.5)',
+                      boxShadow: '0 20px 45px rgba(0,0,0,0.6)',
                       animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }}>
-                      {/* Concrete Wall Grid backdrop representation */}
+                      {/* Spotify Wrapped dynamic background color splash */}
                       <div style={{
                         position: 'absolute',
-                        inset: 0,
-                        backgroundImage: `
-                          linear-gradient(rgba(255,255,255,0.008) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(255,255,255,0.008) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '24px 24px',
-                        opacity: 0.8
-                      }} />
-
-                      {/* Spray Paint Mist behind sticker */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '40%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '200px',
-                        height: '200px',
-                        background: `radial-gradient(circle, ${st.color || '#10b981'}30 0%, transparent 70%)`,
+                        top: '-40px',
+                        left: '-40px',
+                        width: '400px',
+                        height: '240px',
+                        background: `linear-gradient(135deg, ${(st.color || '#10b981')}45 0%, transparent 100%)`,
+                        transform: 'rotate(-12deg)',
                         pointerEvents: 'none',
                         zIndex: 1
                       }} />
 
-                      {/* Core Poster Box with Glowing colored border matching sticker */}
+                      {/* Giant slanted background text overlay */}
                       <div style={{
-                        width: '288px',
-                        height: '428px',
-                        background: '#1a1c22', // textured dark slate
-                        borderRadius: '20px',
-                        border: `3px solid ${st.color || '#10b981'}`,
-                        boxShadow: `0 0 20px ${(st.color || '#10b981')}40`,
-                        padding: '16px 12px 12px 12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        position: 'relative',
-                        zIndex: 2
+                        position: 'absolute',
+                        top: '120px',
+                        left: '-20px',
+                        fontSize: '3.6rem',
+                        fontWeight: 900,
+                        color: st.color || '#10b981',
+                        opacity: 0.06,
+                        transform: 'rotate(-12deg)',
+                        whiteSpace: 'nowrap',
+                        fontFamily: '"Montserrat", "Arial Black", sans-serif',
+                        textTransform: 'uppercase',
+                        pointerEvents: 'none',
+                        zIndex: 1
                       }}>
-                        {/* Action Headline */}
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ffffff', letterSpacing: '0.04em', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', textAlign: 'center' }}>
-                          CHALLENGE GEMEISTERT!
-                        </span>
-
-                        {/* Giant Sticker Display */}
-                        <div style={{
-                          width: '160px',
-                          height: '160px',
-                          borderRadius: '50%',
-                          border: '3px solid #ffffff',
-                          boxShadow: `0 0 25px ${(st.color || '#10b981')}80`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          margin: '18px 0',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          animation: 'floatSticker 4s ease-in-out infinite'
-                        }}>
-                          <img 
-                            src={`/stickers/${st.id}.png?v=1`} 
-                            alt={st.title} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = '3.5rem';
-                                span.innerText = st.emoji;
-                                parent.appendChild(span);
-                              }
-                            }}
-                          />
-                        </div>
-
-                        {/* Student Name */}
-                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#ffffff', textAlign: 'center' }}>
-                          {student.first_name} {student.last_name}
-                        </span>
-
-                        {/* Student Instrument */}
-                        {studentInstrument && (
-                          <span style={{ fontSize: '0.45rem', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.08em', marginTop: '1px', textTransform: 'uppercase' }}>
-                            {studentInstrument}
-                          </span>
-                        )}
-
-                        {/* Sticker Milestone Title */}
-                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: st.color || '#10b981', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', marginTop: '4px', textAlign: 'center' }}>
-                          {st.title}
-                        </span>
-
-                        {/* Challenge Description */}
-                        <p style={{ fontSize: '0.56rem', color: '#cbd5e1', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 8px', lineHeight: '1.3' }}>
-                          {st.desc}
-                        </p>
-
-                        {/* School Badge Pill at the bottom */}
-                        <div style={{
-                          marginTop: 'auto',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          borderRadius: '12px',
-                          padding: '4px 10px',
-                          fontSize: '0.44rem',
-                          fontWeight: 700,
-                          color: '#ffffff',
-                          letterSpacing: '0.04em',
-                          textTransform: 'uppercase'
-                        }}>
-                          {schoolName}
-                        </div>
+                        {st.title}
                       </div>
-                    </div>
-                  ) : (
-                    <div style={{
-                      width: '320px',
-                      height: '460px',
-                      background: '#ffffff', // pure white frame card
-                      borderRadius: '24px',
-                      border: '1.5px solid rgba(0,0,0,0.06)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '16px',
-                      boxShadow: '0 20px 45px rgba(0,0,0,0.1)',
-                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                    }}>
-                      {/* Concrete Wall Grid backdrop representation in light color */}
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        backgroundImage: `
-                          linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '24px 24px',
-                        opacity: 0.8
-                      }} />
 
-                      {/* Spray Paint Mist behind sticker (light background style) */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '40%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '200px',
-                        height: '200px',
-                        background: `radial-gradient(circle, ${st.color || '#10b981'}25 0%, transparent 70%)`,
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }} />
-
-                      {/* Core Poster Box with Glowing colored border matching sticker */}
+                      {/* Core Poster Box */}
                       <div style={{
                         width: '288px',
                         height: '428px',
-                        background: '#f9fafb', // textured light slate
+                        background: 'rgba(18, 18, 22, 0.75)', // semi-translucent dark glass
+                        backdropFilter: 'blur(16px)',
                         borderRadius: '20px',
-                        border: `3px solid ${st.color || '#10b981'}`,
-                        boxShadow: `0 0 20px ${(st.color || '#10b981')}20`,
-                        padding: '16px 12px 12px 12px',
+                        border: `2px solid ${(st.color || '#10b981')}dd`,
+                        boxShadow: `0 8px 32px ${(st.color || '#10b981')}20`,
+                        padding: '18px 12px 14px 12px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         position: 'relative',
                         zIndex: 2
                       }}>
-                        {/* Action Headline */}
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#1e293b', letterSpacing: '0.04em', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', textAlign: 'center' }}>
-                          CHALLENGE GEMEISTERT!
+                        {/* Action Headline Pill */}
+                        <span style={{ 
+                          fontSize: '0.6rem', 
+                          fontWeight: 900, 
+                          color: '#ffffff', 
+                          background: st.color || '#10b981',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          transform: 'rotate(-2deg) skewX(-6deg)',
+                          letterSpacing: '0.06em', 
+                          fontFamily: '"Arial Black", sans-serif', 
+                          textTransform: 'uppercase', 
+                          textAlign: 'center',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                        }}>
+                          GEMEISTERT!
                         </span>
 
                         {/* Giant Sticker Display */}
                         <div style={{
-                          width: '160px',
-                          height: '160px',
+                          width: '155px',
+                          height: '155px',
                           borderRadius: '50%',
                           border: '3px solid #ffffff',
                           boxShadow: `0 0 25px ${(st.color || '#10b981')}60`,
@@ -6981,41 +6961,251 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </div>
 
                         {/* Student Name */}
-                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#ffffff', textAlign: 'center', letterSpacing: '-0.01em' }}>
                           {student.first_name} {student.last_name}
                         </span>
 
                         {/* Student Instrument */}
                         {studentInstrument && (
-                          <span style={{ fontSize: '0.45rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', marginTop: '1px', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.45rem', fontWeight: 900, color: '#94a3b8', letterSpacing: '0.12em', marginTop: '2px', textTransform: 'uppercase' }}>
                             {studentInstrument}
                           </span>
                         )}
 
                         {/* Sticker Milestone Title */}
-                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: st.color || '#10b981', fontFamily: '"Arial Black", sans-serif', textTransform: 'uppercase', marginTop: '4px', textAlign: 'center' }}>
+                        <span style={{ 
+                          fontSize: '0.86rem', 
+                          fontWeight: 900, 
+                          color: st.color || '#10b981', 
+                          fontFamily: '"Arial Black", sans-serif', 
+                          textTransform: 'uppercase', 
+                          marginTop: '6px', 
+                          textAlign: 'center',
+                          transform: 'skewX(-6deg)'
+                        }}>
                           {st.title}
                         </span>
 
                         {/* Challenge Description */}
-                        <p style={{ fontSize: '0.56rem', color: '#475569', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 8px', lineHeight: '1.3' }}>
+                        <p style={{ fontSize: '0.56rem', color: '#cbd5e1', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 10px', lineHeight: '1.3' }}>
                           {st.desc}
                         </p>
 
-                        {/* School Badge Pill at the bottom */}
+                        {/* Footer Section */}
                         <div style={{
                           marginTop: 'auto',
-                          background: 'rgba(0, 0, 0, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
-                          borderRadius: '12px',
-                          padding: '4px 10px',
-                          fontSize: '0.44rem',
-                          fontWeight: 700,
-                          color: '#1e293b',
-                          letterSpacing: '0.04em',
-                          textTransform: 'uppercase'
+                          width: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '6px',
+                          zIndex: 3
                         }}>
-                          {schoolName}
+                          <div style={{
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '12px',
+                            padding: '3px 10px',
+                            fontSize: '0.42rem',
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase'
+                          }}>
+                            {schoolName}
+                          </div>
+                          <span style={{
+                            fontSize: '0.56rem',
+                            fontWeight: 900,
+                            color: st.color || '#10b981',
+                            letterSpacing: '0.06em',
+                            textTransform: 'lowercase',
+                            fontFamily: '"Arial Black", sans-serif'
+                          }}>
+                            campus-groovelab.de
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: '320px',
+                      height: '460px',
+                      background: '#ffffff', // clean white
+                      borderRadius: '24px',
+                      border: '1.5px solid rgba(0,0,0,0.06)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '16px',
+                      boxShadow: '0 20px 45px rgba(0,0,0,0.12)',
+                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                      {/* Spotify Wrapped dynamic background color splash (light mode) */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '-40px',
+                        left: '-40px',
+                        width: '400px',
+                        height: '240px',
+                        background: `linear-gradient(135deg, ${(st.color || '#10b981')}25 0%, transparent 100%)`,
+                        transform: 'rotate(-12deg)',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }} />
+
+                      {/* Giant slanted background text overlay (light mode) */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '120px',
+                        left: '-20px',
+                        fontSize: '3.6rem',
+                        fontWeight: 900,
+                        color: st.color || '#10b981',
+                        opacity: 0.05,
+                        transform: 'rotate(-12deg)',
+                        whiteSpace: 'nowrap',
+                        fontFamily: '"Montserrat", "Arial Black", sans-serif',
+                        textTransform: 'uppercase',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}>
+                        {st.title}
+                      </div>
+
+                      {/* Core Poster Box (Light) */}
+                      <div style={{
+                        width: '288px',
+                        height: '428px',
+                        background: 'rgba(250, 250, 250, 0.85)',
+                        backdropFilter: 'blur(16px)',
+                        borderRadius: '20px',
+                        border: `2px solid ${(st.color || '#10b981')}bb`,
+                        boxShadow: `0 8px 32px ${(st.color || '#10b981')}15`,
+                        padding: '18px 12px 14px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        position: 'relative',
+                        zIndex: 2
+                      }}>
+                        {/* Action Headline Pill (Light) */}
+                        <span style={{ 
+                          fontSize: '0.6rem', 
+                          fontWeight: 900, 
+                          color: '#ffffff', 
+                          background: st.color || '#10b981',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          transform: 'rotate(-2deg) skewX(-6deg)',
+                          letterSpacing: '0.06em', 
+                          fontFamily: '"Arial Black", sans-serif', 
+                          textTransform: 'uppercase', 
+                          textAlign: 'center',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        }}>
+                          GEMEISTERT!
+                        </span>
+
+                        {/* Giant Sticker Display */}
+                        <div style={{
+                          width: '155px',
+                          height: '155px',
+                          borderRadius: '50%',
+                          border: '3px solid #ffffff',
+                          boxShadow: `0 0 25px ${(st.color || '#10b981')}45`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '18px 0',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          animation: 'floatSticker 4s ease-in-out infinite'
+                        }}>
+                          <img 
+                            src={`/stickers/${st.id}.png?v=1`} 
+                            alt={st.title} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = '3.5rem';
+                                span.innerText = st.emoji;
+                                parent.appendChild(span);
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {/* Student Name */}
+                        <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', textAlign: 'center', letterSpacing: '-0.01em' }}>
+                          {student.first_name} {student.last_name}
+                        </span>
+
+                        {/* Student Instrument */}
+                        {studentInstrument && (
+                          <span style={{ fontSize: '0.45rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.12em', marginTop: '2px', textTransform: 'uppercase' }}>
+                            {studentInstrument}
+                          </span>
+                        )}
+
+                        {/* Sticker Milestone Title */}
+                        <span style={{ 
+                          fontSize: '0.86rem', 
+                          fontWeight: 900, 
+                          color: st.color || '#10b981', 
+                          fontFamily: '"Arial Black", sans-serif', 
+                          textTransform: 'uppercase', 
+                          marginTop: '6px', 
+                          textAlign: 'center',
+                          transform: 'skewX(-6deg)'
+                        }}>
+                          {st.title}
+                        </span>
+
+                        {/* Challenge Description */}
+                        <p style={{ fontSize: '0.56rem', color: '#475569', fontWeight: 700, margin: '4px 0 0 0', textAlign: 'center', padding: '0 10px', lineHeight: '1.3' }}>
+                          {st.desc}
+                        </p>
+
+                        {/* Footer Section */}
+                        <div style={{
+                          marginTop: 'auto',
+                          width: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '6px',
+                          zIndex: 3
+                        }}>
+                          <div style={{
+                            background: 'rgba(0, 0, 0, 0.04)',
+                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                            borderRadius: '12px',
+                            padding: '3px 10px',
+                            fontSize: '0.42rem',
+                            fontWeight: 800,
+                            color: '#1e293b',
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase'
+                          }}>
+                            {schoolName}
+                          </div>
+                          <span style={{
+                            fontSize: '0.56rem',
+                            fontWeight: 900,
+                            color: st.color || '#10b981',
+                            letterSpacing: '0.06em',
+                            textTransform: 'lowercase',
+                            fontFamily: '"Arial Black", sans-serif'
+                          }}>
+                            campus-groovelab.de
+                          </span>
                         </div>
                       </div>
                     </div>

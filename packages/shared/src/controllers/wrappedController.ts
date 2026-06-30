@@ -9,23 +9,23 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 const STAGES: Record<string, Record<number, { name: string; assetPath: string; xpThreshold: number }>> = {
   guitarist: {
     1: { name: 'Garagen-Gitarrist', assetPath: '/avatars/hero_guitarist_lvl1.png', xpThreshold: 0 },
-    2: { name: 'Band-Mitglied', assetPath: '/avatars/hero_guitarist_lvl2.png', xpThreshold: 100 },
-    3: { name: 'Rockstar', assetPath: '/avatars/hero_guitarist_lvl3.png', xpThreshold: 300 }
+    2: { name: 'Band-Mitglied', assetPath: '/avatars/hero_guitarist_lvl2.png', xpThreshold: 500 },
+    3: { name: 'Rockstar', assetPath: '/avatars/hero_guitarist_lvl3.png', xpThreshold: 2500 }
   },
   drummer: {
     1: { name: 'Takt-Anfänger', assetPath: '/avatars/hero_drummer_lvl1.png', xpThreshold: 0 },
-    2: { name: 'Studio-Drummer', assetPath: '/avatars/hero_drummer_lvl2.png', xpThreshold: 100 },
-    3: { name: 'Rhythmus-Gott', assetPath: '/avatars/hero_drummer_lvl3.png', xpThreshold: 300 }
+    2: { name: 'Studio-Drummer', assetPath: '/avatars/hero_drummer_lvl2.png', xpThreshold: 500 },
+    3: { name: 'Rhythmus-Gott', assetPath: '/avatars/hero_drummer_lvl3.png', xpThreshold: 2500 }
   },
   keyboardist: {
     1: { name: 'Melodien-Sucher', assetPath: '/avatars/hero_keys_lvl1.png', xpThreshold: 0 },
-    2: { name: 'Synthie-Pionier', assetPath: '/avatars/hero_keys_lvl2.png', xpThreshold: 100 },
-    3: { name: 'Tasten-Virtuose', assetPath: '/avatars/hero_keys_lvl3.png', xpThreshold: 300 }
+    2: { name: 'Synthie-Pionier', assetPath: '/avatars/hero_keys_lvl2.png', xpThreshold: 500 },
+    3: { name: 'Tasten-Virtuose', assetPath: '/avatars/hero_keys_lvl3.png', xpThreshold: 2500 }
   },
   vocalist: {
     1: { name: 'Dusch-Sänger', assetPath: '/avatars/hero_vocals_lvl1.png', xpThreshold: 0 },
-    2: { name: 'Bühnen-Neuling', assetPath: '/avatars/hero_vocals_lvl2.png', xpThreshold: 100 },
-    3: { name: 'Stimm-König/in', assetPath: '/avatars/hero_vocals_lvl3.png', xpThreshold: 300 }
+    2: { name: 'Bühnen-Neuling', assetPath: '/avatars/hero_vocals_lvl2.png', xpThreshold: 500 },
+    3: { name: 'Stimm-König/in', assetPath: '/avatars/hero_vocals_lvl3.png', xpThreshold: 2500 }
   }
 };
 
@@ -238,7 +238,7 @@ export async function completeDetoxSessionHandler(req: Request, res: Response): 
           newStreak = 1;
         }
         streakIncremented = true;
-        xpAdded = 100; // Payout 100 XP for hitting daily focus milestone
+        xpAdded = 10; // Payout 10 XP for hitting daily focus milestone
       }
     }
 

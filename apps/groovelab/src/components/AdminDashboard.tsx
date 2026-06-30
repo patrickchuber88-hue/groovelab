@@ -1904,8 +1904,15 @@ export function AdminDashboard({
       setTimeout(() => {
         if (calendarScrollRef.current) {
           const now = new Date();
-          const currentHour = now.getHours();
-          const currentMin = now.getMinutes();
+          let currentHour = now.getHours();
+          let currentMin = now.getMinutes();
+
+          if (isDateFilterActive && bookingStartTime) {
+            const [h, m] = bookingStartTime.split(':');
+            currentHour = parseInt(h, 10) || currentHour;
+            currentMin = parseInt(m, 10) || currentMin;
+          }
+
           if (currentHour >= 8 && currentHour <= 22) {
             const rowHeight = 56;
             const hoursSinceStart = currentHour - 8;
@@ -1917,7 +1924,7 @@ export function AdminDashboard({
         }
       }, 150);
     }
-  }, [activeTab, selectedCampusRoomId]);
+  }, [activeTab, selectedCampusRoomId, isDateFilterActive, bookingStartTime]);
 
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
@@ -5860,6 +5867,10 @@ export function AdminDashboard({
       const sundayOfSelectedWeek = new Date(mondayOfSelectedWeek);
       sundayOfSelectedWeek.setUTCDate(mondayOfSelectedWeek.getUTCDate() + 6);
 
+      const DAYS_MAP = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const targetDay = DAYS_MAP[dayIdx];
+      const targetDayInt = dayIdx + 1; // 1 = Monday, 7 = Sunday
+
       // 1. Manual bookings
       const manualForSlot = campusBookings.filter((b: any) => {
         if (b.roomId !== selectedRoom.id) return false;
@@ -6000,9 +6011,6 @@ export function AdminDashboard({
       });
 
       // 2. Weekly recurring schedules
-      const DAYS_MAP = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const targetDay = DAYS_MAP[dayIdx];
-      const targetDayInt = dayIdx + 1; // 1 = Monday, 7 = Sunday
       const schedulesForSlot = mergedSchedules.filter((s: any) => {
         if (s.room_id !== selectedRoom.id) return false;
         
@@ -6670,6 +6678,37 @@ export function AdminDashboard({
         }
       }
 
+      setSelectedBooking(null);
+      setBookingPurpose('');
+      setBookingStudentId('');
+      setStudentSearchTerm('');
+      setIsDateFilterActive(false);
+      setShowPreviewField(false);
+      setRecurringInterval(1);
+    };
+
+    const handleDeleteBooking = async () => {
+      if (!selectedBooking || selectedBooking.isSchedule) return;
+      
+      const confirmDelete = window.confirm('Möchtest du diesen Termin wirklich löschen?');
+      if (!confirmDelete) return;
+      
+      try {
+        const { error } = await supabase
+          .from('room_bookings')
+          .delete()
+          .eq('id', selectedBooking.id);
+          
+        if (error) throw error;
+        
+        window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        await fetchData();
+      } catch (dbErr: any) {
+        console.error('Error deleting room booking:', dbErr);
+        alert('Fehler beim Löschen der Raumbuchung: ' + dbErr.message);
+        return;
+      }
+      
       setSelectedBooking(null);
       setBookingPurpose('');
       setBookingStudentId('');
@@ -8238,12 +8277,13 @@ export function AdminDashboard({
                         key={b.id}
                         onClick={() => {
                           setBookingDate(b.date);
+                          setSelectedFloor('Alle');
                           setSelectedCampusRoomId(b.roomId);
                           setSelectedBooking(b);
                           setBookingStartTime(b.startTime);
                           setBookingEndTime(b.endTime);
                           setBookingPurpose(b.purpose || '');
-                          setIsDateFilterActive(true);
+                          setIsDateFilterActive(false);
                           setShowMyBookingsOnly(false);
                         }}
                         style={{
@@ -8706,6 +8746,38 @@ export function AdminDashboard({
                       : `${selectedRoom.name} buchen`}
 
                 </button>
+
+                {isEditing && !selectedBooking?.isSchedule && (
+                  <button
+                    onClick={handleDeleteBooking}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: '#ea4335',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      marginTop: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      height: '38px',
+                      boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#d32f2f';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#ea4335';
+                    }}
+                  >
+                    Termin löschen
+                  </button>
+                )}
 
               </div>
             )}

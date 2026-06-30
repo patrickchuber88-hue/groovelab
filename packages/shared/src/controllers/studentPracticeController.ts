@@ -132,23 +132,23 @@ export async function finishSessionHandler(req: Request, res: Response): Promise
       const STAGES: Record<string, Record<number, { xpThreshold: number; assetPath: string }>> = {
         guitarist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_guitarist_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_guitarist_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_guitarist_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_guitarist_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_guitarist_lvl3.png' }
         },
         drummer: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_drummer_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_drummer_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_drummer_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_drummer_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_drummer_lvl3.png' }
         },
         keyboardist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_keys_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_keys_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_keys_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_keys_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_keys_lvl3.png' }
         },
         vocalist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_vocals_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_vocals_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_vocals_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_vocals_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_vocals_lvl3.png' }
         }
       };
 
@@ -355,23 +355,23 @@ export async function sessionEndHandler(req: Request, res: Response): Promise<vo
       const STAGES: Record<string, Record<number, { xpThreshold: number; assetPath: string }>> = {
         guitarist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_guitarist_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_guitarist_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_guitarist_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_guitarist_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_guitarist_lvl3.png' }
         },
         drummer: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_drummer_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_drummer_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_drummer_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_drummer_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_drummer_lvl3.png' }
         },
         keyboardist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_keys_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_keys_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_keys_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_keys_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_keys_lvl3.png' }
         },
         vocalist: {
           1: { xpThreshold: 0, assetPath: '/avatars/hero_vocals_lvl1.png' },
-          2: { xpThreshold: 100, assetPath: '/avatars/hero_vocals_lvl2.png' },
-          3: { xpThreshold: 300, assetPath: '/avatars/hero_vocals_lvl3.png' }
+          2: { xpThreshold: 500, assetPath: '/avatars/hero_vocals_lvl2.png' },
+          3: { xpThreshold: 2500, assetPath: '/avatars/hero_vocals_lvl3.png' }
         }
       };
 

@@ -877,77 +877,30 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           boxSizing: 'border-box'
         }}>
           {activePortalTab === 'briefing' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
-              {/* Header Panel */}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              {/* Header Panel - Greeting */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Aktivierungs-Center
+                  <h2 style={{ fontSize: '2.4rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                    Guten Morgen, Patrick.
                   </h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', color: '#64748b', fontWeight: 550 }}>
-                    Zahlungseingänge abgleichen und Schüler-Zugänge dauerhaft freischalten.
+                  <p style={{ margin: '6px 0 0 0', fontSize: '1rem', color: '#64748b', fontWeight: 500 }}>
+                    Hier ist dein System-Briefing für heute.
                   </p>
                 </div>
                 
-                {/* Refresh and selection counter info */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  {selectedUserIds.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 12px', borderRadius: '12px' }}>
-                        {selectedUserIds.length} Schüler ausgewählt
-                      </span>
-                      <button
-                        onClick={() => handleBatchActivateUsers(selectedUserIds)}
-                        disabled={loadingPending}
-                        style={{
-                          padding: '10px 16px',
-                          borderRadius: '12px',
-                          background: '#10b981',
-                          border: 'none',
-                          color: '#ffffff',
-                          fontSize: '0.85rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'; }}
-                      >
-                        Ausgewählte freischalten ({selectedUserIds.length})
-                      </button>
-                      <button
-                        onClick={() => setSelectedUserIds([])}
-                        style={{
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          background: '#f1f5f9',
-                          border: 'none',
-                          color: '#64748b',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Auswahl aufheben
-                      </button>
-                    </div>
-                  )}
-
                   <button
                     onClick={fetchPendingUsers}
                     disabled={loadingPending}
                     style={{
-                      padding: '10px 16px',
-                      borderRadius: '12px',
+                      padding: '12px 18px',
+                      borderRadius: '14px',
                       background: '#ffffff',
                       border: '1px solid rgba(15, 23, 42, 0.08)',
                       color: '#475569',
-                      fontSize: '0.88rem',
+                      fontSize: '0.9rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
@@ -957,12 +910,14 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       transition: 'all 0.2s'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#0f172a';
+                      e.currentTarget.style.background = '#ea4335';
                       e.currentTarget.style.color = '#ffffff';
+                      e.currentTarget.style.borderColor = '#ea4335';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = '#ffffff';
                       e.currentTarget.style.color = '#475569';
+                      e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
                     }}
                   >
                     <RefreshCw size={14} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
@@ -970,478 +925,942 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 </div>
               </div>
 
-              {/* Stats Cards Dashboard */}
+              {/* Stats Cards Dashboard (System Overview) */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '20px'
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '24px'
               }}>
+                {/* Total Schools */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.05)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Clock size={20} />
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'transform 0.2s',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Layers size={24} />
                   </div>
                   <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offene Aktivierungen</span>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>{pendingUsers.length}</strong>
+                    <strong style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block' }}>{stats.totalSchools}</strong>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schulen</span>
                   </div>
                 </div>
 
+                {/* Total Teachers */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.05)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Tag size={20} />
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'transform 0.2s',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Award size={24} />
                   </div>
                   <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verwendungszweck</span>
-                    <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#10b981', fontFamily: 'monospace' }}>CG-[Ausweisnummer]</strong>
+                    <strong style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block' }}>{stats.totalTeachers}</strong>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lehrkräfte</span>
                   </div>
                 </div>
 
+                {/* Total Students */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: '1px solid rgba(15, 23, 42, 0.05)',
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.08)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Shield size={20} />
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'transform 0.2s',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Users size={24} />
                   </div>
                   <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zahlungsmodell</span>
-                    <strong style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f59e0b' }}>Selbstzahler / Überweisung</strong>
+                    <strong style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block' }}>{stats.totalStudents}</strong>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler</span>
+                  </div>
+                </div>
+
+                {/* Pending Activations (Red Highlight) */}
+                <div style={{
+                  background: pendingUsers.length > 0 ? 'rgba(234, 67, 53, 0.05)' : 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  border: pendingUsers.length > 0 ? '1px solid rgba(234, 67, 53, 0.2)' : '1px solid rgba(15, 23, 42, 0.05)',
+                  boxShadow: pendingUsers.length > 0 ? '0 10px 30px rgba(234, 67, 53, 0.1)' : '0 10px 30px rgba(15, 23, 42, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'transform 0.2s',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: pendingUsers.length > 0 ? 'rgba(234, 67, 53, 0.15)' : 'rgba(100, 116, 139, 0.1)', color: pendingUsers.length > 0 ? '#ea4335' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '2rem', fontWeight: 900, color: pendingUsers.length > 0 ? '#ea4335' : '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block' }}>{pendingUsers.length}</strong>
+                    <span style={{ fontSize: '0.85rem', color: pendingUsers.length > 0 ? '#ea4335' : '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausstehende Aktivierungen</span>
                   </div>
                 </div>
               </div>
 
-              {/* Main Interactive Split-Screen Container */}
-              <div style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch' }}>
-                
-                {/* Left Pane: List of pending users */}
-                <div style={{
-                  flex: '0 0 45%',
-                  background: 'rgba(255, 255, 255, 0.75)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '24px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.02)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
-                }}>
-                  {/* Search Bar inside pane */}
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)', position: 'relative' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '32px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type="text"
-                      value={pendingSearchQuery}
-                      onChange={(e) => setPendingSearchQuery(e.target.value)}
-                      placeholder="Suche Name, Schule, Ausweis-Nr..."
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '10px 14px 10px 36px',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(15, 23, 42, 0.08)',
-                        background: '#f8fafc',
-                        color: '#0f172a',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        outline: 'none',
-                        transition: 'all 0.2s'
-                      }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#ffffff'; }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)'; e.currentTarget.style.background = '#f8fafc'; }}
-                    />
-                  </div>
-
-                  {/* Bulk Select Utility bar */}
-                  <div style={{
-                    padding: '8px 20px',
-                    background: '#f8fafc',
-                    borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8rem',
-                    color: '#64748b',
-                    fontWeight: 600
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={pendingUsers.length > 0 && selectedUserIds.length === pendingUsers.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUserIds(pendingUsers.map(u => u.id));
-                          } else {
-                            setSelectedUserIds([]);
-                          }
-                        }}
-                        style={{ width: '15px', height: '15px', borderRadius: '4px', cursor: 'pointer' }}
-                      />
-                      <span>Alle auswählen ({pendingUsers.length})</span>
-                    </label>
-                  </div>
-
-                  {/* Scrollable list */}
-                  <div style={{ flex: 1, overflowY: 'auto', maxHeight: '420px', padding: '10px' }}>
-                    {loadingPending ? (
-                      <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '28px', height: '28px', border: '3px solid rgba(59, 130, 246, 0.1)', borderTopColor: '#3b82f6', borderRadius: '50%' }} className="animate-spin" />
-                        <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Lade Schüler...</span>
-                      </div>
-                    ) : (
-                      (() => {
-                        const filtered = pendingUsers.filter(u => {
-                          const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
-                          const schoolName = (schools.find(s => s.id === u.school_id)?.name || '').toLowerCase();
-                          const refCode = `CG-${u.ausweis_nummer || ''}`.toLowerCase();
-                          const query = pendingSearchQuery.toLowerCase();
-                          return name.includes(query) || schoolName.includes(query) || refCode.includes(query);
-                        });
-
-                        if (filtered.length === 0) {
-                          return (
-                            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                              <Check size={28} style={{ color: '#10b981', marginBottom: '8px' }} />
-                              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Keine Einträge gefunden</div>
-                              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Alle Zahlungen sind verarbeitet.</div>
-                            </div>
-                          );
-                        }
-
-                        return filtered.map(u => {
-                          const school = schools.find(s => s.id === u.school_id);
-                          const isSelected = selectedUserIds.includes(u.id);
-                          const isFocused = selectedUser?.id === u.id;
-                          
-                          // Format creation date
-                          const ageStr = u.created_at ? (() => {
-                            const diff = Date.now() - new Date(u.created_at).getTime();
-                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                            if (days === 0) return 'Heute';
-                            if (days === 1) return 'Gestern';
-                            return `Vor ${days} Tagen`;
-                          })() : '';
-
-                          return (
-                            <div
-                              key={u.id}
-                              onClick={() => setSelectedUser(u)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '12px',
-                                borderRadius: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                background: isFocused ? 'rgba(59, 130, 246, 0.06)' : 'transparent',
-                                border: isFocused ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
-                                marginBottom: '6px'
-                              }}
-                              className="activation-list-item"
-                              onMouseOver={(e) => { if (!isFocused) e.currentTarget.style.background = '#f8fafc'; }}
-                              onMouseOut={(e) => { if (!isFocused) e.currentTarget.style.background = 'transparent'; }}
-                            >
-                              {/* Selection Checkbox */}
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedUserIds(prev => [...prev, u.id]);
-                                  } else {
-                                    setSelectedUserIds(prev => prev.filter(id => id !== u.id));
-                                  }
-                                }}
-                                style={{ width: '16px', height: '16px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0 }}
-                              />
-
-                              {/* Student Initials Avatar */}
-                              <div style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '50%',
-                                background: school?.primary_color ? `${school.primary_color}15` : 'rgba(15, 23, 42, 0.05)',
-                                color: school?.primary_color || '#0f172a',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.85rem',
-                                fontWeight: 800,
-                                flexShrink: 0
-                              }}>
-                                {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
-                              </div>
-
-                              {/* User Info details */}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                                  <strong style={{ fontSize: '0.88rem', color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
-                                    {u.first_name} {u.last_name}
-                                  </strong>
-                                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>{ageStr}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                                  <span style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 750,
-                                    color: school?.primary_color || '#64748b',
-                                    background: school?.primary_color ? `${school.primary_color}0d` : '#f1f5f9',
-                                    padding: '2px 6px',
-                                    borderRadius: '6px',
-                                    textOverflow: 'ellipsis',
-                                    overflow: 'hidden',
-                                    whiteSpace: 'nowrap',
-                                    maxWidth: '130px'
-                                  }}>
-                                    {school?.name || 'Unbekannte Schule'}
-                                  </span>
-                                  <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 800, color: '#334155', background: '#e2e8f0', padding: '2px 6px', borderRadius: '6px' }}>
-                                    CG-{u.ausweis_nummer || 'OHNE'}
-                                  </span>
-                                  {!u.is_campus_active ? (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', background: '#dbeafe', padding: '2px 6px', borderRadius: '6px' }}>
-                                      Erstfreischaltung
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
-                                      Zahlung offen
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Pane: Detailed View and Actions */}
-                <div style={{
-                  flex: '0 0 55%',
-                  background: 'rgba(255, 255, 255, 0.75)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '24px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.02)',
-                  padding: '28px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: selectedUser ? 'flex-start' : 'center',
-                  alignItems: selectedUser ? 'stretch' : 'center',
-                  textAlign: selectedUser ? 'left' : 'center'
-                }}>
-                  {selectedUser ? (
-                    (() => {
-                      const u = selectedUser;
-                      const school = schools.find(s => s.id === u.school_id);
-                      const refCode = `CG-${u.ausweis_nummer || 'OHNE'}`;
-                      const isActivating = activatingUserId === u.id;
-                      
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }} className="animate-fade-in">
-                          {/* Profile Header */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
-                            <div style={{
-                              width: '56px',
-                              height: '56px',
-                              borderRadius: '50%',
-                              background: school?.primary_color ? `${school.primary_color}1a` : 'rgba(15, 23, 42, 0.05)',
-                              color: school?.primary_color || '#0f172a',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.25rem',
-                              fontWeight: 900
-                            }}>
-                              {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
-                            </div>
-                            <div>
-                              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                                {u.first_name} {u.last_name}
-                              </h3>
-                              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Rolle: Schüler (Campus-Groovelab)</span>
-                            </div>
-                          </div>
-
-                          {/* Details List */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div>
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Musikschule</span>
-                              <strong style={{ fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                                {school?.name || 'Unbekannte Schule'}
-                              </strong>
-                            </div>
-                            <div>
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zahlungsmethode</span>
-                              <strong style={{ fontSize: '0.88rem', color: '#334155', display: 'block', marginTop: '2px' }}>
-                                {u.student_billing_payment_method === 'bank_transfer' ? 'Überweisung (Vorkasse)' : u.student_billing_payment_method}
-                              </strong>
-                            </div>
-                          </div>
-
-                          {/* Reference Code Match Card (Apple-Style Highlight) */}
-                          <div style={{
-                            background: '#f8fafc',
-                            borderRadius: '16px',
-                            padding: '16px 20px',
-                            border: '1px solid rgba(15, 23, 42, 0.05)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px'
-                          }}>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Verwendungszweck für Kontomuster</span>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                              <code style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
-                                {refCode}
-                              </code>
-                              
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(refCode);
-                                  setCopiedCodeId(u.id);
-                                  setTimeout(() => setCopiedCodeId(null), 2000);
-                                }}
-                                style={{
-                                  background: copiedCodeId === u.id ? '#10b981' : '#ffffff',
-                                  color: copiedCodeId === u.id ? '#ffffff' : '#475569',
-                                  border: '1px solid rgba(15, 23, 42, 0.08)',
-                                  borderRadius: '10px',
-                                  padding: '8px 12px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  transition: 'all 0.2s',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
-                                }}
-                              >
-                                {copiedCodeId === u.id ? (
-                                  <>Copied ✓</>
-                                ) : (
-                                  <>
-                                    <Copy size={13} /> Kopieren
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Fee calculation details */}
-                          <div style={{
-                            background: 'rgba(59, 130, 246, 0.03)',
-                            border: '1px solid rgba(59, 130, 246, 0.1)',
-                            borderRadius: '16px',
-                            padding: '16px 20px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <div>
-                              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#1e3a8a' }}>Zu zahlender Gesamtbetrag:</strong>
-                              <span style={{ fontSize: '0.78rem', color: '#60a5fa', fontWeight: 650 }}>Monatliche Lizenzgebühr (inkl. MwSt.)</span>
-                            </div>
-                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e3a8a' }}>
-                              {priceStudent} €
-                            </span>
-                          </div>
-
-                          {/* Large Action Buttons */}
-                          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button
-                              onClick={() => handleActivateUser(u.id)}
-                              disabled={isActivating}
-                              style={{
-                                width: '100%',
-                                padding: '16px',
-                                borderRadius: '16px',
-                                background: '#10b981',
-                                border: 'none',
-                                color: '#ffffff',
-                                fontSize: '0.95rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.35)'; }}
-                              onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.25)'; }}
-                            >
-                              {isActivating ? 'Wird verarbeitet...' : (!u.is_campus_active ? 'Zahlung bestätigt & dauerhaft freischalten ✓' : 'Zahlung bestätigen ✓')}
-                            </button>
-
-                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#64748b', alignItems: 'center', justifyContent: 'center', marginTop: '6px' }}>
-                              <Shield size={12} style={{ color: '#10b981' }} />
-                              <span>Schaltet Campus-Groovelab &amp; alle Module sofort frei.</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div style={{ color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                      <div style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
-                        background: '#f8fafc',
-                        border: '1px solid rgba(15, 23, 42, 0.05)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#94a3b8'
-                      }}>
-                        <Users size={28} />
-                      </div>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
-                          Kein Schüler ausgewählt
-                        </h4>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550, maxWidth: '280px', lineHeight: 1.4 }}>
-                          Wähle einen Schüler aus der Liste aus, um Zahlungsdetails einzusehen und den Account freizuschalten.
-                        </p>
-                      </div>
-                    </div>
+              {/* Action Required: Aktivierungs-Center */}
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Aktionsbedarf</h3>
+                  {pendingUsers.length > 0 && (
+                    <span style={{ background: '#ea4335', color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      {pendingUsers.length} offen
+                    </span>
                   )}
                 </div>
 
-              </div>
+                {pendingUsers.length === 0 ? (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.6)',
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: '24px',
+                    border: '1px dashed rgba(15, 23, 42, 0.15)',
+                    padding: '60px 40px',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '16px'
+                  }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Check size={32} />
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>Alles erledigt!</h4>
+                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>Es liegen aktuell keine offenen Aktivierungen vor. Genieß den Tag.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch' }}>
+                    
+                    {/* Left Pane: List of pending users */}
+                    <div style={{
+                      flex: '0 0 45%',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(16px)',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(15, 23, 42, 0.06)',
+                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
+                    }}>
+                      {/* Batch Action Bar if selected */}
+                      {selectedUserIds.length > 0 && (
+                        <div style={{ padding: '12px 20px', background: 'rgba(234, 67, 53, 0.05)', borderBottom: '1px solid rgba(234, 67, 53, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ea4335' }}>
+                            {selectedUserIds.length} ausgewählt
+                          </span>
+                          <button
+                            onClick={() => handleBatchActivateUsers(selectedUserIds)}
+                            disabled={loadingPending}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              background: '#ea4335',
+                              border: 'none',
+                              color: '#ffffff',
+                              fontSize: '0.8rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: '0 4px 12px rgba(234, 67, 53, 0.3)',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 67, 53, 0.4)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 67, 53, 0.3)'; }}
+                          >
+                            Ausgewählte freischalten
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Search Bar inside pane */}
+                      <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)', position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '32px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                        <input
+                          type="text"
+                          value={pendingSearchQuery}
+                          onChange={(e) => setPendingSearchQuery(e.target.value)}
+                          placeholder="Suche Name, Schule, Ausweis-Nr..."
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 14px 10px 36px',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            background: '#f8fafc',
+                            color: '#0f172a',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            outline: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = '#ea4335'; e.currentTarget.style.background = '#ffffff'; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)'; e.currentTarget.style.background = '#f8fafc'; }}
+                        />
+                      </div>
+
+                      {/* Bulk Select Utility bar */}
+                      <div style={{
+                        padding: '10px 20px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.8rem',
+                        color: '#64748b',
+                        fontWeight: 600
+                      }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={pendingUsers.length > 0 && selectedUserIds.length === pendingUsers.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUserIds(pendingUsers.map(u => u.id));
+                              } else {
+                                setSelectedUserIds([]);
+                              }
+                            }}
+                            style={{ width: '16px', height: '16px', borderRadius: '4px', cursor: 'pointer', accentColor: '#ea4335' }}
+                          />
+                          <span>Alle {pendingUsers.length} auswählen</span>
+                        </label>
+                      </div>
+
+                      {/* Scrollable list */}
+                      <div style={{ flex: 1, overflowY: 'auto', maxHeight: '450px', padding: '12px' }}>
+                        {loadingPending ? (
+                          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '28px', height: '28px', border: '3px solid rgba(234, 67, 53, 0.1)', borderTopColor: '#ea4335', borderRadius: '50%' }} className="animate-spin" />
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Lade Schüler...</span>
+                          </div>
+                        ) : (
+                          (() => {
+                            const filtered = pendingUsers.filter(u => {
+                              const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
+                              const schoolName = (schools.find(s => s.id === u.school_id)?.name || '').toLowerCase();
+                              const refCode = `CG-${u.ausweis_nummer || ''}`.toLowerCase();
+                              const query = pendingSearchQuery.toLowerCase();
+                              return name.includes(query) || schoolName.includes(query) || refCode.includes(query);
+                            });
+
+                            if (filtered.length === 0) {
+                              return (
+                                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Keine Treffer</div>
+                                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Die Suche ergab keine Ergebnisse.</div>
+                                </div>
+                              );
+                            }
+
+                            return filtered.map(u => {
+                              const school = schools.find(s => s.id === u.school_id);
+                              const isSelected = selectedUserIds.includes(u.id);
+                              const isFocused = selectedUser?.id === u.id;
+                              
+                              // Format creation date
+                              const ageStr = u.created_at ? (() => {
+                                const diff = Date.now() - new Date(u.created_at).getTime();
+                                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                if (days === 0) return 'Heute';
+                                if (days === 1) return 'Gestern';
+                                return `Vor ${days} Tagen`;
+                              })() : '';
+
+                              return (
+                                <div
+                                  key={u.id}
+                                  onClick={() => setSelectedUser(u)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '14px',
+                                    padding: '14px',
+                                    borderRadius: '16px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                    background: isFocused ? 'rgba(234, 67, 53, 0.06)' : 'transparent',
+                                    border: isFocused ? '1px solid rgba(234, 67, 53, 0.15)' : '1px solid transparent',
+                                    marginBottom: '8px'
+                                  }}
+                                  className="activation-list-item"
+                                  onMouseOver={(e) => { if (!isFocused) e.currentTarget.style.background = '#f8fafc'; }}
+                                  onMouseOut={(e) => { if (!isFocused) e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                  {/* Selection Checkbox */}
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedUserIds(prev => [...prev, u.id]);
+                                      } else {
+                                        setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                                      }
+                                    }}
+                                    style={{ width: '18px', height: '18px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0, accentColor: '#ea4335' }}
+                                  />
+
+                                  {/* Student Initials Avatar */}
+                                  <div style={{
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '50%',
+                                    background: school?.primary_color ? `${school.primary_color}15` : 'rgba(15, 23, 42, 0.05)',
+                                    color: school?.primary_color || '#0f172a',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 800,
+                                    flexShrink: 0
+                                  }}>
+                                    {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
+                                  </div>
+
+                                  {/* User Info details */}
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                                      <strong style={{ fontSize: '0.95rem', color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
+                                        {u.first_name} {u.last_name}
+                                      </strong>
+                                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>{ageStr}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                      <span style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 750,
+                                        color: school?.primary_color || '#64748b',
+                                        background: school?.primary_color ? `${school.primary_color}0d` : '#f1f5f9',
+                                        padding: '4px 8px',
+                                        borderRadius: '8px',
+                                        textOverflow: 'ellipsis',
+                                        overflow: 'hidden',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '140px'
+                                      }}>
+                                        {school?.name || 'Unbekannte Schule'}
+                                      </span>
+                                      <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 800, color: '#334155', background: '#e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
+                                        CG-{u.ausweis_nummer || 'OHNE'}
+                                      </span>
+                                      {!u.is_campus_active ? (
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ea4335', background: 'rgba(234, 67, 53, 0.1)', padding: '4px 8px', borderRadius: '8px' }}>
+                                          Neu
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '4px 8px', borderRadius: '8px' }}>
+                                          Zahlung offen
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Pane: Detailed View and Actions */}
+                    <div style={{
+                      flex: '0 0 55%',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(16px)',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(15, 23, 42, 0.06)',
+                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
+                      padding: '32px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: selectedUser ? 'flex-start' : 'center',
+                      alignItems: selectedUser ? 'stretch' : 'center',
+                      textAlign: selectedUser ? 'left' : 'center'
+                    }}>
+                      {selectedUser ? (
+                        (() => {
+                          const u = selectedUser;
+                          const school = schools.find(s => s.id === u.school_id);
+                          const refCode = `CG-${u.ausweis_nummer || 'OHNE'}`;
+                          const isActivating = activatingUserId === u.id;
+                          
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }} className="animate-fade-in">
+                              {/* Profile Header */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
+                                <div style={{
+                                  width: '64px',
+                                  height: '64px',
+                                  borderRadius: '50%',
+                                  background: school?.primary_color ? `${school.primary_color}1a` : 'rgba(15, 23, 42, 0.05)',
+                                  color: school?.primary_color || '#0f172a',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1.4rem',
+                                  fontWeight: 900
+                                }}>
+                                  {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
+                                </div>
+                                <div>
+                                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
+                                    {u.first_name} {u.last_name}
+                                  </h3>
+                                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rolle: Schüler (Campus-Groovelab)</span>
+                                </div>
+                              </div>
+
+                              {/* Details List */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule</span>
+                                  <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                    {school?.name || 'Unbekannte Schule'}
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zahlungsmethode</span>
+                                  <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'block', marginTop: '4px' }}>
+                                    {u.student_billing_payment_method === 'bank_transfer' ? 'Überweisung (Vorkasse)' : u.student_billing_payment_method}
+                                  </strong>
+                                </div>
+                              </div>
+
+                              {/* Reference Code Match Card (Apple-Style Highlight) */}
+                              <div style={{
+                                background: '#f8fafc',
+                                borderRadius: '16px',
+                                padding: '20px 24px',
+                                border: '1px solid rgba(15, 23, 42, 0.05)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                              }}>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verwendungszweck für Kontomuster</span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                                  <code style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                                    {refCode}
+                                  </code>
+                                  
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(refCode);
+                                      setCopiedCodeId(u.id);
+                                      setTimeout(() => setCopiedCodeId(null), 2000);
+                                    }}
+                                    style={{
+                                      background: copiedCodeId === u.id ? '#ea4335' : '#ffffff',
+                                      color: copiedCodeId === u.id ? '#ffffff' : '#475569',
+                                      border: copiedCodeId === u.id ? '1px solid #ea4335' : '1px solid rgba(15, 23, 42, 0.08)',
+                                      borderRadius: '12px',
+                                      padding: '10px 16px',
+                                      fontSize: '0.85rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      transition: 'all 0.2s',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)'
+                                    }}
+                                  >
+                                    {copiedCodeId === u.id ? (
+                                      <>Kopiert ✓</>
+                                    ) : (
+                                      <>
+                                        <Copy size={14} /> Kopieren
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Fee calculation details */}
+                              <div style={{
+                                background: 'rgba(234, 67, 53, 0.03)',
+                                border: '1px solid rgba(234, 67, 53, 0.1)',
+                                borderRadius: '16px',
+                                padding: '20px 24px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <div>
+                                  <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b' }}>Zu zahlender Gesamtbetrag:</strong>
+                                  <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 650 }}>Monatliche Lizenzgebühr (inkl. MwSt.)</span>
+                                </div>
+                                <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#991b1b' }}>
+                                  {priceStudent} €
+                                </span>
+                              </div>
+
+                              {/* Large Action Buttons */}
+                              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <button
+                                  onClick={() => handleActivateUser(u.id)}
+                                  disabled={isActivating}
+                                  style={{
+                                    width: '100%',
+                                    padding: '18px',
+                                    borderRadius: '16px',
+                                    background: '#ea4335',
+                                    border: 'none',
+                                    color: '#ffffff',
+                                    fontSize: '1rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    boxShadow: '0 8px 24px rgba(234, 67, 53, 0.3)',
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                  }}
+                                  onMouseOver={(e) => {
+                                    if (!isActivating) {
+                                      e.currentTarget.style.transform = 'translateY(-2px)';
+                                      e.currentTarget.style.boxShadow = '0 12px 32px rgba(234, 67, 53, 0.4)';
+                                    }
+                                  }}
+                                  onMouseOut={(e) => {
+                                    if (!isActivating) {
+                                      e.currentTarget.style.transform = 'none';
+                                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(234, 67, 53, 0.3)';
+                                    }
+                                  }}
+                                >
+                                  {isActivating ? (
+                                    <><div className="animate-spin" style={{ width: '18px', height: '18px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%' }} /> Aktiviere...</>
+                                  ) : (
+                                    <><Check size={20} /> Zahlung erhalten & Account freischalten</>
+                                  )}
+                                </button>
+                                
+                                <button
+                                  onClick={() => setSelectedUser(null)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '16px',
+                                    borderRadius: '16px',
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    color: '#64748b',
+                                    fontSize: '0.95rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+                                  onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                                >
+                                  Abbrechen
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div style={{ color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(15, 23, 42, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Users size={32} style={{ color: '#94a3b8' }} />
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <strong style={{ fontSize: '1.2rem', color: '#0f172a', display: 'block', marginBottom: '8px', fontWeight: 800 }}>Kein Schüler ausgewählt</strong>
+                            <span style={{ fontSize: '0.95rem', lineHeight: '1.5', display: 'block', maxWidth: '300px', margin: '0 auto' }}>Wähle einen Schüler aus der Liste aus, um Zahlungsdetails einzusehen und den Account freizuschalten.</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              
+
+              {/* Server-Systemstatus & Auslastung */}
+              {(() => {
+                const latestMetric = serverMetrics[0] || null;
+                const cpuVal = latestMetric ? latestMetric.cpu_load : 0;
+                const ramUsed = latestMetric ? latestMetric.mem_used_mb : 0;
+                const ramTotal = latestMetric ? latestMetric.mem_total_mb : 8000;
+                const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
+                const dbConns = latestMetric ? latestMetric.active_connections : 0;
+                
+                let healthStatus: 'optimal' | 'warning' | 'critical' = 'optimal';
+                if (cpuVal >= 4.0 || ramPct >= 90 || dbConns >= 80) {
+                  healthStatus = 'critical';
+                } else if (cpuVal >= 2.0 || ramPct >= 75 || dbConns >= 50) {
+                  healthStatus = 'warning';
+                }
+
+                // Format timestamp
+                const formattedTime = latestMetric 
+                  ? new Date(latestMetric.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                  : '--:--:--';
+
+                return (
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '32px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px'
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '12px',
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Activity size={20} className={healthStatus === 'critical' ? 'animate-pulse' : ''} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                            Server-Systemstatus &amp; Live-Messung
+                          </h3>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                            Hetzner VPS Telemetrie-Agent • Letztes Signal: {formattedTime}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 16px',
+                          borderRadius: '9999px',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#10b981',
+                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}`
+                        }}>
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                            display: 'inline-block'
+                          }} />
+                          {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
+                          {healthStatus === 'warning' && 'WARNUNG (Auslastung erhöht)'}
+                          {healthStatus === 'optimal' && 'OPTIMAL (Gesund)'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Critical Alert Callout */}
+                    {healthStatus === 'critical' && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.03)',
+                        border: '1px solid rgba(239, 68, 68, 0.15)',
+                        borderRadius: '16px',
+                        padding: '18px 24px',
+                        display: 'flex',
+                        gap: '16px',
+                        alignItems: 'flex-start'
+                      }}>
+                        <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>
+                            Achtung: Der Server erreicht seine Leistungsgrenzen!
+                          </strong>
+                          <span style={{ fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.5 }}>
+                            Aufgrund hoher Auslastung (CPU Load ≥ 4.0, RAM ≥ 90% oder offene DB-Verbindungen ≥ 80) läuft das System am Limit.
+                            Ein Umstieg auf einen leistungsstärkeren Hetzner Cloud Server (z. B. Upgrade auf CX32 oder CX42 mit mehr CPU-Kernen und RAM) wird dringend empfohlen, um Server-Ausfälle oder Verzögerungen für die Schulen zu vermeiden.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gauges Grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '24px'
+                    }}>
+                      {/* CPU Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Cpu size={14} /> CPU Auslastung
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#10b981' }}>
+                            {cpuVal.toFixed(2)} / 2.0 Cores
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
+                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Auslastung: {Math.round((cpuVal / 2.0) * 100)}%</span>
+                          <span>{cpuVal >= 4.0 ? 'Kritisch' : cpuVal >= 2.0 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+
+                      {/* RAM Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Sliders size={14} /> Arbeitsspeicher (RAM)
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#10b981' }}>
+                            {(ramUsed / 1024).toFixed(2)} GB / {(ramTotal / 1024).toFixed(2)} GB
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(ramPct, 100)}%`,
+                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Belegt: {Math.round(ramPct)}%</span>
+                          <span>{ramPct >= 90 ? 'Kritisch' : ramPct >= 75 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+
+                      {/* DB Connections Metric Card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(15, 23, 42, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <Database size={14} /> DB Pool Connections
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#10b981' }}>
+                            {dbConns} / 100
+                          </span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(dbConns, 100)}%`,
+                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#10b981',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease-in-out'
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>Auslastung: {dbConns}%</span>
+                          <span>{dbConns >= 80 ? 'Kritisch' : dbConns >= 50 ? 'Warnung' : 'Stabil'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline Trend Chart */}
+                    {serverMetrics.length > 1 && (
+                      <div style={{
+                        borderTop: '1px solid rgba(15, 23, 42, 0.06)',
+                        paddingTop: '24px'
+                      }}>
+                        <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Auslastungshistorie (Letzte 30 Messungen)
+                        </h4>
+                        
+                        {/* Interactive SVG Chart */}
+                        <div style={{ width: '100%', height: '140px', position: 'relative' }}>
+                          {(() => {
+                            const data = [...serverMetrics].reverse();
+                            const width = 800; // virtual width for SVG viewbox
+                            const height = 120; // virtual height for SVG viewbox
+                            
+                            // Normalization helper
+                            const getPoints = (valExtractor: (m: ServerMetric) => number, maxVal: number) => {
+                              return data.map((m, index) => {
+                                const x = (index / (data.length - 1)) * width;
+                                const y = height - (Math.min(valExtractor(m), maxVal) / maxVal) * (height - 10) - 5;
+                                return { x, y };
+                              });
+                            };
+
+                            const cpuPoints = getPoints((m) => m.cpu_load, 4.0);
+                            const ramPoints = getPoints((m) => (m.mem_used_mb / (m.mem_total_mb || 8000)) * 100, 100);
+                            const dbPoints = getPoints((m) => m.active_connections, 100);
+
+                            const pointsToString = (pts: { x: number, y: number }[]) => {
+                              return pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                            };
+
+                            return (
+                              <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                                {/* Definitions for grid line pattern or gradients */}
+                                <defs>
+                                  <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                  <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                  <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00"/>
+                                  </linearGradient>
+                                </defs>
+
+                                {/* Y-axis gridlines */}
+                                <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                                <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                                <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+
+                                {/* Area below curves (fill) */}
+                                {cpuPoints.length > 1 && (
+                                  <polygon
+                                    points={`${cpuPoints[0].x},${height} ${pointsToString(cpuPoints)} ${cpuPoints[cpuPoints.length-1].x},${height}`}
+                                    fill="url(#cpuGrad)"
+                                  />
+                                )}
+                                {ramPoints.length > 1 && (
+                                  <polygon
+                                    points={`${ramPoints[0].x},${height} ${pointsToString(ramPoints)} ${ramPoints[ramPoints.length-1].x},${height}`}
+                                    fill="url(#ramGrad)"
+                                  />
+                                )}
+                                {dbPoints.length > 1 && (
+                                  <polygon
+                                    points={`${dbPoints[0].x},${height} ${pointsToString(dbPoints)} ${dbPoints[dbPoints.length-1].x},${height}`}
+                                    fill="url(#dbGrad)"
+                                  />
+                                )}
+
+                                {/* Line curves */}
+                                <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
+                                <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
+                                <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
+
+                                {/* Interactive dots on latest point */}
+                                {cpuPoints.length > 0 && (
+                                  <>
+                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+                                    <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
+                                    <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
+                                  </>
+                                )}
+                              </svg>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Chart Legend */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '24px',
+                          justifyContent: 'center',
+                          marginTop: '8px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#10b981', borderRadius: '2px' }} />
+                            CPU-Auslastung (Skaliert auf 4.0 Cores)
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#6366f1', borderRadius: '2px' }} />
+                            RAM-Belegung %
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            <span style={{ width: '12px', height: '3px', background: '#a855f7', borderRadius: '2px' }} />
+                            Aktive DB-Verbindungen %
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              
             </div>
+            </div>
+
           ) : activePortalTab === 'billing' ? (
             <div className="animate-fade-in">
               <BillingDashboard />
@@ -2242,6 +2661,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               </div>
             </div>
           ) : (
+            
             <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }} className="animate-fade-in">
               {/* Header Panel */}
               <div style={{
@@ -2251,10 +2671,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               }}>
                 <div>
                   <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Dashboard Leitstand
+                    Schulen &amp; Tenants
                   </h2>
                   <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
-                    Willkommen zurück in der zentralen Campus-Groovelab Schulsteuerung.
+                    Erstelle und verwalte die registrierten Schul-Tenants für Campus-Groovelab.
                   </p>
                 </div>
 
@@ -2275,404 +2695,21 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                     boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = '#0f172a';
+                    e.currentTarget.style.background = '#ea4335';
                     e.currentTarget.style.color = '#ffffff';
+                    e.currentTarget.style.borderColor = '#ea4335';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.background = '#ffffff';
                     e.currentTarget.style.color = '#475569';
+                    e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
                   }}
                 >
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
 
-              {/* KPI metrics cards */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-                gap: '24px'
-              }}>
-                {[
-                  { title: 'Schulen & Tenants', value: stats.totalSchools, icon: <Layers size={20} />, color: '#d97706' },
-                  { title: 'Dozenten & Lehrer', value: stats.totalTeachers, icon: <Users size={20} />, color: '#3b82f6' },
-                  { title: 'Aktive Schüler', value: stats.totalStudents, icon: <GraduationCap size={20} />, color: '#059669' },
-                  { title: 'Lab Sitzungen', value: stats.totalSessions, icon: <Clock size={20} />, color: '#4f46e5' }
-                ].map((kpi, idx) => (
-                  <div key={idx} style={{
-                    background: '#ffffff',
-                    borderRadius: '20px',
-                    padding: '24px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
-                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                  className="hover-scale-mini"
-                  >
-                    <div>
-                      <p style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', margin: 0, letterSpacing: '0.06em' }}>
-                        {kpi.title}
-                      </p>
-                      <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-                        {kpi.value}
-                      </h3>
-                    </div>
-                    <div style={{
-                      background: `${kpi.color}12`,
-                      color: kpi.color,
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: `1px solid ${kpi.color}20`
-                    }}>
-                      {kpi.icon}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Server-Systemstatus & Auslastung */}
-              {(() => {
-                const latestMetric = serverMetrics[0] || null;
-                const cpuVal = latestMetric ? latestMetric.cpu_load : 0;
-                const ramUsed = latestMetric ? latestMetric.mem_used_mb : 0;
-                const ramTotal = latestMetric ? latestMetric.mem_total_mb : 8000;
-                const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
-                const dbConns = latestMetric ? latestMetric.active_connections : 0;
-                
-                let healthStatus: 'optimal' | 'warning' | 'critical' = 'optimal';
-                if (cpuVal >= 4.0 || ramPct >= 90 || dbConns >= 80) {
-                  healthStatus = 'critical';
-                } else if (cpuVal >= 2.0 || ramPct >= 75 || dbConns >= 50) {
-                  healthStatus = 'warning';
-                }
-
-                // Format timestamp
-                const formattedTime = latestMetric 
-                  ? new Date(latestMetric.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
-                  : '--:--:--';
-
-                return (
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '24px'
-                  }}>
-                    {/* Header */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '16px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '12px',
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Activity size={20} className={healthStatus === 'critical' ? 'animate-pulse' : ''} />
-                        </div>
-                        <div>
-                          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                            Server-Systemstatus &amp; Live-Messung
-                          </h3>
-                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                            Hetzner VPS Telemetrie-Agent • Letztes Signal: {formattedTime}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 16px',
-                          borderRadius: '9999px',
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#10b981',
-                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}`
-                        }}>
-                          <span style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
-                            display: 'inline-block'
-                          }} />
-                          {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
-                          {healthStatus === 'warning' && 'WARNUNG (Auslastung erhöht)'}
-                          {healthStatus === 'optimal' && 'OPTIMAL (Gesund)'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Critical Alert Callout */}
-                    {healthStatus === 'critical' && (
-                      <div style={{
-                        background: 'rgba(239, 68, 68, 0.03)',
-                        border: '1px solid rgba(239, 68, 68, 0.15)',
-                        borderRadius: '16px',
-                        padding: '18px 24px',
-                        display: 'flex',
-                        gap: '16px',
-                        alignItems: 'flex-start'
-                      }}>
-                        <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>
-                            Achtung: Der Server erreicht seine Leistungsgrenzen!
-                          </strong>
-                          <span style={{ fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.5 }}>
-                            Aufgrund hoher Auslastung (CPU Load ≥ 4.0, RAM ≥ 90% oder offene DB-Verbindungen ≥ 80) läuft das System am Limit.
-                            Ein Umstieg auf einen leistungsstärkeren Hetzner Cloud Server (z. B. Upgrade auf CX32 oder CX42 mit mehr CPU-Kernen und RAM) wird dringend empfohlen, um Server-Ausfälle oder Verzögerungen für die Schulen zu vermeiden.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Gauges Grid */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '24px'
-                    }}>
-                      {/* CPU Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Cpu size={14} /> CPU Auslastung
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#10b981' }}>
-                            {cpuVal.toFixed(2)} / 2.0 Cores
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
-                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#10b981',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Auslastung: {Math.round((cpuVal / 2.0) * 100)}%</span>
-                          <span>{cpuVal >= 4.0 ? 'Kritisch' : cpuVal >= 2.0 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-
-                      {/* RAM Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Sliders size={14} /> Arbeitsspeicher (RAM)
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#10b981' }}>
-                            {(ramUsed / 1024).toFixed(2)} GB / {(ramTotal / 1024).toFixed(2)} GB
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min(ramPct, 100)}%`,
-                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#10b981',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Belegt: {Math.round(ramPct)}%</span>
-                          <span>{ramPct >= 90 ? 'Kritisch' : ramPct >= 75 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-
-                      {/* DB Connections Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Database size={14} /> DB Pool Connections
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#10b981' }}>
-                            {dbConns} / 100
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min(dbConns, 100)}%`,
-                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#10b981',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Auslastung: {dbConns}%</span>
-                          <span>{dbConns >= 80 ? 'Kritisch' : dbConns >= 50 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timeline Trend Chart */}
-                    {serverMetrics.length > 1 && (
-                      <div style={{
-                        borderTop: '1px solid rgba(15, 23, 42, 0.06)',
-                        paddingTop: '24px'
-                      }}>
-                        <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Auslastungshistorie (Letzte 30 Messungen)
-                        </h4>
-                        
-                        {/* Interactive SVG Chart */}
-                        <div style={{ width: '100%', height: '140px', position: 'relative' }}>
-                          {(() => {
-                            const data = [...serverMetrics].reverse();
-                            const width = 800; // virtual width for SVG viewbox
-                            const height = 120; // virtual height for SVG viewbox
-                            
-                            // Normalization helper
-                            const getPoints = (valExtractor: (m: ServerMetric) => number, maxVal: number) => {
-                              return data.map((m, index) => {
-                                const x = (index / (data.length - 1)) * width;
-                                const y = height - (Math.min(valExtractor(m), maxVal) / maxVal) * (height - 10) - 5;
-                                return { x, y };
-                              });
-                            };
-
-                            const cpuPoints = getPoints((m) => m.cpu_load, 4.0);
-                            const ramPoints = getPoints((m) => (m.mem_used_mb / (m.mem_total_mb || 8000)) * 100, 100);
-                            const dbPoints = getPoints((m) => m.active_connections, 100);
-
-                            const pointsToString = (pts: { x: number, y: number }[]) => {
-                              return pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                            };
-
-                            return (
-                              <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                                {/* Definitions for grid line pattern or gradients */}
-                                <defs>
-                                  <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                  <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                  <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                </defs>
-
-                                {/* Y-axis gridlines */}
-                                <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                                <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                                <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-
-                                {/* Area below curves (fill) */}
-                                {cpuPoints.length > 1 && (
-                                  <polygon
-                                    points={`${cpuPoints[0].x},${height} ${pointsToString(cpuPoints)} ${cpuPoints[cpuPoints.length-1].x},${height}`}
-                                    fill="url(#cpuGrad)"
-                                  />
-                                )}
-                                {ramPoints.length > 1 && (
-                                  <polygon
-                                    points={`${ramPoints[0].x},${height} ${pointsToString(ramPoints)} ${ramPoints[ramPoints.length-1].x},${height}`}
-                                    fill="url(#ramGrad)"
-                                  />
-                                )}
-                                {dbPoints.length > 1 && (
-                                  <polygon
-                                    points={`${dbPoints[0].x},${height} ${pointsToString(dbPoints)} ${dbPoints[dbPoints.length-1].x},${height}`}
-                                    fill="url(#dbGrad)"
-                                  />
-                                )}
-
-                                {/* Line curves */}
-                                <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
-                                <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
-                                <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
-
-                                {/* Interactive dots on latest point */}
-                                {cpuPoints.length > 0 && (
-                                  <>
-                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                                    <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
-                                    <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
-                                  </>
-                                )}
-                              </svg>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Chart Legend */}
-                        <div style={{
-                          display: 'flex',
-                          gap: '24px',
-                          justifyContent: 'center',
-                          marginTop: '8px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#10b981', borderRadius: '2px' }} />
-                            CPU-Auslastung (Skaliert auf 4.0 Cores)
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#6366f1', borderRadius: '2px' }} />
-                            RAM-Belegung %
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#a855f7', borderRadius: '2px' }} />
-                            Aktive DB-Verbindungen %
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              
 
               {/* Layout split grid */}
               <div style={{

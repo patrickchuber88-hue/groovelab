@@ -2410,6 +2410,7 @@ export function TeacherDashboard({
         const filteredOccurs = mappedOccurs.filter((b: any) => {
           if (b.teacherId !== userId) return false;
           if (!b.date) return false;
+          if (!b.studentName) return false;
           return b.date >= todayStr && b.date <= twoWeeksLaterStr;
         });
 
@@ -5739,7 +5740,7 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1 1 350px', minWidth: '300px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: isFreeDay ? '1.5 1 450px' : '1 1 350px', minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
                       {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
@@ -5762,7 +5763,7 @@ export function TeacherDashboard({
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: '190px',
+                              width: isFreeDay ? '280px' : '190px',
                               height: '100%',
                               flexShrink: 0,
                               position: 'relative',
@@ -6800,7 +6801,7 @@ export function TeacherDashboard({
                       </div>
                     ) : (
                       <div className="google-card" style={{ 
-                        flex: '1.2 1 450px', 
+                        flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
                         minWidth: '300px', 
                         padding: '20px 24px', 
                         borderRadius: '20px', 

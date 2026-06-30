@@ -58,14 +58,14 @@ export async function completeDetoxHandler(req: Request, res: Response): Promise
 
     let totalFocus = durationMinutes;
     let monthlyFocus = durationMinutes;
-    let currentXp = durationMinutes * 10;
+    let currentXp = durationMinutes;
     let streakFlame = 1;
     let lastPracticeDate = null;
 
     if (stats) {
       totalFocus = (stats.total_focus_minutes || 0) + durationMinutes;
       monthlyFocus = (stats.monthly_focus_minutes || 0) + durationMinutes;
-      currentXp = (stats.current_xp || 0) + (durationMinutes * 10);
+      currentXp = (stats.current_xp || 0) + durationMinutes;
       streakFlame = stats.streak_flame || 0;
       lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : null;
     }

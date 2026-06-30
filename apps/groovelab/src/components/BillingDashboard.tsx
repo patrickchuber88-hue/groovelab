@@ -503,151 +503,154 @@ export function BillingDashboard() {
       {/* Dynamic styles injector */}
       <style>{`
         .billing-card {
-          background: #ffffff;
-          border-radius: 12px;
-          padding: 22px 24px;
-          border: 1px solid #dadce0;
-          box-shadow: none;
-          transition: all 0.2s ease-in-out;
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(16px);
+          border-radius: 20px;
+          padding: 24px;
+          border: 1px solid rgba(15, 23, 42, 0.05);
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.02);
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           align-items: center;
           gap: 20px;
-          position: relative;
+          cursor: default;
         }
         .billing-card:hover {
-          border-color: #bdc1c6;
-          box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+          transform: translateY(-2px);
+          box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
+          border-color: rgba(234, 67, 53, 0.15);
         }
-        .billing-card::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 6px;
-          height: 100%;
-          background: transparent;
-        }
-        .billing-card-campus::before {
-          background: #1a73e8;
-        }
-        .billing-card-groovelab::before {
-          background: #f9ab00;
-        }
-        .billing-card-purple::before {
-          background: #137333;
-        }
-        .billing-card-slate::before {
-          background: #5f6368;
+        .billing-card:hover .bc-icon-wrapper {
+          background: rgba(234, 67, 53, 0.1) !important;
+          color: #ea4335 !important;
         }
 
         .filter-btn {
-          padding: 8px 16px;
-          border-radius: 100px;
-          font-weight: 600;
-          font-size: 0.82rem;
-          border: 1px solid #dadce0;
-          background: #ffffff;
-          color: #5f6368;
+          padding: 10px 18px;
+          border-radius: 12px;
+          font-weight: 700;
+          font-size: 0.85rem;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: #f8fafc;
+          color: #64748b;
           cursor: pointer;
-          transition: all 0.15s ease-in-out;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
         .filter-btn:hover {
-          background: #f1f3f4;
-          color: #202124;
-          border-color: #dadce0;
+          background: #ffffff;
+          color: #0f172a;
+          border-color: rgba(15, 23, 42, 0.15);
         }
         .filter-btn-active {
-          background: #e8f0fe;
-          color: #1a73e8;
-          border-color: transparent;
-          font-weight: 700;
+          background: rgba(234, 67, 53, 0.08) !important;
+          color: #ea4335 !important;
+          border-color: rgba(234, 67, 53, 0.2) !important;
         }
 
         .billing-table {
           width: 100%;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0 12px;
           text-align: left;
         }
         .billing-table th {
-          padding: 16px;
-          font-size: 0.78rem;
-          font-weight: 700;
-          color: #5f6368;
-          border-bottom: 1px solid #dadce0;
-          background-color: #ffffff;
+          padding: 16px 20px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          color: #64748b;
+          border-bottom: none;
+          background-color: transparent;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
         .billing-row {
-          background: #ffffff;
-          border-bottom: 1px solid #dadce0;
-          transition: background-color 0.15s ease-in-out;
+          background: transparent;
+          transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
         }
         .billing-row td {
-          padding: 16px;
-          font-size: 0.85rem;
-          font-weight: 400;
-          color: #3c4043;
+          padding: 16px 20px;
+          font-size: 0.88rem;
+          font-weight: 500;
+          color: #334155;
+          background: #ffffff;
+          border-top: 1px solid rgba(15, 23, 42, 0.04);
+          border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+        }
+        .billing-row td:first-child {
+          border-left: 1px solid rgba(15, 23, 42, 0.04);
+          border-top-left-radius: 12px;
+          border-bottom-left-radius: 12px;
+        }
+        .billing-row td:last-child {
+          border-right: 1px solid rgba(15, 23, 42, 0.04);
+          border-top-right-radius: 12px;
+          border-bottom-right-radius: 12px;
         }
         .billing-row:hover td {
-          background: #f8f9fa;
+          background: rgba(15, 23, 42, 0.015);
         }
         .billing-row-expanded td {
-          background: #f8f9fa !important;
           border-bottom: none !important;
+        }
+        .billing-row-expanded td:first-child {
+          border-bottom-left-radius: 0 !important;
+        }
+        .billing-row-expanded td:last-child {
+          border-bottom-right-radius: 0 !important;
         }
 
         .status-badge {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 4px 12px;
-          border-radius: 100px;
+          padding: 6px 12px;
+          border-radius: 8px;
           font-size: 0.75rem;
-          font-weight: 700;
+          font-weight: 800;
         }
         .status-badge-active {
-          color: #137333;
-          background: #e6f4ea;
+          color: #10b981;
+          background: rgba(16, 185, 129, 0.1);
         }
         .status-badge-trial {
-          color: #b06000;
-          background: #fef7e0;
+          color: #f59e0b;
+          background: rgba(245, 158, 11, 0.1);
         }
         .status-badge-bypass {
-          color: #c5221f;
-          background: #fce8e6;
+          color: #64748b;
+          background: rgba(100, 116, 139, 0.1);
         }
         .status-badge-suspended {
-          color: #5f6368;
-          background: #f1f3f4;
+          color: #ef4444;
+          background: rgba(239, 68, 68, 0.1);
         }
 
         .action-icon-btn {
           border: none;
           background: none;
           cursor: pointer;
-          color: #5f6368;
+          color: #64748b;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 6px;
-          border-radius: 50%;
+          padding: 8px;
+          border-radius: 10px;
           transition: all 0.15s;
         }
         .action-icon-btn:hover {
-          color: #202124;
-          background: #f1f3f4;
+          color: #ea4335;
+          background: rgba(234, 67, 53, 0.08);
         }
 
         .invoice-card {
           background: #ffffff;
-          border-radius: 8px;
-          border: 1px solid #dadce0;
-          padding: 16px 20px;
+          border-radius: 16px;
+          border: 1px solid rgba(15, 23, 42, 0.05);
+          padding: 20px;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.02);
         }
       `}</style>
 
@@ -683,12 +686,12 @@ export function BillingDashboard() {
             padding: '8px 16px',
             fontWeight: 550,
             fontSize: '0.85rem',
-            color: '#1a73e8',
+            color: '#475569',
             cursor: 'pointer',
             transition: 'background 0.2s'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; }}
-          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = 'rgba(234, 67, 53, 0.05)'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = '#ea4335'; }}
+          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#dadce0'; }}
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           Aktualisieren
@@ -717,97 +720,101 @@ export function BillingDashboard() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '20px'
+        gap: '24px'
       }}>
         
         {/* Total B2B Revenue */}
-        <div className="billing-card billing-card-campus">
-          <div style={{
-            height: '48px',
-            width: '48px',
-            borderRadius: '50%',
-            background: '#e8f0fe',
-            color: '#1a73e8',
+        <div className="billing-card">
+          <div className="bc-icon-wrapper" style={{
+            height: '56px',
+            width: '56px',
+            borderRadius: '16px',
+            background: 'rgba(15, 23, 42, 0.04)',
+            color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            transition: 'all 0.2s'
           }}>
-            <School size={22} />
+            <School size={24} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>B2B Umsatz (Schulen)</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 400, color: '#202124', marginTop: '4px', fontFamily: '"Google Sans", "Roboto", sans-serif' }}>
+            <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>B2B Umsatz (Schulen)</span>
+            <span style={{ display: 'block', fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontFamily: '"Outfit", sans-serif', letterSpacing: '-0.02em' }}>
               {summary.totalB2BRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
         </div>
 
         {/* Total B2C Revenue */}
-        <div className="billing-card billing-card-groovelab">
-          <div style={{
-            height: '48px',
-            width: '48px',
-            borderRadius: '50%',
-            background: '#fef7e0',
-            color: '#b06000',
+        <div className="billing-card">
+          <div className="bc-icon-wrapper" style={{
+            height: '56px',
+            width: '56px',
+            borderRadius: '16px',
+            background: 'rgba(15, 23, 42, 0.04)',
+            color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            transition: 'all 0.2s'
           }}>
-            <TrendingUp size={22} />
+            <TrendingUp size={24} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>B2C Umsatz (App-Käufe)</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 400, color: '#202124', marginTop: '4px', fontFamily: '"Google Sans", "Roboto", sans-serif' }}>
+            <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>B2C Umsatz (App-Käufe)</span>
+            <span style={{ display: 'block', fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontFamily: '"Outfit", sans-serif', letterSpacing: '-0.02em' }}>
               {summary.totalB2CRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
         </div>
 
         {/* Total registered students */}
-        <div className="billing-card billing-card-purple">
-          <div style={{
-            height: '48px',
-            width: '48px',
-            borderRadius: '50%',
-            background: '#e6f4ea',
-            color: '#137333',
+        <div className="billing-card">
+          <div className="bc-icon-wrapper" style={{
+            height: '56px',
+            width: '56px',
+            borderRadius: '16px',
+            background: 'rgba(15, 23, 42, 0.04)',
+            color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            transition: 'all 0.2s'
           }}>
-            <Users size={22} />
+            <Users size={24} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Nutzer</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 400, color: '#202124', marginTop: '4px', fontFamily: '"Google Sans", "Roboto", sans-serif' }}>
-              {summary.totalStudents} <span style={{ fontSize: '0.9rem', color: '#5f6368', fontWeight: 400 }}>Schüler</span>
+            <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktive Nutzer</span>
+            <span style={{ display: 'flex', fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontFamily: '"Outfit", sans-serif', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '6px' }}>
+              {summary.totalStudents} <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 700 }}>Schüler</span>
             </span>
           </div>
         </div>
 
         {/* Bypassed Schools */}
-        <div className="billing-card billing-card-slate">
-          <div style={{
-            height: '48px',
-            width: '48px',
-            borderRadius: '50%',
-            background: '#f1f3f4',
-            color: '#5f6368',
+        <div className="billing-card">
+          <div className="bc-icon-wrapper" style={{
+            height: '56px',
+            width: '56px',
+            borderRadius: '16px',
+            background: 'rgba(15, 23, 42, 0.04)',
+            color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexShrink: 0
+            flexShrink: 0,
+            transition: 'all 0.2s'
           }}>
-            <Ban size={22} />
+            <Ban size={24} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Abo-Bypass aktiv</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 400, color: '#202124', marginTop: '4px', fontFamily: '"Google Sans", "Roboto", sans-serif' }}>
-              {summary.bypassedSchools} <span style={{ fontSize: '0.9rem', color: '#5f6368', fontWeight: 400 }}>Schulen</span>
+            <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abo-Bypass aktiv</span>
+            <span style={{ display: 'flex', fontSize: '2rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontFamily: '"Outfit", sans-serif', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '6px' }}>
+              {summary.bypassedSchools} <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 700 }}>Schulen</span>
             </span>
           </div>
         </div>
@@ -848,11 +855,11 @@ export function BillingDashboard() {
               color: '#202124'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#1a73e8';
-              e.target.style.boxShadow = '0 0 0 2px rgba(26,115,232,0.2)';
+              e.target.style.borderColor = '#ea4335';
+              e.target.style.boxShadow = '0 0 0 3px rgba(234,67,53,0.15)';
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = '#dadce0';
+              e.target.style.borderColor = 'rgba(15, 23, 42, 0.08)';
               e.target.style.boxShadow = 'none';
             }}
           />
@@ -935,7 +942,7 @@ export function BillingDashboard() {
                       <td style={{ fontWeight: 550, color: '#202124' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ 
-                            color: '#5f6368', 
+                            color: isExpanded ? '#ea4335' : '#94a3b8', 
                             transform: isExpanded ? 'rotate(180deg)' : 'none', 
                             transition: 'transform 0.2s',
                             display: 'inline-flex',
@@ -948,7 +955,7 @@ export function BillingDashboard() {
                             height: '28px',
                             borderRadius: '50%',
                             background: '#e8f0fe',
-                            color: '#1a73e8',
+                            color: '#475569',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -990,7 +997,7 @@ export function BillingDashboard() {
                           gap: '6px', 
                           fontSize: '0.78rem', 
                           fontWeight: 600, 
-                          color: '#1a73e8', 
+                          color: '#475569', 
                           backgroundColor: '#e8f0fe', 
                           padding: '4px 10px', 
                           borderRadius: '4px' 
@@ -1021,7 +1028,7 @@ export function BillingDashboard() {
                       <td style={{ textAlign: 'center', fontSize: '0.85rem' }}>
                         <span style={{ fontWeight: 600, color: '#202124' }}>{inv.userQuota}</span>
                         {inv.pendingUserQuota && (
-                          <div style={{ fontSize: '0.68rem', color: '#1a73e8', fontWeight: 600, marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
                             ⏳ Next: {inv.pendingUserQuota}
                           </div>
                         )}
@@ -1054,124 +1061,99 @@ export function BillingDashboard() {
                       return (
                         <tr>
                           <td colSpan={8} style={{ 
-                            padding: '0 24px 28px 24px', 
-                            background: '#f8f9fa',
+                            padding: '0 24px 24px 24px', 
+                            background: '#ffffff',
                             borderBottomLeftRadius: '12px',
                             borderBottomRightRadius: '12px',
-                            borderLeft: '1px solid #dadce0',
-                            borderRight: '1px solid #dadce0',
-                            borderBottom: '1px solid #dadce0'
+                            borderLeft: '1px solid rgba(15, 23, 42, 0.04)',
+                            borderRight: '1px solid rgba(15, 23, 42, 0.04)',
+                            borderBottom: '1px solid rgba(15, 23, 42, 0.04)'
                           }}>
                             <div 
                               onClick={(e: any) => e.stopPropagation()}
                               style={{ 
-                                background: '#ffffff',
-                                borderRadius: '8px',
-                                border: '1px solid #dadce0',
-                                padding: '24px', 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: '24px'
+                                gap: '32px',
+                                paddingTop: '16px',
+                                borderTop: '1px solid rgba(15, 23, 42, 0.04)'
                               }}
                             >
                               
-                              {/* Row 1: Google Settings Card Grid */}
+                              {/* Row 1: Subscription & Billing Grid */}
                               <div style={{
                                 display: 'grid',
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                gap: '20px',
-                                paddingBottom: '20px',
-                                borderBottom: '1px solid #dadce0'
+                                gap: '24px'
                               }}>
-                                {/* Left Card: Subscription details */}
-                                <div style={{
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  padding: '16px 20px',
-                                  border: '1px solid #dadce0',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '12px'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #dadce0', paddingBottom: '8px' }}>
-                                    <span style={{ fontSize: '0.85rem', color: '#202124', fontWeight: 600 }}>Abonnement Details</span>
+                                {/* Left: Subscription details */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abonnement Details</span>
                                   </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#5f6368' }}>Vertragstyp:</span>
-                                      <span style={{ color: '#202124', fontWeight: 600, background: '#f1f3f4', padding: '3px 8px', borderRadius: '4px' }}>
-                                        {inv.subscriptionType === 'solo' ? 'Solo' : 'Standard'}
-                                      </span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
+                                      <span style={{ color: '#64748b' }}>Vertragstyp:</span>
+                                      <span style={{ color: '#0f172a', fontWeight: 600 }}>{inv.subscriptionType === 'solo' ? 'Solo' : 'Standard'}</span>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#5f6368' }}>Freigeschaltete Module:</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
+                                      <span style={{ color: '#64748b' }}>Module:</span>
                                       <div style={{ display: 'flex', gap: '6px' }}>
-                                        {inv.hasCampus && <span style={{ background: '#e8f0fe', color: '#1a73e8', fontSize: '0.7rem', padding: '3px 8px', borderRadius: '4px', fontWeight: 600 }}>Campus</span>}
-                                        {inv.hasGroovelab && <span style={{ background: '#fef7e0', color: '#b06000', fontSize: '0.7rem', padding: '3px 8px', borderRadius: '4px', fontWeight: 600 }}>Groovelab</span>}
+                                        {inv.hasCampus && <span style={{ color: '#137333', fontWeight: 600 }}>Campus</span>}
+                                        {inv.hasGroovelab && <span style={{ color: '#ea4335', fontWeight: 600 }}>Groovelab</span>}
                                       </div>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#5f6368' }}>Kombi-Rabatt (B2B):</span>
-                                      <strong style={{ color: inv.hasKombiDiscount ? '#137333' : '#5f6368', fontWeight: 600 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
+                                      <span style={{ color: '#64748b' }}>Kombi-Rabatt (B2B):</span>
+                                      <strong style={{ color: inv.hasKombiDiscount ? '#137333' : '#64748b', fontWeight: 600 }}>
                                         {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Nein'}
                                       </strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#5f6368' }}>Kostenträger:</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
+                                      <span style={{ color: '#64748b' }}>Kostenträger:</span>
                                       <strong style={{ color: isSelbstzahler ? '#1a73e8' : '#137333', fontWeight: 600 }}>
-                                        {isSelbstzahler ? 'Schüler / Eltern (Selbstzahler)' : 'Musikschule (Sammelzahler)'}
+                                        {isSelbstzahler ? 'Schüler / Eltern' : 'Musikschule'}
                                       </strong>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Right Card: Billing numbers */}
-                                <div style={{
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  padding: '16px 20px',
-                                  border: '1px solid #dadce0',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '12px'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #dadce0', paddingBottom: '8px' }}>
-                                    <span style={{ fontSize: '0.85rem', color: '#202124', fontWeight: 600 }}>Monatsgebühren Übersicht</span>
+                                {/* Right: Billing numbers */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatsgebühren Übersicht</span>
                                   </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                                      <span style={{ color: '#5f6368' }}>Server-Grundgebühr:</span>
-                                      <span style={{ color: '#202124', fontWeight: 550 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                      <span style={{ color: '#64748b' }}>Server-Grundgebühr:</span>
+                                      <span style={{ color: '#0f172a', fontWeight: 600 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                     </div>
                                     {inv.hasKombiDiscount && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#137333' }}>
-                                        <span style={{ fontWeight: 550 }}>Kombi-Rabatt (B2B):</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#137333' }}>
+                                        <span style={{ fontWeight: 600 }}>Kombi-Rabatt:</span>
                                         <span style={{ fontWeight: 600 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                       </div>
                                     )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                                      <span style={{ color: '#5f6368' }}>Profile-Levy (B2B):</span>
-                                      <span style={{ color: '#202124', fontWeight: 550 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                      <span style={{ color: '#64748b' }}>Profile-Levy (B2B):</span>
+                                      <span style={{ color: '#0f172a', fontWeight: 600 }}>
                                         {inv.userFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        <span style={{ fontSize: '0.72rem', color: '#5f6368', fontWeight: 400, marginLeft: '6px' }}>
-                                          ({inv.totalTeachersCount + inv.totalEmployeesCount} Staff x 0,49 + {inv.passiveStudentsCount} Passive x 0,09)
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
+                                          ({inv.totalTeachersCount + inv.totalEmployeesCount} Staff, {inv.passiveStudentsCount} Passiv)
                                         </span>
                                       </span>
                                     </div>
                                     {inv.activeStudentFee > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#1a73e8' }}>
-                                        <span style={{ fontWeight: 550 }}>Schüler-Aktivierung (B2B):</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#1a73e8' }}>
+                                        <span style={{ fontWeight: 600 }}>Schüler-Aktivierung:</span>
                                         <span style={{ fontWeight: 600 }}>
                                           {inv.activeStudentFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                          <span style={{ fontSize: '0.72rem', color: '#1a73e8', fontWeight: 400, marginLeft: '6px' }}>
-                                            ({inv.activeStudents} active x 0,49)
-                                          </span>
                                         </span>
                                       </div>
                                     )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px dashed #dadce0', paddingTop: '8px', marginTop: '4px' }}>
-                                      <span style={{ color: '#202124', fontWeight: 600 }}>Monats-Soll (B2B):</span>
-                                      <strong style={{ color: '#202124', fontSize: '1.05rem', fontWeight: 700 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', borderTop: '1px solid rgba(15, 23, 42, 0.05)', paddingTop: '12px', marginTop: '4px' }}>
+                                      <span style={{ color: '#0f172a', fontWeight: 600 }}>Monats-Soll (B2B):</span>
+                                      <strong style={{ color: '#0f172a', fontWeight: 800 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -1179,45 +1161,39 @@ export function BillingDashboard() {
 
                               {/* Row 2: Schüler Direct Billing Lists (Selbstzahler only) */}
                               {isSelbstzahler && (
-                                <div style={{ paddingBottom: '20px', borderBottom: '1px solid #dadce0' }}>
-                                  <h4 style={{ margin: '0 0 16px 0', fontSize: '0.78rem', fontWeight: 700, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Schüler-Freischaltungsstatus (Direktabrechnung)
-                                  </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Freischaltungsstatus</span>
+                                  </div>
                                   <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                    gap: '16px'
+                                    gap: '24px',
                                   }}>
                                     {/* Spalte 1: Aktiv freigeschaltet */}
-                                    <div style={{ 
-                                      background: '#ffffff', 
-                                      border: '1px solid #dadce0', 
-                                      borderTop: '3px solid #137333',
-                                      borderRadius: '8px', 
-                                      padding: '16px',
-                                    }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f3f4', paddingBottom: '8px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(19, 115, 51, 0.2)' }}>
                                         <strong style={{ fontSize: '0.8rem', color: '#137333', fontWeight: 600 }}>Aktiv freigeschaltet</strong>
                                         <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '100px' }}>
                                           {activePaidStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                                         {activePaidStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#5f6368', opacity: 0.7, fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>Keine aktiven Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine aktiven Schüler</span>
                                         ) : (
                                           activePaidStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '6px 10px', borderRadius: '4px', border: '1px solid #dadce0', fontSize: '0.8rem' }}>
+                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.72rem' }}>
+                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
-                                                <span style={{ color: '#202124', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
+                                                <span style={{ color: '#0f172a', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, true)}
-                                                style={{ border: 'none', background: 'none', color: '#d93025', fontWeight: 500, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '4px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                                style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = 'rgba(234, 67, 53, 0.1)'}
                                                 onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                               >
                                                 Sperren
@@ -1229,31 +1205,25 @@ export function BillingDashboard() {
                                     </div>
 
                                     {/* Spalte 2: Probezeit / Zahlung ausstehend */}
-                                    <div style={{ 
-                                      background: '#ffffff', 
-                                      border: '1px solid #dadce0', 
-                                      borderTop: '3px solid #f9ab00',
-                                      borderRadius: '8px', 
-                                      padding: '16px',
-                                    }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f3f4', paddingBottom: '8px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(176, 96, 0, 0.2)' }}>
                                         <strong style={{ fontSize: '0.8rem', color: '#b06000', fontWeight: 600 }}>Ausstehend / Probezeit</strong>
                                         <span style={{ background: '#fef7e0', color: '#b06000', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '100px' }}>
                                           {pendingStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                                         {pendingStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#5f6368', opacity: 0.7, fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>Keine ausstehenden Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine ausstehenden Schüler</span>
                                         ) : (
                                           pendingStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '6px 10px', borderRadius: '4px', border: '1px solid #fde68a', fontSize: '0.8rem' }}>
+                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#fef7e0', color: '#b06000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.72rem' }}>
+                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#fef7e0', color: '#b06000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                  <span style={{ color: '#202124', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
+                                                  <span style={{ color: '#0f172a', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
                                                   <span style={{ fontSize: '0.65rem', color: '#b06000', fontWeight: 600 }}>
                                                     {s.is_trial ? '⏳ Probezeit' : '⚠️ Zahlung offen'}
                                                   </span>
@@ -1261,19 +1231,9 @@ export function BillingDashboard() {
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ 
-                                                  border: 'none', 
-                                                  background: '#1a73e8', 
-                                                  color: '#ffffff', 
-                                                  fontWeight: 500, 
-                                                  cursor: 'pointer', 
-                                                  fontSize: '0.72rem', 
-                                                  padding: '4px 10px', 
-                                                  borderRadius: '4px',
-                                                  transition: 'background 0.2s'
-                                                }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#1557b0'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#1a73e8'}
+                                                style={{ border: 'none', background: 'rgba(234, 67, 53, 0.1)', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.7rem', padding: '4px 10px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = 'rgba(234, 67, 53, 0.2)'}
+                                                onMouseOut={(e: any) => e.currentTarget.style.background = 'rgba(234, 67, 53, 0.1)'}
                                               >
                                                 Freischalten
                                               </button>
@@ -1284,35 +1244,29 @@ export function BillingDashboard() {
                                     </div>
 
                                     {/* Spalte 3: Kostenloser User */}
-                                    <div style={{ 
-                                      background: '#ffffff', 
-                                      border: '1px solid #dadce0', 
-                                      borderTop: '3px solid #5f6368',
-                                      borderRadius: '8px', 
-                                      padding: '16px',
-                                    }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f3f4', paddingBottom: '8px' }}>
-                                        <strong style={{ fontSize: '0.8rem', color: '#5f6368', fontWeight: 600 }}>Kostenlose Basic User</strong>
-                                        <span style={{ background: '#f1f3f4', color: '#5f6368', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '100px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(100, 116, 139, 0.2)' }}>
+                                        <strong style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Kostenlose Basic User</strong>
+                                        <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '100px' }}>
                                           {freeStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                                         {freeStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#5f6368', opacity: 0.7, fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>Keine kostenlosen Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine kostenlosen Schüler</span>
                                         ) : (
                                           freeStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '6px 10px', borderRadius: '4px', border: '1px solid #dadce0', fontSize: '0.8rem' }}>
+                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#f1f3f4', color: '#5f6368', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.72rem' }}>
+                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
-                                                <span style={{ color: '#202124', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
+                                                <span style={{ color: '#0f172a', fontWeight: 500 }}>{s.first_name} {s.last_name}</span>
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: 'none', color: '#1a73e8', fontWeight: 500, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '4px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#e8f0fe'}
+                                                style={{ border: 'none', background: 'none', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#f1f5f9'}
                                                 onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                               >
                                                 Aktivieren
@@ -1339,7 +1293,7 @@ export function BillingDashboard() {
                                     onClick={() => createManualInvoice(inv.schoolId)}
                                     style={{
                                       backgroundColor: '#ffffff',
-                                      color: '#1a73e8',
+                                      color: '#475569',
                                       border: '1px solid #dadce0',
                                       padding: '6px 14px',
                                       borderRadius: '4px',

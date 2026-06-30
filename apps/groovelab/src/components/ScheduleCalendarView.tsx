@@ -1027,7 +1027,7 @@ export function ScheduleCalendarView({
 
            const timeChanged = change.date !== origDateStr || change.start_time.substring(0, 5) !== origTimeStr.substring(0, 5);
           const roomChanged = originalRoomId !== currentRoomId;
-          const isCancelled = change.status === 'cancelled';
+          const isCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
 
           // Compute regular teaching range for this teacher in this room on target date's weekday
           const targetDate = new Date(change.date + 'T00:00:00');
@@ -1097,7 +1097,7 @@ export function ScheduleCalendarView({
             const timeActuallyChanged = change.date !== oldDbDate || change.start_time.substring(0, 5) !== oldDbTime.substring(0, 5);
 
             if (timeActuallyChanged) {
-              if (change.status === 'cancelled') {
+              if (['cancelled', 'canceled_by_student'].includes(change.status)) {
                 const shortOrigDay = origDayLabel.substring(0, 2) + '.';
                 const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
                 notificationMessage = `Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.`;
@@ -1131,7 +1131,7 @@ export function ScheduleCalendarView({
 
                 if (studentProfile && studentProfile.is_campus_active) {
                   let pushTitle = 'Terminänderung 🔄';
-                  if (change.status === 'cancelled') {
+                  if (['cancelled', 'canceled_by_student'].includes(change.status)) {
                     pushTitle = 'Unterricht fällt aus ☕';
                   } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
                     pushTitle = 'Termin zurückgesetzt 🔄';
@@ -1145,7 +1145,7 @@ export function ScheduleCalendarView({
                       user_id: change.student_id,
                       title: pushTitle,
                       message: notificationMessage,
-                      metadata: { occurrence_id: change.id, type: change.status === 'cancelled' ? 'cancelled' : 'rescheduled' }
+                      metadata: { occurrence_id: change.id, type: ['cancelled', 'canceled_by_student'].includes(change.status) ? 'cancelled' : 'rescheduled' }
                     })
                     .select('id')
                     .single();
@@ -1586,7 +1586,7 @@ export function ScheduleCalendarView({
                 o.date === dateStr && 
                 (!o.student_id || o.student_id === 'vacant') && 
                 o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5) && 
-                o.status === 'cancelled'
+                ['cancelled', 'canceled_by_student'].includes(o.status)
               );
               // Only project the break if it is not cancelled, and there is no active/non-cancelled appointment occupying this slot
               const isOccupied = fetchedData.some(o => o.date === dateStr && o.start_time && (o.start_time || '').substring(0, 5) === (student.assignedTime || '').substring(0, 5) && o.status !== 'cancelled');
@@ -2006,7 +2006,7 @@ export function ScheduleCalendarView({
         occ.student_id && 
         occ.student_id !== 'vacant' && 
         !occ.id.startsWith('mock-') && 
-        (occ.status === 'cancelled' || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
+        (['cancelled', 'canceled_by_student'].includes(occ.status) || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
       );
 
       for (const occ of rescheduledOrCancelled) {
@@ -2462,8 +2462,8 @@ export function ScheduleCalendarView({
     if (!sourceOcc || !targetOcc) return;
 
     // Detect if either slot is a cancelled lesson
-    const isSourceCancelled = sourceOcc.status === 'cancelled';
-    const isTargetCancelled = targetOcc.status === 'cancelled';
+    const isSourceCancelled = ['cancelled', 'canceled_by_student'].includes(sourceOcc.status);
+    const isTargetCancelled = ['cancelled', 'canceled_by_student'].includes(targetOcc.status);
 
     if (isSourceCancelled || isTargetCancelled) {
       const cancelledOcc = isSourceCancelled ? sourceOcc : targetOcc;
@@ -2852,7 +2852,7 @@ export function ScheduleCalendarView({
         const hasCancelledOcc = cachedWeekOccurrences.some(o => 
           o.schedule_id === s.id && 
           o.date === dateStr && 
-          o.status === 'cancelled'
+          ['cancelled', 'canceled_by_student'].includes(o.status)
         );
         if (!hasCancelledOcc) {
           intervals.push({ start, end, type: 'template' });
@@ -3809,7 +3809,7 @@ export function ScheduleCalendarView({
                   const isBreak = !occ.student_id;
                   const isVacant = occ.student_id === 'vacant';
 
-                  if (isBreak && occ.status === 'cancelled') {
+                  if (isBreak && ['cancelled', 'canceled_by_student'].includes(occ.status)) {
                     return null;
                   }
 
@@ -3830,7 +3830,7 @@ export function ScheduleCalendarView({
                   let cardBackground = '';
  
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
-                  const isCancelled = occ.status === 'cancelled';
+                  const isCancelled = ['cancelled', 'canceled_by_student'].includes(occ.status);
                   const isRescheduled = !isBreak && !isVacant && !isSick && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
@@ -4673,7 +4673,7 @@ export function ScheduleCalendarView({
         const isEnsembleOcc = isGroupOcc && !isGruppenunterrichtOcc;
 
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
-        const isCancelled = occ?.status === 'cancelled';
+        const isCancelled = occ?.status && ['cancelled', 'canceled_by_student'].includes(occ.status);
         const canDiscard = isMoved || isCancelled;
         const studentName = occ ? `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim() : 'Schüler';
         
@@ -5177,7 +5177,7 @@ export function ScheduleCalendarView({
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px', paddingRight: '4px' }}>
                             {groupOccs.map(go => {
-                              const isGoCancelled = go.status === 'cancelled';
+                              const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
                               const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
                               const isConfirmed = go.student_acknowledged === true;
 
