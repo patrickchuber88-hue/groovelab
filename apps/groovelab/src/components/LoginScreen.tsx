@@ -1296,6 +1296,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
+      const rolesArray = Array.isArray(user.roles) ? user.roles : [];
+      const hasAdminRole = rolesArray.includes('admin');
+      const hasSecretaryRole = rolesArray.includes('secretary');
+      if ((hasAdminRole || hasSecretaryRole) && user.role !== 'admin' && user.role !== 'secretary') {
+        const newRole = hasAdminRole ? 'admin' : 'secretary';
+        console.log(`[Role Auto-Switch] User has admin/secretary roles but active role is ${user.role}. Forcing auto-switch to ${newRole}`);
+        await supabase
+          .from('users')
+          .update({ role: newRole })
+          .eq('id', user.id);
+        user.role = newRole;
+      }
+
       let finalStationId = null;
       let isHome = false;
 
@@ -1387,12 +1400,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             localStorage.setItem('groovelab_active_platform', 'campus');
           }
         } else {
-          // Admins and secretaries bypass activation flags but still set the target platform they logged in from
-          if (isGroovelabKiosk) {
-            localStorage.setItem('groovelab_active_platform', 'groovelab');
-          } else {
-            localStorage.setItem('groovelab_active_platform', 'campus');
-          }
+          // Admins and secretaries bypass activation flags and always land in the administration module under briefing
+          localStorage.setItem('groovelab_active_workspace', 'secretary');
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          localStorage.setItem('campus_active_tab', 'briefing');
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
@@ -1574,7 +1585,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           console.log(`[Login] Home mode detected. No new session created.`);
         }
       } else {
-        console.log('[Login] Campus login: Bypassing session cleanup and creation.');
+        console.log('[Login] Campus login: Bypassing session cleanup and creation, checking out any active sessions.');
+        await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null);
       }
 
       sessionStorage.setItem('groovelab_user_id', user.id);

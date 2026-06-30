@@ -62,6 +62,7 @@ interface ProfileData {
   instrument: string | null;
   photo_url: string | null;
   role: string;
+  roles?: string[];
   school_name: string;
   school_id: string | null;
   is_campus_active: boolean;
@@ -78,6 +79,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  const redirectToCampus = async (userData: { id: string; role: string; roles?: string[] }) => {
+    const rolesArray = Array.isArray(userData.roles) ? userData.roles : [];
+    const hasAdminRole = rolesArray.includes('admin');
+    const hasSecretaryRole = rolesArray.includes('secretary');
+    const isAdminOrSecretary = userData.role === 'admin' || userData.role === 'secretary' || hasAdminRole || hasSecretaryRole;
+
+    if (isAdminOrSecretary) {
+      const finalAdminRole = hasAdminRole ? 'admin' : 'secretary';
+      if (userData.role !== finalAdminRole) {
+        await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+      }
+      localStorage.setItem('groovelab_active_workspace', 'secretary');
+    }
+
+    // Force check out from active sessions on Campus login to prevent automatic check-in visibility
+    await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('user_id', userData.id).is('check_out_time', null);
+
+    localStorage.setItem('groovelab_user_id', userData.id);
+    sessionStorage.setItem('groovelab_user_id', userData.id);
+    sessionStorage.setItem('groovelab_qr_token', token);
+    localStorage.setItem('groovelab_active_platform', 'campus');
+    localStorage.setItem('campus_active_tab', 'briefing');
+    window.location.replace('/');
+  };
 
   // Admin Mobile Stats
   const [adminStats, setAdminStats] = useState({ activeStudents: 0, activeTeachers: 0, pendingActivations: 0 });
@@ -392,7 +418,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
+          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
           .eq('qr_token', token)
           .single();
 
@@ -446,6 +472,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           instrument: userData.instrument || null,
           photo_url: userData.photo_url || null,
           role: userData.role || 'student',
+          roles: userData.roles || [],
           school_name: schoolName,
           school_id: userData.school_id || null,
           is_campus_active: userData.is_campus_active ?? false,
@@ -468,9 +495,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const alreadyPaired = isPairedForToken(token);
 
         if (alreadyPaired) {
-          sessionStorage.setItem('groovelab_user_id', userData.id);
-          sessionStorage.setItem('groovelab_qr_token', token);
-          setPageState('profile');
+          await redirectToCampus(userData);
         } else {
           // Neues Gerät → Device-Pairing prüfen via RPC
           const deviceKey = getOrCreateDeviceKey();
@@ -483,9 +508,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           if (data?.paired === true) {
             markPairedForToken(token);
-            sessionStorage.setItem('groovelab_user_id', userData.id);
-            sessionStorage.setItem('groovelab_qr_token', token);
-            setPageState('profile');
+            await redirectToCampus(userData);
           } else {
             sessionStorage.removeItem('groovelab_qr_token');
             setPageState('pin_required');
@@ -1108,7 +1131,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       const totalMins = (currentStats?.total_focus_minutes || 0) + minutes;
       const monthlyMins = (currentStats?.monthly_focus_minutes || 0) + minutes;
-      const newXp = (currentStats?.current_xp || 0) + (minutes * 10);
+      const newXp = (currentStats?.current_xp || 0) + minutes;
       const flameLevelName = newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 4 ? 'Mittlere Flamme' : 'Kleine Flamme');
 
       // 1. Fokus-Protokoll schreiben (aufgeteilt in Fokus und Extra)
@@ -1294,10 +1317,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (data?.success === true) {
         markPairedForToken(token);
         if (profile) {
-          sessionStorage.setItem('groovelab_user_id', profile.id);
+          await redirectToCampus(profile);
         }
-        sessionStorage.setItem('groovelab_qr_token', token);
-        setPageState('profile');
       } else if (data?.error === 'no_birth_date') {
         setPinError('Kein Geburtstag hinterlegt. Bitte wende dich an deine Schule.');
         setPinInput('');
@@ -2695,7 +2716,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </p>
             </div>
             <button
-              onClick={() => setPageState('profile')}
+              onClick={() => { if (profile) redirectToCampus(profile); }}
               style={{
                 width: '100%',
                 padding: '16px',

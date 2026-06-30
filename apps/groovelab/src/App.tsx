@@ -2759,7 +2759,7 @@ function App() {
 
   useEffect(() => {
     if (activePlatform === 'campus') {
-      // localStorage.setItem('campus_active_tab', activeStudentTab);
+      localStorage.setItem('campus_active_tab', activeStudentTab);
     } else if (activePlatform === 'ensembles') {
       localStorage.setItem('ensembles_active_tab', activeStudentTab);
     } else {
@@ -2778,7 +2778,7 @@ function App() {
     // Always load the first menu tab when actively switching platforms (Karteikarten)
     let firstMenuTab = 'live';
     if (activePlatform === 'campus') {
-      firstMenuTab = user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live';
+      firstMenuTab = 'briefing';
     } else if (activePlatform === 'ensembles') {
       firstMenuTab = 'overview';
     }
@@ -3048,6 +3048,8 @@ function App() {
         setLoading(false);
         return;
       }
+
+
 
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
       const isStudent = userData.role?.toLowerCase() === 'student';
@@ -5476,7 +5478,7 @@ function App() {
   const hasInviteSchoolId = searchParams.has('invite_school_id');
 
   const handleLogin = async (userId: string, isHome?: boolean) => {
-    const { data: userToLogin } = await supabase.from('users').select('role, contract_ends_at, contract_decision_made, is_external_vocalist').eq('id', userId).single();
+    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
@@ -5490,6 +5492,34 @@ function App() {
         setShowDeletionPrompt(true);
         return; // Pause login until decision is made
       }
+    }
+
+    const rolesArray = Array.isArray(userToLogin?.roles) ? userToLogin.roles : [];
+    const hasAdminRole = rolesArray.includes('admin');
+    const hasSecretaryRole = rolesArray.includes('secretary');
+    
+    if (hasAdminRole || hasSecretaryRole) {
+      const finalAdminRole = hasAdminRole ? 'admin' : 'secretary';
+      if (userToLogin && userToLogin.role !== finalAdminRole) {
+        await supabase
+          .from('users')
+          .update({ role: finalAdminRole })
+          .eq('id', userId);
+      }
+      localStorage.setItem('groovelab_active_workspace', 'secretary');
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'briefing');
+    }
+
+    // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const isCampus = activePlatform === 'campus' || hasAdminRole || hasSecretaryRole;
+    if (isCampus) {
+      await supabase
+        .from('sessions')
+        .update({ check_out_time: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('check_out_time', null);
     }
 
     const mode = isHome ? 'home' : 'lab';
@@ -5506,13 +5536,13 @@ function App() {
     sessionStorage.setItem('groovelab_location_mode', mode);
 
     // Default start tab
-    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-    const startTab = activePlatform === 'campus' 
-      ? (userToLogin?.role === 'student' ? 'briefing' : 'live')
+    const resolvedPlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const startTab = resolvedPlatform === 'campus' 
+      ? 'briefing'
       : 'live';
       
     setActiveStudentTab(startTab);
-    localStorage.setItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+    localStorage.setItem(resolvedPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
     supabase
@@ -5548,7 +5578,9 @@ function App() {
         // Auto-correct if teacher/admin somehow has a student-only tab active
         const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
         if (isTeacherOrAdmin) {
-          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+          const studentTabs = activePlatform === 'campus'
+            ? ['practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching']
+            : ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
             console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
@@ -5916,6 +5948,19 @@ function App() {
         .update({ role: newRole })
         .eq('id', user.id);
       if (error) throw error;
+
+      if (newRole === 'teacher') {
+        localStorage.setItem('groovelab_active_platform', 'campus');
+        localStorage.setItem('campus_active_tab', 'briefing');
+        setActivePlatform('campus');
+        setActiveStudentTab('briefing');
+      } else if (newRole === 'admin' || newRole === 'secretary') {
+        localStorage.setItem('groovelab_active_workspace', 'secretary');
+        localStorage.setItem('groovelab_active_platform', 'campus');
+        localStorage.setItem('campus_active_tab', 'briefing');
+        // Let the workspace state inside SecretaryDashboard load from localStorage
+      }
+
       setUser({ ...user, role: newRole });
     } catch (err: any) {
       alert('Fehler beim Rollenwechsel: ' + err.message);
