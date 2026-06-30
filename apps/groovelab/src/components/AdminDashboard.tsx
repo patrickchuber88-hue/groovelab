@@ -5802,6 +5802,46 @@ export function AdminDashboard({
       return merged;
     })();
 
+    const parseRoomName = (name: string) => {
+      const trimmed = name.trim();
+      const match = trimmed.match(/^(.*?)\s*(\d+)$/);
+      if (match) {
+        return {
+          prefix: match[1].trim(),
+          number: parseInt(match[2], 10)
+        };
+      }
+      return {
+        prefix: trimmed,
+        number: null
+      };
+    };
+
+    // Filter rooms by floor AND availability (if date filter is active)
+    const roomsToRender = (rooms.filter(room => {
+      if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
+      if (roomSearchQuery.trim()) {
+        const query = roomSearchQuery.toLowerCase();
+        const matchesName = room.name?.toLowerCase().includes(query);
+        const matchesFloor = room.floor?.toLowerCase().includes(query);
+        const matchesDesc = room.description?.toLowerCase().includes(query);
+        if (!matchesName && !matchesFloor && !matchesDesc) return false;
+      }
+      return true;
+    })).sort((a, b) => {
+      const parsedA = parseRoomName(a.name || '');
+      const parsedB = parseRoomName(b.name || '');
+      const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix, 'de', { sensitivity: 'base' });
+      if (prefixCompare !== 0) return prefixCompare;
+      
+      const numA = parsedA.number !== null ? parsedA.number : -1;
+      const numB = parsedB.number !== null ? parsedB.number : -1;
+      return numA - numB;
+    });
+
+    // Derived selected room to keep logic aligned
+    const selectedRoom = roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
+
     const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
       if (!selectedRoom) return [];
       
@@ -6465,45 +6505,7 @@ export function AdminDashboard({
       return hasScheduleNow;
     };
 
-    const parseRoomName = (name: string) => {
-      const trimmed = name.trim();
-      const match = trimmed.match(/^(.*?)\s*(\d+)$/);
-      if (match) {
-        return {
-          prefix: match[1].trim(),
-          number: parseInt(match[2], 10)
-        };
-      }
-      return {
-        prefix: trimmed,
-        number: null
-      };
-    };
 
-    // Filter rooms by floor AND availability (if date filter is active)
-    const roomsToRender = (rooms.filter(room => {
-      if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
-      if (roomSearchQuery.trim()) {
-        const query = roomSearchQuery.toLowerCase();
-        const matchesName = room.name?.toLowerCase().includes(query);
-        const matchesFloor = room.floor?.toLowerCase().includes(query);
-        const matchesDesc = room.description?.toLowerCase().includes(query);
-        if (!matchesName && !matchesFloor && !matchesDesc) return false;
-      }
-      return true;
-    })).sort((a, b) => {
-      const parsedA = parseRoomName(a.name || '');
-      const parsedB = parseRoomName(b.name || '');
-      const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix, 'de', { sensitivity: 'base' });
-      if (prefixCompare !== 0) return prefixCompare;
-      
-      const numA = parsedA.number !== null ? parsedA.number : -1;
-      const numB = parsedB.number !== null ? parsedB.number : -1;
-      return numA - numB;
-    });
-
-    // Derived selected room to keep logic aligned
-    const selectedRoom = roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
 
     const handleAddBooking = async (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
