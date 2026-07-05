@@ -2074,43 +2074,63 @@ export function TeacherDashboard({
 
   const loadHolidays = async (url: string) => {
     try {
-      let text = '';
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error();
-        text = await res.text();
-      } catch (corsErr) {
-        const proxies = [
-          `https://corsproxy.io/?${url}`,
-          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-        ];
+      const urls = (() => {
+        try {
+          if (url.startsWith('[')) return JSON.parse(url) as string[];
+        } catch (e) {}
+        if (url.includes(',')) return url.split(',').map(u => u.trim()).filter(Boolean);
+        return [url];
+      })();
 
-        let success = false;
-        for (const proxyUrl of proxies) {
+      let combinedEvents: any[] = [];
+
+      for (const singleUrl of urls) {
+        try {
+          let text = '';
           try {
-            const res = await fetch(proxyUrl);
-            if (!res.ok) continue;
-            if (proxyUrl.includes('allorigins')) {
-              const json = await res.json();
-              text = json.contents;
-            } else {
-              text = await res.text();
+            const res = await fetch(singleUrl);
+            if (!res.ok) throw new Error();
+            text = await res.text();
+          } catch (corsErr) {
+            const proxies = [
+              `https://corsproxy.io/?${singleUrl}`,
+              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
+            ];
+
+            let success = false;
+            for (const proxyUrl of proxies) {
+              try {
+                const res = await fetch(proxyUrl);
+                if (!res.ok) continue;
+                if (proxyUrl.includes('allorigins')) {
+                  const json = await res.json();
+                  text = json.contents;
+                } else {
+                  text = await res.text();
+                }
+                if (text && text.includes('BEGIN:VCALENDAR')) {
+                  success = true;
+                  break;
+                }
+              } catch (e) {
+                console.warn(e);
+              }
             }
-            if (text && text.includes('BEGIN:VCALENDAR')) {
-              success = true;
-              break;
-            }
-          } catch (e) {
-            console.warn(e);
+            if (!success) continue;
           }
+
+          if (text) {
+            const parsedSingle = parseICS(text);
+            combinedEvents = [...combinedEvents, ...parsedSingle];
+          }
+        } catch (e) {
+          console.warn('Error fetching calendar URL:', singleUrl, e);
         }
-        if (!success) return;
       }
 
-      if (!text) return;
+      if (combinedEvents.length === 0) return;
 
-      const events = parseICS(text);
-      const holidayRanges = events
+      const holidayRanges = combinedEvents
         .filter(ev => {
           const summary = (ev.summary || '').toLowerCase();
           return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');

@@ -1778,6 +1778,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [syncInterval, setSyncInterval] = useState<string>('daily');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [calendarUrl, setCalendarUrl] = useState<string>('');
+  const [calendarUrls, setCalendarUrls] = useState<string[]>([]);
+  const [newCalendarUrlInput, setNewCalendarUrlInput] = useState<string>('');
   
   // Tokens & Settings
   const [kioskToken, setKioskToken] = useState<string>('');
@@ -1988,7 +1990,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   // Subjects (Unterrichtsfächer) states
   const [subjects, setSubjects] = useState<any[]>([]);
   const activeSubjectsList = useMemo(() => {
-    const activeSubs = subjects.filter((s: any) => s.is_active).map((s: any) => s.name);
+    const placeholders = new Set([
+      'ohne zuweisung', 'ohnezuweisung', 'allgemein', 
+      'nicht festgelegt', 'nichtfestgelegt', 'nicht zugeordnet', 
+      'nichtzugeordnet', 'none', 'null', ''
+    ]);
+    const activeSubs = Array.from(new Set(
+      subjects
+        .filter((s: any) => s.is_active && s.name)
+        .map((s: any) => s.name.trim())
+    )).filter(name => !placeholders.has(name.toLowerCase()));
+    
     return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
   }, [subjects]);
   const [subjectSearchQuery, setSubjectSearchQuery] = useState<string>('');
@@ -2673,7 +2685,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setSchoolStatus(schoolData.status || 'active');
         setSubscriptionBypass(schoolData.subscription_bypass ?? false);
         setLogoUrl(schoolData.logo_url || '');
-        setCalendarUrl(schoolData.calendar_url || '');
+        const rawUrl = schoolData.calendar_url || '';
+        setCalendarUrl(rawUrl);
+        let parsedUrls: string[] = [];
+        try {
+          if (rawUrl.startsWith('[')) {
+            parsedUrls = JSON.parse(rawUrl);
+          } else if (rawUrl) {
+            parsedUrls = [rawUrl];
+          }
+        } catch (e) {
+          if (rawUrl) parsedUrls = [rawUrl];
+        }
+        setCalendarUrls(parsedUrls);
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
@@ -3278,7 +3302,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         .eq('school_id', schoolId)
         .order('name');
       
-      const list = subjectsData || [];
+      let list = subjectsData || [];
+      
+      // Deduplicate by name case-insensitively
+      const uniqueList: any[] = [];
+      const seenNames = new Set();
+      for (const sub of list) {
+        const nameKey = (sub.name || '').trim().toLowerCase();
+        if (!seenNames.has(nameKey)) {
+          seenNames.add(nameKey);
+          uniqueList.push(sub);
+        }
+      }
+      list = uniqueList;
+
       const hasOhneZuweisung = list.some(s => s.name.toLowerCase() === 'ohne zuweisung');
       if (!hasOhneZuweisung && schoolId) {
         try {
@@ -3855,6 +3892,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
+  const handleAddCalendarUrl = () => {
+    if (!newCalendarUrlInput.trim()) return;
+    if (!newCalendarUrlInput.startsWith('http://') && !newCalendarUrlInput.startsWith('https://')) {
+      alert('Bitte eine gültige URL (beginnend mit http:// oder https://) eingeben.');
+      return;
+    }
+    if (calendarUrls.includes(newCalendarUrlInput.trim())) {
+      alert('Dieser Kalender-Feed ist bereits hinzugefügt.');
+      return;
+    }
+    setCalendarUrls([...calendarUrls, newCalendarUrlInput.trim()]);
+    setNewCalendarUrlInput('');
+  };
+
+  const handleRemoveCalendarUrl = (indexToRemove: number) => {
+    setCalendarUrls(calendarUrls.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSaveCalendarUrls = async () => {
+    try {
+      const serialized = JSON.stringify(calendarUrls);
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          calendar_url: serialized || null
+        })
+        .eq('id', schoolId);
+
+      if (error) throw error;
+      alert('Kalender-Feeds erfolgreich gespeichert! 📅🔗');
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Speichern der Kalender-Feeds: ' + err.message);
+    }
+  };
+
   const handleSaveSchoolGeneralData = async () => {
     if (!schoolName.trim()) {
       alert('Bitte einen Musikschulnamen eingeben.');
@@ -3945,16 +4018,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         if (!line || line.toLowerCase().includes('vorname')) continue;
 
         const parts = line.split(/[;,]/);
-        if (parts.length < 3) {
+        if (parts.length < 2) {
           skippedCount++;
           continue;
         }
 
         const firstName = parts[0]?.trim();
         const lastName = parts[1]?.trim();
-        const email = parts[2]?.trim();
-        const instrument = parts[3]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'ohne Zuweisung');
-        const maxStudents = parseInt(parts[4]?.trim()) || 10;
+        const instrument = parts[2]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'ohne Zuweisung');
+        const maxStudents = parseInt(parts[3]?.trim()) || 10;
         const pin = generateStarterPin('teacher', false, false);
         const qrToken = generateSecureQrToken();
 
@@ -3965,7 +4037,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             role: 'teacher',
             first_name: firstName,
             last_name: lastName,
-            email: email,
+            email: null,
             instrument: instrument,
             max_students: maxStudents,
             ausweis_nummer: pin,
@@ -4452,21 +4524,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           parts = trimmed.split(',');
         }
 
-        if (parts.length < 3) {
-          failCount++;
-          errors.push(`Zeile "${line}": Benötigt mindestens Vorname; Nachname; Geburtsdatum (DD.MM.YYYY).`);
-          continue;
+        let firstName = '';
+        let lastName = '';
+        let birthDate: string | null = null;
+        let instrument = 'Nicht festgelegt';
+        let teacherNamePart = '';
+
+        const isSmartActive = studentFilterTeacher && studentFilterTeacher !== 'All';
+
+        if (parts.length === 1) {
+          // e.g. "Max Mustermann" or "Max"
+          const nameParts = trimmed.split(/\s+/);
+          firstName = nameParts[0] || '';
+          lastName = nameParts.slice(1).join(' ') || '';
+        } else if (parts.length === 2 && isSmartActive) {
+          // e.g. "Max; Mustermann"
+          firstName = parts[0]?.trim();
+          lastName = parts[1]?.trim();
+        } else {
+          // Regular parsing
+          firstName = parts[0]?.trim();
+          lastName = parts[1]?.trim();
+          
+          // Check if parts[2] looks like a birth date (has dot) or instrument
+          const p2 = parts[2]?.trim() || '';
+          if (p2.includes('.')) {
+            birthDate = p2;
+            instrument = parts[3]?.trim() || 'Nicht festgelegt';
+            teacherNamePart = parts[4]?.trim()?.toLowerCase() || '';
+          } else {
+            // No birth date provided, parts[2] is instrument
+            instrument = p2 || 'Nicht festgelegt';
+            teacherNamePart = parts[3]?.trim()?.toLowerCase() || '';
+          }
         }
 
-        const firstName = parts[0]?.trim();
-        const lastName = parts[1]?.trim();
-        const birthDate = parts[2]?.trim(); // DD.MM.YYYY
-        let instrument = parts[3]?.trim() || 'Nicht festgelegt';
-        const teacherNamePart = parts[4]?.trim()?.toLowerCase() || '';
-
-        if (!firstName || !lastName || !birthDate) {
+        if (!firstName) {
           failCount++;
-          errors.push(`Zeile "${line}": Fehlende Pflichtfelder (Vorname, Nachname, Geburtsdatum).`);
+          errors.push(`Zeile "${line}": Vorname fehlt.`);
           continue;
         }
 
@@ -4476,9 +4571,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           const foundSelected = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
           if (foundSelected) {
             teacherId = foundSelected.id;
-            if (!parts[3]?.trim()) {
-              instrument = foundSelected.instrument || 'Nicht festgelegt';
-            }
+            instrument = foundSelected.instrument || 'Nicht festgelegt';
           }
         }
 
@@ -4497,7 +4590,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           const { data, error: rpcError } = await supabase.rpc('import_student', {
             first_name: firstName,
             last_name: lastName,
-            birth_date: birthDate,
+            birth_date: birthDate || '', // Use empty string if birthDate is null
             instrument: instrument,
             school_id: schoolId,
             teacher_id: teacherId || null
@@ -4761,7 +4854,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
 
   const renderSubjectsBoard = () => {
-    const filtered = subjects.filter(s => {
+    const nonPlaceholderSubjects = subjects.filter(s => {
+      const name = (s.name || '').toLowerCase().trim();
+      return name !== 'ohne zuweisung' && name !== 'allgemein';
+    });
+
+    const filtered = nonPlaceholderSubjects.filter(s => {
       const name = (s.name || '').toLowerCase();
       const desc = (s.description || '').toLowerCase();
       const cat = (s.category || '').toLowerCase();
@@ -4773,7 +4871,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       return matchesSearch && matchesCategory;
     });
 
-    const uniqueCategories = Array.from(new Set(subjects.map(s => s.category || 'Allgemein'))).sort((a, b) => a.localeCompare(b));
+    const uniqueCategories = Array.from(new Set(nonPlaceholderSubjects.map(s => s.category || 'Allgemein'))).sort((a, b) => a.localeCompare(b));
 
     return (
       <div style={{ width: '100%' }}>
@@ -4948,9 +5046,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 cursor: 'pointer'
               }}
             >
-              <option value="All">Alle Kategorien ({subjects.length})</option>
+              <option value="All">Alle Kategorien ({nonPlaceholderSubjects.length})</option>
               {uniqueCategories.map(cat => (
-                <option key={cat} value={cat}>{cat} ({subjects.filter(s => s.category === cat).length})</option>
+                <option key={cat} value={cat}>{cat} ({nonPlaceholderSubjects.filter(s => s.category === cat).length})</option>
               ))}
             </select>
           </div>
@@ -5991,7 +6089,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     Sammel-Onboarding (Schüler)
                   </strong>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
-                    Format pro Zeile: <code>Vorname Nachname; Instrument; E-Mail (optional)</code>
+                    {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
+                      <>Format pro Zeile: <code>Vorname Nachname</code> oder <code>Vorname; Nachname</code></>
+                    ) : (
+                      <>Format pro Zeile: <code>Vorname; Nachname; Instrument</code> (Geburtstag optional)</>
+                    )}
                   </span>
                 </div>
 
@@ -6100,7 +6202,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           </span>
                         </div>
                       </div>
-                      
+
                       <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
                         Nur Name nötig!
                       </span>
@@ -6110,7 +6212,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 <textarea
                   value={studentCsvText}
                   onChange={(e) => setStudentCsvText(e.target.value)}
-                  placeholder="Vorname; Nachname; Geburtsdatum (DD.MM.YYYY); Instrument; [Optional Lehrkraft Name]&#10;Max; Mustermann; 15.08.2012; E-Gitarre; Becker"
+                  placeholder={
+                    studentFilterTeacher && studentFilterTeacher !== 'All'
+                      ? "z.B.\nMax Mustermann\nAnna Becker"
+                      : "z.B.\nMax Mustermann; Gitarre\nAnna Becker; Gesang; 15.08.2012"
+                  }
                   style={{
                     width: '100%',
                     height: '100px',
@@ -8277,7 +8383,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           sort_order: rooms.length + successCount,
           is_campus_active: true, // Default to active for Campus
           is_groovelab_active: false, // Default to inactive for GrooveLab
-          floor: assignedFloor
+          floor: assignedFloor,
+          building_id: (selectedBuildingId !== 'All' && selectedBuildingId !== '') ? selectedBuildingId : null
         };
 
         let { data, error } = await supabase.from('rooms').insert(insertPayload).select().single();
@@ -12681,9 +12788,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {empName}
                                 </span>
-                                <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {emp.email || 'Keine E-Mail'}
-                                </span>
+                                {emp.email && (
+                                  <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {emp.email}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -13827,7 +13936,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             Sammel-Onboarding (Lehrer)
                           </strong>
                           <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
-                            Format pro Zeile: <code>Vorname; Nachname; E-Mail; Hauptinstrument (optional)</code>
+                            Format pro Zeile: <code>Vorname; Nachname; Hauptinstrument (optional)</code>
                           </span>
                         </div>
 
@@ -13901,8 +14010,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           onChange={(e) => setCsvText(e.target.value)}
                           placeholder={
                             teacherFilterInstrument && teacherFilterInstrument !== 'All'
-                              ? "Markus; Weber; markus@schule.de\nAnna; Becker; anna@schule.de"
-                              : "Markus; Weber; markus@schule.de; Gitarre\nAnna; Becker; anna@schule.de; Gesang"
+                              ? "Markus; Weber\nAnna; Becker"
+                              : "Markus; Weber; Gitarre\nAnna; Becker; Gesang"
                           }
                           style={{
                             width: '100%',
@@ -14100,9 +14209,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {teacherName}
                                   </span>
-                                  <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {t.email || 'Keine E-Mail'}
-                                  </span>
+                                  {t.email && (
+                                    <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {t.email}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
@@ -21176,16 +21287,8 @@ status: status,
             }
           })();
 
-          // Unique rooms by Name to guarantee absolutely zero duplicate room names are rendered
-          const uniqueRooms = rooms.reduce((acc: any[], current: any) => {
-            if (current && current.name) {
-              const nameKey = (current.name || '').toLowerCase().trim();
-              if (!acc.some(item => (item.name || '').toLowerCase().trim() === nameKey)) {
-                acc.push(current);
-              }
-            }
-            return acc;
-          }, []);
+          // Reference all rooms directly without deduplicating by name, so rooms with same names in different buildings are not hidden
+          const uniqueRooms = rooms;
 
 
 
@@ -23125,13 +23228,28 @@ status: status,
                   {/* Unified List items list */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {(() => {
-                      // 1. Gather all equipment instances with assignment info
-                      const allInstances = schoolEquipment.map((eq: any) => {
+                      // 1. Gather all equipment instances with assignment info from schoolEquipment
+                      const allInstances: any[] = [];
+                      const coveredRoomInsts = new Set<string>();
+
+                      schoolEquipment.forEach((eq: any) => {
                         const assignedRm = rooms.find(rm => 
                           Array.isArray(rm.room_instruments) && 
-                          rm.room_instruments.some((inst: any) => inst.name === eq.name)
+                          rm.room_instruments.some((inst: any, idx: number) => {
+                            const key = `${rm.id}:::${idx}`;
+                            if (inst.name === eq.name && !coveredRoomInsts.has(key)) {
+                              coveredRoomInsts.add(key);
+                              return true;
+                            }
+                            return false;
+                          })
                         );
-                        const roomInst = assignedRm?.room_instruments?.find((inst: any) => inst.name === eq.name);
+                        
+                        const roomInstIdx = assignedRm 
+                          ? assignedRm.room_instruments.findIndex((inst: any) => inst.name === eq.name) 
+                          : -1;
+                        const roomInst = assignedRm?.room_instruments?.[roomInstIdx];
+                        
                         let model = 'Standard';
                         try {
                           const localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
@@ -23154,7 +23272,7 @@ status: status,
                         } catch {}
                         const baseName = eq.name.replace(/\s+#\d+$/, '');
 
-                        return {
+                        allInstances.push({
                           id: eq.id,
                           fullName: eq.name,
                           baseName,
@@ -23162,8 +23280,30 @@ status: status,
                           linkUrl,
                           roomId: assignedRm?.id || null,
                           roomName: assignedRm?.name || null,
-                          roomInstIdx: assignedRm ? assignedRm.room_instruments.findIndex((inst: any) => inst.name === eq.name) : -1
-                        };
+                          roomInstIdx
+                        });
+                      });
+
+                      // Gather any room instruments that were added directly in the room editor modal and are not in schoolEquipment
+                      rooms.forEach(rm => {
+                        if (Array.isArray(rm.room_instruments)) {
+                          rm.room_instruments.forEach((inst: any, idx: number) => {
+                            const key = `${rm.id}:::${idx}`;
+                            if (!coveredRoomInsts.has(key)) {
+                              const baseName = inst.name.replace(/\s+#\d+$/, '');
+                              allInstances.push({
+                                id: `room-direct-${rm.id}-${idx}`,
+                                fullName: inst.name,
+                                baseName,
+                                model: inst.model || 'Standard',
+                                linkUrl: '',
+                                roomId: rm.id,
+                                roomName: rm.name,
+                                roomInstIdx: idx
+                              });
+                            }
+                          });
+                        }
                       });
 
                       // 2. Group by baseName + model
@@ -24046,50 +24186,6 @@ status: status,
                   <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '24px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div>
-                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schulname</label>
-                        <input
-                          type="text"
-                          value={schoolName}
-                          onChange={(e) => setSchoolName(e.target.value)}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße & Hausnummer</label>
-                        <input
-                          type="text"
-                          placeholder="Friedrichstraße 33"
-                          value={schoolStreet}
-                          onChange={(e) => setSchoolStreet(e.target.value)}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ</label>
-                          <input
-                            type="text"
-                            placeholder="79713"
-                            value={schoolZipCode}
-                            onChange={(e) => setSchoolZipCode(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Ort</label>
-                          <input
-                            type="text"
-                            placeholder="Bad Säckingen"
-                            value={schoolCity}
-                            onChange={(e) => setSchoolCity(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
                         <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Logo URL</label>
                         <input
                           type="text"
@@ -24118,7 +24214,7 @@ status: status,
                             style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontFamily: 'monospace' }}
                           />
                         </div>
-{(() => {
+                        {(() => {
                           const hex = editColor.replace('#', '');
                           let textColor = '#ffffff';
                           if (hex.length === 6) {
@@ -24138,21 +24234,6 @@ status: status,
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Abonnierter iCal Kalender-Link (ICS Feed)</label>
-                    <input
-                      type="url"
-                      placeholder="https://example.com/calendar.ics"
-                      value={calendarUrl}
-                      onChange={(e) => setCalendarUrl(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', transition: 'all 0.2s' }}
-                      className="settings-text-input"
-                    />
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginTop: '6px' }}>
-                      Gibt die URL eines externen Kalenders (.ics Format) an, um Schultermine in den Campus-Events zu synchronisieren.
-                    </span>
-                  </div>
-
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '12px' }}>
                     <button 
                       onClick={handleSaveBrandingAndCalendar}
@@ -24170,7 +24251,7 @@ status: status,
                       }}
                       className="hover-scale"
                     >
-                      Branding speichern
+                      Design &amp; Branding speichern
                     </button>
                   </div>
                 </div>
@@ -24280,13 +24361,85 @@ status: status,
                     </button>
                   </div>
 
+                  {/* Multiple iCal Feeds Section */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>📅 Abonnierte iCal Kalender-Links (ICS Feeds)</strong>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
+                        Abonniere einen oder mehrere externe Kalenderfeeds (.ics Format), um Feiertage, Ferien oder Veranstaltungen automatisch im System (Campus-Events) anzuzeigen.
+                      </span>
+                    </div>
+
+                    {/* List of current calendars */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                      {calendarUrls.length === 0 ? (
+                        <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', padding: '10px 14px', background: '#ffffff', borderRadius: '10px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+                          Keine externen Kalender abonniert.
+                        </div>
+                      ) : (
+                        calendarUrls.map((urlItem, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '10px' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                              {urlItem}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveCalendarUrl(idx)}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#ef4444',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = '#fef2f2'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              Entfernen
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add new calendar URL form */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/calendar.ics"
+                        value={newCalendarUrlInput}
+                        onChange={(e) => setNewCalendarUrlInput(e.target.value)}
+                        style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                      />
+                      <button
+                        onClick={handleAddCalendarUrl}
+                        style={{
+                          padding: '10px 18px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: '#ea4335',
+                          color: '#ffffff',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(234, 67, 53, 0.1)'
+                        }}
+                      >
+                        Hinzufügen
+                      </button>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                     <button 
-                      onClick={() => alert('Synchronisationseinstellungen erfolgreich gespeichert!')}
+                      onClick={handleSaveCalendarUrls}
                       style={{ padding: '10px 24px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '12px', border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s' }}
                       className="hover-scale"
                     >
-                      Einstellungen speichern
+                      Kalender &amp; Synchronisation speichern
                     </button>
                   </div>
                 </div>
@@ -24820,22 +24973,6 @@ status: status,
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
-                <input 
-                  type="email" 
-                  value={manageTeacher.email} 
-                  onChange={(e) => setManageTeacher({ ...manageTeacher, email: e.target.value })}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.85rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Instrumente/Fächer</label>
@@ -24852,9 +24989,8 @@ status: status,
                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Benötigte Ausstattung (Für Räume)</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {(() => {
-                    const rawEquipment = schoolEquipment.length > 0 ? schoolEquipment.map(e => e.name) : INSTRUMENT_TAGS;
+                    const availableEquipment = ['Schlagzeug', 'Cajon', 'Bongos', 'Pauken', 'Klavier', 'E-Piano', 'Keyboard'];
                     const cleanName = (name: string) => name.replace(/\s*#\d+$/, '').trim();
-                    const availableEquipment = Array.from(new Set(rawEquipment.map(cleanName))).filter(Boolean);
                     
                     const dbEq = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
                     const requiredEquipment = Array.from(new Set(dbEq.map(cleanName))).filter(Boolean) as string[];

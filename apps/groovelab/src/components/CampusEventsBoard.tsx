@@ -2302,80 +2302,102 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     setCalendarError(null);
 
     try {
-      // Direct client fetch fallback to proxy if blocked by CORS
-      let text = '';
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error();
-        text = await res.text();
-      } catch (corsErr) {
-        // Fallback CORS proxy helper chain
-        const proxies = [
-          `https://corsproxy.io/?${url}`,
-          `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-        ];
+      const urls = (() => {
+        try {
+          if (url.startsWith('[')) return JSON.parse(url) as string[];
+        } catch (e) {}
+        if (url.includes(',')) return url.split(',').map(u => u.trim()).filter(Boolean);
+        return [url];
+      })();
 
-        let success = false;
-        for (const proxyUrl of proxies) {
+      let combinedEvents: any[] = [];
+      let loadFailedCount = 0;
+
+      for (const singleUrl of urls) {
+        try {
+          let text = '';
           try {
-            console.log(`Trying proxy: ${proxyUrl}`);
-            const res = await fetch(proxyUrl);
-            if (!res.ok) continue;
-            
-            if (proxyUrl.includes('allorigins')) {
-              const json = await res.json();
-              text = json.contents;
-            } else {
-              text = await res.text();
-            }
+            const res = await fetch(singleUrl);
+            if (!res.ok) throw new Error();
+            text = await res.text();
+          } catch (corsErr) {
+            const proxies = [
+              `https://corsproxy.io/?${singleUrl}`,
+              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
+            ];
 
-            if (text && text.includes('BEGIN:VCALENDAR')) {
-              success = true;
-              break;
+            let success = false;
+            for (const proxyUrl of proxies) {
+              try {
+                const res = await fetch(proxyUrl);
+                if (!res.ok) continue;
+                if (proxyUrl.includes('allorigins')) {
+                  const json = await res.json();
+                  text = json.contents;
+                } else {
+                  text = await res.text();
+                }
+                if (text && text.includes('BEGIN:VCALENDAR')) {
+                  success = true;
+                  break;
+                }
+              } catch (proxyErr) {
+                console.warn(proxyErr);
+              }
             }
-          } catch (proxyErr) {
-            console.warn(`Proxy ${proxyUrl} failed:`, proxyErr);
+            if (!success) {
+              loadFailedCount++;
+              continue;
+            }
           }
-        }
 
-        if (!success) {
-          throw new Error('All CORS proxies failed');
+          if (text) {
+            const parsedSingle = parseICS(text);
+            combinedEvents = [...combinedEvents, ...parsedSingle];
+          }
+        } catch (err) {
+          console.warn('Error fetching calendar URL:', singleUrl, err);
+          loadFailedCount++;
         }
       }
 
-      const parsed = parseICS(text).map((ev: any, index: number) => {
-        const title = ev.summary || 'Abonnierter Termin';
-        const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
-        
-        const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
-        let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-        if (ev.dtend && isAllDay) {
-          end.setDate(end.getDate() - 1);
-        }
-        
-        const toYYYYMMDD = (d: Date) => {
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          return `${y}-${m}-${day}`;
-        };
+      if (combinedEvents.length > 0) {
+        const parsed = combinedEvents.map((ev: any, index: number) => {
+          const title = ev.summary || 'Abonnierter Termin';
+          const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
+          
+          const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
+          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          if (ev.dtend && isAllDay) {
+            end.setDate(end.getDate() - 1);
+          }
+          
+          const toYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
 
-        return {
-          id: `subscribed-${index}`,
-          title: title,
-          description: ev.description || '',
-          event_date: ev.dtstart ? toYYYYMMDD(ev.dtstart) : '',
-          event_end_date: toYYYYMMDD(end),
-          start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
-          category: isHoliday ? 'Ferien' : 'Schultermin',
-          is_subscribed: true
-        };
-      });
+          return {
+            id: `subscribed-${index}`,
+            title: title,
+            description: ev.description || '',
+            event_date: ev.dtstart ? toYYYYMMDD(ev.dtstart) : '',
+            event_end_date: toYYYYMMDD(end),
+            start_time: ev.dtstart ? ev.dtstart.toTimeString().substring(0, 5) : '00:00',
+            category: isHoliday ? 'Ferien' : 'Schultermin',
+            is_subscribed: true
+          };
+        });
+        setSubscribedEvents(parsed);
+        return;
+      }
 
-      setSubscribedEvents(parsed);
-    } catch (err) {
-      console.warn('CORS feed load failed, displaying default/demo calendar entries for this school URL.');
-      setCalendarError('Kalender-Feed konnte nicht direkt geladen werden (CORS). Zeige Demo-Kalenderdaten.');
+      if (loadFailedCount === urls.length && urls.length > 0) {
+        console.warn('CORS feed load failed, displaying default/demo calendar entries for this school URL.');
+        setCalendarError('Kalender-Feed konnte nicht direkt geladen werden (CORS). Zeige Demo-Kalenderdaten.');
+      }
       
       // Inject standard school demo calendar events to ensure a perfect aesthetic
       setSubscribedEvents([
@@ -2407,6 +2429,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           is_subscribed: true
         }
       ]);
+    } catch (err) {
+      console.error('Error fetching calendar:', err);
     } finally {
       setLoadingCalendar(false);
     }
