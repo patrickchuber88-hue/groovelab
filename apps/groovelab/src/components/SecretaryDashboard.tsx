@@ -1578,6 +1578,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [schoolZipCode, setSchoolZipCode] = useState<string>('');
   const [schoolCity, setSchoolCity] = useState<string>('');
   const [schoolStreet, setSchoolStreet] = useState<string>('');
+  const [schoolHouseNumber, setSchoolHouseNumber] = useState<string>('');
+  const [schoolPhoneNumber, setSchoolPhoneNumber] = useState<string>('');
+  const [schoolEmail, setSchoolEmail] = useState<string>('');
   const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
   const [hasCampusSub, setHasCampusSub] = useState<boolean>(false);
   const [hasGroovelabSub, setHasGroovelabSub] = useState<boolean>(false);
@@ -2628,7 +2631,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       ] = await Promise.all([
         supabase
           .from('schools')
-          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
           .eq('id', schoolId)
           .single(),
         supabase
@@ -2661,6 +2664,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setSchoolZipCode(schoolData.zip_code || '');
         setSchoolCity(schoolData.city || '');
         setSchoolStreet(schoolData.street || '');
+        setSchoolHouseNumber(schoolData.house_number || '');
+        setSchoolPhoneNumber(schoolData.phone_number || '');
+        setSchoolEmail(schoolData.email || '');
         setEditColor(schoolData.primary_color || '#1a73e8');
         setIsSchoolTrial(schoolData.is_trial ?? false);
         setSchoolTrialEndsAt(schoolData.trial_ends_at || null);
@@ -3849,6 +3855,34 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
+  const handleSaveSchoolGeneralData = async () => {
+    if (!schoolName.trim()) {
+      alert('Bitte einen Musikschulnamen eingeben.');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          name: schoolName,
+          subdomain: schoolSubdomain || null,
+          street: schoolStreet || null,
+          house_number: schoolHouseNumber || null,
+          zip_code: schoolZipCode || null,
+          city: schoolCity || null,
+          phone_number: schoolPhoneNumber || null,
+          email: schoolEmail || null
+        })
+        .eq('id', schoolId);
+
+      if (error) throw error;
+      alert('Stammdaten der Musikschule erfolgreich gespeichert! 🏢');
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Speichern der Stammdaten: ' + err.message);
+    }
+  };
+
   const handleSaveBrandingAndCalendar = async () => {
     if (!editColor || !/^#([A-Fa-f0-9]{6})$/.test(editColor)) {
       alert('Bitte gebe einen gültigen Hex-Farbcode ein (z. B. #ea4335).');
@@ -3863,8 +3897,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           logo_url: logoUrl || null,
           calendar_url: calendarUrl || null,
           street: schoolStreet || null,
+          house_number: schoolHouseNumber || null,
           zip_code: schoolZipCode || null,
-          city: schoolCity || null
+          city: schoolCity || null,
+          phone_number: schoolPhoneNumber || null,
+          email: schoolEmail || null
         })
         .eq('id', schoolId);
 
@@ -23836,6 +23873,115 @@ status: status,
                   <div>
                     <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Allgemeine Einstellungen</h3>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Grundlegende System-IDs und System-Bypass-Konfigurationen.</p>
+                  </div>
+
+                  {/* Musikschul-Stammdaten */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Stammdaten der Musikschule</strong>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Name der Musikschule *</label>
+                        <input
+                          type="text"
+                          value={schoolName}
+                          onChange={(e) => setSchoolName(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Wunsch-Subdomain *</label>
+                        <input
+                          type="text"
+                          value={schoolSubdomain}
+                          onChange={(e) => setSchoolSubdomain(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße *</label>
+                        <input
+                          type="text"
+                          value={schoolStreet}
+                          onChange={(e) => setSchoolStreet(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Nr. *</label>
+                        <input
+                          type="text"
+                          value={schoolHouseNumber}
+                          onChange={(e) => setSchoolHouseNumber(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ *</label>
+                        <input
+                          type="text"
+                          value={schoolZipCode}
+                          onChange={(e) => setSchoolZipCode(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Ort *</label>
+                        <input
+                          type="text"
+                          value={schoolCity}
+                          onChange={(e) => setSchoolCity(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Telefonnummer *</label>
+                        <input
+                          type="text"
+                          value={schoolPhoneNumber}
+                          onChange={(e) => setSchoolPhoneNumber(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse *</label>
+                        <input
+                          type="email"
+                          value={schoolEmail}
+                          onChange={(e) => setSchoolEmail(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '14px', marginTop: '4px' }}>
+                      <button
+                        onClick={handleSaveSchoolGeneralData}
+                        style={{
+                          padding: '10px 24px',
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: '#ea4335',
+                          color: '#ffffff',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(234, 67, 53, 0.15)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Stammdaten speichern
+                      </button>
+                    </div>
                   </div>
 
                   {/* Integration Link */}
