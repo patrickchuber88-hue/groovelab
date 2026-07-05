@@ -5903,7 +5903,33 @@ function App() {
   if (!loggedInUserId && !showDeletionPrompt) {
     if (location.pathname === '/') {
       const urlParams = new URLSearchParams(location.search);
-      const isParentOnboarding = urlParams.has('invite_school_id') || urlParams.get('onboarding') === 'parent';
+      
+      const hasSubdomain = (() => {
+        if (typeof window === 'undefined') return false;
+        const host = window.location.hostname;
+        let sub = null;
+        const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
+        for (const domain of mainDomains) {
+          if (host.endsWith(domain)) {
+            sub = host.substring(0, host.length - domain.length);
+            break;
+          }
+        }
+        if (!sub) {
+          const parts = host.split('.');
+          if (parts.length >= 3) {
+            const first = parts[0];
+            if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
+              sub = first;
+            }
+          } else if (parts.length === 2 && parts[1] === 'localhost') {
+            sub = parts[0];
+          }
+        }
+        return !!sub;
+      })();
+
+      const isParentOnboarding = urlParams.has('invite_school_id') || urlParams.get('onboarding') === 'parent' || hasSubdomain;
       if (isParentOnboarding) {
         return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
       }
