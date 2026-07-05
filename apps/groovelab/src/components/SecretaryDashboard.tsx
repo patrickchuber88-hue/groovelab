@@ -20853,11 +20853,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 };
 
                                 // Parse contractStartDate or default to June 12, 2026
-                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date('2026-06-12T19:30:38+02:00');
+                                const contractDateObj = contractStartDate ? new Date(contractStartDate) : new Date();
                                 const startYear = contractDateObj.getFullYear();
                                 const startMonth = contractDateObj.getMonth() + 1; // 1-indexed
 
-                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T19:30:38+02:00') : new Date('2026-06-12T19:30:38+02:00');
+                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T19:30:38+02:00') : new Date();
                                 const currentYear = systemDate.getFullYear();
                                 const currentMonth = systemDate.getMonth() + 1;
 
