@@ -19,4 +19,4 @@ BEGIN
     v_role := public.get_current_user_role();
     RETURN v_role IN ('teacher', 'admin', 'secretary');
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_catalog;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_catalog SET row_security = off;

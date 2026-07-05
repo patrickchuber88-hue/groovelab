@@ -3086,17 +3086,24 @@ function App() {
         localStorage.setItem('groovelab_active_platform', allowedPlatform);
 
         if (allowedPlatform === 'campus') {
-          const defaultTab = isStudent ? 'briefing' : 'live';
+          const storedTab = localStorage.getItem('campus_active_tab');
+          const defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
           setActiveStudentTab(defaultTab);
           localStorage.setItem('campus_active_tab', defaultTab);
         } else {
-          const defaultTab = 'live';
+          const storedTab = localStorage.getItem('groovelab_active_tab');
+          const defaultTab = storedTab ? storedTab : 'live';
           setActiveStudentTab(defaultTab);
           localStorage.setItem('groovelab_active_tab', defaultTab);
         }
       }
 
       const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+      if (typeof window !== 'undefined') {
+        (window as any).debugSchoolId = schoolId;
+        (window as any).debugUserId = userId;
+        (window as any).debugUserData = JSON.stringify(userData);
+      }
       if (!schoolId) {
         console.warn('[Dashboard] No school_id found. Board will be empty.');
         setUser(userData);
@@ -3141,15 +3148,33 @@ function App() {
         }
         if (schoolId) {
           fetchActiveStudentCount(schoolId).catch(err => console.error('Error fetching student count:', err));
-          // Fetch teachers for staff including platform active columns
           supabase.from('users')
-            .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active, is_observer')
+            .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
             .eq('school_id', schoolId)
             .in('role', ['teacher', 'admin'])
             .order('first_name')
             .then(res => {
               if (res.data) setTeachers(res.data);
             });
+
+          // Fetch school users and messages for staff
+          (async () => {
+            const { data: allUsers, error: allUsersError } = await supabase
+              .from('users')
+              .select('id, first_name, last_name, role, photo_url, teacher_id, instrument')
+              .eq('school_id', schoolId)
+              .order('first_name');
+            if (typeof window !== 'undefined') {
+              (window as any).debugAllUsersLength = allUsers?.length;
+              (window as any).debugAllUsersError = allUsersError ? JSON.stringify(allUsersError) : null;
+            }
+            if (allUsers) {
+              setSchoolUsers(allUsers);
+            }
+            checkAnnouncements(schoolId, userData);
+            fetchAnnouncements(schoolId);
+            fetchCampusMessages();
+          })().catch(err => console.error('Error in staff background fetches:', err));
         }
         return;
       }
@@ -3177,7 +3202,7 @@ function App() {
             )
           )
         `).eq('school_id', schoolId).eq('is_groovelab_active', true).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
-        supabase.from('band_members').select('user_id, bands!inner(id, status, song_id, school_id, band_songs(song_id, status))').eq('bands.school_id', schoolId),
+        Promise.resolve({ data: [], error: null }),
         bandIds.length > 0
           ? supabase.from('bands').select(`
               *,
@@ -3188,7 +3213,7 @@ function App() {
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
-        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active, is_observer').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
@@ -3970,11 +3995,15 @@ function App() {
 
 
       // Fetch school users for both student and teacher to support direct messaging
-      const { data: allUsers } = await supabase
+      const { data: allUsers, error: allUsersError } = await supabase
         .from('users')
         .select('id, first_name, last_name, role, photo_url, teacher_id, instrument')
         .eq('school_id', schoolId)
         .order('first_name');
+      if (typeof window !== 'undefined') {
+        (window as any).debugAllUsersLength = allUsers?.length;
+        (window as any).debugAllUsersError = allUsersError ? JSON.stringify(allUsersError) : null;
+      }
       if (allUsers) {
         setSchoolUsers(allUsers);
       }
@@ -3991,6 +4020,10 @@ function App() {
 
     } catch (error: any) {
       console.error('[Dashboard] UNCAUGHT ERROR in fetchDashboardData:', error);
+      if (typeof window !== 'undefined') {
+        (window as any).fetchDashboardDataError = error?.message || String(error);
+        (window as any).fetchDashboardDataStack = error?.stack || '';
+      }
     } finally {
       setLoading(false);
     }
@@ -5877,7 +5910,7 @@ function App() {
       return (
         <LandingPage 
           onLogin={() => navigate('/login')} 
-          onRegister={() => navigate('/signup')} 
+          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
         />
       );
     }
@@ -5936,7 +5969,7 @@ function App() {
   if (user.is_master_admin) {
     return (
       <Suspense fallback={<DashboardLoader />}>
-        <MasterAdminDashboard onLogout={handleLogout} />
+        <MasterAdminDashboard onLogout={handleLogout} currentUser={user} />
       </Suspense>
     );
   }
@@ -5951,13 +5984,13 @@ function App() {
 
       if (newRole === 'teacher') {
         localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'briefing');
+        localStorage.setItem('campus_active_tab', 'live');
         setActivePlatform('campus');
-        setActiveStudentTab('briefing');
+        setActiveStudentTab('live');
       } else if (newRole === 'admin' || newRole === 'secretary') {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'briefing');
+        localStorage.setItem('campus_active_tab', 'live');
         // Let the workspace state inside SecretaryDashboard load from localStorage
       }
 

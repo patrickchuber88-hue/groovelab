@@ -3,8 +3,9 @@ import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
   School, User, Mail, Lock, Phone, MapPin, CheckCircle, 
-  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles, Download
+  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles, Download, Fingerprint
 } from 'lucide-react';
+import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
 interface SignupWizardProps {
   onBackToLogin: () => void;
@@ -26,6 +27,43 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     schoolName: string;
     birthDay?: number;
   } | null>(null);
+
+  // Biometrische Login-States
+  const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
+  const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
+
+  const handleRegisterBiometrics = async () => {
+    if (!createdUser) return;
+    setBiometricsStatus('registering');
+    setBiometricsErrorMessage('');
+    try {
+      if (!isWebAuthnSupported()) {
+        throw new Error('Biometrisches Anmelden wird von diesem Gerät oder Browser nicht unterstützt.');
+      }
+      const mockChallenge = btoa(crypto.randomUUID());
+      const email = `${createdUser.first_name.toLowerCase()}.${createdUser.last_name.toLowerCase()}@campus-groovelab.local`;
+      
+      const result = await registerBiometrics(
+        email,
+        createdUser.id,
+        mockChallenge
+      );
+
+      const { error } = await supabase.from('user_credentials').insert({
+        user_id: createdUser.id,
+        credential_id: result.id,
+        public_key: JSON.stringify(result.response),
+        device_name: 'WebAuthn Device'
+      });
+
+      if (error) throw error;
+      setBiometricsStatus('success');
+    } catch (err: any) {
+      console.error('Biometrics registration failed:', err);
+      setBiometricsStatus('error');
+      setBiometricsErrorMessage(err.message || 'Die Einrichtung wurde abgebrochen oder ist fehlgeschlagen.');
+    }
+  };
 
   // Step 1: School Info
   const [schoolName, setSchoolName] = useState('');
@@ -54,6 +92,16 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   // Step 4: Progress Animation
   const [provisionProgress, setProvisionProgress] = useState(0);
   const [provisionStatus, setProvisionStatus] = useState('');
+
+  // Check URL for pre-filled email from LandingPage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    if (emailParam) {
+      setSchoolEmail(emailParam);
+      setAdminEmail(emailParam);
+    }
+  }, []);
 
   // Pre-generate subdomain from school name
   useEffect(() => {
@@ -414,10 +462,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
       <div style={{
         width: '100%',
-        maxWidth: (step === 4 || step === 3) ? '480px' : '580px',
+        maxWidth: (step === 4 || step === 3) ? '440px' : '580px',
         background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '24px',
-        padding: '38px',
+        padding: step === 3 ? '24px' : '38px',
         boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
         border: '1px solid rgba(0, 0, 0, 0.08)',
         display: 'flex',
@@ -426,7 +474,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         backdropFilter: 'blur(40px) saturate(180%)',
         WebkitBackdropFilter: 'blur(40px) saturate(180%)',
         boxSizing: 'border-box',
-        maxHeight: '90vh',
+        maxHeight: '94vh',
         overflowY: 'auto',
         color: '#1e293b'
       }}>
@@ -688,30 +736,30 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
         {/* STEP 3: REGISTRATION SUCCESS & QR BADGE PREVIEW */}
         {step === 3 && createdUser && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', marginBottom: '8px' }}>
-              <CheckCircle size={36} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', marginBottom: '2px' }}>
+              <CheckCircle size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#16a34a', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#16a34a', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
                 Die Schule <strong>{createdUser.schoolName}</strong> wurde erfolgreich angelegt.
               </p>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
                 Bitte speichere deinen <strong>Campus-Groovelab</strong> QR-Ausweis für den zukünftigen Login.
               </p>
             </div>
 
-            {/* Admin ID / QR Card */}
+            {/* Admin ID / QR Card (Branded with Campus-Groovelab gradient) */}
             <div 
               ref={cardRef}
               style={{
-                background: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
-                borderRadius: '24px',
-                padding: '24px',
+                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                borderRadius: '20px',
+                padding: '16px',
                 width: '100%',
-                maxWidth: '320px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                maxWidth: '280px',
+                boxShadow: '0 12px 24px rgba(19, 115, 51, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -720,33 +768,33 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 boxSizing: 'border-box'
               }}
             >
-              <div style={{ fontSize: '10px', fontWeight: 900, color: '#fef08a', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 900, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '12px', opacity: 0.9 }}>
                 Campus-Groovelab Ausweis
               </div>
               
               {/* QR Code */}
               <div style={{
                 background: 'white',
-                borderRadius: '16px',
-                padding: '12px',
+                borderRadius: '12px',
+                padding: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.1)'
+                boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.1)'
               }}>
                 <QRCode
                   id="signup-qr-code-svg"
                   value={`${window.location.origin}/qr/${createdUser.qr_token}`}
-                  size={180}
+                  size={120}
                   style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                   viewBox={`0 0 256 256`}
                 />
               </div>
 
-              <div style={{ marginTop: '16px', fontWeight: 800, fontSize: '1.1rem', fontFamily: '"Outfit", sans-serif' }}>
+              <div style={{ marginTop: '10px', fontWeight: 800, fontSize: '0.95rem', fontFamily: '"Outfit", sans-serif', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
                 {createdUser.first_name} {createdUser.last_name}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#a7f3d0', fontWeight: 700, textTransform: 'uppercase', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.7rem', color: '#ffffff', fontWeight: 700, textTransform: 'uppercase', marginTop: '1px', opacity: 0.85 }}>
                 Administrator
               </div>
             </div>
@@ -755,86 +803,128 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             <div style={{
               background: '#fffbeb',
               border: '1.5px solid #fef3c7',
-              borderRadius: '20px',
-              padding: '20px',
+              borderRadius: '16px',
+              padding: '12px 16px',
               textAlign: 'left',
               width: '100%',
-              maxWidth: '320px',
+              maxWidth: '280px',
               boxSizing: 'border-box',
               color: '#78350f',
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(251, 191, 36, 0.05)'
+              gap: '4px',
+              boxShadow: '0 4px 10px rgba(251, 191, 36, 0.03)'
             }}>
-              <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: '#b45309' }}>
+              <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.04em', color: '#b45309' }}>
                 ⚠️ WICHTIGE ZUGANGSDATEN (Bitte sicher abspeichern)
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #fde68a', paddingBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #fde68a', paddingBottom: '3px' }}>
                 <span style={{ fontWeight: 700 }}>Ausweis-PIN:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.95rem' }}>{createdUser.ausweis_nummer}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem' }}>{createdUser.ausweis_nummer}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 700 }}>Geräte-PIN:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.95rem' }}>{String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem' }}>{String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '320px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+              
+              {/* Biometrics Setup Button (Fingerprint) */}
+              {isWebAuthnSupported() && (
+                <button
+                  onClick={handleRegisterBiometrics}
+                  disabled={biometricsStatus === 'registering' || biometricsStatus === 'success'}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: biometricsStatus === 'success' ? '1.5px solid #16a34a' : '1.5px solid #d1d5db',
+                    background: biometricsStatus === 'success' ? '#f0fdf4' : biometricsStatus === 'error' ? '#fef2f2' : '#f8fafc',
+                    color: biometricsStatus === 'success' ? '#16a34a' : biometricsStatus === 'error' ? '#dc2626' : '#1e293b',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    cursor: (biometricsStatus === 'registering' || biometricsStatus === 'success') ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Fingerprint size={14} />
+                  {biometricsStatus === 'idle' && 'Fingerabdruck / FaceID einrichten'}
+                  {biometricsStatus === 'registering' && 'Einrichtung läuft...'}
+                  {biometricsStatus === 'success' && 'Biometrischer Login aktiv ✓'}
+                  {biometricsStatus === 'error' && 'Erneut versuchen'}
+                </button>
+              )}
+
+              {biometricsStatus === 'error' && biometricsErrorMessage && (
+                <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 650, marginTop: '-4px', textAlign: 'center' }}>
+                  {biometricsErrorMessage}
+                </div>
+              )}
+
               <button 
                 onClick={downloadQrCode} 
                 style={{
                   width: '100%',
-                  padding: '14px',
-                  borderRadius: '16px',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
                   border: '1.5px solid #d1d5db',
                   background: 'white',
                   color: '#475569',
                   fontWeight: 800,
-                  fontSize: '0.9rem',
+                  fontSize: '0.8rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   boxSizing: 'border-box'
                 }}
               >
-                <Download size={16} /> QR-Ausweis herunterladen
+                <Download size={14} /> QR-Ausweis herunterladen
               </button>
+
               <button 
                 onClick={downloadWalletPass} 
                 style={{
                   width: '100%',
-                  padding: '14px',
-                  borderRadius: '16px',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
                   border: '1.5px solid #d1d5db',
                   background: 'white',
                   color: '#475569',
                   fontWeight: 800,
-                  fontSize: '0.9rem',
+                  fontSize: '0.8rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                   boxSizing: 'border-box'
                 }}
               >
-                <Key size={16} /> Wallet Pass (.pkpass)
+                <Key size={14} /> Wallet Pass (.pkpass)
               </button>
+
               <button 
                 onClick={() => onSignupSuccess(createdUser.id)}
                 style={{
                   ...nextButtonStyle,
                   width: '100%',
-                  margin: '8px 0 0 0',
+                  margin: '4px 0 0 0',
+                  padding: '10px 14px',
+                  fontSize: '0.82rem',
                   boxSizing: 'border-box'
                 }}
               >
-                Zum Dashboard fortfahren <ArrowRight size={16} />
+                Zum Dashboard fortfahren <ArrowRight size={14} />
               </button>
             </div>
           </div>

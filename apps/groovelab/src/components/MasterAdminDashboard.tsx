@@ -4,7 +4,7 @@ import {
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search, Tag, Percent,
-  Activity, Cpu, Database, AlertTriangle
+  Activity, Cpu, Database, AlertTriangle, QrCode, UserPlus, Key, Eye, EyeOff
 } from 'lucide-react';
 
 interface ServerMetric {
@@ -82,9 +82,10 @@ function getSubdomainOrigin(schoolName: string): string {
 
 interface MasterAdminDashboardProps {
   onLogout: () => void;
+  currentUser?: any;
 }
 
-export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
+export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashboardProps) {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -121,6 +122,16 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+
+  // Mehrere Master-Admins verwalten
+  const [masterAdmins, setMasterAdmins] = useState<any[]>([]);
+  const [showAddAdminForm, setShowAddAdminForm] = useState(false);
+  const [newAdminFirstName, setNewAdminFirstName] = useState('');
+  const [newAdminLastName, setNewAdminLastName] = useState('');
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [selectedAdminForQr, setSelectedAdminForQr] = useState<any>(null);
 
     // Pricing States
   const [priceCampus, setPriceCampus] = useState<number | string>(7.99);
@@ -199,7 +210,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
   useEffect(() => {
     fetchSchoolsAndStats();
-    fetchAdminUser();
+    fetchMasterAdmins();
     fetchBillingSettings();
     fetchPendingUsers();
     fetchServerMetrics();
@@ -397,21 +408,92 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }
   };
 
-  const fetchAdminUser = async () => {
+  const fetchMasterAdmins = async () => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('is_master_admin', true)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setAdminUser(data);
-        setAdminUsername(data.master_admin_username || 'admin');
-        setAdminPassword(data.master_admin_password || 'groovelab2026');
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setMasterAdmins(data || []);
+      if (data && data.length > 0) {
+        const current = data.find(d => d.id === currentUser?.id) || data[0];
+        setAdminUser(current);
+        setAdminUsername(current.master_admin_username || 'admin');
+        setAdminPassword(current.master_admin_password || 'groovelab2026');
       }
     } catch (err) {
       console.error('Error fetching admin:', err);
+    }
+  };
+
+  const handleCreateMasterAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminUsername.trim() || !newAdminPassword.trim()) {
+      alert('Bitte fülle alle Pflichtfelder aus.');
+      return;
+    }
+    try {
+      setCreatingAdmin(true);
+      const newAdminId = window.crypto?.randomUUID ? window.crypto.randomUUID() : 'admin-' + Math.random().toString(36).substr(2, 9);
+      const newQrToken = window.crypto?.randomUUID ? window.crypto.randomUUID() : 'qr-' + Math.random().toString(36).substr(2, 9);
+      
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          id: newAdminId,
+          first_name: newAdminFirstName.trim() || 'Master',
+          last_name: newAdminLastName.trim() || 'Admin',
+          role: 'admin',
+          is_master_admin: true,
+          master_admin_username: newAdminUsername.trim(),
+          master_admin_password: newAdminPassword.trim(),
+          qr_token: newQrToken,
+          school_id: null
+        });
+
+      if (error) throw error;
+
+      alert('Neuer Master-Admin erfolgreich erstellt!');
+      setShowAddAdminForm(false);
+      setNewAdminFirstName('');
+      setNewAdminLastName('');
+      setNewAdminUsername('');
+      setNewAdminPassword('');
+      
+      fetchMasterAdmins();
+    } catch (err: any) {
+      alert('Fehler beim Erstellen des Master-Admins: ' + err.message);
+    } finally {
+      setCreatingAdmin(false);
+    }
+  };
+
+  const handleDeleteMasterAdmin = async (adminId: string, adminName: string) => {
+    if (currentUser && adminId === currentUser.id) {
+      alert('Du kannst dich nicht selbst löschen!');
+      return;
+    }
+    if (masterAdmins.length <= 1) {
+      alert('Es muss mindestens ein Master-Admin im System verbleiben!');
+      return;
+    }
+    if (!confirm(`Möchtest du den Master-Admin "${adminName}" wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', adminId);
+
+      if (error) throw error;
+      alert('Master-Admin erfolgreich gelöscht!');
+      fetchMasterAdmins();
+    } catch (err: any) {
+      alert('Fehler beim Löschen: ' + err.message);
     }
   };
   const parseDate = (d: string | null) => {
@@ -481,7 +563,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
 
   const handleUpdateAdminCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminUsername.trim() || !adminPassword.trim()) return;
+    if (!adminUsername.trim() || !adminPassword.trim() || !adminUser) return;
     try {
       setUpdatingAdmin(true);
       const { error } = await supabase
@@ -490,10 +572,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           master_admin_username: adminUsername.trim(),
           master_admin_password: adminPassword.trim()
         })
-        .eq('is_master_admin', true);
+        .eq('id', adminUser.id);
       if (error) throw error;
       alert('Zugangsdaten erfolgreich aktualisiert!');
-      fetchAdminUser();
+      fetchMasterAdmins();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
     } finally {
@@ -605,19 +687,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
     }
 
     try {
-      // 1. Delete users first to satisfy the audit_logs foreign key constraint
-      const { error: usersErr } = await supabase
-        .from('users')
-        .delete()
-        .eq('school_id', id);
-
-      if (usersErr) throw usersErr;
-
-      // 2. Delete the school itself
+      // Call the RPC function that deletes the school and its users/resources in one transaction
+      // with statement_timeout = 0 to prevent statement timeout errors on larger schools.
       const { error } = await supabase
-        .from('schools')
-        .delete()
-        .eq('id', id);
+        .rpc('delete_school_cascade', { p_school_id: id });
 
       if (error) throw error;
       alert(`Schule "${name}" wurde erfolgreich gelöscht.`);
@@ -721,11 +794,11 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
             {/* App Logo & Branding */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '44px', padding: '0 8px' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
+                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
                 width: '40px',
                 height: '40px',
                 borderRadius: '12px',
-                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
+                boxShadow: '0 8px 20px rgba(19, 115, 51, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -748,7 +821,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
                 { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' },
                 { id: 'billing', label: 'Abrechnung & Abonnements', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
-                { id: 'banking', label: 'Adresse & Banking', icon: <Settings size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'banking', label: 'System & Master-Admins', icon: <Shield size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
                 { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
               ].map((tab) => {
                 const isActive = activePortalTab === tab.id;
@@ -813,26 +886,41 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px' }}>
               <div style={{
-                width: '38px',
-                height: '38px',
+                width: '40px',
+                height: '40px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
                 fontWeight: 900,
-                fontSize: '0.8rem',
-                boxShadow: '0 4px 10px rgba(15, 23, 42, 0.15)'
+                fontSize: '0.85rem',
+                boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)'
               }}>
-                MA
+                {((currentUser?.first_name?.[0] || '') + (currentUser?.last_name?.[0] || '')) || 'MA'}
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {adminUsername || 'Master Admin'}
+                  {currentUser?.first_name && currentUser?.last_name ? `${currentUser.first_name} ${currentUser.last_name}` : (adminUsername || 'Master Admin')}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                  System Root
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {currentUser?.master_admin_username ? `@${currentUser.master_admin_username}` : `@${adminUsername || 'admin'}`}
+                </div>
+                <div>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 6px',
+                    borderRadius: '6px',
+                    background: 'rgba(19, 115, 51, 0.08)',
+                    color: '#137333',
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase'
+                  }}>
+                    System Root
+                  </span>
                 </div>
               </div>
             </div>
@@ -2290,10 +2378,10 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
               {/* Header */}
               <div>
                 <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                  Adresse &amp; Banking
+                  System &amp; Master-Admins
                 </h2>
                 <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
-                  Verwalte die globalen Zugangsdaten und die hinterlegte Rechnungsadresse für den Betreiber Simplified Work.
+                  Verwalte die Master-Administratoren mit Kiosk-Zugängen sowie die globalen Rechnungsdaten des Betreibers.
                 </p>
               </div>
 
@@ -2309,97 +2397,255 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                   borderRadius: '24px',
                   padding: '36px',
                   border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '32px'
                 }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                    <Shield size={20} color="#d97706" /> Master-Admin Zugang
-                  </h3>
-
-                  <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Root-Benutzername
-                      </label>
-                      <input
-                        type={usernameFocused ? "text" : "password"}
-                        value={adminUsername}
-                        onChange={(e) => setAdminUsername(e.target.value)}
-                        placeholder="admin"
-                        required
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '12px',
-                          background: '#f8fafc',
-                          border: '1px solid rgba(15, 23, 42, 0.08)',
-                          color: '#0f172a',
-                          fontSize: '0.92rem',
-                          fontWeight: 700,
-                          outline: 'none'
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                        <Shield size={20} color="#137333" /> Master-Admins
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowAddAdminForm(!showAddAdminForm);
+                          setSelectedAdminForQr(null);
                         }}
-                        onFocus={() => setUsernameFocused(true)}
-                        onBlur={() => setUsernameFocused(false)}
-                        className="premium-input"
-                      />
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          background: showAddAdminForm ? '#f1f5f9' : 'rgba(19, 115, 51, 0.08)',
+                          border: 'none',
+                          color: showAddAdminForm ? '#475569' : '#137333',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <UserPlus size={14} /> {showAddAdminForm ? 'Abbrechen' : 'Hinzufügen'}
+                      </button>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Passwort
-                      </label>
-                      <input
-                        type={passwordFocused ? "text" : "password"}
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="Passwort"
-                        required
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '12px',
-                          background: '#f8fafc',
-                          border: '1px solid rgba(15, 23, 42, 0.08)',
-                          color: '#0f172a',
-                          fontSize: '0.92rem',
-                          fontWeight: 700,
-                          outline: 'none'
-                        }}
-                        onFocus={() => setPasswordFocused(true)}
-                        onBlur={() => setPasswordFocused(false)}
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={updatingAdmin}
-                      style={{
-                        padding: '14px',
-                        borderRadius: '12px',
-                        background: '#0f172a',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '0.9rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
+                    {/* Add Admin Form */}
+                    {showAddAdminForm && (
+                      <form onSubmit={handleCreateMasterAdmin} style={{
+                        background: '#f8fafc',
+                        padding: '24px',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(15, 23, 42, 0.06)',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
-                      }}
-                      className="hover-scale-mini"
-                    >
-                      {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
-                    </button>
-                  </form>
+                        flexDirection: 'column',
+                        gap: '16px',
+                        marginBottom: '28px'
+                      }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Neuen Master-Admin erstellen</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Vorname</label>
+                            <input
+                              type="text"
+                              value={newAdminFirstName}
+                              onChange={(e) => setNewAdminFirstName(e.target.value)}
+                              placeholder="z.B. Patrick"
+                              required
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.1)', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Nachname</label>
+                            <input
+                              type="text"
+                              value={newAdminLastName}
+                              onChange={(e) => setNewAdminLastName(e.target.value)}
+                              placeholder="z.B. Huber"
+                              required
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.1)', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Benutzername</label>
+                          <input
+                            type="text"
+                            value={newAdminUsername}
+                            onChange={(e) => setNewAdminUsername(e.target.value)}
+                            placeholder="z.B. patrick.huber88"
+                            required
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.1)', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Passwort</label>
+                          <input
+                            type="password"
+                            value={newAdminPassword}
+                            onChange={(e) => setNewAdminPassword(e.target.value)}
+                            placeholder="Passwort festlegen"
+                            required
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.1)', fontSize: '0.85rem', fontWeight: 700, outline: 'none' }}
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={creatingAdmin}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            background: '#137333',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)'
+                          }}
+                        >
+                          {creatingAdmin ? 'Erstellt...' : 'Admin erstellen'}
+                        </button>
+                      </form>
+                    )}
 
-                  {adminUser && (
+                    {/* Master Admins List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {masterAdmins.map((adm) => {
+                        const isCurrent = currentUser && adm.id === currentUser.id;
+                        const isSelectedForEdit = adminUser && adm.id === adminUser.id;
+                        const admInitials = `${adm.first_name?.[0] || ''}${adm.last_name?.[0] || ''}`.toUpperCase() || 'MA';
+                        return (
+                          <div
+                            key={adm.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 18px',
+                              borderRadius: '16px',
+                              background: isSelectedForEdit ? '#f8fafc' : '#ffffff',
+                              border: isSelectedForEdit ? '1.5px solid #137333' : '1px solid rgba(15, 23, 42, 0.06)',
+                              boxShadow: isSelectedForEdit ? '0 4px 12px rgba(19, 115, 51, 0.04)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                fontWeight: 800,
+                                fontSize: '0.75rem',
+                                flexShrink: 0
+                              }}>
+                                {admInitials}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {adm.first_name} {adm.last_name}
+                                  </span>
+                                  {isCurrent && (
+                                    <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
+                                      Du
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                                  @{adm.master_admin_username}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                onClick={() => {
+                                  setSelectedAdminForQr(selectedAdminForQr?.id === adm.id ? null : adm);
+                                  setShowAddAdminForm(false);
+                                }}
+                                title="QR-Badge anzeigen"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  background: selectedAdminForQr?.id === adm.id ? '#137333' : '#f1f5f9',
+                                  border: 'none',
+                                  color: selectedAdminForQr?.id === adm.id ? '#ffffff' : '#475569',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <QrCode size={14} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setAdminUser(adm);
+                                  setAdminUsername(adm.master_admin_username || '');
+                                  setAdminPassword(adm.master_admin_password || '');
+                                  setShowAddAdminForm(false);
+                                }}
+                                title="Zugangsdaten bearbeiten"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  background: isSelectedForEdit ? 'rgba(19, 115, 51, 0.1)' : '#f1f5f9',
+                                  border: 'none',
+                                  color: isSelectedForEdit ? '#137333' : '#475569',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMasterAdmin(adm.id, `${adm.first_name} ${adm.last_name}`)}
+                                disabled={isCurrent || masterAdmins.length <= 1}
+                                title={isCurrent ? "Du kannst dich nicht selbst löschen" : "Löschen"}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  background: '#fef2f2',
+                                  border: 'none',
+                                  color: isCurrent || masterAdmins.length <= 1 ? '#fca5a5' : '#ef4444',
+                                  cursor: isCurrent || masterAdmins.length <= 1 ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* QR Badge Display */}
+                  {selectedAdminForQr && (
                     <div style={{
-                      marginTop: '28px',
                       padding: '24px',
                       background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                       borderRadius: '16px',
@@ -2409,9 +2655,17 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       alignItems: 'center',
                       gap: '14px'
                     }}>
-                      <strong style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Kiosk Master QR-Badge
-                      </strong>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          QR-Badge: {selectedAdminForQr.first_name} {selectedAdminForQr.last_name}
+                        </strong>
+                        <button
+                          onClick={() => setSelectedAdminForQr(null)}
+                          style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800 }}
+                        >
+                          Schließen
+                        </button>
+                      </div>
                       <div style={{
                         background: '#ffffff',
                         padding: '12px',
@@ -2420,7 +2674,7 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                         border: '1px solid rgba(0,0,0,0.02)'
                       }}>
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${adminUser.qr_token}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${selectedAdminForQr.qr_token}`}
                           alt="Master Admin QR Badge"
                           style={{ width: '120px', height: '120px', display: 'block' }}
                         />
@@ -2428,6 +2682,91 @@ export function MasterAdminDashboard({ onLogout }: MasterAdminDashboardProps) {
                       <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textAlign: 'center', lineHeight: '1.5', fontWeight: 550 }}>
                         Scanne diesen QR-Code am Kiosk-Tablet für schnellen Master-Admin-Zugang.
                       </p>
+                    </div>
+                  )}
+
+                  {/* Edit Credentials Form */}
+                  {adminUser && !showAddAdminForm && (
+                    <div style={{
+                      borderTop: '1px solid rgba(15, 23, 42, 0.08)',
+                      paddingTop: '28px'
+                    }}>
+                      <h4 style={{ margin: '0 0 16px 0', fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Key size={14} color="#137333" /> Zugangsdaten für {adminUser.first_name} bearbeiten
+                      </h4>
+                      <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                            Benutzername
+                          </label>
+                          <input
+                            type="text"
+                            value={adminUsername}
+                            onChange={(e) => setAdminUsername(e.target.value)}
+                            placeholder="admin"
+                            required
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.88rem',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                            Passwort
+                          </label>
+                          <input
+                            type="password"
+                            value={adminPassword}
+                            onChange={(e) => setAdminPassword(e.target.value)}
+                            placeholder="Neues Passwort"
+                            required
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              color: '#0f172a',
+                              fontSize: '0.88rem',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={updatingAdmin}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            background: '#0f172a',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
+                        </button>
+                      </form>
                     </div>
                   )}
                 </div>

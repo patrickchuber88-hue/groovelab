@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
+import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
 const getInstrumentAvatarUrl = (instr: string) => {
   const low = (instr || '').toLowerCase();
@@ -422,6 +423,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [newOnboardingPinConfirm, setNewOnboardingPinConfirm] = useState<string[]>(['', '', '', '']);
   const [isTimetableAssigned, setIsTimetableAssigned] = useState(false);
 
+  // Biometrics / WebAuthn States
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
+  const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
+
+  useEffect(() => {
+    setBiometricsAvailable(isWebAuthnSupported());
+  }, []);
+
   const getDynamicAnnualPriceLocal = (startDateStr: string | null | undefined, isCoFinancing: boolean = false): number => {
     const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
     const month = contractDateObj.getMonth() + 1; // 1-indexed
@@ -495,16 +505,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               .eq('student_id', result.student_id);
 
             const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
-            if (prefSlots && prefSlots.length > 0) {
-              prefSlots.forEach(slot => {
-                const startTimeClean = slot.start_time.substring(0, 5);
-                const cellKey = `${slot.day_of_week}-${startTimeClean}`;
-                loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
-              });
-              setSelectedSlots(loadedSlots);
-            } else {
-              setSelectedSlots({});
-            }
+            setSelectedSlots({});
 
             const { data: mainStudentData } = await supabase
               .from('users')
@@ -527,6 +528,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setActiveParentChildIndex(0);
             setSibLastName(result.last_name || '');
 
+            sessionStorage.setItem('groovelab_user_id', result.student_id);
             setVerifiedStudentDetails({
               first_name: result.first_name,
               last_name: result.last_name,
@@ -1795,16 +1797,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           .eq('student_id', result.student_id);
 
         const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
-        if (prefSlots && prefSlots.length > 0) {
-          prefSlots.forEach(slot => {
-            const startTimeClean = slot.start_time.substring(0, 5);
-            const cellKey = `${slot.day_of_week}-${startTimeClean}`;
-            loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
-          });
-          setSelectedSlots(loadedSlots);
-        } else {
-          setSelectedSlots({});
-        }
+        setSelectedSlots({});
 
         // Get school_id and sibling_group_id
         const { data: mainStudentData } = await supabase
@@ -1864,6 +1857,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setActiveParentChildIndex(0);
         setSibLastName(parentLastName.trim());
 
+        sessionStorage.setItem('groovelab_user_id', result.student_id);
         setVerifiedStudentDetails({
           first_name: parentFirstName.trim(),
           last_name: parentLastName.trim(),
@@ -1879,6 +1873,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setVerifiedStudentId(result.student_id);
         setIsPinSetupNeeded(false);
         setParentOnboardingStep('pin');
+        sessionStorage.setItem('groovelab_user_id', result.student_id);
         setVerifiedStudentDetails({
           first_name: parentFirstName.trim(),
           last_name: parentLastName.trim(),
@@ -1957,16 +1952,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           .eq('student_id', verifiedStudentId);
 
         const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
-        if (prefSlots && prefSlots.length > 0) {
-          prefSlots.forEach(slot => {
-            const startTimeClean = slot.start_time.substring(0, 5);
-            const cellKey = `${slot.day_of_week}-${startTimeClean}`;
-            loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
-          });
-          setSelectedSlots(loadedSlots);
-        } else {
-          setSelectedSlots({});
-        }
+        setSelectedSlots({});
 
         const { data: mainStudentData } = await supabase
           .from('users')
@@ -2025,6 +2011,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setActiveParentChildIndex(0);
         setSibLastName(parentLastName.trim());
 
+        if (verifiedStudentId) {
+          sessionStorage.setItem('groovelab_user_id', verifiedStudentId);
+        }
         setVerifiedStudentDetails({
           first_name: parentFirstName.trim(),
           last_name: parentLastName.trim(),
@@ -2293,6 +2282,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (savePrefErr) throw savePrefErr;
       }
 
+      if (parentChildren[0]?.id) {
+        sessionStorage.setItem('groovelab_user_id', parentChildren[0].id);
+      }
       setParentOnboardingStep('success');
     } catch (err: any) {
       console.error('Save preferences error:', err);
@@ -2327,6 +2319,99 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setMagicLinkMessage(err.message || 'Fehler beim Anfordern des Magic Links.');
     } finally {
       setParentOnboardingLoading(false);
+    }
+  };
+
+  const handleRegisterBiometrics = async () => {
+    if (!verifiedStudentDetails) return;
+    setBiometricsStatus('registering');
+    setBiometricsErrorMessage('');
+    try {
+      // Mock random challenge from server
+      const mockChallenge = btoa(crypto.randomUUID());
+      const email = `${verifiedStudentDetails.first_name.toLowerCase()}.${verifiedStudentDetails.last_name.toLowerCase()}@campus-groovelab.local`;
+      const result = await registerBiometrics(
+        email,
+        verifiedStudentDetails.id,
+        mockChallenge
+      );
+      
+      // Store in Supabase
+      if (verifiedStudentDetails?.id) {
+        sessionStorage.setItem('groovelab_user_id', verifiedStudentDetails.id);
+      }
+      const { error } = await supabase.from('user_credentials').insert({
+        user_id: verifiedStudentDetails.id,
+        credential_id: result.id,
+        public_key: JSON.stringify(result.response),
+        device_name: 'WebAuthn Device'
+      });
+
+      if (error) throw error;
+      setBiometricsStatus('success');
+    } catch (err: any) {
+      console.error('Biometrics registration failed:', err);
+      setBiometricsStatus('error');
+      setBiometricsErrorMessage(err.message || 'Die Einrichtung wurde abgebrochen oder ist fehlgeschlagen.');
+    }
+  };
+
+  const handleBiometricsLogin = async () => {
+    setLoading(true);
+    try {
+      if (!isWebAuthnSupported()) {
+        alert("Biometrisches Anmelden wird von diesem Gerät oder Browser nicht unterstützt.");
+        setLoading(false);
+        return;
+      }
+
+      // 1. Generate challenge
+      const mockChallenge = btoa(crypto.randomUUID());
+      const challengeBuffer = new Uint8Array(
+        atob(mockChallenge).split("").map((c) => c.charCodeAt(0))
+      ).buffer;
+
+      // 2. Fetch the resident credential
+      const assertion = (await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBuffer,
+          userVerification: 'required',
+          timeout: 60000,
+        },
+      })) as PublicKeyCredential;
+
+      if (!assertion) {
+        throw new Error("Keine biometrischen Daten empfangen.");
+      }
+
+      const credentialId = assertion.id;
+
+      // 3. Find the credential row in DB using secure RPC
+      const { data: matchedUserId, error: credErr } = await supabase
+        .rpc('get_user_id_by_credential', { input_credential_id: credentialId });
+
+      if (credErr || !matchedUserId) {
+        throw new Error("Dieses Gerät ist nicht für ein Benutzerkonto registriert.");
+      }
+
+      // 4. Fetch the user details
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', matchedUserId)
+        .single();
+
+      if (userErr || !user) {
+        throw new Error("Benutzerkonto konnte nicht geladen werden.");
+      }
+
+      // 5. Finalize login
+      await finalizeLogin(user, loginStationId, false);
+
+    } catch (err: any) {
+      console.error('Biometrics login failed:', err);
+      alert(err.message || 'Anmeldung per Fingerabdruck fehlgeschlagen.');
+      setLoading(false);
     }
   };
 
@@ -3670,7 +3755,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
 
-        {!isGroovelabKiosk && (
+        {!isGroovelabKiosk && !schoolData && (
           <div style={{ marginTop: '12px', width: '100%' }}>
             <button 
               onClick={() => {
@@ -3905,6 +3990,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             Passwort Anmeldung
           </button>
 
+          {biometricsAvailable && (
+            <button 
+              onClick={handleBiometricsLogin}
+              style={{ 
+                background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
+                border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
+                padding: '10px 24px',
+                borderRadius: '100px',
+                color: isGroovelabKiosk ? '#062413' : '#ffffff', 
+                fontSize: '12px', 
+                fontWeight: 800, 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                cursor: 'pointer', 
+                transition: 'all 0.2s',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
+            >
+              <Fingerprint size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
+              Fingerabdruck Login
+            </button>
+          )}
         </div>
       )}
 
@@ -3988,8 +4101,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Eltern Onboarding & Aktivierung */}
       {expandedSection === 'parentOnboarding' && (
       <div style={{
-        width: '100%',
-        maxWidth: '520px',
+        width: '95%',
+        maxWidth: parentOnboardingStep === 'preferences' ? '850px' : '520px',
         background: '#ffffff',
         borderRadius: '32px',
         padding: '36px',
@@ -4691,7 +4804,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  maxHeight: '320px',
+                  maxHeight: window.innerHeight > 850 ? '480px' : '320px',
                   overflowY: 'auto'
                 }}>
                   {/* Header Row */}
@@ -4905,6 +5018,87 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </button>
             </div>
 
+            {/* FINGERPRINT ACTIVATION */}
+            {biometricsAvailable && (
+              <div style={{
+                width: '100%',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '16px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                textAlign: 'left'
+              }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px' }}>
+                    <Fingerprint size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>
+                      Schneller Login per Fingerabdruck
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#64748b', lineHeight: '1.4' }}>
+                      Entsperre die App beim nächsten Mal sofort per TouchID/FaceID auf diesem Gerät.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '10px', color: '#64748b', background: '#f1f5f9', padding: '8px 12px', borderRadius: '10px', lineHeight: '1.4' }}>
+                  <strong>🔒 100% Sicher:</strong> Dein Fingerabdruck wird niemals auf unseren Servern gespeichert. Dein Gerät verifiziert dich lokal und sendet uns nur eine verschlüsselte Bestätigung.
+                </div>
+
+                {biometricsStatus === 'idle' && (
+                  <button
+                    onClick={handleRegisterBiometrics}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: '10px', border: 'none',
+                      background: '#3b82f6', color: '#ffffff', fontWeight: 800, fontSize: '12px',
+                      cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    }}
+                  >
+                    Fingerabdruck-Login aktivieren
+                  </button>
+                )}
+
+                {biometricsStatus === 'registering' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#3b82f6', fontWeight: 700, padding: '8px' }}>
+                    <RotateCw size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                    Warte auf Bestätigung des Geräts...
+                  </div>
+                )}
+
+                {biometricsStatus === 'success' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#10b981', fontWeight: 800, padding: '8px 0 0 0' }}>
+                    <Check size={16} strokeWidth={3} />
+                    Erfolgreich aktiviert!
+                  </div>
+                )}
+
+                {biometricsStatus === 'error' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 800 }}>
+                      <AlertCircle size={16} />
+                      Einrichtung fehlgeschlagen
+                    </div>
+                    <span style={{ fontSize: '10px', color: '#ef4444' }}>{biometricsErrorMessage}</span>
+                    <button
+                      onClick={handleRegisterBiometrics}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ef4444',
+                        background: 'transparent', color: '#ef4444', fontWeight: 800, fontSize: '11px',
+                        cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      Erneut versuchen
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               onClick={() => onLogin(verifiedStudentDetails.id, false)}
               style={{
@@ -4995,13 +5189,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Admin Bypass for Localhost */}
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Manuel Wagner Bypass */}
-          {import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN && (
+          {/* Patrick Huber Bypass */}
+          {import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN && (
             <button
               onClick={async () => {
                 try {
-                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN;
-                  console.log('[Bypass] Attempting Manuel Wagner login...');
+                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
+                  console.log('[Bypass] Attempting Patrick Huber login...');
                   // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
@@ -5018,11 +5212,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   }
 
                   if (user) {
-                    console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
+                    console.log('[Bypass] Patrick Huber found, logging in:', user.id);
+                    sessionStorage.setItem('groovelab_user_id', user.id);
                     onLogin(user.id, true);
                   } else {
-                    console.warn('[Bypass] No user found with Manuel Wagner token.');
-                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
+                    console.warn('[Bypass] No user found with Patrick Huber token.');
+                    alert('Patrick Huber wurde in der Datenbank nicht gefunden.');
                   }
                 } catch (err: any) {
                   console.error('[Bypass] Runtime Error:', err);
@@ -5049,7 +5244,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
             >
-              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
+              🔓 BYPASS: PATRICK HUBER (VERWALTUNG)
             </button>
           )}
 
@@ -5077,6 +5272,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
                   if (user) {
                     console.log('[Bypass] Admin found, logging in:', user.id);
+                    sessionStorage.setItem('groovelab_user_id', user.id);
                     onLogin(user.id, true);
                   } else {
                     console.warn('[Bypass] No user found with Admin token.');

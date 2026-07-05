@@ -1119,12 +1119,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>('briefing');
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>(() => {
+    const saved = localStorage.getItem('groovelab_secretary_subtab');
+    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit'];
+    if (saved && valid.includes(saved)) return saved as any;
+    return 'briefing';
+  });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status' | 'rooms'>('briefing');
+  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status' | 'rooms'>(() => {
+    const saved = localStorage.getItem('groovelab_campus_subtab');
+    const valid = ['briefing', 'subjects', 'onboarding', 'students', 'cooperations', 'events', 'schedules', 'status', 'rooms'];
+    if (saved && valid.includes(saved)) return saved as any;
+    return 'briefing';
+  });
   const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(() => {
     const saved = localStorage.getItem('gl_setting_subjects');
     return saved !== 'false';
@@ -1166,7 +1176,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [adHocStudentName, setAdHocStudentName] = useState<string>('');
   const [adHocStartTime, setAdHocStartTime] = useState<string>('14:00');
   const [adHocDuration, setAdHocDuration] = useState<number>(45);
-  const [groovelabSubTab, setGroovelabSubTab] = useState<'briefing' | 'live' | 'students' | 'coaches' | 'kiosk' | 'status'>('briefing');
+  const [groovelabSubTab, setGroovelabSubTab] = useState<'live' | 'students' | 'coaches' | 'kiosk'>('live');
   const [pendingBookings, setPendingBookings] = useState<any[]>([]);
   const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -1225,6 +1235,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     };
     loadOwnProfile();
   }, [userId]);
+
+  // Persist navigation tabs and subtabs on change
+  useEffect(() => {
+    localStorage.setItem('groovelab_active_workspace', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
+  }, [secretarySubTab]);
+
+  useEffect(() => {
+    localStorage.setItem('groovelab_campus_subtab', campusSubTab);
+  }, [campusSubTab]);
 
   useEffect(() => {
     const migrateLocalStorageToSupabase = async () => {
@@ -1373,6 +1396,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       alert('Fehler beim Umschalten: ' + err.message);
     }
   };
+
+  const handleToggleStudentModule = async (student: any, moduleType: 'campus' | 'groovelab') => {
+    try {
+      const isCampus = student.is_campus_active || student.isCampusActive;
+      const isGroove = student.is_groovelab_active || student.isGroovelabActive;
+      
+      const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
+      const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_campus_active: newCampusValue,
+          is_groovelab_active: newGrooveValue,
+        })
+        .eq('id', student.id);
+
+      if (error) throw error;
+      
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Umschalten: ' + err.message);
+    }
+  };
+
   const [holidayXpActive, setHolidayXpActive] = useState<boolean>(() => {
     return localStorage.getItem('groovelab_holiday_xp_active') === 'true';
   });
@@ -1911,7 +1959,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [teacherStatusTab, setTeacherStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
   const [teacherFilterInstrument, setTeacherFilterInstrument] = useState<string>('All');
   
+  const [coachSearchQuery, setCoachSearchQuery] = useState<string>('');
+  const [coachFilterInstrument, setCoachFilterInstrument] = useState<string>('All');
+  
+  const [groovelabStudentSearchQuery, setGroovelabStudentSearchQuery] = useState<string>('');
+  const [groovelabStudentFilterInstrument, setGroovelabStudentFilterInstrument] = useState<string>('All');
+  
   // Manual Teacher Creation Form States
+  const [showAddCoachModal, setShowAddCoachModal] = useState<boolean>(false);
+  const [coachModalSearchQuery, setCoachModalSearchQuery] = useState<string>('');
+  const [showManualCreateCoach, setShowManualCreateCoach] = useState<boolean>(false);
+  const [showAddGroovelabStudentModal, setShowAddGroovelabStudentModal] = useState<boolean>(false);
+  const [groovelabStudentModalSearchQuery, setGroovelabStudentModalSearchQuery] = useState<string>('');
+  const [showManualCreateGroovelabStudent, setShowManualCreateGroovelabStudent] = useState<boolean>(false);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
   const [newTeacherFirstName, setNewTeacherFirstName] = useState<string>('');
   const [newTeacherLastName, setNewTeacherLastName] = useState<string>('');
@@ -2663,22 +2723,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         
         const dbIsBooked = schoolData.is_billing_booked ?? false;
         const storedIsBooked = localStorage.getItem('isBillingBooked') === 'true';
-        if (!hasCampus && !hasGroove && !storedIsBooked && !dbIsBooked) {
-          setIsBillingBooked(false);
-          localStorage.removeItem('isBillingBooked');
-          setBookedExtraUsers(0);
-          localStorage.setItem('bookedExtraUsers', '0');
-          setExtraUsersSliderVal(0);
-          setStudentBillingOption('option2');
-          setBillingPayer('school');
-        } else {
+        if (dbIsBooked || storedIsBooked) {
           setIsBillingBooked(true);
           localStorage.setItem('isBillingBooked', 'true');
-          if (hasCampus) setHasCampusSub(true);
-          if (hasGroove) setHasGroovelabSub(true);
+          setHasCampusSub(hasCampus);
+          setHasGroovelabSub(hasGroove);
           const billingOpt = schoolData.student_billing_option || 'option2';
           setStudentBillingOption(billingOpt);
           setBillingPayer((billingOpt === 'option2' || billingOpt === 'option3_2' || billingOpt === 'option3_3') ? 'school' : 'student');
+        } else {
+          setIsBillingBooked(false);
+          localStorage.removeItem('isBillingBooked');
+          setHasCampusSub(hasCampus);
+          setHasGroovelabSub(hasGroove);
         }
         
         setPendingUserQuota(schoolData.pending_user_quota);
@@ -3697,6 +3754,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         .update(updateData)
         .eq('id', schoolId);
       if (error) throw error;
+
+      if (newValue) {
+        // Auto-seed GrooveLab subject if it doesn't exist yet
+        const grooveLabExists = subjects.some(s => s.name.toLowerCase() === 'groovelab');
+        if (!grooveLabExists) {
+          const { error: insertErr } = await supabase
+            .from('subjects')
+            .insert({
+              school_id: schoolId,
+              name: 'GrooveLab',
+              category: 'Allgemein',
+              description: 'Automatisch angelegtes Fach für GrooveLab-Unterricht'
+            });
+          if (insertErr) {
+            console.error('Error seeding GrooveLab subject:', insertErr);
+          }
+        }
+      }
+      fetchDashboardData();
     } catch (err: any) {
       setHasGroovelabSub(!newValue);
     }
@@ -3884,7 +3960,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTeacherFirstName.trim() || !newTeacherLastName.trim() || !newTeacherEmail.trim()) return;
+    if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
 
     try {
       const pin = generateStarterPin('teacher', false, false);
@@ -3897,7 +3973,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           role: 'teacher',
           first_name: newTeacherFirstName.trim(),
           last_name: newTeacherLastName.trim(),
-          email: newTeacherEmail.trim(),
+          email: newTeacherEmail.trim() || null,
           instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
           max_students: newTeacherLimit,
           ausweis_nummer: pin,
@@ -3918,6 +3994,48 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       setNewTeacherLimit(10);
       setNewTeacherContractEndsAt('');
       setShowAddTeacherModal(false);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Anlegen der Lehrkraft: ' + err.message);
+    }
+  };
+
+  const handleCreateCoachForGroovelab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
+
+    try {
+      const pin = generateStarterPin('teacher', false, false);
+      const qrToken = generateSecureQrToken();
+
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          school_id: schoolId,
+          role: 'teacher',
+          first_name: newTeacherFirstName.trim(),
+          last_name: newTeacherLastName.trim(),
+          email: newTeacherEmail.trim() || null,
+          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
+          max_students: newTeacherLimit,
+          ausweis_nummer: pin,
+          teacher_qr_token: qrToken,
+          is_active: true,
+          is_app_user: true,
+          is_campus_active: false,
+          is_groovelab_active: true,
+          contract_ends_at: newTeacherContractEndsAt || null
+        });
+
+      if (error) throw error;
+
+      setNewTeacherFirstName('');
+      setNewTeacherLastName('');
+      setNewTeacherEmail('');
+      setNewTeacherInstrument('');
+      setNewTeacherLimit(10);
+      setNewTeacherContractEndsAt('');
+      setShowAddCoachModal(false);
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Anlegen der Lehrkraft: ' + err.message);
@@ -4189,6 +4307,53 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
       setShowAddStudentModal(false);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Erstellen des Schülers: ' + err.message);
+    }
+  };
+
+  const handleCreateStudentGroovelab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentFirstName || !newStudentLastName || !newStudentBirthDate) {
+      alert('Bitte Vorname, Nachname und Geburtsdatum ausfüllen.');
+      return;
+    }
+
+    try {
+      const teacherId = newStudentTeacherId || null;
+
+      // 1. Call import_student RPC
+      const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
+        first_name: newStudentFirstName,
+        last_name: newStudentLastName,
+        birth_date: newStudentBirthDate.trim(),
+        instrument: newStudentInstrument || 'Nicht festgelegt',
+        school_id: schoolId,
+        teacher_id: teacherId
+      });
+
+      if (insertError) throw insertError;
+
+      // 2. Set is_groovelab_active = true and is_campus_active = false for the newly created student profile
+      if (newStudentId) {
+        await supabase
+          .from('students')
+          .update({ is_groovelab_active: true, is_campus_active: false })
+          .eq('id', newStudentId);
+      }
+
+      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich für GrooveLab angelegt.`);
+      
+      // Reset form
+      setNewStudentFirstName('');
+      setNewStudentLastName('');
+      setNewStudentBirthDate('');
+      setNewStudentNickname('');
+      setNewStudentInstrument('');
+      setNewStudentDuration(30);
+      setNewStudentTeacherId('');
+      setShowAddGroovelabStudentModal(false);
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Erstellen des Schülers: ' + err.message);
@@ -7898,14 +8063,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             console.error(err);
           }
 
-          setRooms(prev => [...prev, {
-            ...data,
-            equipment: data.allowed_instruments || [],
-            floor: data.floor || roomFormFloor,
-            unsuitable_instruments: data.unsuitable_instruments || roomFormUnsuitableInstruments || [],
-            room_instruments: data.room_instruments || roomFormRoomInstruments || [],
-            sonstiges: data.sonstiges || roomFormSonstiges || ''
-          }]);
+          await fetchDashboardData();
         }
       }
       setEditingRoom(null);
@@ -8120,7 +8278,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
 
     if (insertedRooms.length > 0) {
-      setRooms(prev => [...prev, ...insertedRooms]);
+      await fetchDashboardData();
     }
 
     setRoomCsvText('');
@@ -8594,13 +8752,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           default: return '🎓 Campus Verwaltung';
         }
       case 'groovelab':
-        switch (groovelabSubTab) {
-          case 'briefing': return '🎸 GrooveLab Dashboard';
+        switch (groovelabSubTab as any) {
           case 'live': return 'Live Lab';
           case 'coaches': return 'Lehrer';
           case 'students': return 'Schüler';
-          case 'status': return 'Support & Inventar';
-          case 'kiosk': return 'Setup';
+          case 'kiosk': return 'Einstellungen';
           default: return '🎸 GrooveLab Verwaltung';
         }
       default: return '';
@@ -9575,11 +9731,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
           {/* If activeTab is GrooveLab */}
           {activeTab === 'groovelab' && [
-            { id: 'briefing', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'coaches', label: 'Lehrer', icon: Coffee },
+            { id: 'live', label: 'Live Lab', icon: Monitor },
+            { id: 'coaches', label: 'Lehrer', icon: GraduationCap },
             { id: 'students', label: 'Schüler', icon: Users },
-            { id: 'status', label: 'Support & Inventar', icon: ShieldAlert },
-            { id: 'kiosk', label: 'Setup', icon: Sliders }
+            { id: 'kiosk', label: 'Einstellungen', icon: Sliders }
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = groovelabSubTab === item.id;
@@ -10088,7 +10243,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {!((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
+              {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -14053,10 +14208,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     required
                                     value={newTeacherLastName}
                                     onChange={(e) => {
-                                      const val = e.target.value;
-                                      setNewTeacherLastName(val);
-                                      // Suggest email
-                                      setNewTeacherEmail(`${newTeacherFirstName.toLowerCase().trim().replace(/\s+/g, '')}.${val.toLowerCase().trim().replace(/\s+/g, '')}@musaek.de`);
+                                      setNewTeacherLastName(e.target.value);
                                     }}
                                     placeholder="z.B. Bach"
                                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
@@ -14065,10 +14217,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                               
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse *</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse</label>
                                 <input
                                   type="email"
-                                  required
                                   value={newTeacherEmail}
                                   onChange={(e) => setNewTeacherEmail(e.target.value)}
                                   placeholder="z.B. bach@musaek.de"
@@ -16935,111 +17086,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         {/* TAB 3: GROOVELAB */}
         {activeTab === 'groovelab' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Subtab: Startseite (Briefing) */}
-            {groovelabSubTab === 'briefing' && (
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
-                {/* Left Column: GrooveLab Startseite */}
-                <div style={{ flex: 1.6, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <div className="google-kpi-bar" style={{ background: '#fbbc05' }} />
-                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 850, color: '#b45309' }}>
-                      🎸 GrooveLab-Zentrale
-                    </h3>
-                    <p style={{ margin: '0 0 16px 0', fontSize: '0.88rem', color: '#64748b', lineHeight: '1.5' }}>
-                      Willkommen in der GrooveLab-Verwaltung. Hier überwachst du das Live Lab datenschutzkonform, verwaltest Coaches, prüfst Support-Tickets und konfigurierst System-Einstellungen.
-                    </p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 800, textTransform: 'uppercase' }}>Schüler im Live Lab</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#1e293b', marginTop: '4px' }}>
-                          {activeSessions.filter(s => s.users?.role === 'student').length}
-                        </strong>
-                      </div>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 800, textTransform: 'uppercase' }}>Hardware Online-Quote</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#1e293b', marginTop: '4px' }}>
-                          {stations.length ? Math.round((new Set(activeSessions.map(s => s.station_id)).size / stations.length) * 100) : 0}%
-                        </strong>
-                      </div>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 800, textTransform: 'uppercase' }}>Tages-Scans (Simuliert)</span>
-                        <strong style={{ display: 'block', fontSize: '1.8rem', color: '#1e293b', marginTop: '4px' }}>
-                          {activeSessions.length * 3 + 12} Scans
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* GrooveLab Announcements */}
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#b45309' }}>📌 Daily Briefing &amp; Live-Status</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '1.25rem' }}>🟢</span>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Eingecheckte Schüler:</strong>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                            {activeSessions.filter(s => s.users?.role === 'student').length > 0 
-                              ? `Gerade sind ${activeSessions.filter(s => s.users?.role === 'student').length} Schüler aktiv an den iPads eingeloggt.`
-                              : 'Momentan sind keine Schüler im Live Lab angemeldet.'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '1.25rem' }}>🔌</span>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Kiosk-Modus:</strong>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                            Der Kiosk-Token für automatische iPad-Check-ins ist {kioskToken ? 'aktiv' : 'nicht konfiguriert'}.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '8px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '1.25rem' }}>🔥 Holiday-Boost:</span>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>Ferien-XP:</strong>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                            Der Ferien Bonus XP Multiplikator ist {holidayXpActive ? 'aktiviert' : 'deaktiviert'}.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: GrooveLab Sidebar */}
-                <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '24px', flexShrink: 0 }}>
-                  <div className="google-card" style={{ padding: '20px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 800, color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      ⚡ GrooveLab-Betrieb
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem', color: '#64748b' }}>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px', borderRadius: '12px' }}>
-                        <strong style={{ display: 'block', marginBottom: '4px', color: '#b45309' }}>Betriebszustand:</strong>
-                        <span>{isPaused ? '⏸️ Der Schulbetrieb ist aktuell pausiert.' : '✅ Normaler GrooveLab Live-Betrieb.'}</span>
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                        <span>Abo-Status:</span>
-                        <strong style={{ color: '#b45309' }}>{hasGroovelabSub ? 'Aktiviert' : 'Inaktiv'}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>iPads / Stationen:</span>
-                        <strong style={{ color: '#b45309' }}>{stations.length}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Subtab: Startseite (Briefing) removed */}
 
             {/* Subtab: Live Lab Blueprint Board (1:1 replicated from TeacherDashboard) */}
             {groovelabSubTab === 'live' && (() => {
-              const activeRoom = rooms.find(r => r.id === selectedRoomId);
-              const roomStations = stations.filter(s => s.room_id === selectedRoomId);
+              const groovelabRooms = rooms.filter(r => r.is_groovelab_active || r.isGroovelabActive);
+              const activeRoom = groovelabRooms.find(r => r.id === selectedRoomId) || groovelabRooms[0];
+              const roomStations = stations.filter(s => s.room_id === (activeRoom?.id || selectedRoomId));
               const hasCustomLayout = activeRoom && 
                 activeRoom.room_width && 
                 activeRoom.room_height && 
@@ -17056,13 +17109,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               const renderLiveHeader = () => (
                 <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      📺 Live Lab Board
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#eab308', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Music size={20} style={{ color: '#eab308' }} /> Live Lab Board
                     </h3>
-                    {rooms.length > 1 && (
+                    {groovelabRooms.length > 1 && (
                       <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
-                        {rooms.map((room, idx) => {
-                          const isSelected = room.id === selectedRoomId;
+                        {groovelabRooms.map((room, idx) => {
+                          const isSelected = room.id === (activeRoom?.id || selectedRoomId);
                           return (
                             <button
                               key={room.id}
@@ -17158,7 +17211,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const maxH = Math.max(300, windowHeight - 280);
 
                 let unifiedScale = 1.0;
-                const customLayoutScales = rooms.map(r => {
+                const customLayoutScales = groovelabRooms.map(r => {
                   const rStations = stations.filter(s => s.room_id === r.id);
                   const rHasLayout = r.room_width && r.room_height && rStations.some(s => s.pos_x !== null && s.pos_y !== null);
                   if (!rHasLayout) return null;
@@ -17346,369 +17399,1247 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             })()}
 
             {/* Subtab: Students (Schüler) */}
-            {groovelabSubTab === 'students' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>👥 Registrierte Schüler (GrooveLab)</h3>
-                  
-                  {/* Search bar */}
-                  <div style={{ position: 'relative', marginBottom: '20px', maxWidth: '400px' }}>
-                    <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }}>🔍</span>
-                    <input 
-                      type="text" 
-                      placeholder="Schüler nach Name oder Spitzname suchen..." 
-                      value={liveSearchQuery}
-                      onChange={(e) => setLiveSearchQuery(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px 12px 48px',
-                        borderRadius: '14px',
-                        border: '1.5px solid #dadce0',
-                        outline: 'none',
-                        fontSize: '0.88rem',
-                        fontWeight: 650,
-                        boxSizing: 'border-box',
-                        background: '#f8fafc',
-                        color: '#1e293b'
-                      }}
-                    />
-                  </div>
+            {groovelabSubTab === 'students' && (() => {
+              // Get all school students who have GrooveLab active
+              const activeGroovelabStudents = students.filter(s => s.is_groovelab_active || s.isGroovelabActive);
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                    {students
-                      .filter(s => {
-                        const q = liveSearchQuery.trim().toLowerCase();
-                        if (!q) return true;
-                        const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
-                        const nick = (s.nickname || '').toLowerCase();
-                        return name.includes(q) || nick.includes(q);
-                      })
-                      .map(student => {
-                        const isOnline = activeSessions.some(sess => sess.user_id === student.id);
-                        return (
-                          <div 
-                            key={student.id} 
-                            onClick={() => setSelectedStudentForDetail(student)}
-                            style={{ 
-                              padding: '20px', 
-                              borderRadius: '20px', 
-                              border: '1.5px solid #dadce0', 
-                              background: '#f8fafc', 
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '16px',
-                              position: 'relative',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <div style={{ position: 'relative' }}>
-                              <div style={{ width: '48px', height: '48px', borderRadius: '14px', overflow: 'hidden', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: '#64748b' }}>
-                                {student.photo_url ? (
-                                  <img src={student.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                                ) : (
-                                  student.first_name?.[0] || 'S'
-                                )}
-                              </div>
-                              <div style={{ 
-                                position: 'absolute', 
-                                bottom: -3, 
-                                right: -3, 
-                                width: '12px', 
-                                height: '12px', 
-                                borderRadius: '50%', 
-                                background: isOnline ? '#22c55e' : '#cbd5e1', 
-                                border: '2px solid #e2e8f0' 
-                              }} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <strong style={{ display: 'block', fontSize: '0.92rem', color: '#1e293b', fontWeight: 800 }}>
-                                {student.first_name} {student.last_name}
-                              </strong>
-                              {student.nickname && (
-                                <span style={{ display: 'block', fontSize: '0.78rem', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
-                                  "{student.nickname}"
-                                </span>
-                              )}
-                              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>
-                                🎸 {student.instrument || 'Kein Hauptinstrument'}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                              <span style={{ 
-                                fontSize: '0.68rem', 
-                                fontWeight: 800, 
-                                padding: '3px 8px', 
-                                borderRadius: '8px', 
-                                background: isOnline ? '#e6f4ea' : '#18181b',
-                                color: isOnline ? '#137333' : '#a1a1aa'
-                              }}>
-                                {isOnline ? 'Im Lab' : 'Offline'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              </div>
-            )}
+              // Filter active GrooveLab students for the list
+              const filteredStudents = activeGroovelabStudents.filter((s: any) => {
+                const firstName = (s.first_name || '').toLowerCase();
+                const lastName = (s.last_name || '').toLowerCase();
+                const nick = (s.nickname || '').toLowerCase();
+                const query = groovelabStudentSearchQuery.toLowerCase().trim();
+                
+                const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nick.includes(query);
+                
+                const instrument = (s.instrument || 'Nicht festgelegt').toLowerCase();
+                const filterInst = groovelabStudentFilterInstrument.toLowerCase();
+                const matchesInstrument = groovelabStudentFilterInstrument === 'All' || instrument === filterInst;
+                
+                return matchesSearch && matchesInstrument;
+              });
 
-            {/* Subtab: Coaches (Lehrer) */}
-            {groovelabSubTab === 'coaches' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                  {/* Create Coach Form */}
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>🎸 GrooveLab Coach anlegen</h3>
-                    <form onSubmit={handleCreateCoach} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <input type="text" required placeholder="Vorname *" value={coachFirstName} onChange={(e) => setCoachFirstName(e.target.value)} style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: '0.85rem' }} />
-                      <input type="text" required placeholder="Nachname *" value={coachLastName} onChange={(e) => setCoachLastName(e.target.value)} style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: '0.85rem' }} />
-                      <input type="email" required placeholder="E-Mail *" value={coachEmail} onChange={(e) => setCoachEmail(e.target.value)} style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: '0.85rem' }} />
-                      <input type="text" placeholder="Instrument" value={coachInstrument} onChange={(e) => setCoachInstrument(e.target.value)} style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: '0.85rem' }} />
-                      <select value={coachRole} onChange={(e) => setCoachRole(e.target.value as any)} style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.85rem' }}>
-                        <option value="teacher">Coach</option>
-                        <option value="admin">Administrator</option>
-                      </select>
-                      <button type="submit" className="google-btn-primary" style={{ background: '#eab308', color: '#ffffff' }}>Coach Hinzufügen</button>
-                    </form>
-                  </div>
+              // Intelligent search: find school students who do NOT have GrooveLab active yet
+              const nonGroovelabStudents = students.filter(s => 
+                !(s.is_groovelab_active || s.isGroovelabActive) &&
+                (
+                  (s.first_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
+                  (s.last_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
+                  (s.nickname || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim())
+                )
+              );
 
-                  {/* Admin Override Settings */}
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>⚙️ Admin-Overrides (Rechte &amp; Passwort)</h3>
-                    <form onSubmit={handleAdminOverride} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                       <select 
-                        required
-                        value={selectedTeacherForOverride?.id || ''}
-                        onChange={(e) => {
-                          const selected = coaches.find(c => c.id === e.target.value) || campusTeachers.find(c => c.id === e.target.value);
-                          setSelectedTeacherForOverride(selected || null);
-                          if (selected) {
-                            const favs = selected.preferred_room_ids || [];
-                            setOverrideFavRoom1(favs[0] || '');
-                            setOverrideFavRoom2(favs[1] || '');
-                          } else {
-                            setOverrideFavRoom1('');
-                            setOverrideFavRoom2('');
-                          }
-                        }}
-                        style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.85rem' }}
-                      >
-                        <option value="">-- Lehrkraft auswählen --</option>
-                        {coaches.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName} (Coach)</option>)}
-                        {campusTeachers.filter(t => !coaches.some(c => c.id === t.id)).map(t => (
-                          <option key={t.id} value={t.id}>{t.firstName} {t.lastName} (Campus Lehrkraft)</option>
-                        ))}
-                      </select>
+              const uniqueInstruments = Array.from(new Set(activeGroovelabStudents.map(s => s.instrument || 'Nicht festgelegt')));
 
-                      <input 
-                        type="password" 
-                        placeholder="Neuen persönlichen PIN vergeben (Zahl)" 
-                        value={newPasswordOverride} 
-                        onChange={(e) => setNewPasswordOverride(e.target.value)} 
-                        style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: '0.85rem' }} 
-                      />
+              // We need teachers list for the dropdown select in row
+              const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                if (!acc.some(existing => existing.id === t.id)) {
+                  acc.push(t);
+                }
+                return acc;
+              }, []);
 
-                      <select 
-                        value={newRoleOverride} 
-                        onChange={(e) => setNewRoleOverride(e.target.value)} 
-                        style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.85rem' }}
-                      >
-                        <option value="">-- Neue Rolle zuweisen (Optional) --</option>
-                        <option value="teacher">Lehrkraft / Coach</option>
-                        <option value="admin">Administrator / Verwaltung</option>
-                      </select>
-
-                      {/* Favorite rooms */}
-                      {selectedTeacherForOverride && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569' }}>⭐ Lieblingsräume (max. 2)</span>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            <select
-                              value={overrideFavRoom1}
-                              onChange={(e) => setOverrideFavRoom1(e.target.value)}
-                              style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.8rem' }}
-                            >
-                              <option value="">-- Favorit 1 --</option>
-                              {rooms.filter(r => r.is_campus_active !== false).map(r => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                              ))}
-                            </select>
-                            <select
-                              value={overrideFavRoom2}
-                              onChange={(e) => setOverrideFavRoom2(e.target.value)}
-                              style={{ padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: '0.8rem' }}
-                            >
-                              <option value="">-- Favorit 2 --</option>
-                              {rooms.filter(r => r.is_campus_active !== false).map(r => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      <button type="submit" className="google-btn-primary" style={{ background: '#eab308', color: '#ffffff' }}>Überschreiben speichern</button>
-                    </form>
-                  </div>
-                </div>
-
-                {/* Bulk Import Section */}
-                <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>📄 Bulk-Import via TXT</h3>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748b' }}>
-                    Fügen Sie eine Liste von Lehrern ein. Format pro Zeile: <code>Vorname Nachname, Email, Instrument, Rolle (teacher/admin)</code>
-                  </p>
-                  <form onSubmit={handleBulkTeacherImport} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <textarea 
-                      placeholder="Max Mustermann, max@schule.de, Gitarre, teacher&#10;Sabine Admin, sabine@schule.de, Klavier, admin" 
-                      rows={5}
-                      value={bulkTxtInput}
-                      onChange={(e) => setBulkTxtInput(e.target.value)}
-                      style={{ padding: '8px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontFamily: 'monospace', fontSize: '0.8rem' }}
-                    />
-                    <button type="submit" className="google-btn-primary" style={{ background: '#fbbc05', color: '#09090b', fontWeight: 900, alignSelf: 'flex-start' }}>Lehrer importieren</button>
-                  </form>
-                </div>
-
-                <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                  <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', fontWeight: 800, color: '#b45309' }}>👥 Aktive Trainer &amp; Coaches (GrooveLab)</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-                    {coaches.map(c => (
-                      <div key={c.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <strong style={{ fontSize: '0.88rem', color: '#1e293b', display: 'block' }}>{c.firstName} {c.lastName}</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>🎸 {c.instrument || 'Nicht festgelegt'} &bull; {c.role}</span>
-                        </div>
-                        <button onClick={() => handleDeleteUser(c.id)} style={{ border: 'none', background: 'transparent', color: '#ea4335', cursor: 'pointer' }}><Trash2 size={16} /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Subtab: Support & Inventar (Tickets Inbox) */}
-            {groovelabSubTab === 'status' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px', alignItems: 'flex-start' }}>
-                  {/* Warning Cards Inbox */}
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>🚨 Offene Support-Tickets &amp; Defekt-Meldungen</h3>
+              return (
+                <div className="google-card" style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px', 
+                  width: '100%',
+                  padding: '24px',
+                  borderRadius: '24px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+                }}>
+                  {/* TITLE BLOCK & ACTIONS */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Users size={22} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        GrooveLab Schüler ({activeGroovelabStudents.length})
+                      </h3>
+                    </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {tickets.filter(t => t.status === 'OPEN').map(ticket => (
-                        <div 
-                          key={ticket.ticket_id} 
-                          style={{ 
-                            padding: '16px', 
-                            borderRadius: '16px', 
-                            background: '#f8fafc', 
-                            borderLeft: '4px solid #ea4335', 
-                            border: '1px solid #e2e8f0',
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center' 
-                          }}
-                        >
-                          <div>
-                            <strong style={{ display: 'block', fontSize: '0.9rem', color: '#1e293b' }}>Station #{ticket.station_number} - {ticket.component_type}</strong>
-                            <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>{ticket.description || 'Keine Fehlerbeschreibung hinterlegt.'}</span>
-                            <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
-                              Gemeldet am: {new Date(ticket.created_at).toLocaleString('de-DE')}
-                            </span>
+                    <button
+                      onClick={() => {
+                        setGroovelabStudentModalSearchQuery('');
+                        setShowManualCreateGroovelabStudent(false);
+                        setShowAddGroovelabStudentModal(true);
+                      }}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        borderRadius: '12px', 
+                        padding: '8px 16px', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 800,
+                        background: '#fbbc05',
+                        color: '#0f172a',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist',
+                        boxShadow: '0 4px 10px rgba(251,188,5,0.25)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Plus size={15} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Schüler hinzufügen
+                    </button>
+                  </div>
+
+                  {/* FILTERS ROW WITH INTELLIGENT SEARCH */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', position: 'relative' }}>
+                    <div style={{ position: 'relative', flex: 1.5, minWidth: '240px' }}>
+                      <input
+                        type="text"
+                        value={groovelabStudentSearchQuery}
+                        onChange={(e) => setGroovelabStudentSearchQuery(e.target.value)}
+                        placeholder="Schüler suchen oder aus Schule hinzufügen..."
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px 10px 38px',
+                          borderRadius: '14px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: '#ffffff'
+                        }}
+                      />
+                      <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+
+                      {/* Intelligent Auto-suggest / Add Dropdown */}
+                      {groovelabStudentSearchQuery.trim() !== '' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '16px',
+                          boxShadow: '0 12px 30px rgba(15,23,42,0.1)',
+                          zIndex: 100,
+                          marginTop: '6px',
+                          padding: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          maxHeight: '300px',
+                          overflowY: 'auto'
+                        }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', padding: '6px 10px', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>
+                            Intelligente Zuweisung &amp; Suche
                           </div>
                           
-                          <button 
-                            onClick={() => handleResolveTicket(ticket.ticket_id)}
-                            style={{ 
-                              background: '#34a853', 
-                              color: 'white', 
-                              border: 'none', 
-                              padding: '8px 16px', 
-                              borderRadius: '10px', 
-                              fontSize: '0.8rem', 
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 10px rgba(34, 197, 94, 0.2)'
-                            }}
-                          >
-                            ✓ Schaden behoben
-                          </button>
-                        </div>
-                      ))}
+                          {/* List matching school students not yet in GrooveLab */}
+                          {nonGroovelabStudents.map(s => {
+                            const name = `${s.first_name || ''} ${s.last_name || ''}`.trim();
+                            return (
+                              <div key={s.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                transition: 'all 0.15s'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontFamily: 'Urbanist' }}>{name}</strong>
+                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{s.instrument || 'Kein Instrument'}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleToggleStudentModule(s, 'groovelab');
+                                    setGroovelabStudentSearchQuery('');
+                                  }}
+                                  style={{
+                                    background: '#fbbc05',
+                                    border: 'none',
+                                    color: '#0f172a',
+                                    borderRadius: '8px',
+                                    padding: '5px 10px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    fontFamily: 'Urbanist',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  + Zu GrooveLab hinzufügen
+                                </button>
+                              </div>
+                            );
+                          })}
 
-                      {tickets.filter(t => t.status === 'OPEN').length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
-                          🎉 Keine offenen Support-Tickets vorhanden. Alle Stationen laufen einwandfrei!
+                          {nonGroovelabStudents.length === 0 && (
+                            <div style={{ padding: '8px 10px', fontSize: '0.75rem', color: '#64748b', fontFamily: 'Inter' }}>
+                              Keine passenden Schul-Schüler gefunden.
+                            </div>
+                          )}
+
+                          {/* Quick Create Option */}
+                          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '4px', paddingTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const names = groovelabStudentSearchQuery.split(' ');
+                                setNewStudentFirstName(names[0] || '');
+                                setNewStudentLastName(names.slice(1).join(' ') || '');
+                                setNewStudentIsGroovelabActive(true);
+                                setShowAddStudentModal(true);
+                              }}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#b45309',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontFamily: 'Urbanist',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <Plus size={14} /> "+ Als neuen Schüler erstellen"
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* Ticket Reporting Form */}
-                  <div className="google-card" style={{ padding: '24px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#1e293b' }}>
-                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>➕ Hardware-Defekt melden</h3>
-                    <form 
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const stationNumber = formData.get('stationNumber');
-                        const componentType = formData.get('componentType');
-                        const description = formData.get('description');
-                        
-                        try {
-                          const response = await fetch('/api/groovelab/tickets/report', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                              schoolId,
-                              stationNumber: Number(stationNumber),
-                              componentType,
-                              description
-                            })
-                          });
-                          const data = await response.json();
-                          if (!response.ok) {
-                            throw new Error(data.error || 'Failed to report ticket');
-                          }
-                          alert('Schadensmeldung erfolgreich übermittelt.');
-                          e.currentTarget.reset();
-                          fetchDashboardData();
-                        } catch (err: any) {
-                          alert('Fehler beim Melden: ' + err.message);
-                        }
-                      }} 
-                      style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+                    <select
+                      value={groovelabStudentFilterInstrument}
+                      onChange={(e) => setGroovelabStudentFilterInstrument(e.target.value)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '14px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        fontFamily: 'Urbanist',
+                        fontWeight: 600,
+                        outline: 'none',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
                     >
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '6px' }}>Stations-Nummer</label>
-                        <input type="number" required name="stationNumber" min="1" max="100" style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none' }} />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '6px' }}>Defekte Komponente</label>
-                        <select required name="componentType" style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none' }}>
-                          <option value="HEADPHONES">Kopfhörer</option>
-                          <option value="CABLES">Kabel / Adapter</option>
-                          <option value="IPADS">iPad / Tablet</option>
-                          <option value="OTHERS">Sonstiges</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '6px' }}>Fehlerbeschreibung</label>
-                        <textarea required name="description" placeholder="Bitte beschreiben Sie den Defekt möglichst präzise..." rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none' }} />
-                      </div>
-
-                      <button type="submit" className="google-btn-primary" style={{ background: '#eab308', color: '#ffffff' }}>Schaden melden</button>
-                    </form>
+                      <option value="All">Alle Instrumente</option>
+                      {uniqueInstruments.map(inst => (
+                        <option key={inst} value={inst}>{inst}</option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* DYNAMIC STUDENTS LIST (HORIZONTAL ROWS - ORIENTED TO CAMPUS DESIGN) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowX: 'auto', width: '100%' }}>
+                    <style>{`
+                      .status-toggle-btn.groove-active-yellow {
+                        background: #fef3c7;
+                        color: #b45309;
+                        box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                      }
+                      .status-toggle-btn.groove-active-yellow:hover {
+                        background: #fde68a !important;
+                      }
+                    `}</style>
+                    {filteredStudents.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                        Keine GrooveLab Schüler gefunden. Nutze das Suchfeld oben, um Schüler hinzuzufügen.
+                      </div>
+                    ) : (
+                      filteredStudents.map((student: any) => {
+                        const isCampus = student.is_campus_active || student.isCampusActive;
+                        const isGroove = student.is_groovelab_active || student.isGroovelabActive;
+                        const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+                        const { avatarBg, avatarColor } = getAlphabeticalColor(studentName);
+
+                        return (
+                          <div
+                            key={student.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 16px',
+                              borderRadius: '16px',
+                              border: '1px solid #f1f5f9',
+                              background: '#ffffff',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                              transition: 'all 0.25s ease',
+                              minWidth: '850px'
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Avatar & Name Info */}
+                            <div 
+                              onClick={() => setSelectedStudentForDetail(student)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.6', minWidth: '180px', cursor: 'pointer' }}
+                            >
+                              <div style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                background: avatarBg,
+                                color: avatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.88rem',
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                {(student.first_name?.[0] || '') + (student.last_name?.[0] || '')}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {studentName}
+                                </span>
+                                {student.nickname && (
+                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
+                                    „{student.nickname}“
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Instrument Badge */}
+                            <div style={{ flex: '1', minWidth: '100px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                background: '#f5f5f7',
+                                color: '#3a3a3c',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}>
+                                {student.instrument || 'Nicht festgelegt'}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div style={{ flex: '1.25', minWidth: '130px', display: 'flex', justifyContent: 'center' }}>
+                              <span style={{
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                fontSize: '0.78rem',
+                                fontWeight: 700
+                              }}>
+                                GrooveLab aktiv
+                              </span>
+                            </div>
+
+                            {/* PIN Activation status */}
+                            <div style={{ flex: '0.4', minWidth: '50px', display: 'flex', justifyContent: 'center' }}>
+                              {student.is_pin_activated ? (
+                                <span title="Aktiviert"><CheckCircle size={18} style={{ color: '#34a853' }} /></span>
+                              ) : (
+                                <span title="Ausstehend"><Clock size={18} style={{ color: '#fbbc04' }} /></span>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div style={{ flex: '1.5', minWidth: '150px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedStudentForDetail(student);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#b45309',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontFamily: 'Urbanist'
+                                }}
+                              >
+                                Pass teilen
+                              </button>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Möchtest du den GrooveLab-Zugang für ${studentName} wirklich beenden?`)) {
+                                    await handleToggleStudentModule(student, 'groovelab');
+                                  }
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ea4335',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  padding: '2px 6px'
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Schüler hinzufügen Modal */}
+                  {showAddGroovelabStudentModal && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                      <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', maxHeight: '85vh', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        {/* Modal Header */}
+                        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            <Plus style={{ color: '#eab308', marginRight: '6px' }} size={18} /> Schüler hinzufügen
+                          </h3>
+                          <button 
+                            onClick={() => setShowAddGroovelabStudentModal(false)}
+                            style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
+                          {!showManualCreateGroovelabStudent ? (
+                            <>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  value={groovelabStudentModalSearchQuery}
+                                  onChange={(e) => setGroovelabStudentModalSearchQuery(e.target.value)}
+                                  placeholder="Schüler aus der Musikschule suchen..."
+                                  style={{
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    padding: '10px 16px 10px 38px',
+                                    borderRadius: '12px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.85rem',
+                                    outline: 'none'
+                                  }}
+                                />
+                                <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                                {(() => {
+                                  // Find school students not in GrooveLab
+                                  const nonActiveStudents = students.filter(s => 
+                                    !(s.is_groovelab_active || s.isGroovelabActive) &&
+                                    (
+                                      (s.first_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
+                                      (s.last_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
+                                      (s.nickname || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim())
+                                    )
+                                  );
+
+                                  if (nonActiveStudents.length === 0) {
+                                    return (
+                                      <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b', fontSize: '0.85rem' }}>
+                                        Keine Schüler gefunden, die nicht bereits in GrooveLab sind.
+                                      </div>
+                                    );
+                                  }
+
+                                  return nonActiveStudents.map((s: any) => {
+                                    const sName = s.nickname ? `${s.first_name} "${s.nickname}" ${s.last_name}` : `${s.first_name} ${s.last_name}`;
+                                    return (
+                                      <div 
+                                        key={s.id} 
+                                        style={{ 
+                                          display: 'flex', 
+                                          justifyContent: 'space-between', 
+                                          alignItems: 'center', 
+                                          padding: '12px 16px', 
+                                          borderRadius: '16px', 
+                                          background: '#f8fafc', 
+                                          border: '1px solid #e2e8f0' 
+                                        }}
+                                      >
+                                        <div>
+                                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>
+                                            {sName}
+                                          </strong>
+                                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                            {s.instrument || 'Kein Fach'}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={async () => {
+                                            await handleToggleStudentModule(s, 'groovelab');
+                                            setShowAddGroovelabStudentModal(false);
+                                          }}
+                                          className="google-btn-primary"
+                                          style={{
+                                            background: '#fbbc05',
+                                            color: '#0f172a',
+                                            border: 'none',
+                                            borderRadius: '10px',
+                                            padding: '6px 12px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 800
+                                          }}
+                                        >
+                                          + Hinzufügen
+                                        </button>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+
+                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', textAlign: 'center' }}>
+                                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                  Schüler nicht in der Liste?{' '}
+                                  <button
+                                    onClick={() => setShowManualCreateGroovelabStudent(true)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#b45309',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline'
+                                    }}
+                                  >
+                                    Komplett neu erstellen
+                                  </button>
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <form onSubmit={handleCreateStudentGroovelab}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={newStudentFirstName}
+                                      onChange={(e) => setNewStudentFirstName(e.target.value)}
+                                      placeholder="z.B. Amadeus"
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Nachname *</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={newStudentLastName}
+                                      onChange={(e) => setNewStudentLastName(e.target.value)}
+                                      placeholder="z.B. Mozart"
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Spitzname</label>
+                                    <input
+                                      type="text"
+                                      value={newStudentNickname}
+                                      onChange={(e) => setNewStudentNickname(e.target.value)}
+                                      placeholder="z.B. Wolferl"
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Geburtsdatum *</label>
+                                    <input
+                                      type="date"
+                                      required
+                                      value={newStudentBirthDate}
+                                      onChange={(e) => setNewStudentBirthDate(e.target.value)}
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrument / Fach</label>
+                                  <AppleStyleTokenField
+                                    label=""
+                                    selectedString={newStudentInstrument}
+                                    onChange={setNewStudentInstrument}
+                                    suggestions={activeSubjectsList}
+                                    placeholder="Unterrichtsfach auswählen..."
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft zuweisen</label>
+                                  <select
+                                    value={newStudentTeacherId}
+                                    onChange={(e) => setNewStudentTeacherId(e.target.value)}
+                                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: '#ffffff' }}
+                                  >
+                                    <option value="">Keine Lehrkraft zugewiesen</option>
+                                    {allUniqueTeachers.map((t: any) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.firstName || t.first_name} {t.lastName || t.last_name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowManualCreateGroovelabStudent(false)}
+                                    style={{ background: 'transparent', border: 'none', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.82rem' }}
+                                  >
+                                    Zurück zur Suche
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="google-btn-primary"
+                                    style={{ background: '#fbbc05', color: '#0f172a', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 800 }}
+                                  >
+                                    Schüler erstellen &amp; freischalten
+                                  </button>
+                                </div>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
+            {/* Subtab: Coaches (Lehrer) */}
+            {groovelabSubTab === 'coaches' && (() => {
+              // Get all school teachers who are in GrooveLab
+              const activeCoaches = allTeachers.filter(t => t.isGroovelabActive || t.isGroovelabActive === true);
+              
+              // Filter active GrooveLab coaches for the list
+              const filteredCoaches = activeCoaches.filter((t: any) => {
+                const firstName = (t.firstName || '').toLowerCase();
+                const lastName = (t.lastName || '').toLowerCase();
+                const email = (t.email || '').toLowerCase();
+                const query = coachSearchQuery.toLowerCase().trim();
+                
+                const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || email.includes(query);
+                
+                const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
+                const filterInst = coachFilterInstrument.toLowerCase();
+                const matchesInstrument = coachFilterInstrument === 'All' || instrument === filterInst;
+                
+                return matchesSearch && matchesInstrument;
+              });
+
+              // Intelligent search: find school teachers who are NOT in GrooveLab yet
+              const nonGroovelabTeachers = allTeachers.filter(t => 
+                !(t.isGroovelabActive || t.isGroovelabActive === true) &&
+                (
+                  (t.firstName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
+                  (t.lastName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
+                  (t.email || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim())
+                )
+              );
+
+              const uniqueInstruments = Array.from(new Set(activeCoaches.map(t => t.instrument || 'Nicht festgelegt')));
+
+              return (
+                <div className="google-card" style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px', 
+                  width: '100%',
+                  padding: '24px',
+                  borderRadius: '24px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+                }}>
+                  {/* TITLE BLOCK & ACTIONS */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <GraduationCap size={22} style={{ color: '#0f172a' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        GrooveLab Coaches ({activeCoaches.length})
+                      </h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setCoachModalSearchQuery('');
+                        setShowManualCreateCoach(false);
+                        setShowAddCoachModal(true);
+                      }}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        borderRadius: '12px', 
+                        padding: '8px 16px', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 800,
+                        background: '#fbbc05',
+                        color: '#0f172a',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist',
+                        boxShadow: '0 4px 10px rgba(251,188,5,0.25)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Plus size={15} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Lehrkraft hinzufügen
+                    </button>
+                  </div>
+
+                  {/* FILTERS ROW WITH INTELLIGENT SEARCH */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', position: 'relative' }}>
+                    <div style={{ position: 'relative', flex: 1.5, minWidth: '240px' }}>
+                      <input
+                        type="text"
+                        value={coachSearchQuery}
+                        onChange={(e) => setCoachSearchQuery(e.target.value)}
+                        placeholder="Coach suchen oder aus Schule hinzufügen..."
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px 10px 38px',
+                          borderRadius: '14px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontFamily: 'Urbanist',
+                          fontWeight: 600,
+                          outline: 'none',
+                          background: '#ffffff'
+                        }}
+                      />
+                      <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+
+                      {/* Intelligent Auto-suggest / Add Dropdown */}
+                      {coachSearchQuery.trim() !== '' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '16px',
+                          boxShadow: '0 12px 30px rgba(15,23,42,0.1)',
+                          zIndex: 100,
+                          marginTop: '6px',
+                          padding: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          maxHeight: '300px',
+                          overflowY: 'auto'
+                        }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', padding: '6px 10px', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>
+                            Intelligente Zuweisung &amp; Suche
+                          </div>
+                          
+                          {/* List matching school teachers not yet in GrooveLab */}
+                          {nonGroovelabTeachers.map(t => {
+                            const name = `${t.firstName || ''} ${t.lastName || ''}`.trim();
+                            return (
+                              <div key={t.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                transition: 'all 0.15s'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontFamily: 'Urbanist' }}>{name}</strong>
+                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.email} • {t.instrument || 'Kein Instrument'}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleToggleTeacherModule(t, 'groovelab');
+                                    setCoachSearchQuery('');
+                                  }}
+                                  style={{
+                                    background: '#fbbc05',
+                                    border: 'none',
+                                    color: '#0f172a',
+                                    borderRadius: '8px',
+                                    padding: '5px 10px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    fontFamily: 'Urbanist',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  + Zu GrooveLab hinzufügen
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                          {nonGroovelabTeachers.length === 0 && (
+                            <div style={{ padding: '8px 10px', fontSize: '0.75rem', color: '#64748b', fontFamily: 'Inter' }}>
+                              Keine passenden Schul-Lehrkräfte gefunden.
+                            </div>
+                          )}
+
+                          {/* Quick Create Option */}
+                          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '4px', paddingTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const names = coachSearchQuery.split(' ');
+                                setNewTeacherFirstName(names[0] || '');
+                                setNewTeacherLastName(names.slice(1).join(' ') || '');
+                                setShowAddTeacherModal(true);
+                              }}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#b45309',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontFamily: 'Urbanist',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <Plus size={14} /> "+ Als neue Lehrkraft erstellen"
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <select
+                      value={coachFilterInstrument}
+                      onChange={(e) => setCoachFilterInstrument(e.target.value)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '14px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        fontFamily: 'Urbanist',
+                        fontWeight: 600,
+                        outline: 'none',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="All">Alle Instrumente</option>
+                      {uniqueInstruments.map(inst => (
+                        <option key={inst} value={inst}>{inst}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* DYNAMIC TEACHER LIST (HORIZONTAL ROWS) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowX: 'auto', width: '100%' }}>
+                    <style>{`
+                      .status-toggle-btn.groove-active-yellow {
+                        background: #fef3c7;
+                        color: #b45309;
+                        box-shadow: 0 2px 8px rgba(245,158,11,0.12);
+                      }
+                      .status-toggle-btn.groove-active-yellow:hover {
+                        background: #fde68a !important;
+                      }
+                    `}</style>
+                    {filteredCoaches.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                        Keine GrooveLab Coaches gefunden. Nutze das Suchfeld oben, um Lehrer hinzuzufügen.
+                      </div>
+                    ) : (
+                      filteredCoaches.map((t: any) => {
+                        const isCampus = t.isCampusActive || t.is_campus_active;
+                        const isGroove = t.isGroovelabActive || t.is_groovelab_active;
+                        const teacherName = `${t.firstName || ''} ${t.lastName || ''}`.trim();
+                        const { avatarBg, avatarColor } = getAlphabeticalColor(teacherName);
+
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => setManageTeacher(t)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 16px',
+                              borderRadius: '16px',
+                              border: '1px solid #f1f5f9',
+                              background: '#ffffff',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
+                              transition: 'all 0.25s ease',
+                              minWidth: '850px',
+                              cursor: 'pointer'
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Avatar & Name Info */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.6', minWidth: '180px' }}>
+                              <div style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                background: avatarBg,
+                                color: avatarColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.88rem',
+                                fontFamily: 'Urbanist',
+                                flexShrink: 0
+                              }}>
+                                {(t.firstName?.[0] || 'L')}{(t.lastName?.[0] || 'L')}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {teacherName}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Instrument Badge */}
+                            <div style={{ flex: '1', minWidth: '100px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                background: '#f5f5f7',
+                                color: '#3a3a3c',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}>
+                                {t.instrument || 'Nicht festgelegt'}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div style={{ flex: '1.25', minWidth: '130px', display: 'flex', justifyContent: 'center' }}>
+                              <span style={{
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                fontSize: '0.78rem',
+                                fontWeight: 700
+                              }}>
+                                GrooveLab Coach
+                              </span>
+                            </div>
+
+                            {/* PIN Activation status */}
+                            <div style={{ flex: '0.4', minWidth: '50px', display: 'flex', justifyContent: 'center' }}>
+                              {t.isPinActivated ? (
+                                <span title="Aktiviert"><CheckCircle size={18} style={{ color: '#34a853' }} /></span>
+                              ) : (
+                                <span title="Ausstehend"><Clock size={18} style={{ color: '#fbbc04' }} /></span>
+                              )}
+                            </div>
+
+                            {/* Pupil Count */}
+                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
+                              <Users size={16} style={{ color: '#86868b' }} />
+                              <span>{t.studentCount || 0} Schüler</span>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setManageTeacher(t);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#b45309',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontFamily: 'Urbanist'
+                                }}
+                              >
+                                Pass teilen
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleTeacherModule(t, 'groovelab');
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ea4335',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  padding: '2px 6px'
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Lehrkraft hinzufügen Modal */}
+                  {showAddCoachModal && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                      <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', maxHeight: '85vh', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        {/* Modal Header */}
+                        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#eab308' }} /> Lehrkraft hinzufügen
+                          </h3>
+                          <button 
+                            onClick={() => setShowAddCoachModal(false)}
+                            style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
+                          {!showManualCreateCoach ? (
+                            <>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  value={coachModalSearchQuery}
+                                  onChange={(e) => setCoachModalSearchQuery(e.target.value)}
+                                  placeholder="Lehrkraft aus der Schule suchen..."
+                                  style={{
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    padding: '10px 16px 10px 38px',
+                                    borderRadius: '12px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.85rem',
+                                    outline: 'none'
+                                  }}
+                                />
+                                <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                                {(() => {
+                                  // Find school teachers not in GrooveLab
+                                  const nonActiveCoaches = allTeachers.filter(t => 
+                                    !(t.isGroovelabActive || t.is_groovelab_active) &&
+                                    (
+                                      (t.firstName || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim()) ||
+                                      (t.lastName || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim()) ||
+                                      (t.nickname || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim())
+                                    )
+                                  );
+
+                                  if (nonActiveCoaches.length === 0) {
+                                    return (
+                                      <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b', fontSize: '0.85rem' }}>
+                                        Keine Lehrkräfte gefunden, die nicht bereits in GrooveLab sind.
+                                      </div>
+                                    );
+                                  }
+
+                                  return nonActiveCoaches.map((t: any) => {
+                                    return (
+                                      <div 
+                                        key={t.id} 
+                                        style={{ 
+                                          display: 'flex', 
+                                          justifyContent: 'space-between', 
+                                          alignItems: 'center', 
+                                          padding: '12px 16px', 
+                                          borderRadius: '16px', 
+                                          background: '#f8fafc', 
+                                          border: '1px solid #e2e8f0' 
+                                        }}
+                                      >
+                                        <div>
+                                          <strong style={{ display: 'block', fontSize: '0.88rem', color: '#1e293b' }}>
+                                            {t.firstName} {t.lastName}
+                                          </strong>
+                                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                            {t.instrument || 'Kein Fach'}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={async () => {
+                                            await handleToggleTeacherModule(t, 'groovelab');
+                                            setShowAddCoachModal(false);
+                                          }}
+                                          className="google-btn-primary"
+                                          style={{
+                                            background: '#fbbc05',
+                                            color: '#0f172a',
+                                            border: 'none',
+                                            borderRadius: '10px',
+                                            padding: '6px 12px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 800
+                                          }}
+                                        >
+                                          + Hinzufügen
+                                        </button>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+
+                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', textAlign: 'center' }}>
+                                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                  Lehrkraft nicht in der Liste?{' '}
+                                  <button
+                                    onClick={() => setShowManualCreateCoach(true)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#b45309',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline'
+                                    }}
+                                  >
+                                    Komplett neu erstellen
+                                  </button>
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <form onSubmit={handleCreateCoachForGroovelab}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={newTeacherFirstName}
+                                      onChange={(e) => setNewTeacherFirstName(e.target.value)}
+                                      placeholder="z.B. Johann"
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Nachname *</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={newTeacherLastName}
+                                      onChange={(e) => {
+                                        setNewTeacherLastName(e.target.value);
+                                      }}
+                                      placeholder="z.B. Bach"
+                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>E-Mail-Adresse</label>
+                                  <input
+                                    type="email"
+                                    value={newTeacherEmail}
+                                    onChange={(e) => setNewTeacherEmail(e.target.value)}
+                                    placeholder="z.B. bach@musaek.de"
+                                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente/Fächer *</label>
+                                  <AppleStyleTokenField
+                                    label=""
+                                    selectedString={newTeacherInstrument}
+                                    onChange={setNewTeacherInstrument}
+                                    suggestions={activeSubjectsList}
+                                    placeholder="Unterrichtsfächer auswählen..."
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Endzeit / Vertragsende</label>
+                                  <input
+                                    type="date"
+                                    value={newTeacherContractEndsAt}
+                                    onChange={(e) => setNewTeacherContractEndsAt(e.target.value)}
+                                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                  />
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowManualCreateCoach(false)}
+                                    style={{ background: 'transparent', border: 'none', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.82rem' }}
+                                  >
+                                    Zurück zur Suche
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="google-btn-primary"
+                                    style={{ background: '#fbbc05', color: '#0f172a', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 800 }}
+                                  >
+                                    Lehrkraft erstellen &amp; freischalten
+                                  </button>
+                                </div>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()}
+            {/* Subtab: Support & Inventar (Tickets Inbox) removed */}
 
             {/* Subtab: Setup & Kiosk */}
             {groovelabSubTab === 'kiosk' && (
@@ -19426,42 +20357,44 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </div>
 
                                       {/* Savings Display */}
-                                      <div style={{
-                                        background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
-                                        border: '1px solid #10b981',
-                                        borderRadius: '16px',
-                                        padding: '14px 16px',
-                                        marginTop: '12px',
-                                        marginBottom: '16px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <TrendingDown size={18} style={{ color: '#065f46', verticalAlign: 'middle', marginRight: '6px' }} />
-                                          <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
-                                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Monatlich gespart:</span>
-                                            <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
-                                              {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global).toFixed(2).replace('.', ',')} €
-                                            </strong>
+                                      {(billingPayer === 'student' || studentBillingOption === 'cash') && (
+                                        <div style={{
+                                          background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+                                          border: '1px solid #10b981',
+                                          borderRadius: '16px',
+                                          padding: '14px 16px',
+                                          marginTop: '12px',
+                                          marginBottom: '16px',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '6px'
+                                        }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <TrendingDown size={18} style={{ color: '#065f46', verticalAlign: 'middle', marginRight: '6px' }} />
+                                            <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
                                           </div>
-                                          <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Jährlich gespart:</span>
-                                            <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
-                                              {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global * 12).toFixed(2).replace('.', ',')} €
-                                            </strong>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                              <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Monatlich gespart:</span>
+                                              <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                                {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global).toFixed(2).replace('.', ',')} €
+                                              </strong>
+                                            </div>
+                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                              <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Jährlich gespart:</span>
+                                              <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                                {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global * 12).toFixed(2).replace('.', ',')} €
+                                              </strong>
+                                            </div>
                                           </div>
+                                          <span style={{ fontSize: '0.62rem', color: '#047857', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
+                                            {(billingPayer === 'student' || studentBillingOption === 'cash') 
+                                              ? '* Basierend darauf, dass aktive Schüler-Gebühren (0,49 €/Monat) direkt von den Eltern getragen werden.' 
+                                              : '* Durch Verrechnung der passiven Infrastrukturgebühr (0,09 €) bei aktiven Schülerprofilen.'
+                                            }
+                                          </span>
                                         </div>
-                                        <span style={{ fontSize: '0.62rem', color: '#047857', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
-                                          {(billingPayer === 'student' || studentBillingOption === 'cash') 
-                                            ? '* Basierend darauf, dass aktive Schüler-Gebühren (0,49 €/Monat) direkt von den Eltern getragen werden.' 
-                                            : '* Durch Verrechnung der passiven Infrastrukturgebühr (0,09 €) bei aktiven Schülerprofilen.'
-                                          }
-                                        </span>
-                                      </div>
+                                      )}
 
                                       {/* Info Box: How to add students (replaces slider) */}
                                       <div style={{ 

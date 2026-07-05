@@ -5740,7 +5740,7 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: isFreeDay ? '1.5 1 450px' : '1 1 350px', minWidth: '300px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: isWeekend ? '1 1 100%' : (isFreeDay ? '1.2 1 450px' : '1 1 350px'), minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
                       {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
@@ -5755,15 +5755,15 @@ export function TeacherDashboard({
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: '200px',
-                          flex: isFreeDay ? 1 : '0 1 auto',
+                          minHeight: isWeekend ? '300px' : '200px',
+                          flex: (isFreeDay || isWeekend) ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: isFreeDay ? '280px' : '190px',
+                              width: isWeekend ? '420px' : (isFreeDay ? '280px' : '190px'),
                               height: '100%',
                               flexShrink: 0,
                               position: 'relative',
@@ -5787,7 +5787,7 @@ export function TeacherDashboard({
                             </div>
                             
                             <div style={{ 
-                              padding: '24px 32px', 
+                              padding: isWeekend ? '32px 48px' : '24px 32px', 
                               display: 'flex', 
                               flexDirection: 'column', 
                               justifyContent: 'center',
@@ -5816,13 +5816,13 @@ export function TeacherDashboard({
  
                               <h3 style={{ 
                                 margin: 0, 
-                                fontSize: '30px', 
+                                fontSize: isWeekend ? '36px' : '30px', 
                                 fontWeight: 950, 
                                 color: '#0f172a', 
                                 fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                 lineHeight: 1.2
                               }}>
-                                {dynamicGreeting.greeting},{' '}
+                                {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                                 <span style={{ 
                                   color: '#007aff', 
                                   fontWeight: 900,
@@ -5830,11 +5830,14 @@ export function TeacherDashboard({
                                   display: 'inline'
                                 }}>{teacher?.first_name || 'Coach'}</span>!{' '}
                                 <span className="inline-block animate-bounce" style={{ marginLeft: '4px', display: 'inline-block' }}>
-                                  {(new Date().getDay() === 0 || new Date().getDay() === 6) ? '☀️' : '👋'}
+                                  ☀️
                                 </span>
                               </h3>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
-                                {isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle}
+                              <p style={{ margin: isWeekend ? '14px 0 0 0' : '6px 0 0 0', fontSize: isWeekend ? '1rem' : '0.82rem', color: isWeekend ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: isWeekend ? 1.5 : 1.25, maxWidth: isWeekend ? '650px' : undefined }}>
+                                {isWeekend 
+                                  ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche. ✨'
+                                  : (isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle)
+                                }
                               </p>
                             </div>
                           </div>
@@ -6772,7 +6775,8 @@ export function TeacherDashboard({
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
-                    {teacher?.sick_until && !bypassSickView ? (
+                    {!isWeekend && (
+                      teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',
                         minWidth: '300px',
@@ -7622,7 +7626,7 @@ export function TeacherDashboard({
 
                       </div>
                     </div>
-                  )}
+                  ))}
                   </div>
                 </>
               )}

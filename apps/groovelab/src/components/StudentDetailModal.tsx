@@ -707,10 +707,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch latest user details (including group_id)
+      // 1. Fetch latest user details (including group_id and school_id)
       const { data: latestUser } = await supabase
         .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id')
+        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id')
         .eq('id', student.id)
         .single();
 
@@ -739,13 +739,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       }
 
       // Fetch other school students (for group setup dropdown list)
-      const { data: allSchoolStudents } = await supabase
-        .from('users')
-        .select('id, first_name, last_name')
-        .eq('school_id', student.school_id)
-        .eq('role', 'student')
-        .neq('id', student.id);
-      setSchoolStudents(allSchoolStudents || []);
+      const targetSchoolId = latestUser?.school_id || student.school_id || student.schoolId;
+      if (targetSchoolId) {
+        const { data: allSchoolStudents } = await supabase
+          .from('users')
+          .select('id, first_name, last_name')
+          .eq('school_id', targetSchoolId)
+          .eq('role', 'student')
+          .neq('id', student.id);
+        setSchoolStudents(allSchoolStudents || []);
+      } else {
+        setSchoolStudents([]);
+      }
 
       // Fetch skills (shared for group if linked)
       const { data: skillsData } = await supabase

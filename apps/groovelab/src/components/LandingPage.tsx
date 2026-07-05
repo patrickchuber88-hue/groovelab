@@ -6,7 +6,7 @@ import {
 
 interface LandingPageProps {
   onLogin: () => void;
-  onRegister: () => void;
+  onRegister: (email?: string) => void;
 }
 
 export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
@@ -18,7 +18,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const handleCTASubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      onRegister();
+      onRegister(email);
     }
   };
 
@@ -251,7 +251,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               Anmelden
             </button>
             <button 
-              onClick={onRegister}
+              onClick={() => onRegister()}
               style={{
                 backgroundColor: '#137333',
                 color: '#ffffff',
@@ -346,7 +346,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 Anmelden
               </button>
               <button 
-                onClick={onRegister}
+                onClick={() => onRegister()}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -1203,7 +1203,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             </div>
 
             <button 
-              onClick={onRegister}
+              onClick={() => onRegister()}
               style={{
                 width: '100%',
                 padding: '16px 32px',

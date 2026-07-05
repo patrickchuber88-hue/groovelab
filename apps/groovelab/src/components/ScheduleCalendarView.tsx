@@ -140,7 +140,7 @@ export function ScheduleCalendarView({
   const now = new Date();
   const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
   const schoolYearStart = new Date(schoolStartYear, 8, 1);  // Sept 1
-  const schoolYearEnd   = new Date(schoolStartYear + 1, 6, 31); // July 31
+  const schoolYearEnd   = new Date(schoolStartYear + 2, 6, 31); // July 31 of next school year
   const [baseOccurrences, setBaseOccurrences] = useState<ScheduleOccurrence[]>([]);
   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
   const [loading, setLoading] = useState(true);
@@ -909,6 +909,7 @@ export function ScheduleCalendarView({
     setLoading(true);
     try {
       const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+      const processedBookings = new Set<string>();
 
       for (const change of changesToSave) {
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
@@ -1012,11 +1013,15 @@ export function ScheduleCalendarView({
           const oldDate = originalOcc?.date || change.date;
           const oldStartTime = originalOcc?.start_time || change.start_time;
 
-          await supabase.from('room_bookings')
-            .delete()
-            .eq('booked_by', userId)
-            .eq('date', oldDate)
-            .eq('start_time', oldStartTime);
+          const oldBookingKey = `${userId}_${oldDate}_${oldStartTime.substring(0, 5)}`;
+          if (!processedBookings.has(`del_${oldBookingKey}`)) {
+            processedBookings.add(`del_${oldBookingKey}`);
+            await supabase.from('room_bookings')
+              .delete()
+              .eq('booked_by', userId)
+              .eq('date', oldDate)
+              .eq('start_time', oldStartTime);
+          }
 
           const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
@@ -1050,7 +1055,9 @@ export function ScheduleCalendarView({
 
           const needsRoomBooking = !isCancelled && currentRoomId && (timeChanged || roomChanged) && !isInsideOwnRegularBlock;
 
-          if (needsRoomBooking) {
+          const newBookingKey = `${currentRoomId}_${change.date}_${change.start_time.substring(0, 5)}`;
+          if (needsRoomBooking && !processedBookings.has(`ins_${newBookingKey}`)) {
+            processedBookings.add(`ins_${newBookingKey}`);
             const startMins = timeToMinutes(change.start_time);
             const duration = change.duration || 45;
             const endMins = startMins + duration;
@@ -2989,18 +2996,18 @@ export function ScheduleCalendarView({
 
           {/* Right: Tab switch */}
           {activeTab && setActiveTab && (
-            <div className="app-segmented-switch" style={{ margin: 0, padding: '2px', gap: '2px' }}>
+            <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
               <button 
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                style={{ padding: '3px 8px', fontSize: '0.72rem', lineHeight: '1.2' }}
+                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
               >
                 Stundenplan
               </button>
               <button 
                 onClick={() => setActiveTab('designer')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                style={{ padding: '3px 8px', fontSize: '0.72rem', lineHeight: '1.2' }}
+                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
               >
                 Stundenplan-Designer
               </button>
@@ -3052,11 +3059,11 @@ export function ScheduleCalendarView({
           </div>
 
           {/* Right: Actions */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {Object.keys(pendingChanges).length > 0 && (
               <button 
                 onClick={savePendingChanges}
-                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)' }}
+                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)', minHeight: '36px', display: 'flex', alignItems: 'center' }}
                 onMouseOver={e => e.currentTarget.style.background = '#15803d'}
                 onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
               >
@@ -3071,25 +3078,22 @@ export function ScheduleCalendarView({
                 setSelectedForGroup([]);
               }}
               style={{
-                background: isGroupModeActive 
-                  ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
-                  : 'transparent',
+                background: isGroupModeActive ? '#2563eb' : 'transparent',
                 color: isGroupModeActive ? 'white' : '#64748b',
-                border: `1px solid ${isGroupModeActive 
-                  ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335') 
-                  : '#cbd5e1'}`,
+                border: `1px solid ${isGroupModeActive ? '#2563eb' : '#cbd5e1'}`,
                 fontWeight: 600,
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '0.7rem',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.15s'
+                gap: '6px',
+                transition: 'all 0.15s',
+                minHeight: '36px'
               }}
             >
-              <Users size={11} />
+              <Users size={13} />
               {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
             </button>
 
@@ -3102,14 +3106,15 @@ export function ScheduleCalendarView({
                   color: 'white',
                   border: 'none',
                   fontWeight: 650,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '0.7rem',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  gap: '6px',
                   transition: 'all 0.15s',
+                  minHeight: '36px',
                   boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(19, 115, 51, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
                 }}
               >
@@ -3141,19 +3146,20 @@ export function ScheduleCalendarView({
                   background: 'transparent', 
                   color: '#2563eb', 
                   border: '1px solid rgba(37, 99, 235, 0.15)', 
-                  padding: '4px 8px', 
-                  borderRadius: '6px', 
-                  fontSize: '0.7rem', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  fontSize: '0.78rem', 
                   fontWeight: 600, 
                   cursor: 'pointer', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: '4px',
-                  pointerEvents: 'none'
+                  gap: '6px',
+                  pointerEvents: 'none',
+                  minHeight: '36px'
                 }}
               >
-                <CalendarIcon size={11} />
-                Datum wählen
+                <CalendarIcon size={13} />
+                {currentDate.toLocaleDateString('de-DE')}
               </button>
             </div>
 
@@ -3164,21 +3170,22 @@ export function ScheduleCalendarView({
                 background: 'transparent', 
                 color: '#0891b2', 
                 border: '1px solid rgba(8, 145, 178, 0.15)', 
-                padding: '4px 8px', 
-                borderRadius: '6px', 
-                fontSize: '0.7rem', 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.78rem', 
                 fontWeight: 600, 
                 cursor: 'pointer', 
                 transition: 'all 0.15s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px',
+                minHeight: '36px'
               }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
               title="Kopiert alle aktiven Unterrichtstermine dieser Woche"
             >
-              <Copy size={11} />
+              <Copy size={13} />
               Woche kopieren
             </button>
 
@@ -3188,16 +3195,17 @@ export function ScheduleCalendarView({
                 background: 'transparent', 
                 color: localStorage.getItem('groovelab_copied_week_data') ? '#0891b2' : '#94a3b8', 
                 border: `1px solid ${localStorage.getItem('groovelab_copied_week_data') ? 'rgba(8, 145, 178, 0.15)' : 'rgba(148, 163, 184, 0.15)'}`, 
-                padding: '4px 8px', 
-                borderRadius: '6px', 
-                fontSize: '0.7rem', 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.78rem', 
                 fontWeight: 600, 
                 cursor: localStorage.getItem('groovelab_copied_week_data') ? 'pointer' : 'not-allowed', 
                 transition: 'all 0.15s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5
+                gap: '6px',
+                opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5,
+                minHeight: '36px'
               }}
               onMouseOver={e => {
                 if (localStorage.getItem('groovelab_copied_week_data')) {
@@ -3208,13 +3216,13 @@ export function ScheduleCalendarView({
               disabled={!localStorage.getItem('groovelab_copied_week_data')}
               title="Fügt die kopierten Unterrichtstermine in diese Woche ein (überschreibt bestehende)"
             >
-              <Clipboard size={11} />
+              <Clipboard size={13} />
               Woche einfügen
             </button>
 
             <button 
               onClick={handleResetWeek}
-              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
               title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
@@ -3224,7 +3232,7 @@ export function ScheduleCalendarView({
 
             <button 
               onClick={jumpToToday}
-              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
@@ -3233,16 +3241,16 @@ export function ScheduleCalendarView({
             
             <button 
               onClick={jumpToMonthStart}
-              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
               onMouseOver={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
               Zum Monatsanfang
             </button>
             
-            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(0,0,0,0.04)' }}>
-              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '3px', cursor: 'pointer', borderRadius: '4px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={13} /></button>
-              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '3px', cursor: 'pointer', borderRadius: '4px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={13} /></button>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px', alignItems: 'center' }}>
+              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '6px 8px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={15} /></button>
+              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '6px 8px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={15} /></button>
             </div>
           </div>
         </div>
@@ -3855,7 +3863,7 @@ export function ScheduleCalendarView({
                     if (isGroup) {
                       const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
                       const isGruppenunterricht = occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
-                      if (isGruppenunterricht || !isGroovelab) {
+                      if (isGruppenunterricht) {
                         if (isWaiting) {
                           cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
                           finalColors.border = '#10b981';
@@ -4667,6 +4675,15 @@ export function ScheduleCalendarView({
           (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
         ) : [];
 
+        const uniqueGroupOccs: any[] = [];
+        const seenStudentIds = new Set();
+        groupOccs.forEach(o => {
+          if (o.student_id && !seenStudentIds.has(o.student_id)) {
+            seenStudentIds.add(o.student_id);
+            uniqueGroupOccs.push(o);
+          }
+        });
+
         const firstGroupId = groupOccs[0]?.student?.group_id;
         const isDbLinkedGroup = isGroupOcc && !!firstGroupId && groupOccs.every(o => o.student?.group_id === firstGroupId);
         const isGruppenunterrichtOcc = isDbLinkedGroup;
@@ -4679,7 +4696,7 @@ export function ScheduleCalendarView({
         
         const modalTitle = occ?.student_id 
           ? (isGruppenunterrichtOcc 
-              ? groupOccs.map(go => `${go.student?.first_name || ''} ${go.student?.last_name || ''}`.trim()).join(' & ')
+              ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${go.student?.last_name || ''}`.trim()).join(' & ')
               : isEnsembleOcc 
                 ? 'Ensemble/Band Termin' 
                 : `Termin bearbeiten: ${studentName}`
@@ -5173,10 +5190,10 @@ export function ScheduleCalendarView({
                       {isEnsembleOcc && (
                         <div style={{ width: '280px', borderLeft: '1px solid #e5e5ea', paddingLeft: '24px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
                           <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            👥 {groupOccs.length} Schüler in dieser Gruppe
+                            👥 {uniqueGroupOccs.length} Schüler in dieser Gruppe
                           </h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px', paddingRight: '4px' }}>
-                            {groupOccs.map(go => {
+                            {uniqueGroupOccs.map(go => {
                               const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
                               const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
                               const isConfirmed = go.student_acknowledged === true;
@@ -5276,7 +5293,7 @@ export function ScheduleCalendarView({
                                             if (error) {
                                               await showAlert('Fehler beim Entkoppeln des Schülers: ' + error.message);
                                             } else {
-                                              if (groupOccs.length === 1) {
+                                              if (uniqueGroupOccs.length === 1) {
                                                 try {
                                                   await supabase.from('room_bookings')
                                                     .delete()
@@ -5384,7 +5401,7 @@ export function ScheduleCalendarView({
                                 }
                               }
 
-                              const senderStudent = groupOccs.find(o => o.student_id === msg.sender_id)?.student;
+                              const senderStudent = uniqueGroupOccs.find(o => o.student_id === msg.sender_id)?.student;
                               const senderName = senderStudent ? `${senderStudent.first_name} ${senderStudent.last_name}` : 'Schüler';
     
                               return (

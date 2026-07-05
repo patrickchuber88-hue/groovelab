@@ -132,6 +132,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   // Expanded/Collapsed months state for Column 1
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
 
+  // Expanded/Collapsed weeks state for Column 1
+  const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
+
   // Filter for Column 2 (School / Subscribed Events Timeline)
   const [eventFilter, setEventFilter] = useState<'all' | 'subscribed' | 'custom'>('all');
   const [isDragOverPlanning, setIsDragOverPlanning] = useState(false);
@@ -2937,6 +2940,81 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
+  const handleCancelOccurrence = async (occ: any) => {
+    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
+    if (!confirm(`Möchtest du den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr wirklich absagen?`)) return;
+
+    try {
+      const cancelStatus = role === 'student' ? 'canceled_by_student' : 'cancelled';
+      
+      if (occ.is_virtual) {
+        const { error: insertErr } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: occ.schedule_id,
+            student_id: occ.student_id,
+            teacher_id: occ.teacher_id,
+            date: occ.date,
+            start_time: occ.start_time,
+            duration: occ.duration || 45,
+            status: cancelStatus,
+            student_acknowledged: true
+          });
+        if (insertErr) throw insertErr;
+      } else {
+        const { error: updateErr } = await supabase
+          .from('schedule_occurrences')
+          .update({ status: cancelStatus, student_acknowledged: true })
+          .eq('id', occ.id);
+        if (updateErr) throw updateErr;
+      }
+
+      // Add system alert
+      try {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', userId)
+          .single();
+        const userName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Nutzer';
+        const roleLabel = role === 'student' ? 'Schüler' : 'Lehrkraft';
+
+        await supabase.from('system_alerts').insert({
+          school_id: schoolId || null,
+          teacher_id: occ.teacher_id,
+          type: 'Termin abgesagt',
+          message: `❌ Absage: ${roleLabel} ${userName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr abgesagt.`
+        });
+      } catch (alertErr) {
+        console.warn('Could not create system alert:', alertErr);
+      }
+
+      // Send a chat message informing about the cancellation
+      try {
+        const studentId = occ.student_id;
+        const recipientId = role === 'student' ? occ.teacher_id : occ.student_id;
+        if (studentId && recipientId) {
+          const cancelMsg = `❌ Dieser Termin wurde abgesagt.`;
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: userId,
+            recipient_id: recipientId,
+            content: cancelMsg,
+            occurrence_id: occ.id
+          });
+        }
+      } catch (msgErr) {
+        console.warn('Could not send cancellation chat message:', msgErr);
+      }
+
+      await fetchLessons();
+      setActiveChatOcc(null);
+      alert('Termin erfolgreich abgesagt! ❌');
+    } catch (err: any) {
+      console.error('Error canceling occurrence:', err);
+      alert('Fehler beim Absagen des Termins: ' + err.message);
+    }
+  };
+
   // Timeline Events merger (Column 2 merges custom + subscribed)
   const getMergedTimelineEvents = () => {
     const todayStr = new Date().toLocaleDateString('sv-SE');
@@ -2967,10 +3045,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       // Students see events created by themselves, public events, events specifically visible to students, OR if they are explicitly assigned to it
       if (role === 'student') {
+        if (ev.visibility === 'teachers') return false;
         const isAssigned = (ev.assigned_student_ids || []).includes(userId) || ev.student_id === userId;
         return ev.created_by === userId || ev.is_public || ev.visibility === 'all' || ev.visibility === 'students' || isAssigned;
       }
 
+      if (ev.visibility === 'teachers') return false;
       return ev.is_public || ev.created_by === userId;
     });
 
@@ -4035,133 +4115,233 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                   {/* Month Events List */}
                   {isExpanded && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '2px' }}>
-                      {occs.map((occ) => {
-                        const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
-                        const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '2px' }}>
+                      {(() => {
+                        const weekGroups: Record<string, { weekNum: number; rangeStr: string; items: any[] }> = {};
                         
-                        let rowBg = '#ffffff';
-                        let rowBorder = '1px solid #e2e8f0';
-                        let textColor = '#0f172a';
-                        let subColor = '#64748b';
+                        occs.forEach(occ => {
+                          const d = new Date(occ.date);
+                          // ISO Week calculation
+                          const tempDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                          tempDate.setUTCDate(tempDate.getUTCDate() + 4 - (tempDate.getUTCDay() || 7));
+                          const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
+                          const weekNum = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 
-                        if (isCanceled) {
-                          rowBg = '#fef2f2';
-                          rowBorder = '1px solid #fee2e2';
-                          textColor = '#991b1b';
-                          subColor = '#ef4444';
-                        } else if (isRescheduled) {
-                          rowBg = '#fffbeb';
-                          rowBorder = '1px solid #fef3c7';
-                          textColor = '#92400e';
-                          subColor = '#d97706';
-                        }
+                          // Date range (Monday to Sunday) of that week
+                          const day = d.getDay();
+                          const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                          const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+                          const sunday = new Date(monday);
+                          sunday.setDate(monday.getDate() + 6);
+                          
+                          const formatDate = (date: Date) => {
+                            const dd = String(date.getDate()).padStart(2, '0');
+                            const mm = String(date.getMonth() + 1).padStart(2, '0');
+                            return `${dd}.${mm}.`;
+                          };
+                          
+                          const rangeStr = `${formatDate(monday)} - ${formatDate(sunday)}`;
+                          const weekKey = `${monthKey}-W${String(weekNum).padStart(2, '0')}`;
+                          
+                          if (!weekGroups[weekKey]) {
+                            weekGroups[weekKey] = { weekNum, rangeStr, items: [] };
+                          }
+                          weekGroups[weekKey].items.push(occ);
+                        });
 
-                        const opponentName = role === 'student'
-                          ? `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`
-                          : `Schüler: ${occ.student?.first_name || 'Schüler'} ${occ.student?.last_name || ''}`;
+                        const sortedWeekKeys = Object.keys(weekGroups).sort((a, b) => a.localeCompare(b));
+                        const todayStr = new Date().toISOString().substring(0, 10);
 
-                        return (
-                          <div 
-                            key={occ.id}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '12px 14px',
-                              borderRadius: '14px',
-                              background: rowBg,
-                              border: rowBorder,
-                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)',
-                              transition: 'all 0.2s',
-                              gap: '12px',
-                              boxSizing: 'border-box'
-                            }}
-                            className="hover-scale-subtle"
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                              {/* Date Block */}
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : '#f8fafc',
-                                borderRadius: '8px',
-                                padding: '4px',
-                                width: '38px',
-                                height: '38px',
-                                border: '1px solid rgba(0,0,0,0.03)',
-                                flexShrink: 0
-                              }}>
-                                <span style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', color: subColor, lineHeight: 1 }}>
-                                  {formatWeekday(occ.date)}
+                        return sortedWeekKeys.map((weekKey, weekIdx) => {
+                          const wGroup = weekGroups[weekKey];
+                          const isWeekExpanded = expandedWeeks[weekKey] !== undefined
+                            ? expandedWeeks[weekKey]
+                            : (wGroup.items.some(item => item.date === todayStr) || weekIdx === 0);
+
+                          return (
+                            <div key={weekKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {/* Collapsible Week Header */}
+                              <div
+                                onClick={() => setExpandedWeeks(prev => ({ ...prev, [weekKey]: !isWeekExpanded }))}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 12px',
+                                  background: '#ffffff',
+                                  border: '1px solid #f1f5f9',
+                                  borderRadius: '10px',
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {isWeekExpanded ? <ChevronDown size={13} color="#94a3b8" /> : <ChevronRight size={13} color="#94a3b8" />}
+                                  KW {wGroup.weekNum} ({wGroup.rangeStr})
                                 </span>
-                                <span style={{ fontSize: '1rem', fontWeight: 900, color: textColor, lineHeight: 1, marginTop: '2px', fontFamily: 'monospace' }}>
-                                  {occ.date.substring(8, 10)}
+                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
+                                  {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
                                 </span>
                               </div>
 
-                               <div style={{ minWidth: 0, flex: 1 }}>
-                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
-                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>
-                                     {opponentName}
-                                   </span>
-                                  {isCanceled && (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                      <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#ef4444', background: '#fee2e2', padding: '2px 6px', borderRadius: '6px' }}>
-                                        Ausfall
-                                      </span>
-                                    </div>
-                                  )}
-                                  {isRescheduled && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px', flexShrink: 0 }}>
-                                      Verschoben
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Calendar size={12} /> {formatDateGerman(occ.date)}
-                                  </span>
-                                  <span>•</span>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Clock size={12} /> {occ.start_time.substring(0, 5)} Uhr
-                                  </span>
-                                  <span>•</span>
-                                  <span>{occ.duration} Min</span>
-                                </div>
-                              </div>
-                            </div>
+                              {/* Week Items List */}
+                              {isWeekExpanded && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
+                                  {wGroup.items.map(occ => {
+                                    const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                                    const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                                    const hasMessages = activeChatOccIds.has(occ.id);
+                                    
+                                    let rowBg = '#ffffff';
+                                    let rowBorder = '1px solid #e2e8f0';
+                                    let textColor = '#0f172a';
+                                    let subColor = '#64748b';
 
-                            {/* Right Status */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                               <button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   setActiveChatOcc(occ);
-                                 }}
-                                 title="1:1 Shoutbox öffnen"
-                                 style={{
-                                   border: 'none',
-                                   background: activeChatOcc?.id === occ.id ? '#dcfce7' : '#f1f5f9',
-                                   color: activeChatOcc?.id === occ.id ? '#16a34a' : '#475569',
-                                   padding: '6px',
-                                   borderRadius: '8px',
-                                   cursor: 'pointer',
-                                   display: 'inline-flex',
-                                   alignItems: 'center',
-                                   justifyContent: 'center'
-                                 }}
-                               >
-                                 <MessageSquare size={15} />
-                               </button>
+                                    if (isCanceled) {
+                                      rowBg = '#fef2f2';
+                                      rowBorder = '1px solid #fee2e2';
+                                      textColor = '#991b1b';
+                                      subColor = '#ef4444';
+                                    } else if (hasMessages) {
+                                      rowBg = '#fef9c3';
+                                      rowBorder = '1px solid #fef08a';
+                                      textColor = '#854d0e';
+                                      subColor = '#ca8a04';
+                                    } else if (isRescheduled) {
+                                      rowBg = '#fffbeb';
+                                      rowBorder = '1px solid #fef3c7';
+                                      textColor = '#92400e';
+                                      subColor = '#d97706';
+                                    }
+
+                                    const opponentName = role === 'student'
+                                      ? `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`
+                                      : `Schüler: ${occ.student?.first_name || 'Schüler'} ${occ.student?.last_name || ''}`;
+
+                                    return (
+                                      <div 
+                                        key={occ.id}
+                                        style={{
+                                          display: 'flex',
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          padding: '10px 12px',
+                                          borderRadius: '12px',
+                                          background: rowBg,
+                                          border: rowBorder,
+                                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                                          transition: 'all 0.2s',
+                                          gap: '10px',
+                                          boxSizing: 'border-box'
+                                        }}
+                                        className="hover-scale-subtle"
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                          {/* Date Block */}
+                                          <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: isCanceled ? '#fee2e2' : hasMessages ? '#fef08a' : isRescheduled ? '#fef3c7' : '#f8fafc',
+                                            borderRadius: '6px',
+                                            padding: '2px',
+                                            width: '34px',
+                                            height: '34px',
+                                            border: '1px solid rgba(0,0,0,0.03)',
+                                            flexShrink: 0
+                                          }}>
+                                            <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
+                                              {formatWeekday(occ.date)}
+                                            </span>
+                                            <span style={{ fontSize: '12px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
+                                              {occ.date.substring(8, 10)}
+                                            </span>
+                                          </div>
+
+                                          {/* Details */}
+                                          <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                              <span style={{ fontSize: '12px', fontWeight: 800, color: textColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {opponentName}
+                                              </span>
+                                              {isRescheduled && (
+                                                <span style={{
+                                                  fontSize: '7px',
+                                                  fontWeight: 800,
+                                                  background: '#fef3c7',
+                                                  color: '#d97706',
+                                                  padding: '1px 4px',
+                                                  borderRadius: '4px',
+                                                  textTransform: 'uppercase'
+                                                }}>
+                                                  Verschoben
+                                                </span>
+                                              )}
+                                              {isCanceled && (
+                                                <span style={{
+                                                  fontSize: '7px',
+                                                  fontWeight: 800,
+                                                  background: '#fee2e2',
+                                                  color: '#ef4444',
+                                                  padding: '1px 4px',
+                                                  borderRadius: '4px',
+                                                  textTransform: 'uppercase'
+                                                }}>
+                                                  Abgesagt
+                                                </span>
+                                              )}
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                <Calendar size={10} /> {formatDateGerman(occ.date)}
+                                              </span>
+                                              <span>•</span>
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                <Clock size={10} /> {occ.start_time.substring(0, 5)} Uhr
+                                              </span>
+                                              <span>•</span>
+                                              <span>{occ.duration} Min</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Right Status */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveChatOcc(occ);
+                                            }}
+                                            title="1:1 Shoutbox öffnen"
+                                            style={{
+                                              border: 'none',
+                                              background: activeChatOcc?.id === occ.id ? '#dcfce7' : '#f1f5f9',
+                                              color: activeChatOcc?.id === occ.id ? '#16a34a' : '#475569',
+                                              padding: '5px',
+                                              borderRadius: '6px',
+                                              cursor: 'pointer',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}
+                                          >
+                                            <MessageSquare size={13} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </div>
@@ -11262,6 +11442,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                {(() => {
                  const isNoRecipient = role === 'student' ? !activeChatOcc.teacher_id : !activeChatOcc.student_id;
                  const isDisabled = isFrozen || isNoRecipient;
+                 const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
                  const placeholderText = isFrozen 
                    ? "Eingefroren..." 
                    : isNoRecipient 
@@ -11292,6 +11473,56 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                          fontWeight: 600
                        }}
                      />
+                     {isCanceled ? (
+                       <button
+                         type="button"
+                         onClick={() => {
+                           handleUndoCancel(activeChatOcc);
+                           setActiveChatOcc(null);
+                         }}
+                         style={{
+                           background: '#f1f5f9',
+                           color: '#475569',
+                           border: '1px solid #cbd5e1',
+                           borderRadius: '12px',
+                           padding: '10px 16px',
+                           fontSize: '0.85rem',
+                           fontWeight: 800,
+                           cursor: 'pointer',
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           transition: 'all 0.2s',
+                           flexShrink: 0
+                         }}
+                       >
+                         Reaktivieren
+                       </button>
+                     ) : (
+                       <button
+                         type="button"
+                         onClick={() => handleCancelOccurrence(activeChatOcc)}
+                         style={{
+                           background: '#ef4444',
+                           color: '#ffffff',
+                           border: 'none',
+                           borderRadius: '12px',
+                           padding: '10px 16px',
+                           fontSize: '0.85rem',
+                           fontWeight: 800,
+                           cursor: 'pointer',
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           transition: 'all 0.2s',
+                           flexShrink: 0
+                         }}
+                         onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
+                         onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
+                       >
+                         Absagen
+                       </button>
+                     )}
                      <button
                        type="submit"
                        disabled={isDisabled || !chatTypedMessage.trim()}
@@ -11307,7 +11538,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                          display: 'flex',
                          alignItems: 'center',
                          justifyContent: 'center',
-                         transition: 'all 0.2s'
+                         transition: 'all 0.2s',
+                         flexShrink: 0
                        }}
                      >
                        Senden
