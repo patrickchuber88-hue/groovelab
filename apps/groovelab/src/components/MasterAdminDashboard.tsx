@@ -3186,7 +3186,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 overflow: 'hidden'
                               }}>
                                 {school.logo_url ? (
-                                  <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                  <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#ffffff' }} alt="" />
                                 ) : (
                                   school.name.substring(0, 2).toUpperCase()
                                 )}
