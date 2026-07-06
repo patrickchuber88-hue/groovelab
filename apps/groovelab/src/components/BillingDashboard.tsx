@@ -405,8 +405,6 @@ export function BillingDashboard() {
         // Subtotal B2B
         const subtotal = Math.max(0, (baseFee - kombiDiscountAmount) + userFee + activeStudentFee);
         const isBypass = school.subscription_bypass || false;
-        const total = isBypass ? 0.00 : subtotal;
-
         let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
         if (school.status === 'suspended') {
           status = 'suspended';
@@ -415,6 +413,8 @@ export function BillingDashboard() {
         } else if (school.is_trial) {
           status = 'trial';
         }
+
+        const total = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : subtotal;
 
         return {
           schoolId: school.id,
