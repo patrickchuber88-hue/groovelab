@@ -60,6 +60,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const isAkt = invoice.type === 'AKT';
   const isBypass = invoice.status === 'bypass';
   const isGutschrift = invoice.amount < 0;
+  const displayInvoiceId = isGutschrift ? invoice.id.replace('INV-', 'GS-') : invoice.id;
 
   const getDueDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -219,7 +220,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')))}
               </strong>
               <span style={{ color: '#64748b', fontWeight: 700 }}>
-                {isGutschrift ? 'Gutschrift-Nr.' : 'Nr.'} {invoice.id}
+                {isGutschrift ? 'Gutschrift-Nr.' : 'Nr.'} {displayInvoiceId}
               </span>
             </div>
           </div>
@@ -510,7 +511,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
                       <strong>IBAN:</strong> <span>{operatorIban}</span>
                       <strong>BIC:</strong> <span>{operatorBic}</span>
-                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{invoice.id}</strong>
+                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{displayInvoiceId}</strong>
                     </div>
                   </div>
                   <div style={{
@@ -525,7 +526,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     flexShrink: 0
                   }}>
                     <QRCode 
-                      value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${invoice.id}\n`} 
+                      value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${displayInvoiceId}\n`} 
                       size={96} 
                     />
                     <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
