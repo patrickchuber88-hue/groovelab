@@ -59,6 +59,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
   const isBypass = invoice.status === 'bypass';
+  const isGutschrift = invoice.amount < 0;
 
   const getDueDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -211,11 +212,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             </div>
             <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
               <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>
-                {invoice.status === 'Vorschau'
-                  ? (isInf ? 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))
-                  : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))}
+                {isGutschrift
+                  ? (invoice.status === 'Vorschau' ? 'VORSCHAU: GUTSCHRIFT' : 'GUTSCHRIFT')
+                  : (invoice.status === 'Vorschau'
+                    ? (isInf ? 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))
+                    : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')))}
               </strong>
-              <span style={{ color: '#64748b', fontWeight: 700 }}>Nr. {invoice.id}</span>
+              <span style={{ color: '#64748b', fontWeight: 700 }}>
+                {isGutschrift ? 'Gutschrift-Nr.' : 'Nr.'} {invoice.id}
+              </span>
             </div>
           </div>
 
@@ -427,9 +432,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 )}
                 <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
-                  <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                  <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a', whiteSpace: 'nowrap' }}>
-                    {isBypass ? '0,00 €' : invoice.amount.toFixed(2).replace('.', ',')} €
+                  <span style={{ fontWeight: 800 }}>
+                    {isGutschrift ? 'Gesamtbetrag dieser Gutschrift:' : 'Gesamtbetrag dieser Rechnung:'}
+                  </span>
+                  <strong style={{ fontWeight: 900, color: isGutschrift ? '#16a34a' : (isInf ? '#0369a1' : '#16a34a'), whiteSpace: 'nowrap' }}>
+                    {isBypass ? '0,00 €' : (isGutschrift ? `${Math.abs(invoice.amount).toFixed(2).replace('.', ',')} €` : `${invoice.amount.toFixed(2).replace('.', ',')} €`)}
                   </strong>
                 </div>
               </div>
@@ -449,51 +456,70 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
               </div>
               
-              {/* Bank Details Block */}
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '16px', 
-                background: '#f8fafc', 
-                borderRadius: '16px', 
-                border: '1px solid #cbd5e1', 
-                fontSize: '0.74rem', 
-                color: '#475569', 
-                width: '100%', 
-                display: 'flex', 
-                gap: '20px',
-                alignItems: 'center',
-                textAlign: 'left'
-              }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
-                  <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
-                    <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
-                    <strong>IBAN:</strong> <span>{operatorIban}</span>
-                    <strong>BIC:</strong> <span>{operatorBic}</span>
-                    <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{invoice.id}</strong>
+              {/* Payment or Payout notice */}
+              {isGutschrift ? (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '16px', 
+                  background: '#f0fdf4', 
+                  borderRadius: '16px', 
+                  border: '1px solid #bbf7d0', 
+                  fontSize: '0.74rem', 
+                  color: '#166534', 
+                  width: '100%',
+                  textAlign: 'left'
+                }}>
+                  <strong style={{ display: 'block', color: '#14532d', marginBottom: '4px', fontSize: '0.8rem' }}>
+                    Auszahlungs- &amp; Verrechnungshinweis:
+                  </strong>
+                  Dieser Betrag wird Ihrem Kundenkonto gutgeschrieben und mit zukünftigen Forderungen verrechnet oder auf Ihr hinterlegtes Bankkonto erstattet. Sie müssen keine Zahlung veranlassen.
+                </div>
+              ) : (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '16px', 
+                  background: '#f8fafc', 
+                  borderRadius: '16px', 
+                  border: '1px solid #cbd5e1', 
+                  fontSize: '0.74rem', 
+                  color: '#475569', 
+                  width: '100%', 
+                  display: 'flex', 
+                  gap: '20px',
+                  alignItems: 'center',
+                  textAlign: 'left'
+                }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
+                    <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
+                      <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
+                      <strong>IBAN:</strong> <span>{operatorIban}</span>
+                      <strong>BIC:</strong> <span>{operatorBic}</span>
+                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{invoice.id}</strong>
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#ffffff',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    flexShrink: 0
+                  }}>
+                    <QRCode 
+                      value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${invoice.id}\n`} 
+                      size={96} 
+                    />
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Girocode scannen
+                    </span>
                   </div>
                 </div>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#ffffff',
-                  padding: '12px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  flexShrink: 0
-                }}>
-                  <QRCode 
-                    value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${invoice.id}\n`} 
-                    size={96} 
-                  />
-                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Girocode scannen
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
