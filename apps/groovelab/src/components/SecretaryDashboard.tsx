@@ -6223,8 +6223,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   onChange={(e) => setStudentCsvText(e.target.value)}
                   placeholder={
                     studentFilterTeacher && studentFilterTeacher !== 'All'
-                      ? "z.B.\nMax Mustermann; 15.08.2012\nAnna Becker"
-                      : "z.B.\nMax; Mustermann; 15.08.2012; Gitarre; Patrick Huber\nAnna; Becker; Gesang\nJack; Halliday"
+                      ? "z.B.\nMax Mustermann; 15.08.2012\nErika Mustermann"
+                      : "z.B.\nMax; Mustermann; 15.08.2012; Gitarre; Moritz Muster\nErika; Mustermann; Gesang\nLeon; Muster"
                   }
                   style={{
                     width: '100%',
