@@ -1082,7 +1082,7 @@ export function BillingDashboard() {
                                       <span style={{ color: '#64748b' }}>Module:</span>
                                       <div style={{ display: 'flex', gap: '8px' }}>
                                         {inv.hasCampus && <span style={{ color: '#137333', fontWeight: 700, fontSize: '0.78rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '6px' }}>Campus</span>}
-                                        {inv.hasGroovelab && <span style={{ color: '#4f46e5', fontWeight: 700, fontSize: '0.78rem', background: '#e0e7ff', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
+                                        {inv.hasGroovelab && <span style={{ color: '#d97706', fontWeight: 700, fontSize: '0.78rem', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
