@@ -902,19 +902,15 @@ export function BillingDashboard() {
         <table className="billing-table">
           <thead>
             <tr>
-              <th style={{ width: '25%' }}>Musikschule</th>
-              <th style={{ width: '12%' }}>Abo-Status</th>
-              <th style={{ width: '13%', textAlign: 'center' }}>Schüler (Gesamt)</th>
-              <th style={{ width: '13%', textAlign: 'center' }}>Campus aktive User</th>
-              <th style={{ width: '13%', textAlign: 'right' }}>Schul-Lizenzen &amp; Module</th>
-              <th style={{ width: '12%', textAlign: 'right' }}>Private App-Upgrades</th>
-              <th style={{ width: '12%', textAlign: 'right', color: '#1e293b' }}>Gesamtsumme Schule</th>
+              <th style={{ width: '40%' }}>Musikschule</th>
+              <th style={{ width: '30%', textAlign: 'center' }}>Nutzer &amp; Lizenzen</th>
+              <th style={{ width: '30%', textAlign: 'right', color: '#1e293b' }}>Monats-Soll (Schule)</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '60px' }}>
+                <td colSpan={3} style={{ textAlign: 'center', padding: '60px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     <div style={{
                       width: '32px',
@@ -932,7 +928,7 @@ export function BillingDashboard() {
               </tr>
             ) : filteredInvoices.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '60px', fontWeight: 600, color: '#94a3b8' }}>
+                <td colSpan={3} style={{ textAlign: 'center', padding: '60px', fontWeight: 600, color: '#94a3b8' }}>
                   Keine Einträge für diese Filterkombination gefunden.
                 </td>
               </tr>
@@ -948,9 +944,9 @@ export function BillingDashboard() {
                       onClick={() => setExpandedSchoolId(isExpanded ? null : inv.schoolId)}
                       style={{ cursor: 'pointer' }}
                     >
-                      {/* School Name */}
+                      {/* School Name & Status */}
                       <td style={{ fontWeight: 550, color: '#0f172a' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <span style={{ 
                             color: isExpanded ? '#4f46e5' : '#64748b', 
                             transform: isExpanded ? 'rotate(180deg)' : 'none', 
@@ -975,75 +971,61 @@ export function BillingDashboard() {
                           }}>
                             {inv.schoolName?.[0] || 'S'}
                           </span>
-                          <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{inv.schoolName}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{inv.schoolName}</span>
+                            <div>
+                              {inv.status === 'bypass' ? (
+                                 <span className="status-badge status-badge-bypass" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Bypass</span>
+                              ) : inv.status === 'trial' ? (
+                                 <span className="status-badge status-badge-trial" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Probezeit</span>
+                              ) : inv.status === 'suspended' ? (
+                                 <span className="status-badge status-badge-suspended" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Gesperrt</span>
+                              ) : (
+                                 <span className="status-badge status-badge-active" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Aktiv</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       
-                      {/* Subscription Status Badge */}
-                      <td>
-                        {inv.status === 'bypass' ? (
-                           <span className="status-badge status-badge-bypass">Bypass</span>
-                        ) : inv.status === 'trial' ? (
-                           <span className="status-badge status-badge-trial">Probezeit</span>
-                        ) : inv.status === 'suspended' ? (
-                           <span className="status-badge status-badge-suspended">Gesperrt</span>
-                        ) : (
-                           <span className="status-badge status-badge-active">Aktiv</span>
-                        )}
-                      </td>
-                      
-                      {/* Total Pupils */}
+                      {/* Users & active licenses merged */}
                       <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>{inv.totalStudents} Schüler</span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{inv.totalTeachers} Lehrer</span>
-                        </div>
-                      </td>
-
-                      {/* Active Campus Users */}
-                      <td style={{ textAlign: 'center' }}>
-                        <span style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          fontSize: '0.78rem', 
-                          fontWeight: 700, 
-                          color: '#475569', 
-                          backgroundColor: '#f1f5f9', 
-                          padding: '4px 10px', 
-                          borderRadius: '8px',
-                          border: '1px solid rgba(0, 0, 0, 0.03)'
-                        }}>
-                          <BookOpen size={12} style={{ color: '#4f46e5' }} /> {inv.premiumStudents} Campus
-                        </span>
-                      </td>
-
-                      {/* Detailed B2B Modules & Licenses calculation */}
-                      <td style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 550 }}>
-                        <div style={{ color: '#0f172a', fontWeight: 700 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 400, marginTop: '2px', lineHeight: 1.3 }}>
-                          {inv.hasCampus && 'Campus'} {inv.hasCampus && inv.hasGroovelab && '+'} {inv.hasGroovelab && 'GrooveLab'} ({(inv.baseFee - inv.kombiDiscountAmount).toFixed(2).replace('.', ',')} €)
-                          <br />
-                          + Gebühren ({(inv.userFee + inv.activeStudentFee).toFixed(2).replace('.', ',')} €)
-                        </div>
-                      </td>
-
-                      {/* Est. B2C Upgrades */}
-                      <td style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                        <div>{inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 400, marginTop: '2px' }}>
-                          {inv.premiumStudents} upgraded x 9,99 €
-                        </div>
-                      </td>
-
-                      {/* B2B Total Invoice */}
-                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#4f46e5' }}>
-                        <div>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</div>
-                        {inv.subscriptionBypass && (
-                          <span style={{ fontSize: '0.62rem', color: '#4f46e5', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Bypass Aktiv
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.85rem' }}>
+                            {inv.totalStudents} Schüler / {inv.totalTeachers} Lehrer
                           </span>
-                        )}
+                          <span style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '4px', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 700, 
+                            color: '#4f46e5', 
+                            backgroundColor: '#e0e7ff', 
+                            padding: '2px 8px', 
+                            borderRadius: '6px'
+                          }}>
+                            <BookOpen size={10} /> {inv.premiumStudents} aktive Lizenzen
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Total Billed & Breakdown merged */}
+                      <td style={{ textAlign: 'right', fontSize: '0.85rem' }}>
+                        <div style={{ color: '#4f46e5', fontWeight: 800, fontSize: '1rem' }}>
+                          {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 400, marginTop: '2px', lineHeight: 1.3 }}>
+                          {inv.subscriptionBypass ? (
+                            <span style={{ fontWeight: 700, color: '#dc2626' }}>Bypass Aktiv</span>
+                          ) : (
+                            <>
+                              {inv.hasCampus && 'Campus'} {inv.hasCampus && inv.hasGroovelab && '+'} {inv.hasGroovelab && 'GrooveLab'} ({(inv.baseFee - inv.kombiDiscountAmount).toFixed(2).replace('.', ',')} €)
+                              <br />
+                              + Profile ({(inv.userFee + inv.activeStudentFee).toFixed(2).replace('.', ',')} €)
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
@@ -1062,7 +1044,7 @@ export function BillingDashboard() {
 
                       return (
                         <tr>
-                          <td colSpan={7} style={{ 
+                          <td colSpan={3} style={{ 
                             padding: '0 24px 24px 24px', 
                             background: 'rgba(255, 255, 255, 0.95)',
                             borderBottomLeftRadius: '24px',
@@ -1114,6 +1096,15 @@ export function BillingDashboard() {
                                       <strong style={{ color: isSelbstzahler ? '#4f46e5' : '#475569', fontWeight: 700 }}>
                                         {isSelbstzahler ? 'Schüler / Eltern (Direktabrechnung)' : 'Musikschule (Sammelzahler)'}
                                       </strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderTop: '1px dashed rgba(0,0,0,0.08)', paddingTop: '8px', marginTop: '2px' }}>
+                                      <span style={{ color: '#64748b' }}>Private App-Upgrades:</span>
+                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                                        {inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
+                                          ({inv.premiumStudents} x 9,99 €)
+                                        </span>
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
