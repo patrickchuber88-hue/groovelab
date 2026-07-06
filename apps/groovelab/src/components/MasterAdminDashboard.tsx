@@ -61,7 +61,7 @@ function getSubdomainOrigin(schoolName: string): string {
 
   if (host.includes('localhost') || host.includes('127.0.0.1')) {
     const port = host.split(':')[1] || '5173';
-    return `${protocol}//localhost:${port}?school=${subdomain}`;
+    return `${protocol}//${subdomain}.localhost:${port}`;
   } else {
     let cleanHost = host;
     if (cleanHost.startsWith('www.')) {
@@ -78,6 +78,12 @@ function getSubdomainOrigin(schoolName: string): string {
     }
     return `${protocol}//${subdomain}.${baseDomain}`;
   }
+}
+
+function getSecretaryInviteUrl(schoolId: string, schoolName: string, token: string | null): string {
+  const origin = getSubdomainOrigin(schoolName);
+  const separator = origin.includes('?') ? '&' : '?';
+  return `${origin}${separator}invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
 }
 
 interface MasterAdminDashboardProps {
@@ -3526,7 +3532,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '24px',
+            padding: 0,
             fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
             animation: 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
@@ -3540,13 +3546,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {/* Frosted Details Modal Frame */}
           <div style={{
-            width: '100%',
-            maxWidth: '1150px',
-            height: '86vh',
+            width: '100vw',
+            height: '100vh',
             background: '#ffffff',
-            border: '1px solid rgba(15, 23, 42, 0.08)',
-            borderRadius: '28px',
-            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+            border: 'none',
+            borderRadius: 0,
+            boxShadow: 'none',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -3562,26 +3567,38 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               background: '#f8fafc'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '46px',
-                  height: '46px',
-                  borderRadius: '12px',
-                  background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 900,
-                  color: '#ffffff',
-                  fontSize: '1rem',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
-                }}>
-                  {editLogo ? (
-                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    editName.substring(0, 2).toUpperCase()
-                  )}
-                </div>
+                {editLogo ? (
+                  <div style={{
+                    height: '46px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    padding: '2px',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                  }}>
+                    <img src={editLogo} alt="Logo" style={{ maxHeight: '100%', maxWidth: '140px', objectFit: 'contain' }} />
+                  </div>
+                ) : (
+                  <div style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '12px',
+                    background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    fontSize: '1rem',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+                  }}>
+                    {editName.substring(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
@@ -3674,34 +3691,48 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   gap: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
                 }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '16px',
-                    background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '2rem',
-                    fontWeight: 900,
-                    color: '#ffffff',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
-                  }}>
-                    {editLogo ? (
-                      <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      editName.substring(0, 2).toUpperCase()
-                    )}
-                  </div>
+                  {editLogo ? (
+                    <div style={{
+                      width: '100%',
+                      height: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      padding: '4px'
+                    }}>
+                      <img src={editLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '16px',
+                      background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '2rem',
+                      fontWeight: 900,
+                      color: '#ffffff',
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+                    }}>
+                      {editName.substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Live-Vorschau</h4>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Subdomain Origin</label>
-                  <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#0284c7', wordBreak: 'break-all', fontWeight: 600 }}>
+                  <a 
+                    href={getSubdomainOrigin(editName)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#0284c7', wordBreak: 'break-all', fontWeight: 600, textDecoration: 'underline' }}
+                  >
                     {getSubdomainOrigin(editName)}
-                  </span>
+                  </a>
                 </div>
 
                 <div style={{
@@ -3818,7 +3849,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                   }}>
                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                      <Settings size={16} color="#d97706" /> Stammdaten &amp; Design
+                      <Settings size={16} color="#4f46e5" /> Stammdaten &amp; Design
                     </h4>
 
                     <div>
@@ -3888,35 +3919,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Branding-Farbe</label>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <input 
-                          type="color" 
-                          value={editColor} 
-                          onChange={(e) => setEditColor(e.target.value)} 
-                          style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', padding: 0 }} 
-                        />
-                        <input 
-                          type="text" 
-                          value={editColor} 
-                          onChange={(e) => setEditColor(e.target.value)} 
-                          style={{
-                            flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(15,23,42,0.08)',
-                            background: '#f8fafc',
-                            fontSize: '0.88rem',
-                            fontFamily: 'monospace',
-                            color: '#0f172a',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
-                    </div>
+
 
                     <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Logo Bild-URL</label>
@@ -3963,12 +3966,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editHasCampus ? 'rgba(56, 189, 248, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editHasCampus ? 'rgba(56, 189, 248, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editHasCampus ? 'rgba(19, 115, 51, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editHasCampus ? 'rgba(19, 115, 51, 0.2)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#0284c7' : '#475569' }}>🎓 Campus Modul</span>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                          <GraduationCap size={16} color={editHasCampus ? '#137333' : '#64748b'} style={{ marginRight: '8px' }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#137333' : '#475569' }}>Campus Modul</span>
+                        </span>
                         <input
                           type="checkbox"
                           checked={editHasCampus}
@@ -3983,12 +3989,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editHasGroovelab ? 'rgba(251, 146, 60, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editHasGroovelab ? 'rgba(251, 146, 60, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editHasGroovelab ? 'rgba(217, 119, 6, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editHasGroovelab ? 'rgba(217, 119, 6, 0.2)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasGroovelab ? '#ea580c' : '#475569' }}>🎸 GrooveLab Modul</span>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                          <Music size={16} color={editHasGroovelab ? '#d97706' : '#64748b'} style={{ marginRight: '8px' }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasGroovelab ? '#d97706' : '#475569' }}>GrooveLab Modul</span>
+                        </span>
                         <input
                           type="checkbox"
                           checked={editHasGroovelab}
@@ -4003,12 +4012,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editSubscriptionBypass ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editSubscriptionBypass ? 'rgba(239, 68, 68, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editSubscriptionBypass ? 'rgba(220, 38, 38, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editSubscriptionBypass ? 'rgba(220, 38, 38, 0.2)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>⚙️ Freie Aktivierung (Abo-Bypass)</span>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                          <Settings size={16} color={editSubscriptionBypass ? '#dc2626' : '#64748b'} style={{ marginRight: '8px' }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>Freie Aktivierung (Abo-Bypass)</span>
+                        </span>
                         <input
                           type="checkbox"
                           checked={editSubscriptionBypass}
@@ -4029,7 +4041,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    <Clock size={16} color="#d97706" /> Kapazitäten &amp; Limits
+                    <Clock size={16} color="#4f46e5" /> Kapazitäten &amp; Limits
                   </h4>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -4046,7 +4058,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   </div>
 
                   {editLimitsEnabled && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px', animation: 'fadeIn 0.2s' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px', animation: 'fadeIn 0.2s' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Max Lehrer</label>
                         <input
@@ -4072,25 +4084,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           type="number"
                           value={editMaxStudents}
                           onChange={(e) => setEditMaxStudents(Number(e.target.value))}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(15,23,42,0.08)',
-                            background: '#f8fafc',
-                            fontSize: '0.88rem',
-                            color: '#0f172a',
-                            fontWeight: 700
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Max Songs</label>
-                        <input
-                          type="number"
-                          value={editMaxSongs}
-                          onChange={(e) => setEditMaxSongs(Number(e.target.value))}
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',

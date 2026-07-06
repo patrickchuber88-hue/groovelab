@@ -2906,7 +2906,14 @@ export function AdminDashboard({
     e.preventDefault();
     if (!admin?.school_id) return;
     
-    // Check limits - BYPASSED (Limits strictly removed)
+    // Check limits if enabled
+    if (admin?.schools?.limits_enabled) {
+      const maxStudents = admin.schools.max_students ?? 6;
+      if (students.length >= maxStudents) {
+        alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
+        return;
+      }
+    }
     
     const qrToken = crypto.randomUUID();
     const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
@@ -3769,13 +3776,7 @@ export function AdminDashboard({
       const lines = bulkTextSongs.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length === 0) return;
 
-      if (admin?.schools?.limits_enabled) {
-        const maxSongs = admin.schools.max_songs ?? 5;
-        if (songs.length + lines.length > maxSongs) {
-          alert(`Limit überschritten! Du kannst nicht ${lines.length} Songs hinzufügen, da das Maximum bei ${maxSongs} liegt (Aktuell: ${songs.length}).`);
-          return;
-        }
-      }
+      // Check limits - BYPASSED (Song limit not enforced)
 
       const insertPayloads = lines.map(line => {
         let artist = 'Unbekannt';
@@ -3828,13 +3829,7 @@ export function AdminDashboard({
       return;
     }
 
-    if (admin?.schools?.limits_enabled) {
-      const maxSongs = admin.schools.max_songs ?? 5;
-      if (songs.length >= maxSongs) {
-        alert(`Limit erreicht! Deine Schule darf maximal ${maxSongs} Songs in der Mediathek verwalten. Kontaktiere deinen Master-Admin.`);
-        return;
-      }
-    }
+    // Check limits - BYPASSED (Song limit not enforced)
     
     const insertPayload: any = {
       school_id: admin.school_id, 
@@ -13037,8 +13032,7 @@ export function AdminDashboard({
           <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>
             {[
               { label: 'Lehrkräfte', cur: teachers.length, max: (admin as any).schools.max_teachers ?? 2, color: '#3b82f6' },
-              { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#22c55e' },
-              { label: 'Songs', cur: songs.length, max: (admin as any).schools.max_songs ?? 5, color: '#eab308' }
+              { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#22c55e' }
             ].map((item, i) => {
               const pct = Math.min(100, (item.cur / item.max) * 100);
               const isClose = pct >= 90;

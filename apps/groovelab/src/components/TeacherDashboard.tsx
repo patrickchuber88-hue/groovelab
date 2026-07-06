@@ -5760,7 +5760,7 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: isWeekend ? '1 1 100%' : (isFreeDay ? '1.2 1 450px' : '1 1 350px'), minWidth: '300px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
                       {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
@@ -5775,7 +5775,7 @@ export function TeacherDashboard({
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: isWeekend ? '300px' : '200px',
+                          minHeight: (isWeekend || isFreeDay) ? '300px' : '200px',
                           flex: (isFreeDay || isWeekend) ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
@@ -5783,7 +5783,7 @@ export function TeacherDashboard({
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Full Height Avatar on the left */}
                             <div style={{
-                              width: isWeekend ? '420px' : (isFreeDay ? '280px' : '190px'),
+                              width: (isWeekend || isFreeDay) ? '420px' : '190px',
                               height: '100%',
                               flexShrink: 0,
                               position: 'relative',
@@ -6795,7 +6795,7 @@ export function TeacherDashboard({
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
-                    {!isWeekend && (
+                    {!(isWeekend || isFreeDay) && (
                       teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',

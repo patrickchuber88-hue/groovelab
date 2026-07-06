@@ -3007,7 +3007,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 
                 <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#0b57d0' : '#eab308' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#137333' : '#eab308' }}>
                   {schoolName || 'GrooveLab Academy'}
                 </div>
               </div>
@@ -3017,9 +3017,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={() => onLogin(registeredUser.id, true)}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#0b57d0' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
                 transition: 'all 0.2s', outline: 'none'
               }}
             >
@@ -3050,18 +3050,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{
-              background: isSecretary ? '#e8f0fe' : '#eab308', 
+              background: isSecretary ? '#e6f4ea' : '#eab308', 
               padding: '10px', borderRadius: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.08)' : 'none'
+              boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
             }}>
               {isSecretary ? (
-                <School size={24} color="#0b57d0" strokeWidth={2.5} />
+                <School size={24} color="#137333" strokeWidth={2.5} />
               ) : (
                 <Music size={24} color="#0f172a" />
               )}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#0b57d0' : '#ffffff' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#137333' : '#ffffff' }}>
               {isSecretary ? 'Campus Admin Einladung' : 'GrooveLab Einladung'}
             </div>
           </div>
@@ -3073,7 +3073,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {isSecretary 
               ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
-            <strong style={{ color: isSecretary ? '#0b57d0' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
+            <strong style={{ color: isSecretary ? '#137333' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -3156,9 +3156,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${firstNameFocused ? '#0b57d0' : '#dadce0'}` 
+                    ? `1px solid ${firstNameFocused ? '#137333' : '#dadce0'}` 
                     : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(11, 87, 208, 0.12)' : 'none',
+                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3180,9 +3180,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${lastNameFocused ? '#0b57d0' : '#dadce0'}` 
+                    ? `1px solid ${lastNameFocused ? '#137333' : '#dadce0'}` 
                     : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(11, 87, 208, 0.12)' : 'none',
+                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3195,9 +3195,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={signingUp}
               style={{
                 marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#0b57d0' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(11, 87, 208, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
             >

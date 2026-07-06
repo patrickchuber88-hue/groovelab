@@ -118,12 +118,12 @@ export function BillingDashboard() {
 
   const getSchoolInvoices = (schoolId: string, currentInvoiceAmount: number) => {
     const storedDate = localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem('contractStartDate');
-    const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-04-01T12:00:00Z');
+    const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
     
     const startYear = contractDateObj.getFullYear();
     const startMonth = contractDateObj.getMonth() + 1;
 
-    const systemDate = new Date('2026-06-21T13:58:34+02:00');
+    const systemDate = new Date();
     const currentYear = systemDate.getFullYear();
     const currentMonth = systemDate.getMonth() + 1;
 
@@ -519,14 +519,14 @@ export function BillingDashboard() {
         .billing-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
-          border-color: rgba(234, 67, 53, 0.2);
+          border-color: rgba(79, 70, 229, 0.2);
           background: rgba(255, 255, 255, 0.95);
         }
         .billing-card:hover .bc-icon-wrapper {
-          background: rgba(234, 67, 53, 0.08) !important;
-          color: #ea4335 !important;
+          background: rgba(79, 70, 229, 0.08) !important;
+          color: #4f46e5 !important;
         }
-
+ 
         .filter-btn {
           padding: 8px 16px;
           border-radius: 10px;
@@ -539,7 +539,7 @@ export function BillingDashboard() {
           transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
           display: inline-flex;
           align-items: center;
-          justify-content: center;
+          justifyContent: center;
         }
         .filter-btn:hover {
           background: #ffffff;
@@ -547,12 +547,12 @@ export function BillingDashboard() {
           border-color: rgba(0, 0, 0, 0.1);
         }
         .filter-btn-active {
-          background: #ea4335 !important;
+          background: #4f46e5 !important;
           color: #ffffff !important;
-          border-color: #ea4335 !important;
-          box-shadow: 0 4px 12px rgba(234, 67, 53, 0.2);
+          border-color: #4f46e5 !important;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
         }
-
+ 
         .billing-table {
           width: 100%;
           border-collapse: separate;
@@ -595,7 +595,7 @@ export function BillingDashboard() {
         }
         .billing-row:hover td {
           background: rgba(255, 255, 255, 0.95);
-          border-color: rgba(234, 67, 53, 0.1);
+          border-color: rgba(79, 70, 229, 0.1);
         }
         .billing-row-expanded td {
           border-bottom: none !important;
@@ -607,7 +607,7 @@ export function BillingDashboard() {
         .billing-row-expanded td:last-child {
           border-bottom-right-radius: 0 !important;
         }
-
+ 
         .status-badge {
           display: inline-flex;
           align-items: center;
@@ -618,8 +618,8 @@ export function BillingDashboard() {
           font-weight: 700;
         }
         .status-badge-active {
-          color: #ea4335;
-          background: #fce8e6;
+          color: #137333;
+          background: #e6f4ea;
         }
         .status-badge-trial {
           color: #b06000;
@@ -633,7 +633,7 @@ export function BillingDashboard() {
           color: #7f1d1d;
           background: #fee2e2;
         }
-
+ 
         .action-icon-btn {
           border: none;
           background: none;
@@ -641,15 +641,15 @@ export function BillingDashboard() {
           color: #64748b;
           display: flex;
           align-items: center;
-          justify-content: center;
+          justifyContent: center;
           padding: 8px;
           border-radius: 10px;
           transition: all 0.15s;
         }
         .action-icon-btn:hover {
-          color: #ea4335;
-          background: rgba(234, 67, 53, 0.08);
-        }
+          color: #4f46e5;
+          background: rgba(79, 70, 229, 0.08);
+        }   }
 
         .invoice-card {
           background: #ffffff;
@@ -672,10 +672,10 @@ export function BillingDashboard() {
       }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CreditCard style={{ color: '#ea4335' }} size={32} /> Abrechnungen &amp; Abonnements
+            <CreditCard style={{ color: '#4f46e5' }} size={32} /> Abrechnungen &amp; Abonnements
           </h2>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 500 }}>
-            Globale Übersicht über alle B2B Schullizenz-Einnahmen und B2C Premium-Upgrades von Campus-Groovelab.
+            Globale Übersicht über alle Schul-Lizenzgebühren und privaten App-Upgrades von Campus-Groovelab.
           </p>
         </div>
         
@@ -698,7 +698,7 @@ export function BillingDashboard() {
             transition: 'all 0.2s',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.2)'; }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e0e7ff'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.borderColor = 'rgba(79, 70, 229, 0.2)'; }}
           onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
@@ -711,9 +711,9 @@ export function BillingDashboard() {
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: '#ea4335',
-          backgroundColor: '#fce8e6',
-          border: '1px solid rgba(234, 67, 53, 0.2)',
+          color: '#4f46e5',
+          backgroundColor: '#e0e7ff',
+          border: '1px solid rgba(79, 70, 229, 0.2)',
           padding: '16px',
           borderRadius: '16px',
           fontSize: '0.88rem',
@@ -748,7 +748,7 @@ export function BillingDashboard() {
             <School size={22} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>B2B Umsatz (Schulen)</span>
+            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schul-Umsatz (Lizenzen)</span>
             <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em' }}>
               {summary.totalB2BRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
@@ -772,7 +772,7 @@ export function BillingDashboard() {
             <TrendingUp size={22} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>B2C Umsatz (App-Käufe)</span>
+            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Direkt-Umsatz (App-Käufe)</span>
             <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em' }}>
               {summary.totalB2CRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
@@ -866,8 +866,8 @@ export function BillingDashboard() {
               color: '#0f172a'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#ea4335';
-              e.target.style.boxShadow = '0 0 0 3px rgba(234,67,53,0.1)';
+              e.target.style.borderColor = '#4f46e5';
+              e.target.style.boxShadow = '0 0 0 3px rgba(79, 70, 229, 0.1)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)';
@@ -902,27 +902,26 @@ export function BillingDashboard() {
         <table className="billing-table">
           <thead>
             <tr>
-              <th style={{ width: '22%' }}>Musikschule</th>
+              <th style={{ width: '25%' }}>Musikschule</th>
               <th style={{ width: '12%' }}>Abo-Status</th>
-              <th style={{ width: '12%', textAlign: 'center' }}>Schüler (Gesamt)</th>
-              <th style={{ width: '12%', textAlign: 'center' }}>Campus aktive User</th>
-              <th style={{ width: '12%', textAlign: 'right' }}>B2B Module + Aktivierungen</th>
-              <th style={{ width: '12%', textAlign: 'right' }}>B2C App-Upgrades</th>
-              <th style={{ width: '10%', textAlign: 'center' }}>Kontingent</th>
-              <th style={{ width: '14%', textAlign: 'right', color: '#1e293b' }}>Gesamtbetrag (B2B)</th>
+              <th style={{ width: '13%', textAlign: 'center' }}>Schüler (Gesamt)</th>
+              <th style={{ width: '13%', textAlign: 'center' }}>Campus aktive User</th>
+              <th style={{ width: '13%', textAlign: 'right' }}>Schul-Lizenzen &amp; Module</th>
+              <th style={{ width: '12%', textAlign: 'right' }}>Private App-Upgrades</th>
+              <th style={{ width: '12%', textAlign: 'right', color: '#1e293b' }}>Gesamtsumme Schule</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '60px' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '60px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     <div style={{
                       width: '32px',
                       height: '32px',
                       borderRadius: '50%',
-                      border: '3px solid rgba(234, 67, 53, 0.1)',
-                      borderTopColor: '#ea4335',
+                      border: '3px solid rgba(79, 70, 229, 0.1)',
+                      borderTopColor: '#4f46e5',
                       animation: 'spin 1s linear infinite'
                     }} />
                     <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -933,7 +932,7 @@ export function BillingDashboard() {
               </tr>
             ) : filteredInvoices.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '60px', fontWeight: 600, color: '#94a3b8' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '60px', fontWeight: 600, color: '#94a3b8' }}>
                   Keine Einträge für diese Filterkombination gefunden.
                 </td>
               </tr>
@@ -953,7 +952,7 @@ export function BillingDashboard() {
                       <td style={{ fontWeight: 550, color: '#0f172a' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ 
-                            color: isExpanded ? '#ea4335' : '#64748b', 
+                            color: isExpanded ? '#4f46e5' : '#64748b', 
                             transform: isExpanded ? 'rotate(180deg)' : 'none', 
                             transition: 'transform 0.2s',
                             display: 'inline-flex',
@@ -1015,7 +1014,7 @@ export function BillingDashboard() {
                           borderRadius: '8px',
                           border: '1px solid rgba(0, 0, 0, 0.03)'
                         }}>
-                          <BookOpen size={12} style={{ color: '#ea4335' }} /> {inv.premiumStudents} Campus
+                          <BookOpen size={12} style={{ color: '#4f46e5' }} /> {inv.premiumStudents} Campus
                         </span>
                       </td>
 
@@ -1037,21 +1036,11 @@ export function BillingDashboard() {
                         </div>
                       </td>
 
-                      {/* Active Quota */}
-                      <td style={{ textAlign: 'center', fontSize: '0.85rem' }}>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{inv.userQuota}</span>
-                        {inv.pendingUserQuota && (
-                          <div style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
-                            ⏳ Next: {inv.pendingUserQuota}
-                          </div>
-                        )}
-                      </td>
-
                       {/* B2B Total Invoice */}
-                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#ea4335' }}>
+                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#4f46e5' }}>
                         <div>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</div>
                         {inv.subscriptionBypass && (
-                          <span style={{ fontSize: '0.62rem', color: '#ea4335', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#4f46e5', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             Bypass Aktiv
                           </span>
                         )}
@@ -1073,7 +1062,7 @@ export function BillingDashboard() {
 
                       return (
                         <tr>
-                          <td colSpan={8} style={{ 
+                          <td colSpan={7} style={{ 
                             padding: '0 24px 24px 24px', 
                             background: 'rgba(255, 255, 255, 0.95)',
                             borderBottomLeftRadius: '24px',
@@ -1111,18 +1100,18 @@ export function BillingDashboard() {
                                       <span style={{ color: '#64748b' }}>Module:</span>
                                       <div style={{ display: 'flex', gap: '8px' }}>
                                         {inv.hasCampus && <span style={{ color: '#137333', fontWeight: 700, fontSize: '0.78rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '6px' }}>Campus</span>}
-                                        {inv.hasGroovelab && <span style={{ color: '#ea4335', fontWeight: 700, fontSize: '0.78rem', background: '#fce8e6', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
+                                        {inv.hasGroovelab && <span style={{ color: '#4f46e5', fontWeight: 700, fontSize: '0.78rem', background: '#e0e7ff', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#64748b' }}>Kombi-Rabatt (B2B):</span>
-                                      <strong style={{ color: inv.hasKombiDiscount ? '#ea4335' : '#64748b', fontWeight: 700 }}>
+                                      <span style={{ color: '#64748b' }}>Kombi-Rabatt (Schule):</span>
+                                      <strong style={{ color: inv.hasKombiDiscount ? '#137333' : '#64748b', fontWeight: 700 }}>
                                         {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Nein'}
                                       </strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
                                       <span style={{ color: '#64748b' }}>Kostenträger:</span>
-                                      <strong style={{ color: isSelbstzahler ? '#ea4335' : '#475569', fontWeight: 700 }}>
+                                      <strong style={{ color: isSelbstzahler ? '#4f46e5' : '#475569', fontWeight: 700 }}>
                                         {isSelbstzahler ? 'Schüler / Eltern (Direktabrechnung)' : 'Musikschule (Sammelzahler)'}
                                       </strong>
                                     </div>
@@ -1138,13 +1127,13 @@ export function BillingDashboard() {
                                       <span style={{ color: '#0f172a', fontWeight: 700 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                     </div>
                                     {inv.hasKombiDiscount && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#ea4335' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#137333' }}>
                                         <span style={{ fontWeight: 700 }}>Kombi-Rabatt:</span>
                                         <span style={{ fontWeight: 700 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                       </div>
                                     )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                      <span style={{ color: '#64748b' }}>Profile-Levy (B2B):</span>
+                                      <span style={{ color: '#64748b' }}>Servicegebühr Profile:</span>
                                       <span style={{ color: '#0f172a', fontWeight: 700 }}>
                                         {inv.userFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
@@ -1153,7 +1142,7 @@ export function BillingDashboard() {
                                       </span>
                                     </div>
                                     {inv.activeStudentFee > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#ea4335' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#4f46e5' }}>
                                         <span style={{ fontWeight: 700 }}>Schüler-Aktivierung:</span>
                                         <span style={{ fontWeight: 700 }}>
                                           {inv.activeStudentFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
@@ -1161,8 +1150,8 @@ export function BillingDashboard() {
                                       </div>
                                     )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '10px', marginTop: '2px' }}>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>Monats-Soll (B2B):</span>
-                                      <strong style={{ color: '#ea4335', fontWeight: 800 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
+                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>Monats-Soll Schule:</span>
+                                      <strong style={{ color: '#4f46e5', fontWeight: 800 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -1199,8 +1188,8 @@ export function BillingDashboard() {
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, true)}
-                                                style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '6px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                                style={{ border: 'none', background: 'none', color: '#4f46e5', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '6px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#e0e7ff'}
                                                 onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                               >
                                                 Sperren
@@ -1238,9 +1227,9 @@ export function BillingDashboard() {
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: '#fce8e6', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '6px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fad2cf'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                                style={{ border: 'none', background: '#e0e7ff', color: '#4f46e5', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '6px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#c7d2fe'}
+                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#e0e7ff'}
                                               >
                                                 Freischalten
                                               </button>
@@ -1309,7 +1298,7 @@ export function BillingDashboard() {
                                       cursor: 'pointer',
                                       transition: 'all 0.2s'
                                     }}
-                                    onMouseOver={(e: any) => { e.currentTarget.style.background = '#fce8e6'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.1)'; }}
+                                    onMouseOver={(e: any) => { e.currentTarget.style.background = '#e0e7ff'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.borderColor = 'rgba(79, 70, 229, 0.1)'; }}
                                     onMouseOut={(e: any) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
                                   >
                                     + Manuelle Rechnung erstellen
