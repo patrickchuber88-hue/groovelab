@@ -6091,9 +6091,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   </strong>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
                     {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
-                      <>Format pro Zeile: <code>Vorname Nachname</code> oder <code>Vorname; Nachname</code></>
+                      <>Format pro Zeile: <code>Vorname Nachname</code></>
                     ) : (
-                      <>Format pro Zeile: <code>Vorname; Nachname; Instrument</code> (Geburtstag optional)</>
+                      <>Format pro Zeile: <code>Vorname; Nachname; Geburtstag (optional); Instrument (optional); Lehrkraft (optional)</code></>
                     )}
                   </span>
                 </div>
@@ -6216,7 +6216,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   placeholder={
                     studentFilterTeacher && studentFilterTeacher !== 'All'
                       ? "z.B.\nMax Mustermann\nAnna Becker"
-                      : "z.B.\nMax Mustermann; Gitarre\nAnna Becker; Gesang; 15.08.2012"
+                      : "z.B.\nMax; Mustermann; 15.08.2012; Gitarre; Patrick Huber\nAnna; Becker; Gesang\nJack; Halliday"
                   }
                   style={{
                     width: '100%',
