@@ -4539,9 +4539,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           firstName = nameParts[0] || '';
           lastName = nameParts.slice(1).join(' ') || '';
         } else if (parts.length === 2 && isSmartActive) {
-          // e.g. "Max; Mustermann"
-          firstName = parts[0]?.trim();
-          lastName = parts[1]?.trim();
+          // Could be "Max; Mustermann" or "Max Mustermann; 15.08.2012"
+          const p1 = parts[1]?.trim() || '';
+          if (p1.includes('.')) {
+            const nameParts = parts[0].trim().split(/\s+/);
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join(' ') || '';
+            birthDate = p1;
+          } else {
+            firstName = parts[0]?.trim();
+            lastName = parts[1]?.trim();
+          }
         } else {
           // Regular parsing
           firstName = parts[0]?.trim();
@@ -6091,7 +6099,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   </strong>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
                     {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
-                      <>Format pro Zeile: <code>Vorname Nachname</code></>
+                      <>Format pro Zeile: <code>Vorname Nachname; Geburtstag (optional)</code></>
                     ) : (
                       <>Format pro Zeile: <code>Vorname; Nachname; Geburtstag (optional); Instrument (optional); Lehrkraft (optional)</code></>
                     )}
@@ -6215,7 +6223,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   onChange={(e) => setStudentCsvText(e.target.value)}
                   placeholder={
                     studentFilterTeacher && studentFilterTeacher !== 'All'
-                      ? "z.B.\nMax Mustermann\nAnna Becker"
+                      ? "z.B.\nMax Mustermann; 15.08.2012\nAnna Becker"
                       : "z.B.\nMax; Mustermann; 15.08.2012; Gitarre; Patrick Huber\nAnna; Becker; Gesang\nJack; Halliday"
                   }
                   style={{
