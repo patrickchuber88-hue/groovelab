@@ -220,6 +220,15 @@ export function BillingDashboard() {
     }
   };
 
+  const getSchoolNumericId = (id: string): number => {
+    if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash % 98) + 2;
+  };
+
   const createManualInvoice = async (schoolId: string) => {
     const amountStr = prompt("Geben Sie den Rechnungsbetrag ein (z.B. 49,90):");
     if (!amountStr) return;
@@ -230,9 +239,24 @@ export function BillingDashboard() {
     if (!title) return;
 
     try {
-      const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
-      const nextSeq = String((count || 0) + 1).padStart(4, '0');
-      const invoiceId = `INV-${new Date().getFullYear()}-${nextSeq}`;
+      const schoolNumericId = getSchoolNumericId(schoolId);
+      const now = new Date();
+      const yearShort = String(now.getFullYear()).slice(-2);
+      const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+      const prefix = amount < 0 ? 'GS' : 'RE';
+
+      const { data: existingInvoices } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('school_id', schoolId);
+
+      const matchPattern = `${prefix}-${schoolNumericId}-${yearShort}${monthStr}`;
+      const countForPeriod = existingInvoices
+        ? existingInvoices.filter(inv => inv.id.startsWith(matchPattern)).length
+        : 0;
+
+      const seqStr = String(countForPeriod + 1).padStart(2, '0');
+      const invoiceId = `${prefix}-${schoolNumericId}-${yearShort}${monthStr}-${seqStr}`;
 
       const today = new Date().toISOString().split('T')[0];
       const due = new Date();
