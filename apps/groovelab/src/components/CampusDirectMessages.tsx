@@ -598,46 +598,52 @@ export default function CampusDirectMessages({
             </div>
 
             {/* Input Composer */}
-            <form onSubmit={handleSend} style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', gap: '12px' }}>
-              <input 
-                type="text" 
-                placeholder="Deine Nachricht..."
-                value={typedMessage}
-                onChange={e => setTypedMessage(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '12px 18px',
-                  borderRadius: '16px',
-                  border: '1px solid #e2e8f0',
-                  background: 'white',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  outline: 'none',
-                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  background: '#137333',
-                  color: 'white',
-                  border: 'none',
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(19, 115, 51, 0.25)',
-                  transition: 'all 0.2s',
-                  flexShrink: 0
-                }}
-                className="hover-scale"
-              >
-                <Send size={18} />
-              </button>
-            </form>
+            {isStudent && user?.app_usage_mode === 'parent_hybrid' && !user?.parent_allow_chat ? (
+              <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#fef2f2', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center' }}>
+                🔒 Eltern-Sperre: Das Senden von Chat-Nachrichten wurde von deinen Eltern deaktiviert.
+              </div>
+            ) : (
+              <form onSubmit={handleSend} style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', gap: '12px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Deine Nachricht..."
+                  value={typedMessage}
+                  onChange={e => setTypedMessage(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '12px 18px',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    background: 'white',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    background: '#137333',
+                    color: 'white',
+                    border: 'none',
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(19, 115, 51, 0.25)',
+                    transition: 'all 0.2s',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                >
+                  <Send size={18} />
+                </button>
+              </form>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px', textAlign: 'center', background: '#fafbfc' }}>

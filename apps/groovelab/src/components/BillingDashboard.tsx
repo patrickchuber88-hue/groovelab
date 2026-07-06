@@ -166,14 +166,16 @@ export function BillingDashboard() {
       const paidInvoicesList = getPaidInvoices(schoolId);
       const isMarkedPaid = paidInvoicesList.includes(invId);
 
-      const status = isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
+      const isTrialMonth = (y === startYear && m === startMonth);
+      const invoiceAmount = isTrialMonth ? 0.00 : (isCurrent ? currentInvoiceAmount : (currentInvoiceAmount > 0 ? currentInvoiceAmount : 39.90));
+      const status = isTrialMonth ? 'Probemonat' : (isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
 
       list.push({
         id: invId,
         date: invoiceDateStr,
         monthName,
         year: String(y),
-        amount: isCurrent ? currentInvoiceAmount : (currentInvoiceAmount > 0 ? currentInvoiceAmount : 39.90),
+        amount: invoiceAmount,
         status,
         isCreated,
         isCurrentMonth: isCurrent

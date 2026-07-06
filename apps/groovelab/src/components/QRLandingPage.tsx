@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
@@ -73,6 +73,12 @@ interface ProfileData {
   is_trial?: boolean;
   trial_ends_at?: string | null;
   exempt_from_direct_billing?: boolean;
+  has_parent_pin?: boolean | null;
+  parent_allow_chat?: boolean;
+  parent_allow_timer?: boolean;
+  parent_allow_leaderboard?: boolean;
+  parent_allow_groups?: boolean;
+  parent_allow_proposals?: boolean;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -200,6 +206,59 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [activeTab, setActiveTab] = useState<'action' | 'homework'>('action');
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  
+  const [parentUnlocked, setParentUnlocked] = useState(false);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [parentPinInput, setParentPinInput] = useState('');
+  const [parentPinError, setParentPinError] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+
+  const [isInitialPinSetup, setIsInitialPinSetup] = useState(false);
+  const [newPinInput, setNewPinInput] = useState('');
+  const [newPinConfirm, setNewPinConfirm] = useState('');
+  const [parentPinAttempts, setParentPinAttempts] = useState(0);
+  const [parentPinLockoutUntil, setParentPinLockoutUntil] = useState<number | null>(null);
+  const [pinChangeLoading, setPinChangeLoading] = useState(false);
+
+  const handleSaveInitialPin = async () => {
+    if (!profile) return;
+    if (newPinInput.length !== 4 || newPinConfirm.length !== 4) {
+      alert('Die PIN muss 4 Ziffern lang sein.');
+      return;
+    }
+    if (newPinInput !== newPinConfirm) {
+      alert('Die PINs stimmen nicht überein.');
+      return;
+    }
+    if (newPinInput === '0000') {
+      alert('Die PIN darf nicht „0000“ sein.');
+      return;
+    }
+    setPinChangeLoading(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ parent_pin: newPinInput })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, has_parent_pin: true } : null);
+      setIsInitialPinSetup(false);
+      setParentUnlocked(true);
+      setShowPinPrompt(false);
+      setNewPinInput('');
+      setNewPinConfirm('');
+      alert('Erfolgreich! Deine persönliche Eltern-PIN wurde gespeichert.');
+    } catch (err: any) {
+      console.error('Failed to save parent PIN:', err);
+      alert('Fehler beim Speichern der PIN: ' + err.message);
+    } finally {
+      setPinChangeLoading(false);
+    }
+  };
 
   const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
   const preStartCountdownRef = useRef(preStartCountdown);
@@ -418,7 +477,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers holen
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing')
+          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals')
           .eq('qr_token', token)
           .single();
 
@@ -482,7 +541,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           created_at: userData.created_at,
           is_trial: userData.is_trial ?? false,
           trial_ends_at: userData.trial_ends_at,
-          exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false
+          exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false,
+          has_parent_pin: userData.has_parent_pin ?? false,
+          parent_allow_chat: userData.parent_allow_chat ?? true,
+          parent_allow_timer: userData.parent_allow_timer ?? true,
+          parent_allow_leaderboard: userData.parent_allow_leaderboard ?? true,
+          parent_allow_groups: userData.parent_allow_groups ?? true,
+          parent_allow_proposals: userData.parent_allow_proposals ?? true
         });
 
         if (isInactive) {
@@ -3109,6 +3174,396 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           )}
 
+          {!timerRunning && profile.app_usage_mode === 'parent_hybrid' && (
+            <div style={{
+              background: parentUnlocked ? '#e0f2fe' : '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              padding: '10px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.8rem',
+              color: parentUnlocked ? '#0369a1' : '#475569',
+              fontWeight: 700
+            }}>
+              <span>
+                {parentUnlocked ? '🔓 Eltern-Bereich aktiv (Einstellungen freigeschaltet)' : '👪 Dieser Bereich ist für Schüler optimiert.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (parentUnlocked) {
+                    setParentUnlocked(false);
+                  } else {
+                    setShowPinPrompt(true);
+                  }
+                }}
+                style={{
+                  background: parentUnlocked ? '#0284c7' : '#4f46e5',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {parentUnlocked ? 'Sperren' : '🔑 Eltern-Bereich'}
+              </button>
+            </div>
+          )}
+
+          {showPinPrompt && (
+            <div style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '28px',
+                padding: '24px',
+                width: '100%',
+                maxWidth: '320px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                textAlign: 'center'
+              }}>
+                {isInitialPinSetup ? (
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>🔒 Neue Eltern-PIN vergeben</h3>
+                    <p style={{ margin: '8px 0 16px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                      Um fortzufahren, musst du die standardmäßige PIN (0000) durch eine persönliche, sichere 4-stellige Nummer ersetzen.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px', textAlign: 'left' }}>Neue 4-stellige PIN:</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={newPinInput}
+                          onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••"
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            fontSize: '1.25rem',
+                            textAlign: 'center',
+                            border: '2px solid #cbd5e1',
+                            borderRadius: '12px',
+                            outline: 'none',
+                            letterSpacing: '0.4em',
+                            fontWeight: 900,
+                            background: '#f8fafc',
+                            color: '#0f172a'
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px', textAlign: 'left' }}>PIN wiederholen:</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={newPinConfirm}
+                          onChange={(e) => setNewPinConfirm(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••"
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            fontSize: '1.25rem',
+                            textAlign: 'center',
+                            border: '2px solid #cbd5e1',
+                            borderRadius: '12px',
+                            outline: 'none',
+                            letterSpacing: '0.4em',
+                            fontWeight: 900,
+                            background: '#f8fafc',
+                            color: '#0f172a'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsInitialPinSetup(false);
+                          setShowPinPrompt(false);
+                          setNewPinInput('');
+                          setNewPinConfirm('');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveInitialPin}
+                        disabled={newPinInput.length !== 4 || newPinConfirm.length !== 4 || pinChangeLoading}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          background: '#137333',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          cursor: (newPinInput.length !== 4 || newPinConfirm.length !== 4 || pinChangeLoading) ? 'not-allowed' : 'pointer',
+                          opacity: (newPinInput.length !== 4 || newPinConfirm.length !== 4 || pinChangeLoading) ? 0.6 : 1
+                        }}
+                      >
+                        {pinChangeLoading ? 'Speichert...' : 'Speichern'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>👪 Eltern-PIN eingeben</h3>
+                    <p style={{ margin: '8px 0 20px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>
+                      Bitte gib die 4-stellige Eltern-PIN ein, um den geschützten Eltern-Bereich freizuschalten.
+                    </p>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={parentPinInput}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setParentPinInput(val);
+                        if (val.length === 4) {
+                          if (parentPinLockoutUntil && Date.now() < parentPinLockoutUntil) {
+                            const minsLeft = Math.ceil((parentPinLockoutUntil - Date.now()) / 60000);
+                            alert(`Eltern-Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
+                            setParentPinInput('');
+                            return;
+                          }
+
+                          supabase
+                            .rpc('verify_parent_pin', { student_id: profile.id, input_pin: val })
+                            .then(({ data: isCorrect, error: rpcErr }) => {
+                              if (rpcErr) {
+                                console.error('PIN verification failed:', rpcErr);
+                                setParentPinError(true);
+                                setParentPinInput('');
+                                return;
+                              }
+                              if (isCorrect) {
+                                setParentPinAttempts(0);
+                                const isDefault = !profile.has_parent_pin || val === '0000';
+                                if (isDefault) {
+                                  setIsInitialPinSetup(true);
+                                  setParentPinInput('');
+                                } else {
+                                  setParentUnlocked(true);
+                                  setShowPinPrompt(false);
+                                  setParentPinInput('');
+                                  setParentPinError(false);
+                                }
+                              } else {
+                                const newAttempts = parentPinAttempts + 1;
+                                setParentPinAttempts(newAttempts);
+                                if (newAttempts >= 3) {
+                                  const lockoutTime = Date.now() + 15 * 60 * 1000;
+                                  setParentPinLockoutUntil(lockoutTime);
+                                  setParentPinAttempts(0);
+                                  alert('🔒 Zu viele Fehlversuche. Der Eltern-Bereich ist aus Sicherheitsgründen für 15 Minuten gesperrt.');
+                                } else {
+                                  setParentPinError(true);
+                                  alert(`Falsche PIN. Du hast noch ${3 - newAttempts} Versuche.`);
+                                }
+                                setParentPinInput('');
+                              }
+                            });
+                        }
+                      }}
+                      placeholder="••••"
+                      style={{
+                        width: '120px',
+                        padding: '12px 0',
+                        fontSize: '1.75rem',
+                        textAlign: 'center',
+                        border: parentPinError ? '2px solid #ef4444' : '2px solid #cbd5e1',
+                        borderRadius: '16px',
+                        letterSpacing: '0.5em',
+                        fontWeight: 900,
+                        outline: 'none',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        marginBottom: '20px'
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPinPrompt(false);
+                        setParentPinInput('');
+                        setParentPinError(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        border: 'none',
+                        borderRadius: '14px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showConsentModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '28px',
+                padding: '24px',
+                width: '100%',
+                maxWidth: '360px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', textAlign: 'center' }}>
+                  📱 Direkt-Kommunikation freischalten
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                  Sie erlauben damit Ihrem Kind, direkt und selbstständig über die App mit Lehrkräften zu kommunizieren. Dies schaltet den Chat-Eingang frei und macht das Profil schulintern sichtbar.
+                </p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 650, color: '#1e293b' }}>
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      style={{ marginTop: '3px' }}
+                    />
+                    <span>Ich stimme zu, dass mein Kind eigenständig Nachrichten senden und empfangen darf.</span>
+                  </label>
+                  
+                  <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 650, color: '#1e293b' }}>
+                    <input
+                      type="checkbox"
+                      checked={acceptedPrivacy}
+                      onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                      style={{ marginTop: '3px' }}
+                    />
+                    <span>Ich habe die Datenschutzhinweise und die AGB gelesen und akzeptiere diese im Namen meines Kindes.</span>
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowConsentModal(false);
+                      setAcceptedTerms(false);
+                      setAcceptedPrivacy(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: 'none',
+                      borderRadius: '14px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!acceptedTerms || !acceptedPrivacy}
+                    onClick={async () => {
+                      try {
+                        const { error: logError } = await supabase
+                          .from('parent_consent_logs')
+                          .insert({
+                            student_id: profile.id,
+                            parent_email: 'eltern@campus-groovelab.de',
+                            consent_type: 'direct_communication',
+                            ip_address: '127.0.0.1',
+                            user_agent: navigator.userAgent
+                          });
+                        if (logError) throw logError;
+
+                        const { error: updateError } = await supabase
+                          .from('users')
+                          .update({ app_usage_mode: 'student_only' })
+                          .eq('id', profile.id);
+                        if (updateError) throw updateError;
+
+                        setProfile(prev => prev ? { ...prev, app_usage_mode: 'student_only' } : null);
+                        setParentUnlocked(false);
+                        setShowConsentModal(false);
+                        alert('Erfolgreich freigeschaltet! Der Modus wurde auf "Selbstnutzer" umgestellt.');
+                      } catch (err: any) {
+                        alert('Fehler bei der Aktivierung: ' + err.message);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: (!acceptedTerms || !acceptedPrivacy) ? '#cbd5e1' : '#16a34a',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '14px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: (!acceptedTerms || !acceptedPrivacy) ? 'not-allowed' : 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    Freischalten
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Thin separator */}
           {!timerRunning && <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }}></div>}
 
@@ -3212,6 +3667,133 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   )
                 ) : (
                   renderHomeworkWidget()
+                )}
+
+                {profile.app_usage_mode === 'parent_hybrid' && parentUnlocked && (
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1.5px solid #bbf7d0',
+                    borderRadius: '24px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    textAlign: 'left',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Key size={16} style={{ color: '#16a34a' }} /> Berechtigungen verwalten
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
+                      Du kannst die Kommunikationsrechte auf dein Kind übertragen oder einzelne Funktionen gezielt freigeben.
+                    </p>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setShowConsentModal(true)}
+                      style={{
+                        background: '#16a34a',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '10px 16px',
+                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        alignSelf: 'flex-start',
+                        marginBottom: '8px'
+                      }}
+                    >
+                      Modus wechseln zu "Selbstnutzer"
+                    </button>
+
+                    <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#15803d', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Settings size={14} style={{ color: '#15803d' }} /> Einzelne Funktionen freigeben:
+                      </h5>
+                      
+                      {/* Toggle 1: Chat */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={profile.parent_allow_chat ?? true}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ parent_allow_chat: checked }).eq('id', profile.id);
+                            if (!error) setProfile(prev => prev ? { ...prev, parent_allow_chat: checked } : null);
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <MessageSquare size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Chat &amp; Lehrer-Kommunikation erlauben</span>
+                      </label>
+
+                      {/* Toggle 2: Timer */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={profile.parent_allow_timer ?? true}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ parent_allow_timer: checked }).eq('id', profile.id);
+                            if (!error) setProfile(prev => prev ? { ...prev, parent_allow_timer: checked } : null);
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <Timer size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Selbständiger Übe-Timer &amp; Streaks</span>
+                      </label>
+
+                      {/* Toggle 3: Leaderboard */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={profile.parent_allow_leaderboard ?? true}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ parent_allow_leaderboard: checked }).eq('id', profile.id);
+                            if (!error) setProfile(prev => prev ? { ...prev, parent_allow_leaderboard: checked } : null);
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <Trophy size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Sichtbarkeit in Bestenlisten</span>
+                      </label>
+
+                      {/* Toggle 4: Groups */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={profile.parent_allow_groups ?? true}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ parent_allow_groups: checked }).eq('id', profile.id);
+                            if (!error) setProfile(prev => prev ? { ...prev, parent_allow_groups: checked } : null);
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <Users size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Beitritt zu Band- &amp; Gruppen-Chats</span>
+                      </label>
+
+                      {/* Toggle 5: Proposals */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={profile.parent_allow_proposals ?? true}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ parent_allow_proposals: checked }).eq('id', profile.id);
+                            if (!error) setProfile(prev => prev ? { ...prev, parent_allow_proposals: checked } : null);
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <Music size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Repertoire- &amp; Songvorschläge senden</span>
+                      </label>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (

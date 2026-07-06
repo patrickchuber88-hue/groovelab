@@ -14,11 +14,36 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+  const [activeDocument, setActiveDocument] = useState<'none' | 'terms' | 'privacy'>('none');
+  const [calcCampus, setCalcCampus] = useState<boolean>(true);
+  const [calcGroovelab, setCalcGroovelab] = useState<boolean>(true);
+  const [calcStudents, setCalcStudents] = useState<number>(80);
+  const [calcTeachers, setCalcTeachers] = useState<number>(8);
+  const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
+
+  const getPaidMonthsUntilAugust = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    let startBillingMonth = currentMonth + 1;
+    let startBillingYear = now.getFullYear();
+    if (startBillingMonth > 11) {
+      startBillingMonth = 0;
+      startBillingYear += 1;
+    }
+    let targetYear = startBillingYear;
+    if (startBillingMonth >= 8) {
+      targetYear += 1;
+    }
+    const targetDate = new Date(targetYear, 7, 1);
+    const startDate = new Date(startBillingYear, startBillingMonth, 1);
+    const diffMonths = (targetDate.getFullYear() - startDate.getFullYear()) * 12 + (targetDate.getMonth() - startDate.getMonth()) + 1;
+    return Math.max(1, diffMonths);
+  };
 
   const handleCTASubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      onRegister(email);
+      onRegister(email.trim().toLowerCase());
     }
   };
 
@@ -228,6 +253,24 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             >
               Preise
             </button>
+
+            {/* Datenschutz */}
+            <button 
+              onClick={() => setShowPrivacyAudits(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 650,
+                fontSize: '14px',
+                color: '#137333',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              🛡️ Datenschutz
+            </button>
           </nav>
 
           {/* CTA & Login (Desktop) */}
@@ -324,7 +367,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#137333', paddingLeft: '8px' }}>Für Schüler &amp; Eltern</div>
             </div>
 
-            <div onClick={() => scrollToSection('pricing')} style={{ fontWeight: 600, fontSize: '16px', color: '#232326' }}>Preise</div>
+            <div onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', cursor: 'pointer' }}>Preise</div>
+            
+            <div onClick={() => { setShowPrivacyAudits(true); setMobileMenuOpen(false); }} style={{ fontWeight: 650, fontSize: '16px', color: '#137333', cursor: 'pointer' }}>🛡️ Datenschutz &amp; Sicherheit</div>
             
             <hr style={{ border: 'none', borderTop: '1px solid #e8e8ed' }} />
 
@@ -415,9 +460,18 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           <input 
             type="email" 
             placeholder="Deine E-Mail-Adresse"
+            aria-label="Deine E-Mail-Adresse"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#137333';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(19, 115, 51, 0.2), inset 0 1px 2px rgba(0,0,0,0.02)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#e8e8ed';
+              e.currentTarget.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.02)';
+            }}
             style={{
               flex: '1 1 280px',
               padding: '16px 24px',
@@ -426,7 +480,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               fontSize: '16px',
               backgroundColor: '#ffffff',
               outline: 'none',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s'
             }}
           />
           <button 
@@ -458,9 +513,22 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </form>
 
         <p style={{
+          fontSize: '11px',
+          color: '#64748b',
+          marginTop: '-4px',
+          marginBottom: '20px',
+          textAlign: 'center',
+          lineHeight: 1.4,
+          maxWidth: '540px'
+        }}>
+          Mit Klick auf „Jetzt kostenlos starten“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#137333', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#137333', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
+        </p>
+
+        <p style={{
           fontSize: '13px',
           color: '#7d7d82',
-          marginBottom: '64px'
+          marginBottom: '64px',
+          marginTop: '0px'
         }}>
           Die Basis-Softwarelizenz ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
         </p>
@@ -616,6 +684,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Schulweite Briefings:</strong> Ankündigungen mit einem Klick an alle Lehrkräfte senden.</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
+                    <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
+                    <span><strong>100% DSGVO &amp; Schrems II-konform:</strong> Ausschließlich deutsches Cloud-Hosting (Hetzner in Sachsen). Kein US-Haftungsrisiko.</span>
                   </li>
                 </ul>
               </div>
@@ -1202,6 +1274,165 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </div>
             </div>
 
+            {/* Interactive Price Calculator */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '24px',
+              padding: '24px',
+              textAlign: 'left',
+              marginBottom: '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🧮 Interaktiver Preisrechner
+              </h4>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 550, lineHeight: 1.4 }}>
+                Simuliere deine monatlichen Hosting- & Servicegebühren. Da der erste Monat <strong>kostenlos</strong> ist, reduzieren sich die restlichen Jahreskosten für das laufende Schuljahr auf <strong>{getPaidMonthsUntilAugust()} Abrechnungsmonate</strong> (bis August).
+              </p>
+
+              {/* Module select toggles */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: calcCampus ? '#e6f4ea' : '#ffffff',
+                  border: calcCampus ? '1.5px solid #137333' : '1.5px solid #cbd5e1',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  transition: 'all 0.2s',
+                  userSelect: 'none'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={calcCampus}
+                    onChange={(e) => setCalcCampus(e.target.checked)}
+                    style={{ accentColor: '#137333', cursor: 'pointer' }}
+                  />
+                  Campus (7,99 €)
+                </label>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: calcGroovelab ? '#e6f4ea' : '#ffffff',
+                  border: calcGroovelab ? '1.5px solid #137333' : '1.5px solid #cbd5e1',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  transition: 'all 0.2s',
+                  userSelect: 'none'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={calcGroovelab}
+                    onChange={(e) => setCalcGroovelab(e.target.checked)}
+                    style={{ accentColor: '#137333', cursor: 'pointer' }}
+                  />
+                  GrooveLab (4,99 €)
+                </label>
+              </div>
+
+              {/* Slider / Numbers inputs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
+                    <span>Aktive Schüler:</span>
+                    <span style={{ color: '#137333' }}>{calcStudents} Schüler ({(calcStudents * 0.49).toFixed(2)} €/Mo)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="500"
+                    step="5"
+                    value={calcStudents}
+                    onChange={(e) => setCalcStudents(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
+                    <span>Lehrer & Admins:</span>
+                    <span style={{ color: '#137333' }}>{calcTeachers} Profile ({(calcTeachers * 0.49).toFixed(2)} €/Mo)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value={calcTeachers}
+                    onChange={(e) => setCalcTeachers(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              {(() => {
+                const baseVal = (calcCampus && calcGroovelab) ? 9.99 : (calcCampus ? 7.99 : (calcGroovelab ? 4.99 : 0.00));
+                const userVal = (calcStudents * 0.49) + (calcTeachers * 0.49);
+                const monthlyTotal = baseVal + userVal;
+                const paidM = getPaidMonthsUntilAugust();
+                const totalYear = monthlyTotal * paidM;
+                const standardTwelveMonth = monthlyTotal * 12;
+
+                return (
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
+                      <span>Monatliche Basis-Gebühr:</span>
+                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{baseVal.toFixed(2).replace('.', ',')} €/Mo</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
+                      <span>Monatliche Service-Gebühr:</span>
+                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{userVal.toFixed(2).replace('.', ',')} €/Mo</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', fontWeight: 800, color: '#0f172a' }}>
+                      <span>Regulärer Monatspreis:</span>
+                      <span style={{ color: '#137333', fontSize: '14px' }}>{monthlyTotal.toFixed(2).replace('.', ',')} €/Mo</span>
+                    </div>
+
+                    <div style={{
+                      marginTop: '8px',
+                      background: '#e6f4ea',
+                      borderRadius: '10px',
+                      padding: '10px',
+                      borderLeft: '4px solid #137333',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#137333', fontWeight: 900, fontSize: '13px' }}>
+                        <span>Kosten im 1. Schuljahr:</span>
+                        <span>{totalYear.toFixed(2).replace('.', ',')} €</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#137333', fontWeight: 650 }}>
+                        (Bestehend aus 1 Probemonat für 0,00 € + {paidM} Abrechnungsmonaten bis August. Du sparst {monthlyTotal.toFixed(2).replace('.', ',')} € im ersten Jahr gegenüber einem regulären 12-Monatstarif!)
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             <button 
               onClick={() => onRegister()}
               style={{
@@ -1267,6 +1498,339 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           </div>
         </div>
       </footer>
+ 
+      {/* Legal documents Modal popup */}
+      {activeDocument !== 'none' && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '24px'
+        }}
+        onClick={() => setActiveDocument('none')}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            width: '100%',
+            maxWidth: '640px',
+            maxHeight: '80vh',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.06)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px 32px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                  {activeDocument === 'terms' ? '📜 Nutzungsbedingungen (AGB)' : '🛡️ Datenschutzerklärung'}
+                </h3>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Campus-Groovelab Plattform
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveDocument('none')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  fontWeight: 300,
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  outline: 'none'
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{
+              padding: '32px',
+              overflowY: 'auto',
+              fontSize: '0.9rem',
+              color: '#334155',
+              lineHeight: 1.6,
+              textAlign: 'left'
+            }}>
+              {activeDocument === 'terms' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>1. Geltungsbereich & Dienste</h4>
+                    <p style={{ margin: 0 }}>Diese Nutzungsbedingungen regeln die Bereitstellung und Verwendung der Webanwendung Campus-Groovelab. Durch das Erstellen eines Profils erklären Sie sich mit diesen Bedingungen einverstanden.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>2. Kostenfreie Basis-Softwarelizenz</h4>
+                    <p style={{ margin: 0 }}>Die Basis-Softwarelizenz der Plattform Campus-Groovelab ist dauerhaft 100% kostenlos. Für Hosting-Infrastruktur, zusätzliche Teammitglieder oder Schüleraktivierungen können zusätzliche variable oder fixe Tarife gemäß Preisliste anfallen.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>3. Gewährleistung und Haftung</h4>
+                    <p style={{ margin: 0 }}>Der Plattform-Betreiber bemüht sich um eine kontinuierliche Verfügbarkeit der Web-App. Die Nutzung erfolgt auf eigene Gefahr. Für Datenverluste oder Ausfälle wird keine Haftung übernommen, es sei denn, es liegt grobe Fahrlässigkeit vor.</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>1. Erhebung und Speicherung personenbezogener Daten</h4>
+                    <p style={{ margin: 0 }}>Wir erheben Ihre E-Mail-Adresse zum Zweck der Systemregistrierung. Personenbezogene Profildaten von Schülern (Name, Vorname, Geburtsdatum) werden zur Bereitstellung der Stundenplan- und Homework-Funktionen verwendet. Vornamen werden verschlüsselt in der Datenbank abgelegt.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>2. Lokale Kamera-Verarbeitung</h4>
+                    <p style={{ margin: 0 }}>Das Einscannen der QR-Ausweise geschieht vollständig lokal in Ihrem Webbrowser. Videodaten, Einzelbilder oder biometrische Merkmale werden zu keinem Zeitpunkt an externe Server übertragen oder dort dauerhaft gespeichert.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>3. Auskunftsrecht & Löschung</h4>
+                    <p style={{ margin: 0 }}>Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung oder Löschung dieser Daten zu verlangen.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '20px 32px',
+              borderTop: '1px solid #f1f5f9',
+              background: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setActiveDocument('none')}
+                style={{
+                  background: '#137333',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  fontWeight: 650,
+                  fontSize: '0.85rem',
+                  padding: '10px 24px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(19, 115, 51, 0.15)',
+                  outline: 'none'
+                }}
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛡️ Datenschutz & Sicherheitsstufen Modal */}
+      {showPrivacyAudits && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '24px'
+        }}
+        onClick={() => setShowPrivacyAudits(false)}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '32px',
+            width: '100%',
+            maxWidth: '750px',
+            maxHeight: '85vh',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.06)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '28px 32px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#137333', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🛡️ Das Campus-Groovelab Sicherheitsversprechen
+                </h3>
+                <span style={{ fontSize: '0.72rem', color: '#137333', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  13 von 13 Sicherheits- & Datenschutz-Stufen erfüllt
+                </span>
+              </div>
+              <button 
+                onClick={() => setShowPrivacyAudits(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7d7d82' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              padding: '32px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              backgroundColor: '#fafbfc'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+                Als deutscher App-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde von Grund auf nach dem Prinzip <strong>Privacy by Design</strong> entwickelt und setzt fortschrittliche kryptografische Härtungen ein, um ein maximales Sicherheitsniveau zu garantieren:
+              </p>
+
+              {/* 10 Stufen Grid/Liste */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                
+                {[
+                  {
+                    title: '1. PGP-Verschlüsselung der Namen (Art. 32 DSGVO)',
+                    desc: 'Schülervornamen werden in der Datenbank durch starke symmetrische PGP-Verschlüsselung geschützt. Selbst bei direktem Datenbankzugriff sind diese ohne den Schlüssel absolut unlesbar.'
+                  },
+                  {
+                    title: '2. E-Mail-Fragmentierung (Präfix- & Suffix-Splitting)',
+                    desc: 'Jede E-Mail-Adresse wird in zwei Teile getrennt: Der vordere, persönliche Teil (das Präfix) wird PGP-verschlüsselt in einer Tabelle abgelegt. Der hintere Anbieter-Teil (das Suffix, z. B. @gmail.com) liegt physisch isoliert in einer anderen Tabelle.'
+                  },
+                  {
+                    title: '3. Strikte Row-Level Security (RLS)',
+                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies. Es ist technisch ausgeschlossen, dass eine Musikschule jemals Daten einer anderen Schule sieht.'
+                  },
+                  {
+                    title: '4. Einweg-Hashing von Passwörtern & PINs',
+                    desc: 'Weder Passwörter noch die 4-stelligen Eltern-PINs werden im Klartext gespeichert. Sie werden über modernste kryptografische Hashes (Bcrypt & SHA-256) einweg-verschlüsselt.'
+                  },
+                  {
+                    title: '5. Brute-Force-Sperre (Lockout-Logic)',
+                    desc: 'Die Eingabe der PINs wird streng überwacht. Nach drei Falscheingaben wird der Zugriff für die jeweilige Sitzung aus Sicherheitsgründen für 15 Minuten komplett gesperrt.'
+                  },
+                  {
+                    title: '6. Eltern-Souveränität (Art. 8 DSGVO)',
+                    desc: 'Eltern verwalten die Rechte ihres Kindes über ein feingranulares Dashboard. Chat-Rechte, Timer, Gruppenbeitritte und Songvorschläge können einzeln de-/aktiviert werden.'
+                  },
+                  {
+                    title: '7. Revisionssichere Einwilligungsprotokolle',
+                    desc: 'Jede Einwilligung der Eltern und Verträge der Schulen werden revisionssicher inklusive Timestamp, anonymisierter IP und Browser-Fingerprint rechtssicher archiviert.'
+                  },
+                  {
+                    title: '8. Lokale Kamera-Verarbeitung (Zero-Cloud Bio-Login)',
+                    desc: 'Kamera-Feeds für QR-Logins und Biometrie werden ausschließlich lokal auf dem Endgerät verarbeitet. Es findet niemals eine Übertragung von Bild- oder Gesichtsdaten statt.'
+                  },
+                  {
+                    title: '9. Eliminierte Entwickler-Bypässe im Release',
+                    desc: 'Alle Debug- und Bypass-Schnittstellen für Entwickler werden beim Kompilieren des Produktions-Builds durch strikte Compiler-Flags physisch aus dem Programmcode gelöscht.'
+                  },
+                  {
+                    title: '10. Lokaler Fingerabdruck- & Passkey-Login (TouchID/FaceID)',
+                    desc: 'Nutzer können sich über die biometrische Hardware ihres Endgeräts (TouchID/FaceID) einloggen. Die Verifizierung erfolgt zu 100 % lokal – biometrische Merkmale verlassen niemals das Endgerät.'
+                  },
+                  {
+                    title: '11. Automatische Inaktivitäts-Sperre (Auto-Lock)',
+                    desc: 'Auf gemeinsam genutzten Geräten in den Unterrichtsräumen (Lab-Modus) meldet die App inaktive Nutzer nach 20 Minuten automatisch ab (inkl. 30s Warn-Countdown), um unbefugten Zugriff Dritter zu verhindern.'
+                  },
+                  {
+                    title: '12. Server-Standort Deutschland (ISO 27001)',
+                    desc: 'Das Hosting erfolgt ausschließlich in nach ISO 27001 zertifizierten Hochsicherheits-Rechenzentren in Deutschland (Falkenstein/Sachsen) – kein US-Schrems-II-Haftungsrisiko.'
+                  },
+                  {
+                    title: '13. Modul-Kapselung & QR-Sperre vor Ort (Schulbetrieb)',
+                    desc: 'Auf gemeinsam genutzten Schul-Geräten (Lab-Modus) wird das datensensible Campus-Modul physisch gekapselt. Schüler können nicht ohne Weiteres dorthin wechseln; sie müssen sich vor Ort per schnellem QR-Scan erneut verifizieren.'
+                  }
+                ].map((stufe, idx) => (
+                  <div key={idx} style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                  }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: '#e6f4ea',
+                      color: '#137333',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      flexShrink: 0
+                    }}>
+                      ✓
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                        {stufe.title}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
+                        {stufe.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '20px 32px',
+              borderTop: '1px solid #f1f5f9',
+              background: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowPrivacyAudits(false)}
+                style={{
+                  background: '#137333',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  fontWeight: 650,
+                  fontSize: '0.85rem',
+                  padding: '10px 24px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(19, 115, 51, 0.15)',
+                  outline: 'none'
+                }}
+              >
+                Verstanden &amp; Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global CSS Inject to handle responsive menus and simple styles */}
       <style>{`

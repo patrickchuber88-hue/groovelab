@@ -143,6 +143,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
+  const [parentPin, setParentPin] = useState<string>(student.parent_pin || '');
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groupStudents, setGroupStudents] = useState<any[]>([]);
   const [schoolStudents, setSchoolStudents] = useState<any[]>([]);
@@ -179,6 +180,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false);
+  const [consentLogs, setConsentLogs] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -615,6 +617,24 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleUpdateParentPin = async (newPin: string) => {
+    try {
+      if (newPin && !/^\d{4}$/.test(newPin)) {
+        alert('Die Eltern-PIN muss genau 4 Ziffern lang sein.');
+        return;
+      }
+      const { error } = await supabase
+        .from('users')
+        .update({ parent_pin: newPin || null })
+        .eq('id', student.id);
+      if (error) throw error;
+      setParentPin(newPin);
+      student.parent_pin = newPin;
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren der Eltern-PIN: ' + err.message);
+    }
+  };
+
   const handleLinkGroup = async () => {
     if (!selectedStudentToLink) return;
     try {
@@ -710,7 +730,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // 1. Fetch latest user details (including group_id and school_id)
       const { data: latestUser } = await supabase
         .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id')
+        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id, parent_pin')
         .eq('id', student.id)
         .single();
 
@@ -721,6 +741,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
         setLessonDuration(latestUser.lesson_duration || 30);
         setAppUsageMode(latestUser.app_usage_mode || 'student_only');
+        setParentPin(latestUser.parent_pin || '');
         
         if (latestUser.group_id) {
           setGroupId(latestUser.group_id);
@@ -736,6 +757,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           setGroupId(null);
           setGroupStudents([]);
         }
+
+        // Fetch parent consent logs
+        const { data: cLogs } = await supabase
+          .from('parent_consent_logs')
+          .select('created_at, ip_address, user_agent, consent_type')
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false });
+        if (cLogs) setConsentLogs(cLogs);
       }
 
       // Fetch other school students (for group setup dropdown list)
@@ -2226,6 +2255,80 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     </span>
                   )}
                 </div>
+
+                {appUsageMode === 'parent_hybrid' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '16px', border: '1px solid #e2e8f0', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>👪 Eltern-PIN (4-stellig)</span>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Schützt den Elternbereich vor unbefugtem Zugriff</span>
+                    </div>
+                    {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="Ziffern"
+                        value={parentPin}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setParentPin(val);
+                          if (val.length === 4 || val.length === 0) {
+                            handleUpdateParentPin(val);
+                          }
+                        }}
+                        style={{
+                          width: '80px',
+                          padding: '6px 10px',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '10px',
+                          fontSize: '0.85rem',
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          color: '#1e293b'
+                        }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>
+                        {parentPin ? '••••' : 'Nicht festgelegt'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {consentLogs.length > 0 && (
+                  <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', width: '100%' }}>
+                    <h5 style={{ margin: '0 0 8px 0', fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                      🛡️ Revisionssichere Einwilligungsprotokolle
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {consentLogs.map((log, idx) => (
+                        <div key={idx} style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '8px 10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#137333' }}>
+                              ✓ {log.consent_type === 'terms_privacy' ? 'AGB & Datenschutz akzeptiert' : 'Direkt-Kommunikation freigegeben'}
+                            </span>
+                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>
+                              {new Date(log.created_at).toLocaleString('de-DE')}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#7d7d82' }}>
+                            <span>IP: {log.ip_address || 'Anonymisiert'}</span>
+                            <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.user_agent}>
+                              Browser: {log.user_agent || 'Unbekannt'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
               </div>
             </section>

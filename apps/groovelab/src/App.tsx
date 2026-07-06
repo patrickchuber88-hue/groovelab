@@ -3,7 +3,7 @@ import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldChec
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
-import { LoginScreen } from './components/LoginScreen';
+import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { subscribeUserToPush } from './utils/webPush';
 
@@ -1686,6 +1686,7 @@ function App() {
     if (typeof window === 'undefined') return null;
     return sessionStorage.getItem('groovelab_user_id');
   });
+  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
 
 
@@ -1693,6 +1694,11 @@ function App() {
   const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
   const [deletionPromptUserId, setDeletionPromptUserId] = useState<string | null>(null);
   const [deletionPromptIsHome, setDeletionPromptIsHome] = useState<boolean | undefined>(undefined);
+
+  const [showAutoLockWarning, setShowAutoLockWarning] = useState(false);
+  const [autoLockCountdown, setAutoLockCountdown] = useState(30);
+  const [showCampusUnlockScanner, setShowCampusUnlockScanner] = useState(false);
+  const [campusUnlockError, setCampusUnlockError] = useState<string | null>(null);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -2031,17 +2037,35 @@ function App() {
     }
     return (saved as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
   });
-  const setActivePlatform = React.useCallback((val: any) => {
+  const setActivePlatform = React.useCallback((val: any, forceUnlock = false) => {
+    // Intercept switching to campus if student in lab mode
+    if (val === 'campus' && locationMode === 'lab' && user?.role === 'student' && !forceUnlock) {
+      setShowCampusUnlockScanner(true);
+      return;
+    }
+
     React.startTransition(() => {
       setActivePlatformRaw(val);
       localStorage.setItem('groovelab_active_platform', val);
+      
+      // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
+      if (val === 'campus') {
+        const savedTab = localStorage.getItem('campus_active_tab') || 'briefing';
+        setActiveStudentTabRaw(savedTab);
+      } else if (val === 'ensembles') {
+        const savedTab = localStorage.getItem('ensembles_active_tab') || 'overview';
+        setActiveStudentTabRaw(savedTab);
+      } else {
+        const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
+        setActiveStudentTabRaw(savedTab);
+      }
     });
-  }, []);
+  }, [locationMode, user?.role]);
 
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
     const platform = (localStorage.getItem('groovelab_active_platform') as any) || 'groovelab';
     if (platform === 'campus') {
-      return localStorage.getItem('campus_active_tab') || 'profile';
+      return localStorage.getItem('campus_active_tab') || 'briefing';
     }
     if (platform === 'ensembles') {
       return localStorage.getItem('ensembles_active_tab') || 'overview';
@@ -2051,6 +2075,15 @@ function App() {
   const setActiveStudentTab = React.useCallback((val: any) => {
     React.startTransition(() => {
       setActiveStudentTabRaw(val);
+      // Persist the tab to the correct localStorage key based on the current active platform
+      const platform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      if (platform === 'campus') {
+        localStorage.setItem('campus_active_tab', val);
+      } else if (platform === 'ensembles') {
+        localStorage.setItem('ensembles_active_tab', val);
+      } else {
+        localStorage.setItem('groovelab_active_tab', val);
+      }
     });
   }, []);
 
@@ -2176,7 +2209,6 @@ function App() {
   const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
   const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [studentMessages, setStudentMessages] = useState<any[]>([]);
@@ -2775,17 +2807,19 @@ function App() {
     }
     previousPlatform.current = activePlatform;
     
-    // Always load the first menu tab when actively switching platforms (Karteikarten)
-    let firstMenuTab = 'live';
-    if (activePlatform === 'campus') {
-      firstMenuTab = 'briefing';
-    } else if (activePlatform === 'ensembles') {
-      firstMenuTab = 'overview';
-    }
-    setActiveStudentTab(firstMenuTab);
+    // Load the saved tab for the new platform to guarantee flawless switching
     const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
-    localStorage.setItem(storageKey, firstMenuTab);
-  }, [activePlatform, user?.role]);
+    const savedTab = localStorage.getItem(storageKey);
+    
+    let fallbackTab = 'live';
+    if (activePlatform === 'campus') {
+      fallbackTab = 'briefing';
+    } else if (activePlatform === 'ensembles') {
+      fallbackTab = 'overview';
+    }
+    
+    setActiveStudentTab(savedTab || fallbackTab);
+  }, [activePlatform]);
 
   // Safety Hook: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
   // If a student is on the 'campus' platform but the activeStudentTab is not a valid campus tab (e.g. 'live'),
@@ -5568,14 +5602,21 @@ function App() {
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
 
-    // Default start tab
-    const resolvedPlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-    const startTab = resolvedPlatform === 'campus' 
-      ? 'briefing'
-      : 'live';
-      
+    // Default start tab: Always open the briefing board for all users in Campus, and for staff/teachers in GrooveLab.
+    // GrooveLab students start on the 'live' tab.
+    localStorage.setItem('campus_active_tab', 'briefing');
+    if (userToLogin?.role === 'student') {
+      localStorage.setItem('groovelab_active_tab', 'live');
+      if (mode === 'lab') {
+        localStorage.setItem('groovelab_active_platform', 'groovelab');
+      }
+    } else {
+      localStorage.setItem('groovelab_active_tab', 'briefing');
+    }
+    
+    const resolvedPlatform = mode === 'lab' && userToLogin?.role === 'student' ? 'groovelab' : (localStorage.getItem('groovelab_active_platform') || 'groovelab');
+    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'briefing';
     setActiveStudentTab(startTab);
-    localStorage.setItem(resolvedPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
     supabase
@@ -5634,6 +5675,101 @@ function App() {
       }
     }
   }, [user?.role, activePlatform, activeStudentTab]);
+
+  // Lock platform to groovelab on page load/initial mount in lab mode for security
+  useEffect(() => {
+    if (user && user.role === 'student' && locationMode === 'lab') {
+      const activePlat = localStorage.getItem('groovelab_active_platform');
+      if (activePlat === 'campus') {
+        console.log('[Lab Lock] Resetting platform to groovelab on page load for student security');
+        setActivePlatformRaw('groovelab');
+        localStorage.setItem('groovelab_active_platform', 'groovelab');
+        const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
+        setActiveStudentTabRaw(savedTab);
+      }
+    }
+  }, [user?.role, locationMode]);
+
+  // Automatic Inactivity Timeout (Auto-Lock) for shared devices in Lab Mode
+  useEffect(() => {
+    if (!loggedInUserId || locationMode !== 'lab') {
+      setShowAutoLockWarning(false);
+      return;
+    }
+
+    let mainTimeoutId: any = null;
+    
+    // 20 minutes = 1,200,000 milliseconds
+    const TIMEOUT_DURATION = 1200000; 
+
+    const isMediaActive = () => {
+      const mediaElements = Array.from(document.querySelectorAll('audio, video'));
+      const html5Active = mediaElements.some((media: any) => !media.paused && !media.ended);
+      const sessionActive = !!session;
+      return html5Active || sessionActive;
+    };
+
+    const handleTimeoutReached = () => {
+      if (isMediaActive()) {
+        resetTimer();
+        return;
+      }
+
+      if (document.visibilityState === 'hidden') {
+        console.log('[Auto-Lock] User inactive in background, logging out directly...');
+        handleLogout(true, false);
+      } else {
+        setShowAutoLockWarning(true);
+        setAutoLockCountdown(30);
+      }
+    };
+
+    const resetTimer = () => {
+      setShowAutoLockWarning(false);
+      if (mainTimeoutId) clearTimeout(mainTimeoutId);
+      mainTimeoutId = setTimeout(handleTimeoutReached, TIMEOUT_DURATION);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const activityHandler = () => {
+      if (!showAutoLockWarning) {
+        resetTimer();
+      }
+    };
+
+    events.forEach(event => {
+      window.addEventListener(event, activityHandler);
+    });
+
+    resetTimer();
+
+    return () => {
+      if (mainTimeoutId) clearTimeout(mainTimeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, activityHandler);
+      });
+    };
+  }, [loggedInUserId, locationMode, showAutoLockWarning, session]);
+
+  // Handle countdown ticks for the visual Auto-Lock warning modal
+  useEffect(() => {
+    if (!showAutoLockWarning) return;
+
+    const intervalId = setInterval(() => {
+      setAutoLockCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(intervalId);
+          console.log('[Auto-Lock] Warning countdown finished, logging out...');
+          setShowAutoLockWarning(false);
+          handleLogout(true, false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [showAutoLockWarning]);
 
   useEffect(() => {
     let debounceCountTimer: any = null;
@@ -7350,9 +7486,6 @@ function App() {
               <div 
                 onClick={() => {
                   setActivePlatform('campus');
-                  const firstTab = user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live';
-                  setActiveStudentTab(firstTab);
-                  localStorage.setItem('campus_active_tab', firstTab);
                 }}
                 style={{
                   display: 'flex',
@@ -7379,7 +7512,9 @@ function App() {
                 }}
               >
                 <GraduationCap size={15} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
-                <span>Campus</span>
+                <span>
+                  {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' ? '🔒 ' : ''}Campus
+                </span>
               </div>
             )}
 
@@ -7388,8 +7523,6 @@ function App() {
               <div 
                 onClick={() => {
                   setActivePlatform('groovelab');
-                  setActiveStudentTab('live');
-                  localStorage.setItem('groovelab_active_tab', 'live');
                 }}
                 style={{
                   display: 'flex',
@@ -7425,8 +7558,6 @@ function App() {
               <div 
                 onClick={() => {
                   setActivePlatform('ensembles');
-                  setActiveStudentTab('overview');
-                  localStorage.setItem('ensembles_active_tab', 'overview');
                 }}
                 style={{
                   display: 'flex',
@@ -7816,7 +7947,6 @@ function App() {
                     }}
                     onSwitchPlatform={(newPlatform) => {
                       setActivePlatform(newPlatform);
-                      setActiveStudentTab(newPlatform === 'campus' ? 'briefing' : 'live');
                     }}
                     onFoundBand={(form, mySlot) => {
                       console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
@@ -12787,10 +12917,256 @@ function App() {
             activePlatform={activePlatform as any}
             onSwitchPlatform={(newPlatform) => {
               setActivePlatform(newPlatform);
-              setActiveStudentTab(newPlatform === 'campus' ? (user?.role?.toLowerCase() === 'student' ? 'briefing' : 'live') : 'live');
             }}
           />
         </Suspense>
+      )}
+
+      {/* Auto-Lock Inactivity Warning Modal */}
+      {showAutoLockWarning && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}>
+          <div className="glass-panel animation-slide-up" style={{
+            background: '#ffffff',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '36px',
+            borderRadius: '28px',
+            maxWidth: '460px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: '#fef2f2',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <Clock size={32} />
+            </div>
+
+            <div>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', margin: '0 0 10px 0', letterSpacing: '-0.02em' }}>
+                Bist du noch da?
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.95rem', color: '#64748b', lineHeight: 1.5, fontWeight: 550 }}>
+                Aufgrund von Inaktivität wirst du in <span style={{ color: '#ef4444', fontWeight: 800 }}>{autoLockCountdown} Sekunden</span> automatisch abgemeldet.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAutoLockWarning(false);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '16px 24px',
+                  borderRadius: '16px',
+                  fontSize: '1rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(16,185,129,0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%'
+                }}
+                className="hover-scale"
+              >
+                <Check size={20} />
+                Ja, weiterüben!
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAutoLockWarning(false);
+                  handleLogout(true, false);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: 'none',
+                  padding: '14px 24px',
+                  borderRadius: '16px',
+                  fontSize: '0.9rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  width: '100%'
+                }}
+                className="hover-scale"
+              >
+                Jetzt abmelden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Campus Unlock QR-Scanner Modal (Lab Mode security) */}
+      {showCampusUnlockScanner && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}>
+          <div className="glass-panel animation-slide-up" style={{
+            background: '#ffffff',
+            border: '1px solid rgba(19, 115, 51, 0.2)',
+            padding: '36px',
+            borderRadius: '28px',
+            maxWidth: '460px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#e6f4ea',
+              color: '#137333',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)'
+            }}>
+              <Lock size={24} />
+            </div>
+
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                🔒 Campus freischalten
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5, fontWeight: 550 }}>
+                Bitte scanne deinen Schüler-Ausweis (QR-Code) ein, um das Campus-Modul freizuschalten.
+              </p>
+            </div>
+
+            {/* Camera View Finder */}
+            <div style={{
+              position: 'relative',
+              width: '260px',
+              height: '260px',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              background: '#09090b',
+              border: '4px solid #34a853',
+              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)'
+            }}>
+              <CustomQRScanner
+                facingMode="user"
+                onScan={(val) => {
+                  if (val === user?.qr_token) {
+                    console.log('[Campus Unlock] Verification successful!');
+                    setShowCampusUnlockScanner(false);
+                    setCampusUnlockError(null);
+                    setActivePlatform('campus', true);
+                  } else {
+                    console.warn('[Campus Unlock] Token mismatch:', val);
+                    setCampusUnlockError('Falscher Ausweis! Scanne bitte deinen eigenen Ausweis.');
+                  }
+                }}
+                onError={(err) => {
+                  console.error('[Campus Unlock] Scanner error:', err);
+                }}
+              />
+              {/* Corner brackets */}
+              <div style={{ position: 'absolute', top: 16, left: 16, width: 24, height: 24, borderLeft: '4px solid #34a853', borderTop: '4px solid #34a853', borderRadius: '4px 0 0 0' }} />
+              <div style={{ position: 'absolute', top: 16, right: 16, width: 24, height: 24, borderRight: '4px solid #34a853', borderTop: '4px solid #34a853', borderRadius: '0 4px 0 0' }} />
+              <div style={{ position: 'absolute', bottom: 16, left: 16, width: 24, height: 24, borderLeft: '4px solid #34a853', borderBottom: '4px solid #34a853', borderRadius: '0 0 0 4px' }} />
+              <div style={{ position: 'absolute', bottom: 16, right: 16, width: 24, height: 24, borderRight: '4px solid #34a853', borderBottom: '4px solid #34a853', borderRadius: '0 0 4px 0' }} />
+              
+              {/* Laser animation */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: 'rgba(52, 168, 83, 0.8)',
+                boxShadow: '0 0 8px #34a853',
+                animation: 'scan-laser 2s linear infinite'
+              }} />
+            </div>
+
+            {campusUnlockError && (
+              <div style={{
+                color: '#ef4444',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                background: '#fef2f2',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                ⚠️ {campusUnlockError}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCampusUnlockScanner(false);
+                setCampusUnlockError(null);
+              }}
+              style={{
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                padding: '14px 24px',
+                borderRadius: '16px',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                width: '100%'
+              }}
+              className="hover-scale"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Edit Profile Modal */}

@@ -38,7 +38,7 @@ interface CustomQRScannerProps {
   facingMode: 'user' | 'environment';
 }
 
-function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScannerProps) {
+export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number | null>(null);
@@ -362,6 +362,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loadingKioskData, setLoadingKioskData] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(true);
+  const [cameraHasError, setCameraHasError] = useState(false);
 
   // Onboarding States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -3513,127 +3514,140 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               pointerEvents: 'none',
               zIndex: 9
             }} />
-            {isCameraActive ? (
-              <>
-                <CustomQRScanner
-                  onScan={(val) => {
-                    console.log('[Scanner] Extracted QR value:', val);
-                    handleScan(val);
-                  }}
-                  onError={(err: any) => {
-                    console.error('[Scanner] Camera error:', err);
-                    const errMsg = err?.message || String(err || '');
-                    if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
-                      setError(`Kamera-Fehler: ${errMsg}`);
-                    }
-                  }}
-                  paused={loading}
-                  facingMode={facingMode}
-                />
-
-                {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  pointerEvents: 'none',
-                  zIndex: 10
-                }}>
-                  {/* 4 Corner brackets for scanner target */}
-                  <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderTopLeftRadius: '8px' }} />
-                  <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderTopRightRadius: '8px' }} />
-                  <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderBottomLeftRadius: '8px' }} />
-                  <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderBottomRightRadius: '8px' }} />
-                  
-                  {/* Animated Laser line */}
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    width: '100%',
-                    height: '80px',
-                    background: 'linear-gradient(180deg, rgba(167, 243, 208, 0) 0%, rgba(167, 243, 208, 0.08) 50%, rgba(167, 243, 208, 0) 100%)',
-                    filter: 'blur(6px)',
-                    animation: 'scanLaser 4s ease-in-out infinite',
-                    pointerEvents: 'none'
-                  }} />
-                </div>
-
-                <style dangerouslySetInnerHTML={{__html: `
-                  @keyframes scanLaser {
-                    0% { top: -20%; }
-                    50% { top: 100%; }
-                    100% { top: -20%; }
-                  }
-                `}} />
-
-                {/* Switch Camera Button */}
-                <button
-                  onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    zIndex: 15,
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: 'white',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                    transition: 'all 0.2s ease',
-                    outline: 'none'
-                  }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
-                  title="Kamera wechseln"
-                >
-                  <RotateCw size={18} />
-                </button>
-              </>
-            ) : (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                color: 'white',
-                padding: '24px',
-                textAlign: 'center'
-              }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
-                  <Tablet size={24} />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCameraActive(true)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: '#a7f3d0',
-                    color: '#062413',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(167, 243, 208, 0.2)'
-                  }}
-                >
-                  Kamera aktivieren
-                </button>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
-                  Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#a7f3d0', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span>
-                </div>
-              </div>
-            )}
+             {isCameraActive && !cameraHasError ? (
+               <>
+                 <CustomQRScanner
+                   onScan={(val) => {
+                     console.log('[Scanner] Extracted QR value:', val);
+                     handleScan(val);
+                   }}
+                   onError={(err: any) => {
+                     console.error('[Scanner] Camera error:', err);
+                     setCameraHasError(true);
+                     const errMsg = err?.message || String(err || '');
+                     if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
+                       setError(`Kamera-Fehler: ${errMsg}`);
+                     }
+                   }}
+                   paused={loading}
+                   facingMode={facingMode}
+                 />
+ 
+                 {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
+                 <div style={{
+                   position: 'absolute',
+                   inset: 0,
+                   pointerEvents: 'none',
+                   zIndex: 10
+                 }}>
+                   {/* 4 Corner brackets for scanner target */}
+                   <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderTopLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderTopRightRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderBottomLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderBottomRightRadius: '8px' }} />
+                   
+                   {/* Animated Laser line */}
+                   <div style={{
+                     position: 'absolute',
+                     left: 0,
+                     width: '100%',
+                     height: '80px',
+                     background: 'linear-gradient(180deg, rgba(167, 243, 208, 0) 0%, rgba(167, 243, 208, 0.08) 50%, rgba(167, 243, 208, 0) 100%)',
+                     filter: 'blur(6px)',
+                     animation: 'scanLaser 4s ease-in-out infinite',
+                     pointerEvents: 'none'
+                   }} />
+                 </div>
+ 
+                 <style dangerouslySetInnerHTML={{__html: `
+                   @keyframes scanLaser {
+                     0% { top: -20%; }
+                     50% { top: 100%; }
+                     100% { top: -20%; }
+                   }
+                 `}} />
+ 
+                 {/* Switch Camera Button */}
+                 <button
+                   onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                   style={{
+                     position: 'absolute',
+                     top: '12px',
+                     right: '12px',
+                     zIndex: 15,
+                     width: '38px',
+                     height: '38px',
+                     borderRadius: '50%',
+                     background: 'rgba(255, 255, 255, 0.15)',
+                     backdropFilter: 'blur(10px)',
+                     WebkitBackdropFilter: 'blur(10px)',
+                     border: '1px solid rgba(255, 255, 255, 0.25)',
+                     display: 'flex',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+                     cursor: 'pointer',
+                     color: 'white',
+                     boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                     transition: 'all 0.2s ease',
+                     outline: 'none'
+                   }}
+                   onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                   onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                   title="Kamera wechseln"
+                 >
+                   <RotateCw size={18} />
+                 </button>
+               </>
+             ) : (
+               <div style={{
+                 width: '100%',
+                 height: '100%',
+                 display: 'flex',
+                 flexDirection: 'column',
+                 alignItems: 'center',
+                 justifyContent: 'center',
+                 gap: '16px',
+                 color: 'white',
+                 padding: '24px',
+                 textAlign: 'center'
+               }}>
+                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
+                   {cameraHasError ? <span style={{ fontSize: '20px' }}>📷🚫</span> : <Tablet size={24} />}
+                 </div>
+                 {cameraHasError ? (
+                   <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
+                     Kamerazugriff blockiert oder nicht verfügbar
+                   </div>
+                 ) : (
+                   <button
+                     type="button"
+                     onClick={() => {
+                       setCameraHasError(false);
+                       setIsCameraActive(true);
+                     }}
+                     style={{
+                       padding: '10px 20px',
+                       borderRadius: '12px',
+                       border: 'none',
+                       background: '#a7f3d0',
+                       color: '#062413',
+                       fontWeight: 800,
+                       fontSize: '13px',
+                       cursor: 'pointer',
+                       boxShadow: '0 4px 12px rgba(167, 243, 208, 0.2)'
+                     }}
+                   >
+                     Kamera aktivieren
+                   </button>
+                 )}
+                 <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
+                   {cameraHasError 
+                     ? "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung." 
+                     : <>Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#a7f3d0', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span></>
+                   }
+                 </div>
+               </div>
+             )}
 
             {loading && (
               <div style={{
@@ -3650,7 +3664,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             )}
           </div>
-        </div>
+            {isCameraActive && !cameraHasError && (
+              <p style={{
+                fontSize: '10px',
+                color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.45)',
+                marginTop: '12px',
+                marginBottom: 0,
+                textAlign: 'center',
+                lineHeight: 1.3,
+                maxWidth: '280px'
+              }}>
+                🔒 Die Kamera-Verarbeitung erfolgt ausschließlich lokal auf Ihrem Gerät; es werden keine Bilddaten übertragen.
+              </p>
+            )}
+          </div>
 
         {/* Passwort Anmeldung button for Kiosk Mode inside the card under the camera image */}
         {isGroovelabKiosk && (
@@ -3962,34 +3989,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       {/* Passwort Anmeldung & Eltern-Onboarding buttons under the card if available */}
       {expandedSection === 'none' && !isGroovelabKiosk && (
-        <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button 
-            onClick={() => setExpandedSection('pin')}
-            style={{ 
-              background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
-              border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
-              padding: '10px 24px',
-              borderRadius: '100px',
-              color: isGroovelabKiosk ? '#062413' : '#ffffff', 
-              fontSize: '12px', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.05em', 
-              cursor: 'pointer', 
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
-          >
-            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
-            Passwort Anmeldung
-          </button>
-
+        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
           {biometricsAvailable && (
             <button 
               onClick={handleBiometricsLogin}
@@ -4018,6 +4018,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               Fingerabdruck Login
             </button>
           )}
+
+          <button 
+            onClick={() => setExpandedSection('pin')}
+            style={{ 
+              background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
+              border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
+              padding: '10px 24px',
+              borderRadius: '100px',
+              color: isGroovelabKiosk ? '#062413' : '#ffffff', 
+              fontSize: '12px', 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.05em', 
+              cursor: 'pointer', 
+              transition: 'all 0.2s',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
+          >
+            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
+            Passwort Anmeldung
+          </button>
         </div>
       )}
 
@@ -5189,13 +5216,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Admin Bypass for Localhost */}
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Patrick Huber Bypass */}
+          {/* Manuel Wagner Bypass */}
           {import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN && (
             <button
               onClick={async () => {
                 try {
                   const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
-                  console.log('[Bypass] Attempting Patrick Huber login...');
+                  console.log('[Bypass] Attempting Manuel Wagner login...');
                   // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
@@ -5212,12 +5239,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   }
 
                   if (user) {
-                    console.log('[Bypass] Patrick Huber found, logging in:', user.id);
+                    console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
                     sessionStorage.setItem('groovelab_user_id', user.id);
                     onLogin(user.id, true);
                   } else {
-                    console.warn('[Bypass] No user found with Patrick Huber token.');
-                    alert('Patrick Huber wurde in der Datenbank nicht gefunden.');
+                    console.warn('[Bypass] No user found with Manuel Wagner token.');
+                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
                   }
                 } catch (err: any) {
                   console.error('[Bypass] Runtime Error:', err);
@@ -5244,7 +5271,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
             >
-              🔓 BYPASS: PATRICK HUBER (VERWALTUNG)
+              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
             </button>
           )}
 
