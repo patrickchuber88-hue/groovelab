@@ -1,23 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
 
-const SUPABASE_URL = 'https://supabase.campus-groovelab.de';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+const env = fs.readFileSync('/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/.env.local', 'utf-8');
+const url = env.match(/VITE_SUPABASE_URL=(.*)/)[1].trim();
+const key = env.match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim();
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+const supabase = createClient(url, key);
 
-async function checkOtherStudents() {
-  const { data: students, error } = await supabase
-    .from('users')
-    .select('id, first_name, last_name, role, is_active, is_campus_active, is_groovelab_active, show_groovelab')
-    .eq('role', 'student')
-    .limit(20);
+async function run() {
+  const { data: schools, error } = await supabase
+    .from('schools')
+    .select('id, name, subdomain');
 
-  if (error) {
-    console.error("Error fetching students:", error);
-    return;
-  }
-
-  console.log("Students:", JSON.stringify(students, null, 2));
+  console.log("Error:", error);
+  console.log("Schools:", schools);
 }
 
-checkOtherStudents();
+run();

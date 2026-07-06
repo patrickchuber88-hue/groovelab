@@ -11,6 +11,21 @@
 ## Billing & Pricing Rules
 - **Software License**: The base software license for **Campus-Groovelab** is always 100% free of charge ("100% kostenlos").
 - Only server hosting/service fees, team members, and pupil activation fees are subject to charge.
+- **Module Pricing & Bundles**:
+  - **Campus Module**: Base price is 7,99 € / Mo.
+  - **GrooveLab Module**: Base price is 4,99 € / Mo.
+  - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (saving 2,99 € / Mo. compared to 12,98 € / Mo.).
+  - **Service Fee (Lehrer & Verwaltung)**: 0,49 € / Mo. per active administrator/teacher profile.
+- **Billing Methods for Student Activations (Schüleraktivierungen)**:
+  - **Musikschule übernimmt alle Kosten (Sammelzahler)** (Music school covers all fees, making it completely free for students/parents):
+    - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student / Mo.
+    - *Jahresbeitrag bei Aktivierung (10% Rabatt)*: Active students billed as an annual fee in a separate monthly bill, offering a 10% discount.
+    - *Einmalige Komplett-Aktivierung zum Schuljahresstart (20% Rabatt)*: The school activates all students at the school year start, billed once for the entire school year with a 20% discount.
+  - **Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)** (Direct billing with parents/students; only available for the Campus module; GrooveLab activations are always covered by the school):
+    - *Vollständige Direktabrechnung*: Student/parent pays the full amount of 0,49 € / Mo. (annual fee: 5,88 €). School is relieved of the passive database fee (school pays 0,00 €).
+    - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
+    - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
+
 
 ## Platform Modules Design & Styling
 - **Primary Theme Colors**: 
