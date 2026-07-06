@@ -97,6 +97,7 @@ export function BillingDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<any>(null);
   const [tick, setTick] = useState(0);
 
   const getPaidInvoices = (schoolId: string): string[] => {
@@ -1357,6 +1358,46 @@ export function BillingDashboard() {
                                           </div>
 
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setViewingInvoice({
+                                                  invoiceId: invoice.id,
+                                                  schoolId: inv.schoolId,
+                                                  schoolName: inv.schoolName,
+                                                  date: invoice.billing_date,
+                                                  amount: invoice.amount,
+                                                  status: invoice.status,
+                                                  hasCampus: inv.hasCampus,
+                                                  hasGroovelab: inv.hasGroovelab,
+                                                  baseFee: inv.baseFee,
+                                                  kombiDiscountAmount: inv.kombiDiscountAmount,
+                                                  userFee: inv.userFee,
+                                                  activeStudentFee: inv.activeStudentFee,
+                                                  totalTeachersCount: inv.totalTeachersCount,
+                                                  totalEmployeesCount: inv.totalEmployeesCount,
+                                                  passiveStudentsCount: inv.passiveStudentsCount,
+                                                  activeStudents: inv.activeStudents,
+                                                  subscriptionBypass: inv.subscriptionBypass,
+                                                  subtotal: inv.subtotal
+                                                });
+                                              }}
+                                              style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid rgba(0, 0, 0, 0.08)',
+                                                borderRadius: '8px',
+                                                padding: '6px 12px',
+                                                fontSize: '0.78rem',
+                                                fontWeight: 700,
+                                                color: '#4f46e5',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                              }}
+                                            >
+                                              Ansehen 📄
+                                            </button>
                                             {invoice.isDb ? (
                                               <select
                                                 value={invoice.status}
@@ -1418,6 +1459,284 @@ export function BillingDashboard() {
           </tbody>
         </table>
       </div>
+      
+      {viewingInvoice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px',
+        }} onClick={() => setViewingInvoice(null)}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '750px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative'
+          }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '24px 32px',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.05)'
+            }}>
+              <div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  color: '#4f46e5',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  display: 'block',
+                  marginBottom: '4px'
+                }}>Campus-Groovelab Rechnung</span>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                  Rechnung {viewingInvoice.invoiceId}
+                </h3>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 16px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Drucken 🖨️
+                </button>
+                <button
+                  onClick={() => setViewingInvoice(null)}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '12px',
+                    width: '36px',
+                    height: '36px',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content / Printable Invoice */}
+            <div style={{ padding: '40px 48px', color: '#1e293b', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              {/* Top Meta Details */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', alignItems: 'flex-start' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Campus-Groovelab</h4>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block' }}>groovelab GmbH</span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block' }}>Karlsplatz 12, 10117 Berlin</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    backgroundColor: viewingInvoice.status === 'paid' ? '#e6f4ea' : '#fce8e6',
+                    color: viewingInvoice.status === 'paid' ? '#137333' : '#ea4335'
+                  }}>
+                    {viewingInvoice.status === 'paid' ? 'Bezahlt' : 'Offen'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Recipient */}
+              <div style={{ marginBottom: '40px' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Empfänger:</span>
+                <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{viewingInvoice.schoolName}</strong>
+                <span style={{ fontSize: '0.82rem', color: '#475569', display: 'block', marginTop: '2px' }}>Musikschulleitung &amp; Verwaltung</span>
+              </div>
+
+              {/* Invoice Dates */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '16px',
+                padding: '16px 24px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '16px',
+                marginBottom: '40px',
+                border: '1px solid rgba(0, 0, 0, 0.02)'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Rechnungsdatum:</span>
+                  <strong style={{ color: '#0f172a' }}>{viewingInvoice.date}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Leistungszeitraum:</span>
+                  <strong style={{ color: '#0f172a' }}>Monatlich</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Zahlbar bis:</span>
+                  <strong style={{ color: '#0f172a' }}>14 Tage netto</strong>
+                </div>
+              </div>
+
+              {/* Line Items Table */}
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.82rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Positionen</h4>
+              <div style={{ borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontWeight: 700, borderBottom: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569' }}>
+                  <span style={{ flex: 2 }}>Beschreibung</span>
+                  <span style={{ flex: 1, textAlign: 'center' }}>Menge</span>
+                  <span style={{ flex: 1, textAlign: 'right' }}>Einzelpreis</span>
+                  <span style={{ flex: 1, textAlign: 'right' }}>Gesamtpreis</span>
+                </div>
+                
+                {/* 1. Base Fee (Campus) */}
+                {viewingInvoice.hasCampus && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ flex: 2, fontWeight: 600, color: '#0f172a' }}>
+                      Campus Modul (B2B Lizenz)
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>Unterstützung für das Online-Schulportal</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>1</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>7,99 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>7,99 €</span>
+                  </div>
+                )}
+
+                {/* 2. Base Fee (GrooveLab) */}
+                {viewingInvoice.hasGroovelab && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ flex: 2, fontWeight: 600, color: '#0f172a' }}>
+                      GrooveLab Modul (B2B Lizenz)
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>Unterstützung für die Gamified Music App</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>1</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>4,99 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>4,99 €</span>
+                  </div>
+                )}
+
+                {/* 3. Kombi Discount */}
+                {viewingInvoice.hasCampus && viewingInvoice.hasGroovelab && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9', color: '#137333' }}>
+                    <span style={{ flex: 2, fontWeight: 600 }}>
+                      Kombi-Vorteil Rabatt
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#137333', fontWeight: 400 }}>Vorteilspreis bei Doppelbuchung</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>1</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>-2,99 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>-2,99 €</span>
+                  </div>
+                )}
+
+                {/* 4. Active Staff profile fee */}
+                {(viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ flex: 2, fontWeight: 600, color: '#0f172a' }}>
+                      Servicegebühr Profile (Lehrer/Admin)
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>Monatliche Nutzungsgebühr je aktives Profil</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>{viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount}</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>0,49 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>{((viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount) * 0.49).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                )}
+
+                {/* 5. Passive students infrastructure fee */}
+                {viewingInvoice.passiveStudentsCount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ flex: 2, fontWeight: 600, color: '#0f172a' }}>
+                      Infrastrukturgebühr Passiv-Schüler
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>Passiv-Accounts in der Schuldatenbank</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>{viewingInvoice.passiveStudentsCount}</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>0,09 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>{(viewingInvoice.passiveStudentsCount * 0.09).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                )}
+                
+                {/* 6. Active students fee */}
+                {viewingInvoice.activeStudentFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ flex: 2, fontWeight: 600, color: '#0f172a' }}>
+                      Schüler-Aktivierungsgebühr (Monatlich)
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>Vollständige Freischaltungen durch Schule</span>
+                    </span>
+                    <span style={{ flex: 1, textAlign: 'center' }}>{Math.round(viewingInvoice.activeStudentFee / 0.49)}</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>0,49 €</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>{viewingInvoice.activeStudentFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Total Calculation Details */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
+                <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#64748b' }}>Zwischensumme netto:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingInvoice.subscriptionBypass ? '0,00 €' : viewingInvoice.subtotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <span style={{ color: '#64748b' }}>Umsatzsteuer (0% - steuerbefreit):</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>0,00 €</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', paddingTop: '4px' }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>Rechnungsbetrag:</span>
+                    <strong style={{ fontWeight: 900, color: '#4f46e5', fontSize: '1.15rem' }}>
+                      {viewingInvoice.subscriptionBypass ? '0,00 €' : viewingInvoice.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Info */}
+              <div style={{
+                padding: '20px 24px',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: '16px',
+                backgroundColor: 'rgba(0,0,0,0.01)',
+                fontSize: '0.78rem',
+                color: '#64748b'
+              }}>
+                <strong style={{ display: 'block', color: '#475569', marginBottom: '6px' }}>Zahlungsinformationen</strong>
+                Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen unter Angabe des Verwendungszwecks.<br />
+                <span style={{ display: 'block', marginTop: '6px' }}>
+                  <strong>IBAN:</strong> DE89 1007 0000 0123 4567 89 &nbsp;&bull;&nbsp; 
+                  <strong>BIC:</strong> KARSDEFFXXX &nbsp;&bull;&nbsp; 
+                  <strong>Verwendungszweck:</strong> {viewingInvoice.invoiceId}
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
       
     </div>
   );
