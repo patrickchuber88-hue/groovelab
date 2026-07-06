@@ -4,7 +4,8 @@ import {
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search, Tag, Percent,
-  Activity, Cpu, Database, AlertTriangle, QrCode, UserPlus, Key, Eye, EyeOff
+  Activity, Cpu, Database, AlertTriangle, QrCode, UserPlus, Key, Eye, EyeOff,
+  Link, Briefcase
 } from 'lucide-react';
 
 interface ServerMetric {
@@ -4202,7 +4203,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    🔗 Direkt-Links &amp; Integration
+                    <Link size={16} color="#4f46e5" /> Direkt-Links &amp; Integration
                   </h4>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -4300,7 +4301,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   padding: '24px'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    💼 Hauptbenutzer / School Admins
+                    <Briefcase size={16} color="#4f46e5" /> Hauptbenutzer / School Admins
                   </h4>
 
                   {schoolStats[selectedSchool.id]?.adminUsers && schoolStats[selectedSchool.id]?.adminUsers.length > 0 ? (
@@ -4323,7 +4324,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 550 }}>
                               {admin.role === 'secretary' ? 'Sekretariat / Verwaltung' : 'Admin'}
                             </div>
-                            <div style={{ marginTop: '8px' }}>
+                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               {admin.is_pin_activated ? (
                                 <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '100px' }}>
                                   PIN Aktiviert
@@ -4332,6 +4333,42 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#ca8a04', background: 'rgba(234, 179, 8, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
                                   Ausweis: {admin.ausweis_nummer || '—'}
                                 </span>
+                              )}
+
+                              {admin.is_pin_activated && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (confirm(`Möchtest du den Zugang für ${admin.first_name || ''} ${admin.last_name || ''} zurücksetzen? Der Nutzer kann sich beim nächsten Login wieder mit seiner Ausweis-ID (CG-${admin.ausweis_nummer || ''}) anmelden und einen neuen PIN vergeben.`)) {
+                                      const { error } = await supabase
+                                        .from('users')
+                                        .update({ is_pin_activated: false })
+                                        .eq('id', admin.id);
+                                        
+                                      if (error) {
+                                        alert('Fehler beim Zurücksetzen: ' + error.message);
+                                      } else {
+                                        alert('Zugang erfolgreich zurückgesetzt!');
+                                        fetchSchoolsAndStats(); // Reload master admin data
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    background: 'rgba(79, 70, 229, 0.08)',
+                                    color: '#4f46e5',
+                                    fontSize: '0.64rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseOver={(e: any) => e.currentTarget.style.background = '#e0e7ff'}
+                                  onMouseOut={(e: any) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.08)'}
+                                >
+                                  PIN zurücksetzen
+                                </button>
                               )}
                             </div>
                           </div>
