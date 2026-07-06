@@ -273,138 +273,152 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </tr>
             </thead>
             <tbody>
-              {isInf && (
+              {isGutschrift ? (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '8px 0' }}>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>Gutschrift</strong>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Erstattung / Gutschrift für Infrastruktur- &amp; Servicegebühren</span>
+                  </td>
+                  <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1</td>
+                  <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>{Math.abs(invoice.amount).toFixed(2).replace('.', ',')} €</td>
+                  <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>{Math.abs(invoice.amount).toFixed(2).replace('.', ',')} €</td>
+                </tr>
+              ) : (
                 <>
-                  {/* Position 1: 100% Kostenlose Software Lizenz */}
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '8px 0' }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                      {invoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                    <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
-                  </tr>
+                  {isInf && (
+                    <>
+                      {/* Position 1: 100% Kostenlose Software Lizenz */}
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                          {invoice.isCurrentMonth ? '1 Monat' : '12 Monate'}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
+                        <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                      </tr>
 
-                  {/* Position 2: Campus platform access */}
-                  {campusCost > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {campusCost.toFixed(2).replace('.', ',')} €
-                      </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                        {((invoice.isCurrentMonth ? 1 : 12) * campusCost).toFixed(2).replace('.', ',')} €
-                      </td>
-                    </tr>
+                      {/* Position 2: Campus platform access */}
+                      {campusCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {campusCost.toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {((invoice.isCurrentMonth ? 1 : 12) * campusCost).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Position 2.5: Groovelab platform access */}
+                      {groovelabCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {groovelabCost.toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {((invoice.isCurrentMonth ? 1 : 12) * groovelabCost).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Position 3: Team-Members */}
+                      {invoice.totalTeachersCount > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{invoice.totalTeachersCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User)</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {(invoice.totalTeachersCount * 0.49).toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {((invoice.totalTeachersCount * 0.49) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Position 4: School Base Fee for DB creation */}
+                      {invoice.passiveStudentsCount > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {invoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User)</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {(invoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {((invoice.passiveStudentsCount * 0.09) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Position 5: School Pays active student activations (if any) */}
+                      {invoice.activeStudentFee > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler-Aktivierungen</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule)</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   )}
 
-                  {/* Position 2.5: Groovelab platform access */}
-                  {groovelabCost > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {groovelabCost.toFixed(2).replace('.', ',')} €
-                      </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                        {((invoice.isCurrentMonth ? 1 : 12) * groovelabCost).toFixed(2).replace('.', ',')} €
-                      </td>
-                    </tr>
+                  {isAkt && (
+                    <>
+                      {/* Position 1: Student Activations */}
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 0' }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate)
+                            {studentBillingOption === 'option3_2' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
+                            {studentBillingOption === 'option3_3' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                          {invoice.activationsCount || 0} Schüler
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                          {(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                          {invoice.amount.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    </>
                   )}
-
-                  {/* Position 3: Team-Members */}
-                  {invoice.totalTeachersCount > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{invoice.totalTeachersCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User)</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {(invoice.totalTeachersCount * 0.49).toFixed(2).replace('.', ',')} €
-                      </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                        {((invoice.totalTeachersCount * 0.49) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
-                      </td>
-                    </tr>
-                  )}
-
-                  {/* Position 4: School Base Fee for DB creation */}
-                  {invoice.passiveStudentsCount > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {invoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User)</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {(invoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €
-                      </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                        {((invoice.passiveStudentsCount * 0.09) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
-                      </td>
-                    </tr>
-                  )}
-
-                  {/* Position 5: School Pays active student activations (if any) */}
-                  {invoice.activeStudentFee > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler-Aktivierungen</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule)</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                        {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
-                      </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                        {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
-                      </td>
-                    </tr>
-                  )}
-                </>
-              )}
-
-              {isAkt && (
-                <>
-                  {/* Position 1: Student Activations */}
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '8px 0' }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate)
-                        {studentBillingOption === 'option3_2' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
-                        {studentBillingOption === 'option3_3' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                      {invoice.activationsCount || 0} Schüler
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                      {(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €
-                    </td>
-                    <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                      {invoice.amount.toFixed(2).replace('.', ',')} €
-                    </td>
-                  </tr>
                 </>
               )}
             </tbody>
