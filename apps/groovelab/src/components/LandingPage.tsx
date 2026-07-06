@@ -19,6 +19,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [calcGroovelab, setCalcGroovelab] = useState<boolean>(true);
   const [calcStudents, setCalcStudents] = useState<number>(80);
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
+  const [calcBillingModel, setCalcBillingModel] = useState<'parent' | 'school'>('parent');
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
 
   const getPaidMonthsUntilAugust = () => {
@@ -1064,6 +1065,12 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   Geht ein Ausweis verloren, sperrst und regenerierst du das Token im Admin-Bereich mit nur einem Klick – ohne Passwörter oder Schülerprofile ändern zu müssen.
                 </p>
               </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🔒 Modul-Kapselung vor Ort</h4>
+                <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  Auf gemeinsam genutzten Schul-iPads sperrt die App den Campus-Bereich automatisch ab. Der Wechsel dorthin erfordert eine kurze QR-Scan-Bestätigung des Schülers.
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -1099,6 +1106,39 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }}>Echtzeit-Datenisolation via Row-Level Security</span>
               </div>
+
+              <div 
+                onClick={() => setShowPrivacyAudits(true)}
+                style={{
+                  marginTop: '16px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '12px 20px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.15) 0%, rgba(19, 115, 51, 0.25) 100%)',
+                  border: '1px solid rgba(52, 168, 83, 0.3)',
+                  color: '#d1fae5',
+                  cursor: 'pointer',
+                  fontWeight: 750,
+                  fontSize: '13.5px',
+                  transition: 'all 0.2s',
+                  width: 'fit-content'
+                }}
+                className="hover-scale"
+              >
+                <span>🛡️ 13 von 13 Sicherheits-Stufen erfüllt</span>
+                <span style={{ 
+                  background: '#34a853', 
+                  color: 'white', 
+                  fontSize: '11px', 
+                  fontWeight: 800, 
+                  padding: '3px 8px', 
+                  borderRadius: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em'
+                }}>Details ansehen</span>
+              </div>
             </div>
           </div>
 
@@ -1115,6 +1155,25 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               width: '100%',
               maxWidth: '480px'
             }}>
+              <div style={{
+                alignSelf: 'flex-start',
+                backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderRadius: '100px',
+                padding: '6px 14px',
+                fontSize: '11px',
+                fontWeight: 800,
+                color: '#f59e0b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '-4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.05)'
+              }}>
+                <span>🌟 HÖCHSTE SICHERHEITS-STUFE: POSTGRESQL RLS</span>
+              </div>
               <div style={{
                 backgroundColor: '#18181b',
                 border: '1px solid #27272a',
@@ -1266,11 +1325,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (bzw. 5,88 € im Jahr). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
+                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (im 1. Jahr nur 5,39 € dank Gratis-Probemonat, danach 5,88 €/Jahr). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Laufzeiten:</strong> Keine Einrichtungsgebühr. Nach Ablauf des 1-monatigen Probemonats läuft der Vertrag flexibel bis zum jeweiligen Schuljahresende (August).</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <span style={{ fontSize: '15px', color: '#232326' }}><strong>0,00 € Schul-Budget-Belastung:</strong> Nutze die Direktabrechnung mit den Eltern (0,49 €/Monat). Die Musikschule zahlt dann 0,00 € Schüler-Datenbankgebühren.</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Soziales Freikontingent (5%):</strong> Bei Eltern-Direktabrechnung erhält deine Schule automatisch 5 % Freilizenzen für Härtefälle (z. B. Geschwisterrabatte, Sozialtarife) zur freien Zuweisung.</span>
               </div>
             </div>
 
@@ -1342,49 +1409,178 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </label>
               </div>
 
+              {/* Billing model segmented toggle */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Abrechnung der Schüler-Lizenzen:
+                </span>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  background: '#f1f5f9', 
+                  borderRadius: '12px', 
+                  padding: '3px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setCalcBillingModel('parent')}
+                    style={{
+                      background: calcBillingModel === 'parent' ? '#ffffff' : 'none',
+                      color: calcBillingModel === 'parent' ? '#137333' : '#475569',
+                      border: 'none',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: calcBillingModel === 'parent' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>🛡️ Eltern-Direktzahler (Standard)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalcBillingModel('school')}
+                    style={{
+                      background: calcBillingModel === 'school' ? '#ffffff' : 'none',
+                      color: calcBillingModel === 'school' ? '#137333' : '#475569',
+                      border: 'none',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: calcBillingModel === 'school' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>🏫 Schule (Sammelzahler)</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Slider / Numbers inputs */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                     <span>Aktive Schüler:</span>
-                    <span style={{ color: '#137333' }}>{calcStudents} Schüler ({(calcStudents * 0.49).toFixed(2)} €/Mo)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="9999"
+                        value={calcStudents}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(9999, parseInt(e.target.value) || 0));
+                          setCalcStudents(val);
+                        }}
+                        style={{
+                          width: '64px',
+                          padding: '4px 6px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          textAlign: 'center',
+                          fontWeight: 800,
+                          color: '#137333',
+                          fontSize: '12px',
+                          outline: 'none'
+                        }}
+                      />
+                      <span>Schüler ({(calcStudents * 0.49).toFixed(2)} €/Mo)</span>
+                    </div>
                   </div>
                   <input
                     type="range"
                     min="10"
-                    max="500"
+                    max="2000"
                     step="5"
-                    value={calcStudents}
+                    value={Math.min(calcStudents, 2000)}
                     onChange={(e) => setCalcStudents(parseInt(e.target.value))}
                     style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
                   />
                 </div>
 
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
                     <span>Lehrer & Admins:</span>
-                    <span style={{ color: '#137333' }}>{calcTeachers} Profile ({(calcTeachers * 0.49).toFixed(2)} €/Mo)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="999"
+                        value={calcTeachers}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(999, parseInt(e.target.value) || 0));
+                          setCalcTeachers(val);
+                        }}
+                        style={{
+                          width: '54px',
+                          padding: '4px 6px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          textAlign: 'center',
+                          fontWeight: 800,
+                          color: '#137333',
+                          fontSize: '12px',
+                          outline: 'none'
+                        }}
+                      />
+                      <span>Profile ({(calcTeachers * 0.49).toFixed(2)} €/Mo)</span>
+                    </div>
                   </div>
                   <input
                     type="range"
                     min="1"
-                    max="50"
+                    max="150"
                     step="1"
-                    value={calcTeachers}
+                    value={Math.min(calcTeachers, 150)}
                     onChange={(e) => setCalcTeachers(parseInt(e.target.value))}
                     style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
                   />
                 </div>
               </div>
 
+              {/* Enterprise / Large school discount warning */}
+              {calcStudents >= 500 && (
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px dashed rgba(245, 158, 11, 0.4)',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  fontSize: '11px',
+                  color: '#b45309',
+                  fontWeight: 700,
+                  lineHeight: 1.4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span>💡</span>
+                  <span>
+                    <strong>Großschul-Vorteil:</strong> Ab 500 aktiven Schülern bieten wir vergünstigte Flatrates & Volumenrabatte an. Nimm Kontakt mit uns auf!
+                  </span>
+                </div>
+              )}
+
               {/* Calculations Box */}
               {(() => {
                 const baseVal = (calcCampus && calcGroovelab) ? 9.99 : (calcCampus ? 7.99 : (calcGroovelab ? 4.99 : 0.00));
-                const userVal = (calcStudents * 0.49) + (calcTeachers * 0.49);
+                const studentFee = calcBillingModel === 'parent' ? 0.00 : (calcStudents * 0.49);
+                const teacherFee = calcTeachers * 0.49;
+                const userVal = studentFee + teacherFee;
                 const monthlyTotal = baseVal + userVal;
                 const paidM = getPaidMonthsUntilAugust();
                 const totalYear = monthlyTotal * paidM;
-                const standardTwelveMonth = monthlyTotal * 12;
 
                 return (
                   <div style={{
@@ -1402,11 +1598,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       <span style={{ fontWeight: 800, color: '#0f172a' }}>{baseVal.toFixed(2).replace('.', ',')} €/Mo</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
-                      <span>Monatliche Service-Gebühr:</span>
-                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{userVal.toFixed(2).replace('.', ',')} €/Mo</span>
+                      <span>Service-Gebühr Lehrkräfte ({calcTeachers} Profile):</span>
+                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{teacherFee.toFixed(2).replace('.', ',')} €/Mo</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
+                      <span>Service-Gebühr Schüler ({calcStudents} Schüler):</span>
+                      {calcBillingModel === 'parent' ? (
+                        <span style={{ fontWeight: 800, color: '#137333' }}>0,00 € (Direktabrechnung)</span>
+                      ) : (
+                        <span style={{ fontWeight: 800, color: '#0f172a' }}>{studentFee.toFixed(2).replace('.', ',')} €/Mo</span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', fontWeight: 800, color: '#0f172a' }}>
-                      <span>Regulärer Monatspreis:</span>
+                      <span>Regulärer Monatspreis für die Schule:</span>
                       <span style={{ color: '#137333', fontSize: '14px' }}>{monthlyTotal.toFixed(2).replace('.', ',')} €/Mo</span>
                     </div>
 
