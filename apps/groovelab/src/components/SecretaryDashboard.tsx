@@ -25534,7 +25534,7 @@ status: status,
             restmonate: selectedInvoice.restmonate
           }}
           schoolName={schoolName}
-          schoolStreet={schoolStreet}
+          schoolStreet={schoolStreet ? `${schoolStreet} ${schoolHouseNumber || ''}`.trim() : ''}
           schoolZipCode={schoolZipCode}
           schoolCity={schoolCity}
           operatorCompany={operatorCompany}

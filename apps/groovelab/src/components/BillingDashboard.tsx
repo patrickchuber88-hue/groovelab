@@ -297,7 +297,7 @@ export function BillingDashboard() {
       // 2. Fetch schools
       const { data: schools, error: schoolsErr } = await supabase
         .from('schools')
-        .select('id, name, street, zip_code, city, subscription_type, has_campus_subscription, has_groovelab_subscription, has_kombi_discount, subscription_bypass, status, is_trial, user_quota, pending_user_quota, student_billing_option');
+        .select('id, name, street, house_number, zip_code, city, subscription_type, has_campus_subscription, has_groovelab_subscription, has_kombi_discount, subscription_bypass, status, is_trial, user_quota, pending_user_quota, student_billing_option');
 
       if (schoolsErr) throw schoolsErr;
 
@@ -443,7 +443,7 @@ export function BillingDashboard() {
         return {
           schoolId: school.id,
           schoolName: school.name,
-          schoolStreet: school.street || '',
+          schoolStreet: school.street ? `${school.street} ${school.house_number || ''}`.trim() : '',
           schoolZipCode: school.zip_code || '',
           schoolCity: school.city || '',
           subscriptionType: school.subscription_type === 'solo' ? 'solo' : 'standard',
