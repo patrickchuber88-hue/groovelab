@@ -1113,9 +1113,14 @@ export function BillingDashboard() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatsgebühren Übersicht</span>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.02)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                      <span style={{ color: '#64748b' }}>Server-Grundgebühr:</span>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                        <span style={{ color: '#64748b' }}>Grundgebühr Module:</span>
+                                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                      </div>
+                                      <div style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'right', marginTop: '-2px' }}>
+                                        ({inv.hasCampus && 'Campus: 7,99 €'}{inv.hasCampus && inv.hasGroovelab && ' + '}{inv.hasGroovelab && 'GrooveLab: 4,99 €'})
+                                      </div>
                                     </div>
                                     {inv.hasKombiDiscount && (
                                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#137333' }}>
@@ -1128,7 +1133,7 @@ export function BillingDashboard() {
                                       <span style={{ color: '#0f172a', fontWeight: 700 }}>
                                         {inv.userFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
-                                          ({inv.totalTeachersCount + inv.totalEmployeesCount} Staff, {inv.passiveStudentsCount} Passiv)
+                                          ({inv.totalTeachersCount + inv.totalEmployeesCount} aktive Profile à 0,49 €)
                                         </span>
                                       </span>
                                     </div>
