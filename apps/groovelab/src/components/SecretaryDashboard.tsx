@@ -4591,7 +4591,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           const { data, error: rpcError } = await supabase.rpc('import_student', {
             first_name: firstName,
             last_name: lastName,
-            birth_date: birthDate || '', // Use empty string if birthDate is null
+            birth_date: birthDate || '01.01.2000', // Default to 01.01.2000 if not provided
             instrument: instrument,
             school_id: schoolId,
             teacher_id: teacherId || null
