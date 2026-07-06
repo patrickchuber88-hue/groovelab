@@ -21176,7 +21176,11 @@ status: status,
                                           {isExpanded && grouped[monthKey].map((inv) => (
                                             <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
                                               <div>
-                                                <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>{inv.id}</strong>
+                                                <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a' }}>
+                                                  {inv.amount < 0 
+                                                    ? inv.id.replace('INV-', 'GS-') 
+                                                    : inv.id.replace('INV-', 'RE-')}
+                                                </strong>
                                                 <span style={{ fontSize: '0.65rem', color: inv.type === 'INF' ? '#0369a1' : '#6b21a8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, marginTop: '2px' }}>
                                                    {inv.type === 'INF' ? (
                                                      <>

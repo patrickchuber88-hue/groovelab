@@ -1535,7 +1535,11 @@ export function BillingDashboard() {
                                           }}
                                         >
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-                                            <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>{invoice.id}</span>
+                                            <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                              {invoice.amount < 0 
+                                                ? invoice.id.replace('INV-', 'GS-') 
+                                                : invoice.id.replace('INV-', 'RE-')}
+                                            </span>
                                             <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>{invoice.billing_date}</span>
                                             <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
                                               {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}

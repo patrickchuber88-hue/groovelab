@@ -60,7 +60,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const isAkt = invoice.type === 'AKT';
   const isBypass = invoice.status === 'bypass';
   const isGutschrift = invoice.amount < 0;
-  const displayInvoiceId = isGutschrift ? invoice.id.replace('INV-', 'GS-') : invoice.id;
+  const displayInvoiceId = isGutschrift 
+    ? invoice.id.replace('INV-', 'GS-') 
+    : invoice.id.replace('INV-', 'RE-');
 
   const getDueDate = (dateStr: string) => {
     if (!dateStr) return '';
