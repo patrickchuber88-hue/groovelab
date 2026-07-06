@@ -62,6 +62,7 @@ interface PlatformSummary {
   totalB2CRevenue: number;
   totalTeachers: number;
   totalStudents: number;
+  totalUnpaid: number;
 }
 
 const formatDateDisplay = (dateString: string) => {
@@ -90,7 +91,8 @@ export function BillingDashboard() {
     totalB2BRevenue: 0,
     totalB2CRevenue: 0,
     totalTeachers: 0,
-    totalStudents: 0
+    totalStudents: 0,
+    totalUnpaid: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -466,11 +468,54 @@ export function BillingDashboard() {
         .select('*')
         .order('billing_date', { ascending: false });
       
+      const realInvoices = allInvoices || [];
       if (!invoicesErr && allInvoices) {
         setDbInvoices(allInvoices);
       } else {
         setDbInvoices([]);
       }
+
+      let totalUnpaid = 0;
+      calculatedInvoices.forEach(inv => {
+        const schoolInvoicesFromDb = realInvoices.filter(i => i.school_id === inv.schoolId);
+        const storedDate = localStorage.getItem(`contractStartDate_${inv.schoolId}`) || localStorage.getItem('contractStartDate');
+        const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
+        const startYear = contractDateObj.getFullYear();
+        const startMonth = contractDateObj.getMonth() + 1;
+        const systemDate = new Date();
+        const currentYear = systemDate.getFullYear();
+        const currentMonth = systemDate.getMonth() + 1;
+        
+        let y = startYear;
+        let m = startMonth;
+        while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+          const monthStr = m < 10 ? `0${m}` : `${m}`;
+          const invId = `RE-${y}-${monthStr}`;
+          
+          const dbMatch = schoolInvoicesFromDb.find(i => i.id === invId || i.id === `INV-${y}-${monthStr}`);
+          const paidInvoicesList = JSON.parse(localStorage.getItem(`paid_invoices_${inv.schoolId}`) || '[]');
+          const isMarkedPaid = paidInvoicesList.includes(invId);
+          
+          let status = 'open';
+          let amount = inv.total;
+          if (dbMatch) {
+            status = dbMatch.status;
+            amount = dbMatch.amount;
+          } else if (isMarkedPaid) {
+            status = 'paid';
+          }
+          
+          if (status !== 'paid' && status !== 'cancelled' && status !== 'Bezahlt') {
+            totalUnpaid += amount;
+          }
+          
+          m++;
+          if (m > 12) {
+            m = 1;
+            y++;
+          }
+        }
+      });
 
       setInvoices(calculatedInvoices);
       setSummary({
@@ -481,7 +526,8 @@ export function BillingDashboard() {
         totalB2BRevenue: parseFloat(totalB2BRevenue.toFixed(2)),
         totalB2CRevenue: parseFloat(totalB2CRevenue.toFixed(2)),
         totalTeachers,
-        totalStudents
+        totalStudents,
+        totalUnpaid: parseFloat(totalUnpaid.toFixed(2))
       });
 
     } catch (err: any) {
@@ -490,6 +536,50 @@ export function BillingDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCSV = () => {
+    const headers = [
+      'Musikschule',
+      'Abo-Status',
+      'Gesamt Schueler',
+      'Gesamt Lehrer',
+      'Aktive Campus-Lizenzen',
+      'Bypass Aktiv',
+      'Server-Grundpreis (EUR)',
+      'Kombi-Rabatt (EUR)',
+      'Servicegebuehr Profile (EUR)',
+      'Aktivierungsgebuehr Schueler (EUR)',
+      'Monats-Soll gesamt (EUR)'
+    ];
+
+    const rows = filteredInvoices.map(inv => [
+      inv.schoolName,
+      inv.status === 'trial' ? 'Probezeit' : inv.status === 'suspended' ? 'Gesperrt' : inv.status === 'bypass' ? 'Bypass' : 'Aktiv',
+      inv.totalStudents,
+      inv.totalTeachers,
+      inv.premiumStudents,
+      inv.subscriptionBypass ? 'Ja' : 'Nein',
+      inv.baseFee.toFixed(2),
+      inv.kombiDiscountAmount.toFixed(2),
+      inv.userFee.toFixed(2),
+      inv.activeStudentFee.toFixed(2),
+      inv.total.toFixed(2)
+    ]);
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))
+    ].join('\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Abrechnungsliste_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredInvoices = invoices.filter(inv => {
@@ -756,6 +846,30 @@ export function BillingDashboard() {
           </div>
         </div>
 
+        {/* Total B2B Unpaid / Outstanding */}
+        <div className="billing-card">
+          <div className="bc-icon-wrapper" style={{
+            height: '52px',
+            width: '52px',
+            borderRadius: '14px',
+            background: 'rgba(234, 67, 53, 0.08)',
+            color: '#ea4335',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <CreditCard size={22} />
+          </div>
+          <div>
+            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offene Posten (B2B)</span>
+            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#ea4335', marginTop: '4px', letterSpacing: '-0.02em' }}>
+              {summary.totalUnpaid.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            </span>
+          </div>
+        </div>
+
         {/* Total B2C Revenue */}
         <div className="billing-card">
           <div className="bc-icon-wrapper" style={{
@@ -894,6 +1008,29 @@ export function BillingDashboard() {
               {btn.label}
             </button>
           ))}
+          <button
+            onClick={handleExportCSV}
+            style={{
+              background: '#4f46e5',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '10px 18px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.15)',
+              transition: 'all 0.2s',
+              marginLeft: '12px'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4338ca'; }}
+            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#4f46e5'; }}
+          >
+            Exportieren (CSV) 📥
+          </button>
         </div>
 
       </div>
