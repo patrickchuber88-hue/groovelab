@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { 
   CreditCard, 
   Search, 
@@ -1623,375 +1624,33 @@ export function BillingDashboard() {
         </table>
       </div>
       
-      {viewingInvoice && (() => {
-        const isBypass = viewingInvoice.subscriptionBypass || false;
-        
-        // Helper to format due date
-        const getDueDate = (dateStr: string) => {
-          if (!dateStr) return '';
-          const months: Record<string, number> = {
-            'Januar': 0, 'Februar': 1, 'März': 2, 'April': 3, 'Mai': 4, 'Juni': 5,
-            'Juli': 6, 'August': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Dezember': 11
-          };
-          const parts = dateStr.split(' ');
-          if (parts.length === 3) {
-            const day = parseInt(parts[0]);
-            const monthIndex = months[parts[1]] || 0;
-            const year = parseInt(parts[2]);
-            const d = new Date(year, monthIndex, day);
-            d.setDate(d.getDate() + 14);
-            const deMonths = [
-              'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
-              'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-            ];
-            return `${d.getDate()}. ${deMonths[d.getMonth()]} ${d.getFullYear()}`;
-          }
-          return dateStr;
-        };
-
-        const dueDateStr = getDueDate(viewingInvoice.date);
-        const lpStr = viewingInvoice.date.split(' ').slice(1).join(' ');
-
-        return (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            padding: '20px'
-          }} onClick={() => setViewingInvoice(null)}>
-            <style>{`
-              @media print {
-                .no-print {
-                  display: none !important;
-                }
-                body * {
-                  visibility: hidden !important;
-                }
-                #printable-invoice, #printable-invoice * {
-                  visibility: visible !important;
-                }
-                #printable-invoice {
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 100% !important;
-                  max-height: 270mm !important;
-                  overflow: hidden !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  box-shadow: none !important;
-                  border: none !important;
-                  page-break-after: avoid !important;
-                  page-break-inside: avoid !important;
-                }
-                html, body {
-                  max-height: 270mm !important;
-                  height: 100% !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  background: #fff !important;
-                  overflow: hidden !important;
-                  page-break-after: avoid !important;
-                  page-break-inside: avoid !important;
-                }
-                @page {
-                  size: A4 portrait;
-                  margin: 10mm;
-                }
-              }
-            `}</style>
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '680px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-              border: '1px solid #e2e8f0',
-              fontFamily: 'Inter',
-              display: 'flex',
-              flexDirection: 'column',
-              maxHeight: '90vh',
-              overflow: 'hidden',
-              animation: 'scaleUp 0.2s ease-out'
-            }} onClick={(e) => e.stopPropagation()}>
-              
-              {/* Header / Actions */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Rechnungs-Vorschau</span>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => {
-                      window.print();
-                    }}
-                    style={{
-                      background: '#16a34a',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '6px 14px',
-                      fontSize: '0.72rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(22, 163, 74, 0.15)'
-                    }}
-                  >
-                    Drucken / PDF
-                  </button>
-                  <button
-                    onClick={() => setViewingInvoice(null)}
-                    style={{
-                      background: '#ffffff',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '6px 14px',
-                      fontSize: '0.72rem',
-                      fontWeight: 750,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Schließen
-                  </button>
-                </div>
-              </div>
-
-              {/* Print Area */}
-              <div id="printable-invoice" style={{ padding: '24px 30px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.35' }}>
-                {/* Invoice Meta */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div>
-                    <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
-                    <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
-                    <strong style={{ display: 'block', fontSize: '0.92rem', color: '#0f172a' }}>
-                      {viewingInvoice.status === 'open' || viewingInvoice.status === 'paid' ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN'}
-                    </strong>
-                    <span style={{ color: '#64748b', fontWeight: 700 }}>Nr. {viewingInvoice.invoiceId}</span>
-                  </div>
-                </div>
-
-                {/* Addresses */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px', fontSize: '0.72rem' }}>
-                  <div>
-                    <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Rechnungsempfänger</span>
-                    <strong style={{ color: '#0f172a', display: 'block' }}>{viewingInvoice.schoolName}</strong>
-                    {viewingInvoice.schoolStreet && <span>{viewingInvoice.schoolStreet}<br /></span>}
-                    <span>{viewingInvoice.schoolZipCode} {viewingInvoice.schoolCity}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-                    <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
-                    <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>{operatorCompany}</strong>
-                    <span>{operatorContact}</span><br />
-                    <span>{operatorStreet}</span><br />
-                    <span>{operatorZip} {operatorCity}</span>
-                  </div>
-                </div>
-
-                {/* Dates */}
-                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '8px', fontSize: '0.7rem', marginBottom: '16px', border: '1px solid #f1f5f9' }}>
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
-                    <strong style={{ color: '#0f172a' }}>{viewingInvoice.date}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Fälligkeit</span>
-                    <strong style={{ color: '#0f172a' }}>{dueDateStr}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Leistungszeitraum</span>
-                    <strong style={{ color: '#0f172a' }}>{lpStr}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Zahlungsart</span>
-                    <strong style={{ color: '#0f172a' }}>Rechnung (14 Tage Zahlungsziel)</strong>
-                  </div>
-                </div>
-
-                {/* Line Items Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', marginBottom: '16px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
-                      <th style={{ padding: '8px 0' }}>Position</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Menge</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Einzelpreis</th>
-                      <th style={{ padding: '8px 0', textAlign: 'right' }}>Gesamtpreis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Position 1: 100% Kostenlose Software Lizenz */}
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 0' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
-                    </tr>
-
-                    {/* Position 2: Campus platform access */}
-                    {viewingInvoice.hasCampus && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>7,99 €</td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>7,99 €</td>
-                      </tr>
-                    )}
-
-                    {/* Position 2.5: Groovelab platform access */}
-                    {viewingInvoice.hasGroovelab && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>4,99 €</td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>4,99 €</td>
-                      </tr>
-                    )}
-
-                    {/* Position 3: Team-Members */}
-                    {(viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount) > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User)</span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                          {((viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount) * 0.49).toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {((viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount) * 0.49).toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Position 4: School Base Fee for DB creation */}
-                    {viewingInvoice.passiveStudentsCount > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {viewingInvoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User)</span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                          {(viewingInvoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {(viewingInvoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-                    
-                    {/* Position 5: School Pays active student activations (if any) */}
-                    {viewingInvoice.activeStudentFee > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler-Aktivierungen</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule)</span>
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                          {viewingInvoice.activeStudentFee.toFixed(2).replace('.', ',')} €
-                        </td>
-                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {viewingInvoice.activeStudentFee.toFixed(2).replace('.', ',')} €
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-
-                {/* Total Calculation */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.78rem', borderTop: '2px solid #e2e8f0', paddingTop: '12px' }}>
-                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <div style={{ width: '320px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                        <span>• Träger Musikschule (Betrieb &amp; Infrastruktur):</span>
-                        <span style={{ fontWeight: 650, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                          {isBypass ? '0,00 €' : viewingInvoice.amount.toFixed(2).replace('.', ',')} €
-                        </span>
-                      </div>
-                      <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
-                        <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                        <strong style={{ fontWeight: 900, color: '#0369a1', whiteSpace: 'nowrap' }}>
-                          {isBypass ? '0,00 €' : viewingInvoice.amount.toFixed(2).replace('.', ',')} €
-                        </strong>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
-                      Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
-                    </div>
-                    
-                    {/* Bank Details Block */}
-                    <div style={{ 
-                      marginTop: '12px', 
-                      padding: '16px', 
-                      background: '#f8fafc', 
-                      borderRadius: '16px', 
-                      border: '1px solid #cbd5e1', 
-                      fontSize: '0.74rem', 
-                      color: '#475569', 
-                      width: '100%', 
-                      display: 'flex', 
-                      gap: '20px',
-                      alignItems: 'center',
-                      textAlign: 'left'
-                    }}>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
-                        <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
-                        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
-                          <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
-                          <strong>IBAN:</strong> <span>{operatorIban}</span>
-                          <strong>BIC:</strong> <span>{operatorBic}</span>
-                          <strong>Verwendungszweck:</strong> <strong style={{ color: '#0f172a' }}>{viewingInvoice.invoiceId}</strong>
-                        </div>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#ffffff',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        flexShrink: 0
-                      }}>
-                        <QRCode 
-                          value={`BCD\n002\n1\nSCT\n${operatorBic.replace(/\s+/g, '')}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${viewingInvoice.amount.toFixed(2)}\n\n\n${viewingInvoice.invoiceId}\n`} 
-                          size={96} 
-                        />
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Girocode scannen
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {viewingInvoice && (
+        <InvoicePreviewModal
+          invoice={{
+            id: viewingInvoice.invoiceId,
+            date: viewingInvoice.date,
+            amount: viewingInvoice.amount,
+            status: viewingInvoice.status,
+            hasCampus: viewingInvoice.hasCampus,
+            hasGroovelab: viewingInvoice.hasGroovelab,
+            totalTeachersCount: viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount,
+            passiveStudentsCount: viewingInvoice.passiveStudentsCount,
+            activeStudentFee: viewingInvoice.activeStudentFee
+          }}
+          schoolName={viewingInvoice.schoolName}
+          schoolStreet={viewingInvoice.schoolStreet}
+          schoolZipCode={viewingInvoice.schoolZipCode}
+          schoolCity={viewingInvoice.schoolCity}
+          operatorCompany={operatorCompany}
+          operatorContact={operatorContact}
+          operatorStreet={operatorStreet}
+          operatorZip={operatorZip}
+          operatorCity={operatorCity}
+          operatorIban={operatorIban}
+          operatorBic={operatorBic}
+          onClose={() => setViewingInvoice(null)}
+        />
+      )}
       
     </div>
   );
