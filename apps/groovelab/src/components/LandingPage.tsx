@@ -1325,7 +1325,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (im 1. Jahr nur 5,39 € dank Gratis-Probemonat, danach 5,88 €/Jahr). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
+                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (nur 5,39 €/Jahr dank jährlichem Gratis-Monat). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
@@ -1886,7 +1886,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   🛡️ Das Campus-Groovelab Sicherheitsversprechen
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#137333', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  13 von 13 Sicherheits- & Datenschutz-Stufen erfüllt
+                  13-stufiges Sicherheits- & Datenschutzkonzept
                 </span>
               </div>
               <button 
@@ -1916,23 +1916,23 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 {[
                   {
                     title: '1. PGP-Verschlüsselung der Namen (Art. 32 DSGVO)',
-                    desc: 'Schülervornamen werden in der Datenbank durch starke symmetrische PGP-Verschlüsselung geschützt. Selbst bei direktem Datenbankzugriff sind diese ohne den Schlüssel absolut unlesbar.'
+                    desc: 'Schülervornamen werden in der Datenbank durch starke symmetrische PGP-Verschlüsselung geschützt. Selbst bei direktem Datenbankzugriff sind diese ohne den Schlüssel nach dem aktuellen Stand der Technik unlesbar.'
                   },
                   {
-                    title: '2. E-Mail-Fragmentierung (Präfix- & Suffix-Splitting)',
-                    desc: 'Jede E-Mail-Adresse wird in zwei Teile getrennt: Der vordere, persönliche Teil (das Präfix) wird PGP-verschlüsselt in einer Tabelle abgelegt. Der hintere Anbieter-Teil (das Suffix, z. B. @gmail.com) liegt physisch isoliert in einer anderen Tabelle.'
+                    title: '2. E-Mail-Vermeidung für Schüler & Lehrer (Datenminimierung)',
+                    desc: 'Zur maximalen Datensparsamkeit erheben und speichern wir für Schüler und Lehrer keinerlei E-Mail-Adressen. Die gesamte App-Funktionalität läuft ohne diese Angabe. Lediglich die Kontakt-E-Mail der Musikschule als Vertragspartner wird erfasst.'
                   },
                   {
                     title: '3. Strikte Row-Level Security (RLS)',
-                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies. Es ist technisch ausgeschlossen, dass eine Musikschule jemals Daten einer anderen Schule sieht.'
+                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies. Dies stellt sicher, dass eine Musikschule systemisch bedingt nur auf die eigenen Daten zugreifen kann.'
                   },
                   {
                     title: '4. Einweg-Hashing von Passwörtern & PINs',
-                    desc: 'Weder Passwörter noch die 4-stelligen Eltern-PINs werden im Klartext gespeichert. Sie werden über modernste kryptografische Hashes (Bcrypt & SHA-256) einweg-verschlüsselt.'
+                    desc: 'Weder Passwörter noch die 4-stelligen Eltern-PINs werden im Klartext gespeichert. Sie werden über kryptografische Hashes (Bcrypt & SHA-256) einweg-verschlüsselt.'
                   },
                   {
                     title: '5. Brute-Force-Sperre (Lockout-Logic)',
-                    desc: 'Die Eingabe der PINs wird streng überwacht. Nach drei Falscheingaben wird der Zugriff für die jeweilige Sitzung aus Sicherheitsgründen für 15 Minuten komplett gesperrt.'
+                    desc: 'Die Eingabe der PINs wird überwacht. Nach drei Falscheingaben wird der Zugriff für die jeweilige Sitzung aus Sicherheitsgründen für 15 Minuten gesperrt.'
                   },
                   {
                     title: '6. Eltern-Souveränität (Art. 8 DSGVO)',
@@ -1940,19 +1940,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   },
                   {
                     title: '7. Revisionssichere Einwilligungsprotokolle',
-                    desc: 'Jede Einwilligung der Eltern und Verträge der Schulen werden revisionssicher inklusive Timestamp, anonymisierter IP und Browser-Fingerprint rechtssicher archiviert.'
+                    desc: 'Jede Einwilligung der Eltern und Verträge der Schulen werden revisionssicher inklusive Timestamp, anonymisierter IP und Browser-Fingerprint archiviert.'
                   },
                   {
                     title: '8. Lokale Kamera-Verarbeitung (Zero-Cloud Bio-Login)',
-                    desc: 'Kamera-Feeds für QR-Logins und Biometrie werden ausschließlich lokal auf dem Endgerät verarbeitet. Es findet niemals eine Übertragung von Bild- oder Gesichtsdaten statt.'
+                    desc: 'Kamera-Feeds für QR-Logins und Biometrie werden ausschließlich lokal auf dem Endgerät verarbeitet. Es findet keine Übertragung von Bild- oder Gesichtsdaten auf unsere Server statt.'
                   },
                   {
                     title: '9. Eliminierte Entwickler-Bypässe im Release',
-                    desc: 'Alle Debug- und Bypass-Schnittstellen für Entwickler werden beim Kompilieren des Produktions-Builds durch strikte Compiler-Flags physisch aus dem Programmcode gelöscht.'
+                    desc: 'Alle Debug- und Bypass-Schnittstellen für Entwickler werden beim Kompilieren des Produktions-Builds durch strikte Compiler-Flags aus dem Programmcode gelöscht.'
                   },
                   {
                     title: '10. Lokaler Fingerabdruck- & Passkey-Login (TouchID/FaceID)',
-                    desc: 'Nutzer können sich über die biometrische Hardware ihres Endgeräts (TouchID/FaceID) einloggen. Die Verifizierung erfolgt zu 100 % lokal – biometrische Merkmale verlassen niemals das Endgerät.'
+                    desc: 'Nutzer können sich über die biometrische Hardware ihres Endgeräts (TouchID/FaceID) einloggen. Die Verifizierung erfolgt lokal – biometrische Merkmale verlassen das Endgerät nicht.'
                   },
                   {
                     title: '11. Automatische Inaktivitäts-Sperre (Auto-Lock)',

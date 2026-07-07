@@ -3249,13 +3249,14 @@ export function AdminDashboard({
       }
     }
 
+    const isAdmOrSec = newTeacher.isAdmin;
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
       role: newTeacher.isAdmin ? 'admin' : 'teacher', 
       first_name: newTeacher.firstName, 
       last_name: newTeacher.lastName, 
       instrument: newTeacher.instrument || '',
-      photo_url: newTeacher.photoUrl,
+      photo_url: isAdmOrSec ? '/campus_login_hero.png' : newTeacher.photoUrl,
       qr_token: crypto.randomUUID()
     }).select().single();
     if (error) alert('Fehler: ' + error.message);
@@ -3301,12 +3302,13 @@ export function AdminDashboard({
   const handleUpdateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTeacher) return;
+    const isAdmOrSec = editingTeacher.role === 'admin' || editingTeacher.role === 'secretary';
     const { error } = await supabase.from('users').update({
       first_name: editingTeacher.first_name,
       last_name: editingTeacher.last_name,
       role: editingTeacher.role,
       groovelab_instrument: editingTeacher.groovelab_instrument,
-      photo_url: editingTeacher.photo_url,
+      photo_url: isAdmOrSec ? '/campus_login_hero.png' : editingTeacher.photo_url,
       bio: editingTeacher.bio,
       expertise: editingTeacher.expertise,
       bands: editingTeacher.bands

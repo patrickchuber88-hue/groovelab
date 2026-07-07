@@ -366,6 +366,7 @@ export function BillingDashboard() {
         totalTeachers: number;
         activeTeachers: number;
         totalEmployees: number;
+        activeEmployees: number;
       }> = {};
 
       users?.forEach(u => {
@@ -376,7 +377,8 @@ export function BillingDashboard() {
             premiumStudents: 0,
             totalTeachers: 0,
             activeTeachers: 0,
-            totalEmployees: 0
+            totalEmployees: 0,
+            activeEmployees: 0
           };
         }
         if (u.role === 'student') {
@@ -402,6 +404,9 @@ export function BillingDashboard() {
           (u.roles && (u.roles.includes('admin') || u.roles.includes('secretary')));
         if (isEmployee) {
           userStatsMap[u.school_id].totalEmployees++;
+          if (u.is_active) {
+            userStatsMap[u.school_id].activeEmployees++;
+          }
         }
       });
 
@@ -414,7 +419,8 @@ export function BillingDashboard() {
           premiumStudents: 0, 
           totalTeachers: 0, 
           activeTeachers: 0,
-          totalEmployees: 0
+          totalEmployees: 0,
+          activeEmployees: 0
         };
 
         const pendingStudentsCount = pendingCountMap[school.id] || 0;
@@ -422,8 +428,8 @@ export function BillingDashboard() {
         const activeStudents = stats.activeStudents;
         const premiumStudents = stats.premiumStudents;
         
-        const teachersCount = stats.totalTeachers;
-        const employeesCount = stats.totalEmployees;
+        const teachersCount = stats.activeTeachers; // Fix: use active count
+        const employeesCount = stats.activeEmployees; // Fix: use active count
 
         // MODULE BASE FEE CALCULATION
         let baseFee = 0;
@@ -439,7 +445,8 @@ export function BillingDashboard() {
         
         // PASSIVE STUDENTS FEE (0.09 € per passive student profile)
         const isPartial = school.student_billing_option === 'student_partial';
-        const passiveStudentsCount = isPartial ? totalStudents : Math.max(0, totalStudents - activeStudents);
+        const isFullDirect = school.student_billing_option === 'student_full';
+        const passiveStudentsCount = isPartial ? totalStudents : (isFullDirect ? 0 : Math.max(0, totalStudents - activeStudents));
         const passiveStudentsFee = passiveStudentsCount * 0.09;
 
         // Profile-Levy (B2B User Fee)

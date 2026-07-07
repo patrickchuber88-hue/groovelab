@@ -19422,7 +19422,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           1. Vollständige Direktabrechnung (Schüler zahlt 0,49 € / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: 5,88 €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
+                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: 5,39 €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
                                         </span>
                                       </div>
                                     </label>
@@ -20477,7 +20477,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         </span>
                                         <span style={{ fontSize: '0.74rem', background: '#e0f2fe', color: '#0369a1', padding: '6px 12px', borderRadius: '100px', fontWeight: 800 }}>
                                           Schülertarif: {
-                                            studentBillingOption === 'option1' ? 'Jahrespauschale (4,80 € / Jahr)' :
+                                            studentBillingOption === 'option1' ? 'Jahrespauschale (5,39 € / Jahr)' :
                                             studentBillingOption === 'option2' ? 'Monatsumlage (0,40 € / Monat)' :
                                             studentBillingOption === 'option3_2' ? 'Kofinanzierung (Jährlich)' :
                                             studentBillingOption === 'option3_3' ? 'Kofinanzierung (Monatlich)' :
@@ -25325,7 +25325,7 @@ status: status,
             {/* Selection options inside the modal */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
               {[
-                { id: 'option1', title: 'Option 1: Jahrespauschale', desc: '4,80 € / Jahr pro Schüler (Einmalzahlung)' },
+                { id: 'option1', title: 'Option 1: Jahrespauschale', desc: '5,39 € / Jahr pro Schüler (Einmalzahlung)' },
                 { id: 'option2', title: 'Option 2: Monatsumlage', desc: '0,40 € / Mo. pro Schüler (Monatlich)' }
               ].map((opt) => {
                 const isSelected = selectedModalOption === opt.id;

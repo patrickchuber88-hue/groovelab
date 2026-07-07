@@ -10,11 +10,11 @@ const config = {
   readyTimeout: 10000
 };
 
-const migrationFile = '/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/supabase/migrations/151_streak_reset_cron.sql';
+const migrationFile = '/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/supabase/migrations/201_security_hardening.sql';
 const sql = fs.readFileSync(migrationFile, 'utf8');
 
 conn.on('ready', () => {
-  conn.exec('docker exec -i supabase-db psql -U postgres -d postgres', (err, stream) => {
+  conn.exec('docker exec -i supabase-db psql -U supabase_admin -d postgres -c "SELECT policyname, qual FROM pg_policies WHERE tablename = \'users_raw\';"', (err, stream) => {
     if (err) throw err;
     
     stream.on('close', (code, signal) => {

@@ -6605,9 +6605,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 const expectedLength = pinVerificationUser.role === 'student' ? 2 : 4;
                 if (pinVerificationInput.length !== expectedLength) return;
                 
-                const isMatch = pinVerificationUser.role === 'student'
-                  ? (parseInt(pinVerificationInput) === parseInt(studentBirthDay))
-                  : (pinVerificationInput === pinVerificationUser.personal_pin);
+                let isMatch = false;
+                if (pinVerificationUser.role === 'student') {
+                  isMatch = parseInt(pinVerificationInput) === parseInt(studentBirthDay);
+                } else {
+                  const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
+                    user_uuid: pinVerificationUser.id,
+                    input_pin: pinVerificationInput
+                  });
+                  if (!pinErr && pinOk === true) {
+                    isMatch = true;
+                  }
+                }
 
                 if (isMatch) {
                   const user = pinVerificationUser;

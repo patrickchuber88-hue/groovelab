@@ -1995,7 +1995,7 @@ function App() {
     const updateData: any = {
       first_name: editingProfile.first_name,
       last_name: editingProfile.last_name,
-      photo_url: editingProfile.photo_url
+      photo_url: (user.role === 'admin' || user.role === 'secretary') ? '/campus_login_hero.png' : editingProfile.photo_url
     };
 
     if (user.role === 'student') {
@@ -3077,6 +3077,15 @@ function App() {
       if (membershipsRes.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const userData = userRes.data;
+      if (userData) {
+        const r = (userData.role || '').toLowerCase();
+        const rolesArr = userData.roles || [];
+        const isAdminOrSec = r === 'admin' || r === 'secretary' || rolesArr.includes('admin') || rolesArr.includes('secretary');
+        if (isAdminOrSec) {
+          userData.photo_url = '/campus_login_hero.png';
+          userData.avatar_url = '/campus_login_hero.png';
+        }
+      }
       if (!userData) {
         console.warn('[Dashboard] No user data found for ID:', userId);
         setLoading(false);
@@ -8313,6 +8322,13 @@ function App() {
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'all 0.3s' }} className="photo-overlay">
                     <button 
                       onClick={() => {
+                        const r = (user?.role || '').toLowerCase();
+                        const rolesArr = user?.roles || [];
+                        const isAdminOrSec = r === 'admin' || r === 'secretary' || rolesArr.includes('admin') || rolesArr.includes('secretary');
+                        if (isAdminOrSec) {
+                          alert('Mitarbeiter der Verwaltung und des Sekretariats nutzen das Standard-Profilbild (/campus_login_hero.png).');
+                          return;
+                        }
                         setAvatarPickerType('student');
                         setShowAvatarPicker(true);
                       }}
