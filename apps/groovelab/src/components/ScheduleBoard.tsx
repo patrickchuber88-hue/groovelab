@@ -2765,6 +2765,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           setSelectedTeacherId={setSelectedTeacherId}
           currentUserRole={currentUserRole}
           hasSubmittedSchedule={hasSubmittedSchedule}
+          scheduleStatus={scheduleStatus}
         />
       ) : (
         <>
@@ -2843,16 +2844,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
 
-            <div className="app-segmented-switch" style={{ margin: 0 }}>
+            <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
               <button 
                 onClick={() => setActiveTab('calendar')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
               >
-                {hasSubmittedSchedule ? 'Mein Stundenplan' : 'Entwurf'}
+                Stundenplan
               </button>
               <button 
                 onClick={() => setActiveTab('designer')}
                 className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
               >
                 Stundenplan-Designer
               </button>

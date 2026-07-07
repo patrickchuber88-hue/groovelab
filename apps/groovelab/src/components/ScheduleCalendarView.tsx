@@ -67,6 +67,7 @@ interface ScheduleCalendarViewProps {
   setSelectedTeacherId?: (id: string) => void;
   currentUserRole?: string;
   hasSubmittedSchedule?: boolean;
+  scheduleStatus?: 'none' | 'pending' | 'approved';
 }
 
 export function ScheduleCalendarView({ 
@@ -79,7 +80,8 @@ export function ScheduleCalendarView({
   selectedTeacherId,
   setSelectedTeacherId,
   currentUserRole,
-  hasSubmittedSchedule = true
+  hasSubmittedSchedule = true,
+  scheduleStatus = 'none'
 }: ScheduleCalendarViewProps) {
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
@@ -2970,14 +2972,14 @@ export function ScheduleCalendarView({
         gap: '10px'
       }}>
         {/* Row 1: Title & Main Navigation */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', width: '100%', gap: '10px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <CalendarIcon size={16} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                   KW {weekNumber}
                 </h2>
                 <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -3014,7 +3016,7 @@ export function ScheduleCalendarView({
             </div>
           </div>
 
-          {/* Right: Tab switch */}
+          {/* Center: Tab switch */}
           {activeTab && setActiveTab && (
             <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
               <button 
@@ -3033,6 +3035,9 @@ export function ScheduleCalendarView({
               </button>
             </div>
           )}
+
+          {/* Right: Spacer for centering */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }} />
         </div>
 
         {/* Divider line */}
@@ -3046,34 +3051,52 @@ export function ScheduleCalendarView({
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
               </span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {activeRooms.map(room => {
-                  const isActive = selectedRoomIdForXRay === room.id;
-                  return (
-                    <button
-                      key={room.id}
-                      onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
-                      style={{
-                        background: isActive 
-                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#0b57d0')
-                          : '#ffffff',
-                        color: isActive ? '#ffffff' : '#475569',
-                        border: `1px solid ${isActive 
-                          ? (localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#0b57d0')
-                          : 'rgba(0,0,0,0.08)'}`,
-                        borderRadius: '4px',
-                        padding: '2px 6px',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.12s',
-                        boxShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.02)'
-                      }}
-                    >
-                      {room.name}
-                    </button>
-                  );
-                })}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {hasSubmittedSchedule && scheduleStatus === 'approved' ? (
+                  activeRooms.map(room => {
+                    const isActive = selectedRoomIdForXRay === room.id;
+                    const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+                    const primaryColor = isCampus ? '#137333' : '#ea4335';
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                        style={{
+                          background: isActive ? primaryColor : '#ffffff',
+                          color: isActive ? '#ffffff' : '#475569',
+                          border: `1px solid ${isActive ? primaryColor : 'rgba(0,0,0,0.08)'}`,
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '30px'
+                        }}
+                      >
+                        {room.name}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <span style={{ 
+                    fontSize: '0.72rem', 
+                    color: '#ea4335', 
+                    fontWeight: 600, 
+                    background: '#fce8e6', 
+                    padding: '4px 10px', 
+                    borderRadius: '6px', 
+                    display: 'inline-flex', 
+                    alignItems: 'center',
+                    minHeight: '28px'
+                  }}>
+                    Stundenplan noch nicht eingereicht & freigegeben
+                  </span>
+                )}
               </div>
             </div>
           </div>
