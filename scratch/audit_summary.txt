@@ -1,0 +1,434 @@
+=== RLS DISABLED TABLES ===
+Found 20 tables with RLS disabled:
+- activation_days
+- audit_temp_results
+- campus_direct_messages
+- email_prefixes
+- email_suffixes
+- magic_link_logs
+- notifications
+- onboarding_attempts
+- parent_email_prefixes
+- parent_email_suffixes
+- push_subscriptions
+- schedule_occurrences
+- sessions
+- student_first_names
+- student_last_names
+- student_onboarding_tokens
+- student_schedule_preferences
+- students
+- user_email_prefixes
+- user_email_suffixes
+
+=== POLICIES PER TABLE ===
+
+Table: audit_logs (1 policies)
+  * [SELECT] Admins and secretaries can view audit logs (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw changer   WHERE ((changer.id = (((current_setting('request.headers'::text, true))::json ->> 'x-user-id'::text))::uuid) AND (changer.role = ANY (ARRAY['admin'::user_role, 'secretary'::user_role])) AND (changer.school_id = audit_logs.school_id)))))
+
+Table: avatars (1 policies)
+  * [ALL] avatars_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = avatars.user_id) AND check_school_access(u.school_id)))))
+
+Table: band_gigs (3 policies)
+  * [ALL] Band members manage gigs (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM band_members   WHERE ((band_members.band_id = band_gigs.band_id) AND (band_members.user_id = auth.uid()))))
+  * [SELECT] Gigs visible to school (roles: ["public"])
+    QUAL: true
+  * [ALL] band_gigs_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM bands b   WHERE ((b.id = band_gigs.band_id) AND check_school_access(b.school_id))))
+
+Table: band_media (3 policies)
+  * [ALL] Band members manage media (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM band_members   WHERE ((band_members.band_id = band_media.band_id) AND (band_members.user_id = auth.uid()))))
+  * [SELECT] Media visible to school (roles: ["public"])
+    QUAL: true
+  * [ALL] band_media_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM bands b   WHERE ((b.id = band_media.band_id) AND check_school_access(b.school_id))))
+
+Table: band_members (2 policies)
+  * [SELECT] Band members are visible to school members (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.school_id = ( SELECT bands.school_id            FROM bands           WHERE (bands.id = band_members.band_id))))))
+  * [ALL] band_members_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM bands b   WHERE ((b.id = band_members.band_id) AND check_school_access(b.school_id))))
+
+Table: band_proposal_votes (3 policies)
+  * [ALL] Band members vote (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM (band_song_proposals p      JOIN band_members m ON ((p.band_id = m.band_id)))   WHERE ((p.id = band_proposal_votes.proposal_id) AND (m.user_id = auth.uid()))))
+  * [SELECT] Votes visible to band members (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM (band_song_proposals p      JOIN band_members m ON ((p.band_id = m.band_id)))   WHERE ((p.id = band_proposal_votes.proposal_id) AND (m.user_id = auth.uid()))))
+  * [ALL] band_proposal_votes_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM (band_song_proposals p      JOIN bands b ON ((b.id = p.band_id)))   WHERE ((p.id = band_proposal_votes.proposal_id) AND check_school_access(b.school_id))))
+
+Table: band_song_proposals (3 policies)
+  * [ALL] Band members manage proposals (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM band_members   WHERE ((band_members.band_id = band_song_proposals.band_id) AND (band_members.user_id = auth.uid()))))
+  * [SELECT] Proposals visible to band members (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM band_members   WHERE ((band_members.band_id = band_song_proposals.band_id) AND (band_members.user_id = auth.uid()))))
+  * [ALL] band_song_proposals_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM bands b   WHERE ((b.id = band_song_proposals.band_id) AND check_school_access(b.school_id))))
+
+Table: band_song_slots (1 policies)
+  * [ALL] band_song_slots_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM (band_songs bs      JOIN bands b ON ((b.id = bs.band_id)))   WHERE ((bs.id = band_song_slots.band_song_id) AND check_school_access(b.school_id))))
+
+Table: band_songs (1 policies)
+  * [ALL] band_songs_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM bands b   WHERE ((b.id = band_songs.band_id) AND check_school_access(b.school_id))))
+
+Table: bands (4 policies)
+  * [UPDATE] Band members can update their band (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM band_members   WHERE ((band_members.band_id = bands.id) AND (band_members.user_id = auth.uid()))))
+  * [SELECT] Bands are visible to school members (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.school_id = bands.school_id))))
+  * [ALL] bands_modify (roles: ["public"])
+    QUAL: check_school_access(school_id)
+  * [SELECT] bands_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: buildings (2 policies)
+  * [ALL] buildings_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] buildings_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: campus_announcements (2 policies)
+  * [ALL] campus_announcements_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] campus_announcements_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: campus_direct_messages (1 policies)
+  * [ALL] campus_direct_messages_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE (((u.id = campus_direct_messages.sender_id) OR (u.id = campus_direct_messages.recipient_id)) AND check_school_access(u.school_id)))))
+
+Table: campus_event_program_points (4 policies)
+  * [DELETE] campus_event_program_points_delete (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND ((get_current_user_role() = ANY (ARRAY['admin'::user_role, 'secretary'::user_role])) OR ((get_current_user_role() = 'teacher'::user_role) AND (teacher_id = get_current_user_id()) AND (status = 'submitted'::text)))))
+  * [INSERT] campus_event_program_points_insert (roles: ["public"])
+    WITH CHECK: (is_master_admin() OR (check_school_access(school_id) AND ((get_current_user_role() = ANY (ARRAY['admin'::user_role, 'secretary'::user_role])) OR ((get_current_user_role() = 'teacher'::user_role) AND ((teacher_id IS NULL) OR (teacher_id = get_current_user_id())) AND (EXISTS ( SELECT 1    FROM campus_events ce   WHERE ((ce.id = campus_event_program_points.event_id) AND ((ce.visibility = ANY (ARRAY['teachers'::text, 'all'::text, 'students'::text])) OR (ce.created_by = get_current_user_id())))))))))
+  * [SELECT] campus_event_program_points_select (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND ((get_current_user_role() = ANY (ARRAY['admin'::user_role, 'secretary'::user_role])) OR ((get_current_user_role() = 'teacher'::user_role) AND (EXISTS ( SELECT 1    FROM campus_events ce   WHERE ((ce.id = campus_event_program_points.event_id) AND ((ce.visibility IS DISTINCT FROM 'private'::text) OR (ce.created_by = get_current_user_id()) OR (campus_event_program_points.teacher_id = get_current_user_id())))))) OR ((get_current_user_role() = 'student'::user_role) AND ((additional_feedback_responses -> 'assigned_students'::text) ? (get_current_user_id())::text)))))
+  * [UPDATE] campus_event_program_points_update (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND ((get_current_user_role() = ANY (ARRAY['admin'::user_role, 'secretary'::user_role])) OR ((get_current_user_role() = 'teacher'::user_role) AND (teacher_id = get_current_user_id())))))
+
+Table: campus_events (2 policies)
+  * [ALL] campus_events_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND (is_teacher_or_admin() OR (created_by = get_current_user_id()))))
+  * [SELECT] campus_events_select (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND ((created_by = get_current_user_id()) OR ((assigned_student_ids IS NOT NULL) AND (get_current_user_id() = ANY (assigned_student_ids))) OR ((visibility = 'all'::text) OR ((visibility = 'teachers'::text) AND (get_current_user_role() = ANY (ARRAY['teacher'::user_role, 'admin'::user_role, 'secretary'::user_role]))) OR ((visibility = 'students'::text) AND (get_current_user_role() = ANY (ARRAY['student'::user_role, 'teacher'::user_role, 'admin'::user_role, 'secretary'::user_role])))))))
+
+Table: campus_feedback_requests (2 policies)
+  * [ALL] campus_feedback_requests_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] campus_feedback_requests_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: campus_feedback_responses (1 policies)
+  * [ALL] campus_feedback_responses_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM campus_feedback_requests r   WHERE ((r.id = campus_feedback_responses.request_id) AND check_school_access(r.school_id)))))
+
+Table: cooperations (2 policies)
+  * [ALL] cooperations_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] cooperations_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: dpa_agreements (3 policies)
+  * [INSERT] dpa_agreements_insert (roles: ["public"])
+    WITH CHECK: (check_school_access(school_id) OR (NOT (EXISTS ( SELECT 1    FROM dpa_agreements dpa_agreements_1   WHERE (dpa_agreements_1.school_id = dpa_agreements_1.school_id)))))
+  * [ALL] dpa_agreements_modify (roles: ["public"])
+    QUAL: is_master_admin()
+  * [SELECT] dpa_agreements_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: ensemble_members (1 policies)
+  * [ALL] ensemble_members_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM ensembles e   WHERE ((e.id = ensemble_members.ensemble_id) AND check_school_access(e.school_id)))))
+
+Table: ensemble_messages (1 policies)
+  * [ALL] ensemble_messages_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM ensembles e   WHERE ((e.id = ensemble_messages.ensemble_id) AND check_school_access(e.school_id)))))
+
+Table: ensemble_songs (1 policies)
+  * [ALL] ensemble_songs_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM ensembles e   WHERE ((e.id = ensemble_songs.ensemble_id) AND check_school_access(e.school_id)))))
+
+Table: ensembles (2 policies)
+  * [ALL] ensembles_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] ensembles_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: exercises (2 policies)
+  * [ALL] exercises_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] exercises_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: fokus_logs (1 policies)
+  * [ALL] fokus_logs_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = fokus_logs.user_id) AND check_school_access(u.school_id)))))
+
+Table: groovelab_tickets (1 policies)
+  * [ALL] groovelab_tickets_all (roles: ["public"])
+    QUAL: (is_master_admin() OR check_school_access(school_id))
+
+Table: help_requests (1 policies)
+  * [ALL] help_requests_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = help_requests.user_id) AND check_school_access(u.school_id))))
+
+Table: instruments (2 policies)
+  * [ALL] instruments_modify (roles: ["public"])
+    QUAL: is_master_admin()
+  * [SELECT] instruments_select (roles: ["public"])
+    QUAL: true
+
+Table: invite_tokens (2 policies)
+  * [ALL] invite_tokens_master (roles: ["public"])
+    QUAL: is_master_admin()
+  * [ALL] invite_tokens_school_admin (roles: ["public"])
+    QUAL: ((get_user_school_id() = school_id) AND is_teacher_or_admin())
+
+Table: invoices (1 policies)
+  * [ALL] Master admins have full control on invoices (roles: ["public"])
+    QUAL: is_master_admin()
+
+Table: kiosks (2 policies)
+  * [ALL] kiosks_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND is_teacher_or_admin()))
+  * [SELECT] kiosks_select (roles: ["public"])
+    QUAL: ((secret_token = get_kiosk_token()) OR check_school_access(school_id))
+
+Table: lab_planning (1 policies)
+  * [ALL] lab_planning_all (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: lehrwerke (2 policies)
+  * [ALL] lehrwerke_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] lehrwerke_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: lessons (4 policies)
+  * [DELETE] lessons_delete (roles: ["public"])
+    QUAL: is_master_admin()
+  * [INSERT] lessons_insert (roles: ["public"])
+    WITH CHECK: is_master_admin()
+  * [SELECT] lessons_select (roles: ["public"])
+    QUAL: (is_master_admin() OR ((get_current_user_role() = 'teacher'::user_role) AND (teacher_id = get_current_user_id())) OR ((get_current_user_role() = 'student'::user_role) AND (student_id = get_current_user_id())))
+  * [UPDATE] lessons_update (roles: ["public"])
+    QUAL: is_master_admin()
+
+Table: master_billing_settings (2 policies)
+  * [ALL] Allow master admin update on master_billing_settings (roles: ["public"])
+    QUAL: is_master_admin()
+    WITH CHECK: is_master_admin()
+  * [SELECT] Allow public select on master_billing_settings (roles: ["public"])
+    QUAL: true
+
+Table: parent_consent_logs (2 policies)
+  * [INSERT] Users can create consent logs from their own school (roles: ["public"])
+    WITH CHECK: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = parent_consent_logs.student_id) AND (u.school_id = ((auth.jwt() ->> 'school_id'::text))::uuid))))
+  * [SELECT] Users can see consent logs from their own school (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = parent_consent_logs.student_id) AND (u.school_id = ((auth.jwt() ->> 'school_id'::text))::uuid))))
+
+Table: premium_status (1 policies)
+  * [ALL] premium_status_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = premium_status.student_id) AND check_school_access(u.school_id)))))
+
+Table: progress_matrix (1 policies)
+  * [ALL] progress_matrix_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = progress_matrix.student_id) AND check_school_access(u.school_id)))) OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = progress_matrix.student_id) AND (((u.qr_token)::text = get_qr_token()) OR ((u.teacher_qr_token)::text = get_qr_token()))))))
+
+Table: rejection_history (1 policies)
+  * [ALL] rejection_history_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = rejection_history.user_id) AND check_school_access(u.school_id))))
+
+Table: reschedule_requests (2 policies)
+  * [ALL] Allow full access for authenticated users (roles: ["public"])
+    QUAL: (auth.role() = 'authenticated'::text)
+  * [SELECT] Allow read access for authenticated users (roles: ["public"])
+    QUAL: (auth.role() = 'authenticated'::text)
+
+Table: room_blocked_slots (2 policies)
+  * [ALL] room_blocked_slots_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] room_blocked_slots_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: room_bookings (4 policies)
+  * [DELETE] room_bookings_delete (roles: ["public"])
+    QUAL: (booked_by = get_current_user_id())
+  * [ALL] room_bookings_fallback_all (roles: ["public"])
+    QUAL: true
+    WITH CHECK: true
+  * [INSERT] room_bookings_insert (roles: ["public"])
+    WITH CHECK: ((school_id IN ( SELECT users_raw.school_id    FROM users_raw   WHERE (users_raw.id = get_current_user_id()))) AND (booked_by = get_current_user_id()))
+  * [SELECT] room_bookings_select (roles: ["public"])
+    QUAL: (school_id IN ( SELECT users_raw.school_id    FROM users_raw   WHERE (users_raw.id = get_current_user_id())))
+
+Table: room_instrument_compatibility (1 policies)
+  * [ALL] room_instrument_compatibility_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM rooms r   WHERE ((r.id = room_instrument_compatibility.room_id) AND check_school_access(r.school_id)))))
+
+Table: rooms (2 policies)
+  * [ALL] rooms_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] rooms_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: schedule_exceptions (1 policies)
+  * [ALL] schedule_exceptions_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM schedules s   WHERE ((s.id = schedule_exceptions.schedule_id) AND check_school_access(s.school_id)))))
+
+Table: schedule_occurrences (3 policies)
+  * [ALL] schedule_occurrences_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR ((EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = schedule_occurrences.teacher_id) AND check_school_access(u.school_id)))) AND is_teacher_or_admin()) OR (student_id = (NULLIF(((current_setting('request.headers'::text, true))::json ->> 'x-user-id'::text), ''::text))::uuid))
+  * [SELECT] schedule_occurrences_select (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = u.teacher_id) AND check_school_access(u.school_id)))) OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = schedule_occurrences.student_id) AND (((u.qr_token)::text = get_qr_token()) OR ((u.teacher_qr_token)::text = get_qr_token()))))))
+  * [ALL] schedule_occurrences_student_modify (roles: ["public"])
+    QUAL: (auth.uid() = student_id)
+    WITH CHECK: (auth.uid() = student_id)
+
+Table: schedules (2 policies)
+  * [ALL] schedules_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND is_teacher_or_admin()))
+  * [SELECT] schedules_select (roles: ["public"])
+    QUAL: (is_master_admin() OR check_school_access(school_id) OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = schedules.student_id) AND (((u.qr_token)::text = get_qr_token()) OR ((u.teacher_qr_token)::text = get_qr_token()))))))
+
+Table: school_contract_signatures (2 policies)
+  * [INSERT] Admins can create signatures for their own school (roles: ["public"])
+    WITH CHECK: (school_id = ((auth.jwt() ->> 'school_id'::text))::uuid)
+  * [SELECT] Users can see signatures from their own school (roles: ["public"])
+    QUAL: (school_id = ((auth.jwt() ->> 'school_id'::text))::uuid)
+
+Table: school_equipment (1 policies)
+  * [ALL] Enable all for school_equipment (roles: ["public"])
+    QUAL: true
+    WITH CHECK: true
+
+Table: schools (5 policies)
+  * [ALL] Master admins can manage schools (roles: ["authenticated"])
+    QUAL: is_master_admin()
+    WITH CHECK: is_master_admin()
+  * [SELECT] Schools are visible to everyone (roles: ["public"])
+    QUAL: true
+  * [INSERT] schools_insert (roles: ["public"])
+    WITH CHECK: true
+  * [ALL] schools_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(id) AND is_teacher_or_admin()))
+    WITH CHECK: (is_master_admin() OR (check_school_access(id) AND is_teacher_or_admin()))
+  * [SELECT] schools_select (roles: ["public"])
+    QUAL: true
+
+Table: server_metrics (2 policies)
+  * [SELECT] Master admins can view server metrics (roles: ["authenticated"])
+    QUAL: is_master_admin()
+  * [INSERT] Service role can insert server metrics (roles: ["service_role"])
+    WITH CHECK: true
+
+Table: sessions (2 policies)
+  * [SELECT] Master admins can see all sessions (roles: ["authenticated"])
+    QUAL: is_master_admin()
+  * [ALL] sessions_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = sessions.user_id) AND check_school_access(u.school_id))))
+
+Table: sheet_music_annotations (1 policies)
+  * [ALL] sheet_music_annotations_policy (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM student_tasks   WHERE ((student_tasks.id = sheet_music_annotations.task_id) AND ((student_tasks.student_id = auth.uid()) OR (student_tasks.teacher_id = auth.uid())))))
+
+Table: songs (5 policies)
+  * [ALL] Admins can manage songs (roles: ["authenticated"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'admin'::user_role))))
+    WITH CHECK: (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'admin'::user_role))))
+  * [ALL] Teachers can manage own songs (roles: ["authenticated"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'teacher'::user_role) AND (songs.teacher_id = auth.uid()))))
+    WITH CHECK: ((EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'teacher'::user_role)))) AND (teacher_id = auth.uid()))
+  * [SELECT] Teachers see only own songs (roles: ["authenticated"])
+    QUAL: ((EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'admin'::user_role) AND (users_raw.school_id = songs.school_id)))) OR ((EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'teacher'::user_role)))) AND (teacher_id = auth.uid())) OR (EXISTS ( SELECT 1    FROM users_raw   WHERE ((users_raw.id = auth.uid()) AND (users_raw.role = 'student'::user_role) AND (users_raw.school_id = songs.school_id)))))
+  * [ALL] songs_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] songs_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: stations (2 policies)
+  * [ALL] stations_modify (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM rooms r   WHERE ((r.id = stations.room_id) AND check_school_access(r.school_id) AND is_teacher_or_admin())))
+  * [SELECT] stations_select (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM rooms r   WHERE ((r.id = stations.room_id) AND check_school_access(r.school_id))))
+
+Table: student_cascades (2 policies)
+  * [ALL] student_cascades_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] student_cascades_select (roles: ["public"])
+    QUAL: true
+
+Table: student_progress_matrix (1 policies)
+  * [ALL] student_progress_matrix_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = student_progress_matrix.user_id) AND check_school_access(u.school_id)))))
+
+Table: student_stats (1 policies)
+  * [ALL] student_stats_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = student_stats.student_id) AND check_school_access(u.school_id)))))
+
+Table: student_tasks (4 policies)
+  * [DELETE] student_tasks_delete (roles: ["public"])
+    QUAL: (auth.uid() = teacher_id)
+  * [INSERT] student_tasks_insert (roles: ["public"])
+    WITH CHECK: (auth.uid() = teacher_id)
+  * [SELECT] student_tasks_select (roles: ["public"])
+    QUAL: ((auth.uid() = student_id) OR (auth.uid() = teacher_id))
+  * [UPDATE] student_tasks_update (roles: ["public"])
+    QUAL: ((auth.uid() = student_id) OR (auth.uid() = teacher_id))
+
+Table: subjects (2 policies)
+  * [ALL] subjects_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] subjects_select (roles: ["public"])
+    QUAL: check_school_access(school_id)
+
+Table: system_alerts (2 policies)
+  * [ALL] system_alerts_modify (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND is_teacher_or_admin()))
+  * [SELECT] system_alerts_select (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND is_teacher_or_admin()) OR (teacher_id = (NULLIF(((current_setting('request.headers'::text, true))::json ->> 'x-user-id'::text), ''::text))::uuid))
+
+Table: teacher_invitations (2 policies)
+  * [ALL] teacher_invitations_modify (roles: ["public"])
+    QUAL: (check_school_access(school_id) AND is_teacher_or_admin())
+  * [SELECT] teacher_invitations_select (roles: ["public"])
+    QUAL: true
+
+Table: user_availability (1 policies)
+  * [ALL] user_availability_all (roles: ["public"])
+    QUAL: (is_master_admin() OR (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = user_availability.user_id) AND check_school_access(u.school_id)))))
+
+Table: user_credentials (3 policies)
+  * [INSERT] Allow insert for authenticated users (roles: ["public"])
+    WITH CHECK: (get_auth_user_id_or_header() = user_id)
+  * [DELETE] Users can delete their own credentials (roles: ["public"])
+    QUAL: (get_auth_user_id_or_header() = user_id)
+  * [SELECT] Users can view their own credentials (roles: ["public"])
+    QUAL: (get_auth_user_id_or_header() = user_id)
+
+Table: user_progress (1 policies)
+  * [ALL] user_progress_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = user_progress.user_id) AND check_school_access(u.school_id))))
+
+Table: user_song_skills (1 policies)
+  * [ALL] user_song_skills_all (roles: ["public"])
+    QUAL: (EXISTS ( SELECT 1    FROM users_raw u   WHERE ((u.id = user_song_skills.user_id) AND check_school_access(u.school_id))))
+
+Table: users_raw (5 policies)
+  * [SELECT] Master admins can see all profiles (roles: ["authenticated"])
+    QUAL: is_master_admin()
+  * [DELETE] users_delete (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND is_teacher_or_admin()))
+  * [INSERT] users_insert (roles: ["public"])
+    WITH CHECK: (is_master_admin() OR ((get_user_school_id() = school_id) AND is_teacher_or_admin()) OR school_has_no_users(school_id) OR validate_invite_token(((current_setting('request.headers'::text, true))::json ->> 'x-invite-token'::text), school_id))
+  * [SELECT] users_select (roles: ["public"])
+    QUAL: ((is_master_admin = true) OR is_master_admin() OR ((get_kiosk_token() IS NOT NULL) AND (EXISTS ( SELECT 1    FROM kiosks k   WHERE ((k.secret_token = get_kiosk_token()) AND (k.school_id = users_raw.school_id))))) OR ((get_kiosk_token() IS NULL) AND (get_qr_token() IS NOT NULL) AND (((qr_token)::text = get_qr_token()) OR ((teacher_qr_token)::text = get_qr_token()) OR (upper((ausweis_nummer)::text) = upper(get_qr_token())))) OR check_school_access(school_id) OR school_has_no_users(school_id))
+  * [UPDATE] users_update (roles: ["public"])
+    QUAL: (is_master_admin() OR (check_school_access(school_id) AND (is_teacher_or_admin() OR (id = (((current_setting('request.headers'::text, true))::json ->> 'x-user-id'::text))::uuid))) OR ((get_qr_token() IS NOT NULL) AND (((qr_token)::text = get_qr_token()) OR ((teacher_qr_token)::text = get_qr_token()) OR (upper((ausweis_nummer)::text) = upper(get_qr_token())))))

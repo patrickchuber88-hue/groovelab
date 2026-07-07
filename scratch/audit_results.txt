@@ -1,0 +1,1698 @@
+
+==========================================
+AUDIT REPORT FOR: App.tsx
+==========================================
+
+--- Brand Naming Violations ---
+  Line 1325: Found 'groovelab' -> Line: localStorage.setItem('groovelab_kiosk_token', kioskTokenParam);
+  Line 1326: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_station_id');
+  Line 1327: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_kiosk_room_id');
+  Line 1328: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_user_id');
+  Line 1329: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_user_id');
+  Line 1330: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_location_mode');
+  Line 1340: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', kioskStationId);
+  Line 1341: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_user_id');
+  Line 1342: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_user_id');
+  Line 1343: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_location_mode');
+  Line 1354: Found 'groovelab' -> Line: localStorage.setItem('groovelab_kiosk_room_id', kioskRoomIdFromUrl);
+  Line 1687: Found 'groovelab' -> Line: return sessionStorage.getItem('groovelab_user_id');
+  Line 1716: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_install_prompt_dismissed');
+  Line 1836: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', data.station_id);
+  Line 1840: Found 'groovelab' -> Line: localStorage.setItem('groovelab_kiosk_room_id', data.room_id);
+  Line 1844: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_kiosk_token');
+  Line 1845: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_station_id');
+  Line 1846: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_kiosk_room_id');
+  Line 1867: Found 'GrooveLab' -> Line: 'GrooveLab Guitar Vol. 1',
+  Line 1868: Found 'GrooveLab' -> Line: 'GrooveLab Drums Vol. 1',
+  Line 1869: Found 'GrooveLab' -> Line: 'GrooveLab Guitar Vol. 2',
+  Line 1870: Found 'GrooveLab' -> Line: 'GrooveLab Drums Vol. 2',
+  Line 1871: Found 'GrooveLab' -> Line: 'GrooveLab Bass Vol. 1',
+  Line 1872: Found 'GrooveLab' -> Line: 'GrooveLab Keyboard Vol. 1',
+  Line 1873: Found 'GrooveLab' -> Line: 'GrooveLab Keys Vol. 1',
+  Line 1874: Found 'GrooveLab' -> Line: 'GrooveLab Vocals Vol. 1'
+  Line 1928: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', chosen.id);
+  Line 1932: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', 'skip');
+  Line 1937: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', 'skip');
+  Line 2038: Found 'groovelab' -> Line: return (saved as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
+  Line 2049: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', val);
+  Line 2073: Found 'groovelab' -> Line: return localStorage.getItem('groovelab_active_tab') || 'live';
+  Line 2085: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', val);
+  Line 2099: Found 'groovelab' -> Line: return (localStorage.getItem('groovelab_active_band_subtab') as 'meine' | 'alle') || 'meine';
+  Line 2286: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_selected_teacher_id', selectedTeacher.id);
+  Line 2288: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_selected_teacher_id');
+  Line 2294: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_selected_student_id', selectedStudentProfile.id);
+  Line 2296: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_selected_student_id');
+  Line 2342: Found 'groovelab' -> Line: if (id) sessionStorage.setItem('groovelab_last_form_id', id);
+  Line 2343: Found 'groovelab' -> Line: else sessionStorage.removeItem('groovelab_last_form_id');
+  Line 2387: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.song_id}_${inst}`, 'true');
+  Line 2391: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}_${inst}`, 'true');
+  Line 2394: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in dismissSuggestion');
+  Line 2427: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill (suggest to band) in auto-trigger', skill.title);
+  Line 2451: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill(null) inside safety check effect!');
+  Line 2515: Found 'groovelab' -> Line: localStorage.setItem('groovelab_show_band_profile', showBandProfile.toString());
+  Line 2516: Found 'groovelab' -> Line: localStorage.setItem('groovelab_band_profile_view', bandProfileView);
+  Line 2518: Found 'groovelab' -> Line: localStorage.setItem('groovelab_selected_band_id', selectedBandForProfile.id);
+  Line 2520: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_selected_band_id');
+  Line 2559: Found 'groovelab' -> Line: { id: 'band_kids_groovelab', url: '/avatars/band_kids_groovelab.png', size: 4 },
+  Line 2559: Found 'groovelab' -> Line: { id: 'band_kids_groovelab', url: '/avatars/band_kids_groovelab.png', size: 4 },
+  Line 2752: Found 'GrooveLab' -> Line: document.title = `${data.name} | GrooveLab Profile`;
+  Line 2798: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', activeStudentTab);
+  Line 2804: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', activePlatform);
+  Line 2853: Found 'Groovelab' -> Line: console.log('--- Groovelab Diagnostics ---');
+  Line 3112: Found 'groovelab' -> Line: allowedPlatform = 'groovelab';
+  Line 3120: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', allowedPlatform);
+  Line 3131: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', defaultTab);
+  Line 3178: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', 'lab');
+  Line 3181: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', 'home');
+  Line 3186: Found 'groovelab' -> Line: .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
+  Line 3238: Found 'groovelab' -> Line: `).eq('school_id', schoolId).eq('is_groovelab_active', true).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
+  Line 3250: Found 'groovelab' -> Line: supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+  Line 3251: Found 'groovelab' -> Line: supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
+  Line 3269: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', 'lab');
+  Line 3272: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', 'home');
+  Line 4493: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_deleted_messages_${user.id}`, JSON.stringify(newDeleted));
+  Line 4770: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_announcement_${user.id}_${pendingFounding.id}`, 'true');
+  Line 4810: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in handleFoundBand (existing group)');
+  Line 4982: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_founding_done_${user.id}_${target.song_id || target.id}`, 'true');
+  Line 4983: Found 'groovelab' -> Line: if (groupID) localStorage.setItem(`groovelab_form_done_${user.id}_${groupID}`, 'true');
+  Line 4988: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill(null) at the end of handleFoundBand');
+  Line 5093: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_announcement_${user.id}_${pendingFounding.id}`, 'true');
+  Line 5497: Found 'groovelab' -> Line: roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+  Line 5514: Found 'groovelab' -> Line: localStorage.setItem('groovelab_kiosk_room_id', roomId);
+  Line 5520: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_user_id');
+  Line 5521: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_location_mode');
+  Line 5522: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_user_id');
+  Line 5523: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_location_mode');
+  Line 5524: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_active_tab');
+  Line 5532: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_station_id');
+  Line 5533: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_kiosk_room_id');
+  Line 5534: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_active_platform');
+  Line 5538: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_user_id');
+  Line 5539: Found 'groovelab' -> Line: sessionStorage.removeItem('groovelab_location_mode');
+  Line 5540: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_user_id');
+  Line 5541: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_location_mode');
+  Line 5542: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_active_tab');
+  Line 5576: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'secretary');
+  Line 5577: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'campus');
+  Line 5602: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_user_id', userId);
+  Line 5603: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', mode);
+  Line 5609: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', 'live');
+  Line 5611: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'groovelab');
+  Line 5611: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'groovelab');
+  Line 5614: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', 'briefing');
+  Line 5667: Found 'groovelab' -> Line: if (isStudent && activePlatform === 'groovelab') {
+  Line 5670: Found 'groovelab' -> Line: console.log('[Tab Sync] Auto-correcting invalid groovelab student tab to live:', activeStudentTab);
+  Line 5672: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_tab', 'live');
+  Line 5684: Found 'groovelab' -> Line: console.log('[Lab Lock] Resetting platform to groovelab on page load for student security');
+  Line 5685: Found 'groovelab' -> Line: setActivePlatformRaw('groovelab');
+  Line 5686: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'groovelab');
+  Line 5686: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'groovelab');
+  Line 5863: Found 'groovelab' -> Line: .select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)')
+  Line 5892: Found 'GROOVELAB' -> Line: <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>GROOVELAB</div>
+  Line 6058: Found 'campus-groovelab' -> Line: if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
+  Line 6148: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'campus');
+  Line 6153: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'secretary');
+  Line 6154: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_platform', 'campus');
+  Line 6556: Found 'groovelab' -> Line: localStorage.setItem('groovelab_install_prompt_dismissed', String(Date.now()));
+  Line 6630: Found 'GrooveLab' -> Line: {activePlatform === 'campus' ? 'Campus App' : 'GrooveLab'} installieren
+  Line 6633: Found 'groovelab' -> Line: {typeof window !== 'undefined' ? window.location.hostname : 'groovelab.app'}
+  Line 7098: Found 'GrooveLab' -> Line: }}>GrooveLab</div>
+  Line 7404: Found 'GrooveLab' -> Line: : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
+  Line 7404: Found 'GrooveLab' -> Line: : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
+  Line 7404: Found 'GrooveLab' -> Line: : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
+  Line 7404: Found 'GrooveLab' -> Line: : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
+  Line 7525: Found 'groovelab' -> Line: setActivePlatform('groovelab');
+  Line 7533: Found 'groovelab' -> Line: background: activePlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.05)',
+  Line 7534: Found 'groovelab' -> Line: color: activePlatform === 'groovelab' ? '#09090b' : '#eab308',
+  Line 7535: Found 'groovelab' -> Line: border: activePlatform === 'groovelab' ? '1px solid #facc15' : '1px solid rgba(250, 204, 21, 0.18)',
+  Line 7542: Found 'groovelab' -> Line: zIndex: activePlatform === 'groovelab' ? 2 : 1,
+  Line 7543: Found 'groovelab' -> Line: transform: activePlatform === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
+  Line 7544: Found 'groovelab' -> Line: boxShadow: activePlatform === 'groovelab' ? '0 -4px 16px rgba(250, 204, 21, 0.18)' : 'none',
+  Line 7551: Found 'groovelab' -> Line: <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
+  Line 7552: Found 'GrooveLab' -> Line: <span>GrooveLab</span>
+  Line 7844: Found 'GrooveLab' -> Line: {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
+  Line 7844: Found 'GrooveLab' -> Line: {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
+  Line 7844: Found 'GrooveLab' -> Line: {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
+  Line 7844: Found 'GrooveLab' -> Line: {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
+  Line 7888: Found 'groovelab' -> Line: : activePlatform === 'groovelab'
+  Line 7940: Found 'groovelab' -> Line: activePlatform="groovelab"
+  Line 7946: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', mode);
+  Line 7952: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
+  Line 7974: Found 'groovelab' -> Line: display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
+  Line 8060: Found 'Groovelab' -> Line: 🏢 {user.schools?.name || 'Groovelab Campus'}
+  Line 8341: Found 'Groovelab' -> Line: <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Groovelab Academy'}</span>
+  Line 9329: Found 'groovelab' -> Line: sessionStorage.setItem('groovelab_location_mode', mode);
+  Line 9923: Found 'Groovelab' -> Line: <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#86868b', marginTop: '2px' }}>Sende eine Benachrichtigung an deine Groovelab Community</div>
+  Line 10865: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
+  Line 11570: Found 'GrooveLab' -> Line: <p style={{ color: '#64748b', margin: 0, fontWeight: 600 }}>Die Köpfe hinter der GrooveLab Academy.</p>
+  Line 11681: Found 'groovelab' -> Line: {user && activePlatform === 'groovelab' && user.role === 'student' && locationMode === 'lab' && session?.station_id && (
+  Line 12063: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_founding_ignored_${user.id}_${sId}_${inst}`, 'true');
+  Line 12075: Found 'Groovelab' -> Line: console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in handleSuggestToBand');
+  Line 12252: Found 'GrooveLab' -> Line: <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+  Line 12267: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
+  Line 12272: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+  Line 12277: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>GrooveLab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+  Line 12374: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales, jedoch rein komplementäres Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs, der organisatorischen Infrastruktur sowie zur pädagogischen Lernbegleitung mittels Gamification-Elementen.</p>
+  Line 12679: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
+  Line 12685: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice', 'groovelab')} className="hover-scale" title="Üben">
+  Line 12688: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library', 'groovelab')} className="hover-scale" title="Bibliothek">
+  Line 12693: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire', 'groovelab')} className="hover-scale" title="Repertoire">
+  Line 12697: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching', 'groovelab')} className="hover-scale" title="Band-Matching">
+  Line 12701: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
+  Line 12704: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('messages')} style={{ ...getMobileButtonStyle('messages', 'groovelab'), position: 'relative' }} className="hover-scale" title="Nachrichten">
+  Line 12725: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
+  Line 12765: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
+  Line 12769: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages', 'groovelab')} className="hover-scale" title="Nachrichten">
+  Line 12772: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'groovelab')} className="hover-scale" title="Schüler">
+  Line 12775: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team', 'groovelab')} className="hover-scale" title="Team">
+  Line 12778: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'groovelab')} className="hover-scale" title="Räume">
+  Line 12781: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'groovelab')} className="hover-scale" title="Songs">
+  Line 12784: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
+  Line 12787: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'groovelab')} className="hover-scale" title="Statistik">
+  Line 12790: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery', 'groovelab')} className="hover-scale" title="ID Galerie">
+  Line 12793: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Einstellungen">
+  Line 12796: Found 'groovelab' -> Line: <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
+  Line 13264: Found 'groovelab' -> Line: setEditingProfile({...editingProfile, groovelab_instrument: next.join(', ')});
+
+--- Color Violations ---
+  None found
+
+--- Emoji/Colored Icon Violations ---
+  Line 76: Found emoji(s) '🎼' -> Line: "Musik": "🎼"
+  Line 508: Found emoji(s) '🎸' -> Line: <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🎸</div>
+  Line 860: Found emoji(s) '🎸' -> Line: {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
+  Line 1243: Found emoji(s) '🎸' -> Line: {APP_INSTRUMENT_ICONS[displayInst] || '🎸'} {member.user_id ? (u?.first_name || 'Mitglied') : member.external_name}
+  Line 1260: Found emoji(s) '🎸' -> Line: {APP_INSTRUMENT_ICONS[inst] || '🎸'} Gesucht
+  Line 1409: Found emoji(s) '✅🎉🤘🚀' -> Line: const isSuccess = msgLower.includes('erfolg') || msgLower.includes('erfolgreich') || msgLower.includes('glückwunsch') || msgLower.includes('kopiert') || msgLower.includes('bereit') || msgLower.includes('gespeichert') || msgLower.includes('zurückgesetzt') || msgLower.includes('gelöscht') || msgLower.includes('gesendet') || msgLower.includes('eingereicht') || msgLower.includes('akzeptiert') || msgLower.includes('✅') || msgLower.includes('🎉') || msgLower.includes('🤘') || msgLower.includes('🚀');
+  Line 5060: Found emoji(s) '🤘' -> Line: alert('Du bist jetzt offizielles Mitglied! 🤘');
+  Line 5196: Found emoji(s) '🚀🎸' -> Line: alert(`Glückwunsch! Die Band "${finalName}" wurde erfolgreich gegründet! 🚀🎸`);
+  Line 5393: Found emoji(s) '🎸🚀' -> Line: content: `Ich habe die Challenge für "${skill.songs?.title || skill.title}" gemeistert und den Song für unsere Band vorgeschlagen! Wer ist dabei? 🎸🚀`
+  Line 5402: Found emoji(s) '🔥' -> Line: content: `🔥 Juhu! Wir haben "${song?.title || skill.songs?.title || skill.title}" vollständig besetzt und gemeistert! Der Song ist ab sofort in unserem Repertoire!`
+  Line 6715: Found emoji(s) '✕' -> Line: ✕
+  Line 6771: Found emoji(s) '🎓' -> Line: 🎓
+  Line 6994: Found emoji(s) '💡' -> Line: 💡 App nicht auffindbar?
+  Line 7516: Found emoji(s) '🔒' -> Line: {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' ? '🔒 ' : ''}Campus
+  Line 8060: Found emoji(s) '🏢' -> Line: 🏢 {user.schools?.name || 'Groovelab Campus'}
+  Line 8095: Found emoji(s) '🎵' -> Line: <span>🎵</span>
+  Line 8254: Found emoji(s) '🗓' -> Line: 🗓️
+  Line 8403: Found emoji(s) '🎵' -> Line: APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '🎵'}
+  Line 8429: Found emoji(s) '🎤🎵' -> Line: <span style={{ fontSize: '1.25rem' }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || (inst === 'Vocals' ? '🎤' : '🎵')}</span>
+  Line 8497: Found emoji(s) '✅' -> Line: alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
+  Line 8632: Found emoji(s) '✕' -> Line: content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
+  Line 8725: Found emoji(s) '👨🏫' -> Line: <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
+  Line 8848: Found emoji(s) '🎸' -> Line: <span style={{ fontSize: '1.1rem' }}>{APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}</span>
+  Line 8944: Found emoji(s) '✅' -> Line: alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
+  Line 9101: Found emoji(s) '✕' -> Line: content = <span style={{ opacity: 0.3, fontSize: '0.6rem' }}>✕</span>;
+  Line 9179: Found emoji(s) '👨🏫' -> Line: <span style={{ fontSize: '1.1rem' }}>👨‍🏫</span>
+  Line 9887: Found emoji(s) '👁' -> Line: 👁️ {readCount}{totalTarget > 0 ? `/${totalTarget}` : ''}
+  Line 10128: Found emoji(s) '👁' -> Line: 👁️ Gelesen von {readCount} von {totalTarget}
+  Line 10363: Found emoji(s) '🎸' -> Line: <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🎸</div>
+  Line 10416: Found emoji(s) '🏆' -> Line: <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>🏆</div>
+  Line 10488: Found emoji(s) '🚀' -> Line: { id: 'starter', label: '🚀 Starter' },
+  Line 10489: Found emoji(s) '⚡' -> Line: { id: 'pro', label: '⚡ Pro' }
+  Line 10571: Found emoji(s) '🚀⚡' -> Line: {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
+  Line 10642: Found emoji(s) '🚀' -> Line: Du spielst bereits {myInstrument} in der Band "{activeBandForSong.name}" für diesen Song! 🚀
+  Line 10693: Found emoji(s) '📢' -> Line: ? `📢 BAND-PROJEKT (ABSTIMMUNG LÄUFT)`
+  Line 10695: Found emoji(s) '🎸' -> Line: ? `🎸 GASTMUSIKER-SUCHE ${isMySlot ? '(DEINE BAND)' : ''}`
+  Line 10696: Found emoji(s) '✨📢' -> Line: : (isMySlot ? '✨ Deine Formation' : (form.isInitial ? '📢 Offenes Recruiting' : `Band-Slot #${fIndex + 1}`)))
+  Line 10816: Found emoji(s) '❓' -> Line: <div style={{ fontSize: '1.5rem', opacity: 0.2 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
+  Line 10847: Found emoji(s) '✨🎸✨' -> Line: <span>✨</span> Formation vollständig! 🎸 <span>✨</span>
+  Line 10854: Found emoji(s) '🎸' -> Line: const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
+  Line 11006: Found emoji(s) '🎸' -> Line: <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🎸</div>
+  Line 11140: Found emoji(s) '🔇' -> Line: <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔇</div>
+  Line 11614: Found emoji(s) '🎸' -> Line: <span key={idx} style={{ fontSize: '1.25rem' }}>{APP_INSTRUMENT_ICONS[inst] || '🎸'}</span>
+  Line 11652: Found emoji(s) '👥' -> Line: <div style={{ fontSize: '3rem', marginBottom: '20px' }}>👥</div>
+  Line 11708: Found emoji(s) '🎸' -> Line: <h2 className="animation-glow-text" style={{ fontSize: '2.3rem', fontWeight: 1000, color: '#1e293b', marginBottom: '8px', letterSpacing: '-0.04em' }}>BAND GRÜNDEN 🎸</h2>
+  Line 11819: Found emoji(s) '✓' -> Line: }}>✓</div>
+  Line 11869: Found emoji(s) '💡' -> Line: 💡 <em>Lehrer können den Bandcoach nachträglich jederzeit ändern.</em>
+  Line 11903: Found emoji(s) '🚀' -> Line: <Zap size={20} fill="white" /> EIGENE BAND GRÜNDEN 🚀
+  Line 11914: Found emoji(s) '🎸' -> Line: <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎸</div>
+  Line 11972: Found emoji(s) '🏆' -> Line: <h2 className="animation-glow-text" style={{ fontSize: '2.5rem', fontWeight: 1000, color: '#1e293b', marginBottom: '16px', letterSpacing: '-0.04em' }}>GLÜCKWUNSCH! 🏆</h2>
+  Line 12126: Found emoji(s) '🎉' -> Line: alert(`Erfolg! 🎉\n\nEin neuer, öffentlicher Matching-Slot für „${suggestingSkill.songs?.title || suggestingSkill.title || 'deinen Song'}“ wurde für dich geöffnet!\n\nDeine Teamkollegen können sich nun im Matching-Board eintragen.`);
+  Line 12373: Found emoji(s) '📋' -> Line: <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+  Line 13076: Found emoji(s) '🔒' -> Line: 🔒 Campus freischalten
+  Line 13142: Found emoji(s) '⚠' -> Line: ⚠️ {campusUnlockError}
+  Line 13622: Found emoji(s) '🌐' -> Line: {inst === 'Alle' && '🌐'}
+  Line 13623: Found emoji(s) '🎸' -> Line: {inst === 'E-Gitarre' && '🎸'}
+  Line 13624: Found emoji(s) '🎹' -> Line: {inst === 'E-Piano' && '🎹'}
+  Line 13625: Found emoji(s) '🥁' -> Line: {inst === 'E-Drum' && '🥁'}
+  Line 13626: Found emoji(s) '🎸' -> Line: {inst === 'E-Bass' && '🎸'}
+  Line 13627: Found emoji(s) '🎤' -> Line: {inst === 'Gesang' && '🎤'}
+  Line 13867: Found emoji(s) '⚠' -> Line: <span style={{ fontSize: '1.5rem', marginBottom: '8px' }}>⚠️</span>
+  Line 13926: Found emoji(s) '🎸' -> Line: if (insts['E-Gitarre'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_guitar_url || isWebspace) slides.push({ id: 'guitar', label: 'E-Gitarre', icon: '🎸', desc: 'Stimme für E-Gitarre (Starter & Pro)' }); }
+  Line 13927: Found emoji(s) '🎸' -> Line: if (insts['E-Bass'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_bass_url || isWebspace) slides.push({ id: 'bass', label: 'E-Bass', icon: '🎸', desc: 'Stimme für E-Bass (Starter & Pro)' }); }
+  Line 13928: Found emoji(s) '🥁' -> Line: if (insts['E-Drums'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_drums_url || isWebspace) slides.push({ id: 'drums', label: 'E-Drums', icon: '🥁', desc: 'Stimme für E-Drums / Schlagzeug' }); }
+  Line 13929: Found emoji(s) '🎹' -> Line: if (insts['E-Piano'] > 0) { if (!hasAnyDirectPdf || !!song.pdf_keys_url || isWebspace) slides.push({ id: 'keys', label: 'E-Piano', icon: '🎹', desc: 'Stimme für Keyboard & E-Piano' }); }
+  Line 13930: Found emoji(s) '🎤' -> Line: if (!hasAnyDirectPdf || !!song.pdf_vocals_url || isWebspace) slides.push({ id: 'vocals', label: 'Gesang / Lyrics', icon: '🎤', desc: 'Songtext, Gesangspart und Vocal-Harmonien' });
+  Line 13991: Found emoji(s) '♩' -> Line: /[♩\u2669\u266a\u266b\u2705q]\s*=\s*(\d+)/i,
+  Line 14261: Found emoji(s) '🔒' -> Line: Sicherer GrooveLab-Modus: Kopieren, Speichern und Drucken ist deaktiviert! 🔒
+  Line 14301: Found emoji(s) '⚠' -> Line: <span>⚠️ Auto-Scroll pausiert (Manuelles Scrollen)</span>
+  Line 14360: Found emoji(s) '🚀' -> Line: <button onClick={() => setSelectedLevel('starter')} style={{ background: selectedLevel === 'starter' ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'transparent', color: selectedLevel === 'starter' ? '#1e293b' : '#94a3b8', border: 'none', padding: '5px 12px', borderRadius: '7px', fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer', transition: 'all 0.2s ease' }}>Starter 🚀</button>
+  Line 14361: Found emoji(s) '🔥' -> Line: <button onClick={() => setSelectedLevel('pro')} style={{ background: selectedLevel === 'pro' ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : 'transparent', color: selectedLevel === 'pro' ? 'white' : '#94a3b8', border: 'none', padding: '5px 12px', borderRadius: '7px', fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer', transition: 'all 0.2s ease' }}>Pro 🔥</button>
+  Line 14371: Found emoji(s) '🔒' -> Line: <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px', color: 'white' }}>Sicherer Dropbox-Notenständer 🔒</h3>
+  Line 14449: Found emoji(s) '🎵' -> Line: Playback Track 🎵
+  Line 14471: Found emoji(s) '♩' -> Line: <span>♩ =</span>
+  Line 14614: Found emoji(s) '🎶' -> Line: Demo-Playback laden 🎶
+  Line 14621: Found emoji(s) '📄' -> Line: <span style={{ color: '#94a3b8' }}>📄 Seiten:</span>
+
+--- Avatar Violations / References ---
+  None found
+
+==========================================
+AUDIT REPORT FOR: AdminDashboard.tsx
+==========================================
+
+--- Brand Naming Violations ---
+  Line 212: Found 'groovelab' -> Line: activePlatform?: 'campus' | 'groovelab';
+  Line 226: Found 'groovelab' -> Line: activePlatform = 'groovelab',
+  Line 772: Found 'groovelab' -> Line: localStorage.setItem('groovelab_campus_bookings', JSON.stringify(campusBookings));
+  Line 787: Found 'groovelab' -> Line: localStorage.setItem('groovelab_textbausteine', JSON.stringify(textbausteine));
+  Line 1905: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_selected_booking_date');
+  Line 1909: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_selected_booking_room_id');
+  Line 1913: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_selected_booking_start_time');
+  Line 1917: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_selected_booking_end_time');
+  Line 1994: Found 'groovelab' -> Line: else sq = sq.eq('is_groovelab_active', true);
+  Line 2001: Found 'groovelab' -> Line: sq = sq.eq('is_groovelab_active', true);
+  Line 2086: Found 'groovelab' -> Line: else tsq = tsq.eq('is_groovelab_active', true);
+  Line 2098: Found 'groovelab' -> Line: roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+  Line 2256: Found 'groovelab' -> Line: else sq = sq.eq('is_groovelab_active', true);
+  Line 2280: Found 'groovelab' -> Line: else if (activePlatform !== 'campus') studSq = studSq.eq('is_groovelab_active', true);
+  Line 2313: Found 'groovelab' -> Line: else if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
+  Line 2324: Found 'groovelab' -> Line: else coachTsq = coachTsq.eq('is_groovelab_active', true);
+  Line 2335: Found 'groovelab' -> Line: else statsTsq = statsTsq.eq('is_groovelab_active', true);
+  Line 2341: Found 'groovelab' -> Line: else if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
+  Line 2365: Found 'groovelab' -> Line: else ssq = ssq.eq('is_groovelab_active', true);
+  Line 2409: Found 'groovelab' -> Line: else ssq = ssq.eq('is_groovelab_active', true);
+  Line 2532: Found 'groovelab' -> Line: else if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
+  Line 2536: Found 'groovelab' -> Line: else statsSongsSq = statsSongsSq.eq('is_groovelab_active', true);
+  Line 2576: Found 'groovelab' -> Line: .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs!inner(title, artist, is_campus_active, is_groovelab_active)')
+  Line 2582: Found 'groovelab' -> Line: skillsSq = skillsSq.eq('songs.is_groovelab_active', true);
+  Line 2934: Found 'groovelab' -> Line: is_groovelab_active: activePlatform === 'groovelab',
+  Line 2934: Found 'groovelab' -> Line: is_groovelab_active: activePlatform === 'groovelab',
+  Line 3004: Found 'groovelab' -> Line: is_groovelab_active: activePlatform === 'groovelab',
+  Line 3004: Found 'groovelab' -> Line: is_groovelab_active: activePlatform === 'groovelab',
+  Line 3087: Found 'GrooveLab' -> Line: : 'Möchtest du diesen Schüler wirklich von GrooveLab entfernen?';
+  Line 3546: Found 'groovelab' -> Line: .eq('is_groovelab_active', true)
+  Line 3807: Found 'groovelab' -> Line: is_groovelab_active: activePlatform !== 'campus',
+  Line 3852: Found 'groovelab' -> Line: is_groovelab_active: activePlatform !== 'campus',
+  Line 5181: Found 'groovelab' -> Line: ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
+  Line 5332: Found 'groovelab' -> Line: setEditingTeacher({...editingTeacher, groovelab_instrument: next.join(', ')});
+  Line 5465: Found 'groovelab' -> Line: {t.groovelab_instrument?.split(',')
+  Line 5760: Found 'groovelab' -> Line: id: `virtual_groovelab_schedule_${d}`,
+  Line 5763: Found 'groovelab' -> Line: teacher_id: 'groovelab',
+  Line 5766: Found 'GrooveLab' -> Line: purpose: 'GrooveLab Plattform',
+  Line 9066: Found 'groovelab' -> Line: <div style={{ background: `${groovelabBrandColor}15`, color: groovelabBrandColor, padding: '14px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px -6px ${groovelabBrandColor}30` }}>
+  Line 9066: Found 'groovelab' -> Line: <div style={{ background: `${groovelabBrandColor}15`, color: groovelabBrandColor, padding: '14px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px -6px ${groovelabBrandColor}30` }}>
+  Line 9066: Found 'groovelab' -> Line: <div style={{ background: `${groovelabBrandColor}15`, color: groovelabBrandColor, padding: '14px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px -6px ${groovelabBrandColor}30` }}>
+  Line 9110: Found 'groovelab' -> Line: border: dragOverRoomId === room.id ? `2px dashed ${groovelabBrandColor}` : '1px solid #f1f5f9',
+  Line 9121: Found 'groovelab' -> Line: <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${groovelabBrandColor}10`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  Line 9122: Found 'groovelab' -> Line: <Box size={20} color={groovelabBrandColor} />
+  Line 9131: Found 'groovelab' -> Line: <MapPin size={14} color={groovelabBrandColor} /> Layout
+  Line 9133: Found 'groovelab' -> Line: <button onClick={() => triggerBatchAddStations(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: groovelabBrandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+  Line 9237: Found 'groovelab' -> Line: style={{ background: groovelabBrandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+  Line 9281: Found 'groovelab' -> Line: return activePlatform === 'groovelab' ? renderGroovelabRoomsTab() : renderCampusRoomsTab();
+  Line 9281: Found 'Groovelab' -> Line: return activePlatform === 'groovelab' ? renderGroovelabRoomsTab() : renderCampusRoomsTab();
+  Line 9449: Found 'GrooveLab' -> Line: : 'Verwalte deine Songs und deren Instrumentierungen für GrooveLab.'}
+  Line 10128: Found 'GrooveLab' -> Line: <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+  Line 10145: Found 'GrooveLab' -> Line: placeholder={`GrooveLab Drums Vol. 2 - Max Mustermann - 80\nGrooveLab Piano Vol. 1 - 60`}
+  Line 10145: Found 'GrooveLab' -> Line: placeholder={`GrooveLab Drums Vol. 2 - Max Mustermann - 80\nGrooveLab Piano Vol. 1 - 60`}
+  Line 10169: Found 'GrooveLab' -> Line: <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+  Line 12127: Found 'groovelab' -> Line: activePlatform={activePlatform === "campus" ? "campus" : "groovelab"}
+  Line 12217: Found 'Groovelab' -> Line: link.download = (selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? `Campus_Pass_${selectedQRUser.first_name}.jpg` : `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+  Line 12343: Found 'campus-groovelab' -> Line: <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
+  Line 12413: Found 'campus-groovelab' -> Line: <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={150} />
+  Line 16269: Found 'campus-groovelab' -> Line: <QRCode value={`https://campus-groovelab.de/qr/${u.qr_token || u.id || ''}`} size={110} />
+  Line 16298: Found 'groovelab' -> Line: activePlatform = 'groovelab'
+  Line 16311: Found 'groovelab' -> Line: activePlatform?: 'campus' | 'groovelab'
+  Line 16442: Found 'groovelab' -> Line: localStorage.setItem('groovelab_station_id', station.id);
+  Line 16573: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_station_id');
+  Line 16695: Found 'groovelab' -> Line: {localStorage.getItem('groovelab_station_id') && (
+  Line 16699: Found 'groovelab' -> Line: localStorage.removeItem('groovelab_station_id');
+  Line 16903: Found 'Groovelab' -> Line: <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Betriebszeiten und Sicherheitseinstellungen für dein Groovelab.</p>
+  Line 17192: Found 'groovelab' -> Line: [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
+
+--- Color Violations ---
+  Line 5182: Green theme elements in Admin/Secretariat: ['#e6f4ea', '#137333'] -> Line: <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#137333', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+  Line 11875: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isInLab ? '#d1fae5' : '#f1f5f9',
+  Line 12240: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #137333 0%, #064e3b 100%)',
+  Line 12435: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333')
+  Line 12449: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: boxShadow: `0 15px 35px ${(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333') : '#34a853'}50`,
+  Line 16518: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: activeSession ? '#d1fae5' : '#f1f5f9',
+
+--- Emoji/Colored Icon Violations ---
+  Line 687: Found emoji(s) '🥁' -> Line: { id: 'r1', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du auf dem Instrument startest. Der Rhythmus ist das Herz der Musik!', type: 'both', category: 'rhythm', active: true },
+  Line 689: Found emoji(s) '🐌' -> Line: { id: 'r3', label: '🐌 Schnecken-Tempo', text: 'Übe die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn du den Ablauf im Schlaf beherrschst, schalten wir den Turbo an!', type: 'both', category: 'rhythm', active: true },
+  Line 690: Found emoji(s) '🧩' -> Line: { id: 'r4', label: '🧩 Puzzle-Taktik', text: 'Teile das Stück in kleine Häppchen auf. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', category: 'rhythm', active: true },
+  Line 691: Found emoji(s) '🚶♂' -> Line: { id: 'r5', label: '🚶‍♂️ Klatsch-Gehen', text: 'Gehe gleichmäßig im Puls des Stücks durch den Raum und klatsche den Rhythmus der Melodie dazu.', type: 'both', category: 'rhythm', active: false },
+  Line 695: Found emoji(s) '🔂' -> Line: { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', category: 'technique', active: true },
+  Line 696: Found emoji(s) '👁' -> Line: { id: 't2', label: '👁️ Blind-Flug', text: 'Schließe beim Üben mal die Augen. Vertraue auf dein Gefühl und meistere die Stelle ganz blind auswendig!', type: 'both', category: 'technique', active: true },
+  Line 697: Found emoji(s) '🏋♂' -> Line: { id: 't3', label: '🏋️‍♂️ Fokus-Gym', text: 'Trainiere die schwierige Stelle ganz fokussiert in Zeitlupe, um maximale Kontrolle und Präzision aufzubauen.', type: 'both', category: 'technique', active: true },
+  Line 698: Found emoji(s) '🕵♂' -> Line: { id: 't4', label: '🕵️‍♂️ Detail-Detektiv', text: 'Lies den Text oder die Noten laut mit und achte genau auf jedes Detail. Sei wie ein Detektiv, dem kein Fehler entgeht!', type: 'lehrwerke', category: 'technique', active: true },
+  Line 699: Found emoji(s) '🚀' -> Line: { id: 't5', label: '🚀 Hürden-Sprung', text: 'Konzentriere dich auf die Bewegung direkt vor und nach dem schwierigen Wechsel. Wiederhole diesen Sprung gezielt mehrmals.', type: 'both', category: 'technique', active: false },
+  Line 700: Found emoji(s) '🕸' -> Line: { id: 't6', label: '🕸️ Relax-Übung', text: 'Achte darauf, dass alle Muskeln entspannt bleiben, die gerade Pause haben – so sparst du Energie und spielst flüssiger.', type: 'both', category: 'technique', active: false },
+  Line 703: Found emoji(s) '🎵' -> Line: { id: 'p1', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', category: 'performance', active: true },
+  Line 704: Found emoji(s) '🌟' -> Line: { id: 'p2', label: '🌟 Eigener Remix', text: 'Du beherrschst das Stück super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante oder Verzierung für diesen Teil.', type: 'songs', category: 'performance', active: true },
+  Line 705: Found emoji(s) '🎭' -> Line: { id: 'p3', label: '🎭 Storyteller', text: 'Welche Geschichte erzählt dieses Stück? Gestalte den Klang so, als würdest du ein trauriges, spannendes oder fröhliches Abenteuer vertonen.', type: 'both', category: 'performance', active: true },
+  Line 706: Found emoji(s) '🌊' -> Line: { id: 'p4', label: '🌊 Atem-Fluss', text: 'Gestalte die Phrasen wie einen langen Atemzug. Verbinde die Töne weich und lasse die Musik atmen.', type: 'both', category: 'performance', active: true },
+  Line 707: Found emoji(s) '🎤' -> Line: { id: 'p5', label: '🎤 Echo-Spiel', text: 'Stelle dir vor, die zweite Hälfte der Phrase ist das leise Echo aus den Bergen. Gestalte sie deutlich leiser.', type: 'both', category: 'performance', active: false },
+  Line 708: Found emoji(s) '🎬' -> Line: { id: 'p6', label: '🎬 Scheinwerfer-An', text: 'Spiele das Stück einmal komplett durch, ohne bei Fehlern anzuhalten - genau so, als stündest du live auf einer großen Bühne!', type: 'both', category: 'performance', active: false }
+  Line 720: Found emoji(s) '🎵' -> Line: const [selectedIcon, setSelectedIcon] = useState('🎵');
+  Line 725: Found emoji(s) '🐌🚀🕵♂🧩🥁🎹🎸🎷🎧🎤🎼🏆' -> Line: '🐌', '🚀', '🕵️‍♂️', '🧩', '🥁', '🎹', '🎸', '🎷', '🎧', '🎤', '🎼', '🏆',
+  Line 726: Found emoji(s) '🎖🌟🎯⚡💡🔍🦖🦁🦊🦉🦄🔥' -> Line: '🎖️', '🌟', '🎯', '⚡', '💡', '🔍', '🦖', '🦁', '🦊', '🦉', '🦄', '🔥',
+  Line 727: Found emoji(s) '👑🌈🎨🎬🎵🎺🎻🔔📢🏰🎈' -> Line: '👑', '🌈', '🎨', '🎬', '⏱️', '🎵', '🎺', '🎻', '🔔', '📢', '🏰', '🎈',
+  Line 728: Found emoji(s) '👽🍿🧊🦾🧠✨🍀🍕🐱🐶🧁💿' -> Line: '👽', '🍿', '🧊', '🦾', '🧠', '✨', '🍀', '🍕', '🐱', '🐶', '🧁', '💿',
+  Line 729: Found emoji(s) '📻🎙🎛🎚🎶🦾🦸♂🧙♂🏃♂🧗♂🏄♂🧘♂' -> Line: '📻', '🎙️', '🎛️', '🎚️', '🎶', '🦾', '🦸‍♂️', '🧙‍♂️', '🏃‍♂️', '🧗‍♂️', '🏄‍♂️', '🧘‍♂️',
+  Line 730: Found emoji(s) '👾🛸💎🔑🧭🗺🎪🎢🎳🎮🧪🧬' -> Line: '👾', '🛸', '💎', '🔑', '🧭', '🗺️', '🎪', '🎢', '🎳', '🎮', '🧪', '🧬',
+  Line 731: Found emoji(s) '⚙🛠🧱🎉🎊🔇🔈🗯💭✏📝📂' -> Line: '⚙️', '🛠️', '🧱', '🎉', '🎊', '🔇', '🔈', '🗯️', '💭', '✏️', '📝', '📂',
+  Line 732: Found emoji(s) '📈📬🏷❤🍀🌈' -> Line: '📈', '📬', '🏷️', '❤️', '🍀', '🌈'
+  Line 743: Found emoji(s) '🎵' -> Line: setSelectedIcon('🎵');
+  Line 749: Found emoji(s) '🎵' -> Line: const firstAvail = AVAILABLE_ICONS.find(icon => !used.includes(icon)) || '🎵';
+  Line 1022: Found emoji(s) '✅' -> Line: alert('Song-Details erfolgreich aktualisiert! ✅');
+  Line 2780: Found emoji(s) '🔥' -> Line: emoji: '🔥',
+  Line 2791: Found emoji(s) '⚡' -> Line: emoji: '⚡',
+  Line 2802: Found emoji(s) '🏆' -> Line: emoji: '🏆',
+  Line 3137: Found emoji(s) '✨' -> Line: alert('Keine verwaisten Einträge gefunden. Deine Datenbank ist sauber! ✨');
+  Line 3144: Found emoji(s) '✅' -> Line: alert(`${orphaned.length} verwaiste Einträge erfolgreich entfernt! ✅`);
+  Line 3319: Found emoji(s) '✅' -> Line: alert('Lehrer-Profil erfolgreich aktualisiert! ✅');
+  Line 3672: Found emoji(s) '✅' -> Line: alert(`Punkt ${currentPoints.length} erfolgreich für "${latestRoom.name}" hinzugefügt! ✅`);
+  Line 3910: Found emoji(s) '✅' -> Line: alert('Song erfolgreich aktualisiert! ✅');
+  Line 3958: Found emoji(s) '🗑' -> Line: alert('Song wurde inklusive aller Verknüpfungen erfolgreich gelöscht. 🗑️');
+  Line 4498: Found emoji(s) '👤' -> Line: 👤
+  Line 4546: Found emoji(s) '🔍' -> Line: <div style={{ fontSize: '3rem', margin: '0 auto 20px auto', width: '80px', height: '80px', background: '#f8fafc', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔍</div>
+  Line 4632: Found emoji(s) '🎉' -> Line: <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8rem' }}>Alle Bands sind stimmlich besetzt! 🎉</div>
+  Line 4791: Found emoji(s) '📱' -> Line: 📱 Selbstnutzer
+  Line 4804: Found emoji(s) '👪' -> Line: 👪 Eltern-Hybrid
+  Line 5017: Found emoji(s) '✅' -> Line: ✅ Aktiv
+  Line 5030: Found emoji(s) '🚫' -> Line: 🚫 Gesperrt (Bypass)
+  Line 5051: Found emoji(s) '📱' -> Line: 📱 Selbstnutzer (Student)
+  Line 5064: Found emoji(s) '👪' -> Line: 👪 Eltern-Hybrid
+  Line 5416: Found emoji(s) '👁' -> Line: {isObserver ? '👁 Hospitant' : 'Lehrer'}
+  Line 5470: Found emoji(s) '🎸' -> Line: <span>{ADMIN_INSTRUMENT_ICONS[inst] || '🎸'}</span> {inst}
+  Line 7417: Found emoji(s) '📅' -> Line: <span>📅</span>
+  Line 7437: Found emoji(s) '✕' -> Line: Filter zurücksetzen ✕
+  Line 7577: Found emoji(s) '★' -> Line: <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#8e8e93' }}>★</span>
+  Line 7726: Found emoji(s) '🌴' -> Line: 🌴 {activeHoliday.name}
+  Line 8152: Found emoji(s) '⚠' -> Line: ⚠️ Doppelbelegung
+  Line 8389: Found emoji(s) '⚡' -> Line: <span style={{ color: brandColor }}>⚡</span> Raum buchen
+  Line 8474: Found emoji(s) '👁' -> Line: 👁️ Vorschau
+  Line 8921: Found emoji(s) '🔗' -> Line: 🔗 {inst.name}
+  Line 9001: Found emoji(s) '❌' -> Line: ❌ {inst}
+  Line 10047: Found emoji(s) '🎵' -> Line: <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
+  Line 10165: Found emoji(s) '📚' -> Line: <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#854d0e', margin: 0 }}>📚 Lehrwerk bearbeiten: {editingLehrwerk.title}</h3>
+  Line 10232: Found emoji(s) '📖' -> Line: <p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800 }}>📖 {item.totalPages || 50} Seiten</p>
+  Line 10289: Found emoji(s) '⚡' -> Line: <span style={{ background: `${brandColor}15`, color: brandColor, padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', fontSize: '1rem' }}>⚡</span>
+  Line 10336: Found emoji(s) '🎵' -> Line: const emoji = hasEmoji ? parts[0] : '🎵';
+  Line 10381: Found emoji(s) '✅' -> Line: {isCopied ? '✅' : emoji}
+  Line 10397: Found emoji(s) '✓✓' -> Line: {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
+  Line 10423: Found emoji(s) '🟢⚪' -> Line: <span>{tb.active ? '🟢 Aktiv' : '⚪ Inakt.'}</span>
+  Line 10641: Found emoji(s) '🌱' -> Line: <span>🌱</span> Übe-Ziele der Klasse
+  Line 10797: Found emoji(s) '🎉' -> Line: {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
+  Line 10813: Found emoji(s) '✨' -> Line: <span>✨</span> Helden-Momente
+  Line 10822: Found emoji(s) '🤫' -> Line: <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
+  Line 11069: Found emoji(s) '🏆' -> Line: <span>🏆</span> Gemeisterte Challenges (Stage Ready)
+  Line 11074: Found emoji(s) '🎸' -> Line: { name: 'E-Gitarre', value: stats.stageReadyPerInst?.guitar || 0, icon: '🎸', color: '#ef4444' }, // Red
+  Line 11075: Found emoji(s) '🎹' -> Line: { name: 'E-Piano / Keys', value: stats.stageReadyPerInst?.keys || 0, icon: '🎹', color: '#a855f7' }, // Purple
+  Line 11076: Found emoji(s) '🥁' -> Line: { name: 'E-Drums', value: stats.stageReadyPerInst?.drums || 0, icon: '🥁', color: '#3b82f6' }, // Blue
+  Line 11077: Found emoji(s) '🎸' -> Line: { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, icon: '🎸', color: '#eab308' }, // Yellow
+  Line 11078: Found emoji(s) '🎤' -> Line: { name: 'Vocals / Gesang', value: stats.stageReadyPerInst?.vocals || 0, icon: '🎤', color: '#ec4899' } // Pink
+  Line 11106: Found emoji(s) '📅' -> Line: <span>📅</span> Auslastung nach Wochentag
+  Line 11146: Found emoji(s) '🔥' -> Line: <span>🔥</span> XP Leaderboard (Top 5 Schüler)
+  Line 11179: Found emoji(s) '🎵' -> Line: <span>🎵</span> Beliebteste Songs (Repertoire-Hits)
+  Line 11192: Found emoji(s) '🥇🥈🥉' -> Line: {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+  Line 11200: Found emoji(s) '🔥' -> Line: 🔥 {song.count} Schüler üben
+  Line 11911: Found emoji(s) '🎸' -> Line: {ADMIN_INSTRUMENT_ICONS[sub.instrument] || '🎸'}
+  Line 11925: Found emoji(s) '⚡🚀' -> Line: {sub.difficulty_level === 'original' ? '⚡ PRO' : '🚀 STARTER'}
+  Line 12742: Found emoji(s) '🎹' -> Line: {station.instrument === 'E-Piano' && '🎹'}
+  Line 12743: Found emoji(s) '🥁' -> Line: {station.instrument === 'E-Drums' && '🥁'}
+  Line 12744: Found emoji(s) '🎸' -> Line: {station.instrument === 'E-Gitarre' && '🎸'}
+  Line 12745: Found emoji(s) '🎸' -> Line: {station.instrument === 'E-Bass' && '🎸'}
+  Line 12746: Found emoji(s) '🎤' -> Line: {station.instrument === 'Vocals' && '🎤'}
+  Line 12820: Found emoji(s) '✨' -> Line: ✨ Symmetrisches Standard-Raster anwenden
+  Line 12862: Found emoji(s) '🎹' -> Line: <option value="E-Piano">🎹 E-Piano</option>
+  Line 12863: Found emoji(s) '🥁' -> Line: <option value="E-Drums">🥁 E-Drums</option>
+  Line 12864: Found emoji(s) '🎸' -> Line: <option value="E-Gitarre">🎸 E-Gitarre</option>
+  Line 12865: Found emoji(s) '🎸' -> Line: <option value="E-Bass">🎸 E-Bass</option>
+  Line 12866: Found emoji(s) '🎤' -> Line: <option value="Vocals">🎤 Mikrofon (Gesang)</option>
+  Line 12867: Found emoji(s) '📱' -> Line: <option value="Tablet">📱 Tablet (Standard/Anderes)</option>
+  Line 13450: Found emoji(s) '📖' -> Line: 📖 {book.totalPages || 50} Seiten
+  Line 13715: Found emoji(s) '🗓' -> Line: 🗓️ Hausaufgaben KW {getISOWeekNum(undefined, lessonDayForProgress)}
+  Line 13721: Found emoji(s) '✨' -> Line: ✨ Keine aktiven Hausaufgaben erfasst. Markiere Lehrwerke oder Songs.
+  Line 13733: Found emoji(s) '📖' -> Line: 📖 <span>{book.title}</span> <span style={{ color: '#4b5563', fontWeight: 700, marginLeft: '4px' }}>· S. {homeworkPages.map(p => p.num).join(', ')}</span>
+  Line 13746: Found emoji(s) '🧠📄' -> Line: <span>{p.status === 'theory_done' ? '🧠' : '📄'} S. {p.num}</span>
+  Line 13813: Found emoji(s) '✕' -> Line: ✕
+  Line 13882: Found emoji(s) '➕' -> Line: ➕ Notiz hinzufügen
+  Line 13888: Found emoji(s) '⚡' -> Line: ⚡ Schnell-Textbausteine
+  Line 13999: Found emoji(s) '🖌' -> Line: 🖌️ Pinsel:
+  Line 14107: Found emoji(s) '➕' -> Line: ➕ Schüler hinzufügen
+  Line 14406: Found emoji(s) '🎵' -> Line: <span style={{ fontSize: '32px', lineHeight: 1 }}>🎵</span>
+  Line 14732: Found emoji(s) '🗓' -> Line: 🗓️ Hausaufgaben & Übetipps
+  Line 14745: Found emoji(s) '🎵' -> Line: 🎵 <span>{song.artist} - {song.title}</span>
+  Line 14779: Found emoji(s) '✕' -> Line: ✕
+  Line 14841: Found emoji(s) '➕' -> Line: ➕ Hinzufügen
+  Line 14847: Found emoji(s) '⚡' -> Line: <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>⚡ Schnell-Textbausteine</span>
+  Line 14924: Found emoji(s) '🎵' -> Line: 🎵 Songstatus:
+  Line 15256: Found emoji(s) '➕' -> Line: ➕ Schüler zuteilen
+  Line 15436: Found emoji(s) '⚡' -> Line: <span>⚡</span>
+  Line 15468: Found emoji(s) '✏➕' -> Line: {editingTextbaustein ? '✏️ Baustein bearbeiten' : '➕ Neuer Baustein'}
+  Line 15534: Found emoji(s) '🥁' -> Line: { id: 'rhythm', label: '🥁 Rhythmus' },
+  Line 15535: Found emoji(s) '🎹' -> Line: { id: 'technique', label: '🎹 Technik' },
+  Line 15536: Found emoji(s) '🎭' -> Line: { id: 'performance', label: '🎭 Ausdruck' }
+  Line 15635: Found emoji(s) '🔍' -> Line: <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+  Line 15658: Found emoji(s) '🥁' -> Line: { id: 'rhythm', label: '🥁 Rhythmus' },
+  Line 15659: Found emoji(s) '🎹' -> Line: { id: 'technique', label: '🎹 Technik' },
+  Line 15660: Found emoji(s) '🎭' -> Line: { id: 'performance', label: '🎭 Ausdruck' }
+  Line 15768: Found emoji(s) '🟢⚪' -> Line: {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
+  Line 16428: Found emoji(s) '📴' -> Line: <div style={{ opacity: 0.6, fontSize: '1.2rem', marginBottom: '4px' }}>📴</div>
+  Line 16488: Found emoji(s) '✨✨' -> Line: <span>✨</span> DIESES IPAD <span>✨</span>
+  Line 16596: Found emoji(s) '🔌' -> Line: <span>🔌</span> Kopplung aufheben
+
+--- Avatar Violations / References ---
+  Line 10: Reference -> Line: import { renderInstrumentIcon } from '../utils/instruments';
+  Line 44: Reference -> Line: const INSTRUMENT_COLORS: Record<string, string> = {
+  Line 52: Reference -> Line: const normalizeInstrument = (name: string) => {
+  Line 62: Reference -> Line: const ADMIN_INSTRUMENT_ICONS: Record<string, any> = {
+  Line 63: Reference -> Line: "Gitarre": renderInstrumentIcon("Gitarre"),
+  Line 64: Reference -> Line: "Guitar": renderInstrumentIcon("Guitar"),
+  Line 65: Reference -> Line: "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
+  Line 66: Reference -> Line: "Bass": renderInstrumentIcon("Bass"),
+  Line 67: Reference -> Line: "E-Bass": renderInstrumentIcon("E-Bass"),
+  Line 68: Reference -> Line: "Drums": renderInstrumentIcon("Drums"),
+  Line 69: Reference -> Line: "E-Drums": renderInstrumentIcon("E-Drums"),
+  Line 70: Reference -> Line: "Vocals": renderInstrumentIcon("Vocals"),
+  Line 71: Reference -> Line: "Gesang": renderInstrumentIcon("Gesang"),
+  Line 72: Reference -> Line: "Piano / Keys": renderInstrumentIcon("Keys"),
+  Line 73: Reference -> Line: "Piano": renderInstrumentIcon("Piano"),
+  Line 74: Reference -> Line: "E-Piano": renderInstrumentIcon("E-Piano"),
+  Line 75: Reference -> Line: "Keys": renderInstrumentIcon("Keys")
+  Line 77: Reference -> Line: const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
+  Line 78: Reference -> Line: if (!instrument) return '/avatars/gitarre_avatar_new.png';
+  Line 79: Reference -> Line: const inst = instrument.toLowerCase().trim();
+  Line 80: Reference -> Line: if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  Line 81: Reference -> Line: if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
+  Line 82: Reference -> Line: if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  Line 83: Reference -> Line: if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
+  Line 84: Reference -> Line: if (inst.includes('bass')) return '/avatars/bass_avatar.png';
+  Line 85: Reference -> Line: if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  Line 86: Reference -> Line: if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  Line 87: Reference -> Line: if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
+  Line 88: Reference -> Line: if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  Line 89: Reference -> Line: if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
+  Line 90: Reference -> Line: if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  Line 91: Reference -> Line: if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
+  Line 92: Reference -> Line: if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
+  Line 93: Reference -> Line: if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  Line 94: Reference -> Line: if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  Line 95: Reference -> Line: if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  Line 96: Reference -> Line: if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  Line 97: Reference -> Line: if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  Line 98: Reference -> Line: if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
+  Line 99: Reference -> Line: return '/avatars/gitarre_avatar_new.png';
+  Line 102: Reference -> Line: const resolveCampusAvatar = (u: any): string => {
+  Line 103: Reference -> Line: if (!u) return '/avatar_ghost.jpg';
+  Line 112: Reference -> Line: const studentInstrument = u.instrument || 'Nicht festgelegt';
+  Line 113: Reference -> Line: const inst = studentInstrument.toLowerCase().trim();
+  Line 115: Reference -> Line: if (u.photo_url && (u.photo_url.includes('egitarre_avatar') || u.photo_url.includes('gitarre_avatar_new'))) {
+  Line 118: Reference -> Line: return '/avatars/gitarre_avatar_new.png';
+  Line 120: Reference -> Line: return getInstrumentAvatarUrl(studentInstrument);
+  Line 123: Reference -> Line: return getInstrumentAvatarUrl(u.instrument);
+  Line 127: Reference -> Line: const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
+  Line 128: Reference -> Line: if (!instrument) return 'guitarist';
+  Line 129: Reference -> Line: const inst = instrument.toLowerCase().trim();
+  Line 151: Reference -> Line: const TEACHER_AVATARS = [
+  Line 152: Reference -> Line: { id: 't_male', url: '/avatar_teacher_male.jpg', label: 'Academy Coach M' },
+  Line 153: Reference -> Line: { id: 't_female', url: '/avatar_teacher_female.jpg', label: 'Academy Coach F' },
+  Line 154: Reference -> Line: { id: 't_expert', url: '/avatar_teacher_expert.jpg', label: 'Expert Coach' },
+  Line 155: Reference -> Line: { id: 't_clean', url: '/avatar_teacher_clean.jpg', label: 'Classic Coach' },
+  Line 156: Reference -> Line: { id: 't_drummer', url: '/avatar_teacher_drummer.jpg', label: 'Beat Coach' },
+  Line 157: Reference -> Line: { id: 't_drums', url: '/avatar_teacher_drums.jpg', label: 'Percussion Expert' },
+  Line 158: Reference -> Line: { id: 't_gold', url: '/avatar_teacher_gold_glasses.jpg', label: 'Session Pro' },
+  Line 159: Reference -> Line: { id: 't_senior', url: '/avatar_teacher_senior.jpg', label: 'Senior Mentor' }
+  Line 162: Reference -> Line: const STUDENT_AVATARS = [
+  Line 163: Reference -> Line: { id: 'avatar_blockfloete', url: '/avatars/blockfloete_avatar.png', label: 'Blockflöte' },
+  Line 164: Reference -> Line: { id: 'avatar_bariton', url: '/avatars/bariton_avatar.png', label: 'Bariton' },
+  Line 165: Reference -> Line: { id: 'avatar_cello', url: '/avatars/cello_avatar_new.png', label: 'Cello' },
+  Line 166: Reference -> Line: { id: 'avatar_ebass', url: '/avatars/ebass_avatar.png', label: 'E-Bass' },
+  Line 167: Reference -> Line: { id: 'avatar_egitarre', url: '/avatars/egitarre_avatar.png', label: 'E-Gitarre' },
+  Line 168: Reference -> Line: { id: 'avatar_guitar', url: '/avatars/gitarre_avatar_new.png', label: 'Gitarre' },
+  Line 169: Reference -> Line: { id: 'avatar_horn', url: '/avatars/horn_avatar_new.png', label: 'Horn' },
+  Line 170: Reference -> Line: { id: 'avatar_clarinet', url: '/avatars/klarinette_avatar_new.png', label: 'Klarinette' },
+  Line 171: Reference -> Line: { id: 'avatar_piano', url: '/avatars/klavier_avatar_new.png', label: 'Piano / Keys' },
+  Line 172: Reference -> Line: { id: 'avatar_kontrabass', url: '/avatars/kontrabass_avatar.png', label: 'Kontrabass' },
+  Line 173: Reference -> Line: { id: 'avatar_oboe', url: '/avatars/oboe_avatar.png', label: 'Oboe' },
+  Line 174: Reference -> Line: { id: 'avatar_trombone', url: '/avatars/posaune_avatar.png', label: 'Posaune' },
+  Line 175: Reference -> Line: { id: 'avatar_flute', url: '/avatars/querfloete_avatar.png', label: 'Querflöte' },
+  Line 176: Reference -> Line: { id: 'avatar_saxophone', url: '/avatars/saxophon_avatar_new.png', label: 'Saxofon' },
+  Line 177: Reference -> Line: { id: 'avatar_drums', url: '/avatars/schlagzeug_avatar.png', label: 'Drums' },
+  Line 178: Reference -> Line: { id: 'avatar_trumpet', url: '/avatars/trompete_avatar_new.png', label: 'Trompete' },
+  Line 179: Reference -> Line: { id: 'avatar_violin', url: '/avatars/violine_avatar_new.png', label: 'Geige' },
+  Line 180: Reference -> Line: { id: 'avatar_vocals', url: '/avatars/gesang_avatar.png', label: 'Vocals' }
+  Line 282: Reference -> Line: const [editSongInstrumentation, setEditSongInstrumentation] = useState<Record<string, number>>({});
+  Line 283: Reference -> Line: const [assignSongStudentInstrument, setAssignSongStudentInstrument] = useState<string>('E-Gitarre');
+  Line 299: Reference -> Line: const [hoveredInstrumentIdx, setHoveredInstrumentIdx] = useState<number | null>(null);
+  Line 687: Reference -> Line: { id: 'r1', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du auf dem Instrument startest. Der Rhythmus ist das Herz der Musik!', type: 'both', category: 'rhythm', active: true },
+  Line 875: Reference -> Line: const handleAssignStudentToSong = async (studentId: string, instrument: string = 'ohne Zuweisung') => {
+  Line 888: Reference -> Line: instrument: instrument,
+  Line 905: Reference -> Line: const handleUnassignStudentFromSong = async (skillId: string, studentId: string, songTitle: string, instrument: string) => {
+  Line 906: Reference -> Line: if (!window.confirm('Bist du sicher, dass du die Zuweisung und somit den Fortschritt für dieses Instrument löschen möchtest?')) return;
+  Line 914: Reference -> Line: const topicName = `${selectedSongForDetail.artist} - ${songTitle} (${instrument})`;
+  Line 936: Reference -> Line: instrument: string,
+  Line 965: Reference -> Line: const topicName = `${selectedSongForDetail.artist} - ${selectedSongForDetail.title} (${instrument})`;
+  Line 994: Reference -> Line: activeSkill.instrument,
+  Line 1013: Reference -> Line: instrumentation: editSongInstrumentation
+  Line 1019: Reference -> Line: setSongs(prev => prev.map(s => s.id === selectedSongForDetail.id ? { ...s, title: editSongTitle, artist: editSongArtist, instrumentation: editSongInstrumentation } : s));
+  Line 1020: Reference -> Line: setSelectedSongForDetail((prev: any) => ({ ...prev, title: editSongTitle, artist: editSongArtist, instrumentation: editSongInstrumentation }));
+  Line 1052: Reference -> Line: const topicName = `${selectedSongForDetail.artist} - ${selectedSongForDetail.title} (${skill.instrument})`;
+  Line 1265: Reference -> Line: const [quickInstrument, setQuickInstrument] = useState('Gitarre');
+  Line 1423: Reference -> Line: const [externalInstrument, setExternalInstrument] = useState('Vocals');
+  Line 1428: Reference -> Line: const [parsedStudents, setParsedStudents] = useState<{ firstName: string; lastName: string; instrument: string }[]>([]);
+  Line 1429: Reference -> Line: const [defaultInstrumentForBulk, setDefaultInstrumentForBulk] = useState('Gitarre');
+  Line 1431: Reference -> Line: const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' });
+  Line 1439: Reference -> Line: const [selectedMembers, setSelectedMembers] = useState<{user_id: string, instrument: string}[]>([]);
+  Line 1443: Reference -> Line: const [newTeacher, setNewTeacher] = useState({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
+  Line 1464: Reference -> Line: const [editingStationInstrument, setEditingStationInstrument] = useState<string>('');
+  Line 1494: Reference -> Line: instrument: 'Tablet',
+  Line 1516: Reference -> Line: setEditingStationInstrument(station.instrument || '');
+  Line 1521: Reference -> Line: setEditingStationInstrument('');
+  Line 1529: Reference -> Line: const [newSong, setNewSong] = useState({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } as Record<string, number> });
+  Line 1536: Reference -> Line: const [qrAvatarDataUrl, setQrAvatarDataUrl] = useState<string | null>(null);
+  Line 1585: Reference -> Line: setQrAvatarDataUrl(null);
+  Line 1592: Reference -> Line: let originalUrl = selectedQRUser.photo_url || '/avatar_ghost.jpg';
+  Line 1596: Reference -> Line: originalUrl = getInstrumentAvatarUrl(selectedQRUser.instrument);
+  Line 1600: Reference -> Line: setQrAvatarDataUrl(originalUrl);
+  Line 1608: Reference -> Line: if (originalUrl !== '/avatar_ghost.jpg') {
+  Line 1620: Reference -> Line: setQrAvatarDataUrl(reader.result as string);
+  Line 1627: Reference -> Line: setQrAvatarDataUrl(originalUrl);
+  Line 1651: Reference -> Line: setQrAvatarDataUrl(dataUrl);
+  Line 1665: Reference -> Line: const [instrumentFilter, setInstrumentFilter] = useState<string>('all');
+  Line 1734: Reference -> Line: const handleAddMember = async (bandId: string, userId: string | null, instrument: string, extName?: string) => {
+  Line 1739: Reference -> Line: instrument: instrument,
+  Line 1765: Reference -> Line: .select('band_song_id, instrument, part_number')
+  Line 1770: Reference -> Line: (s: any) => s.band_song_id === bs.id && s.instrument === instrument
+  Line 1778: Reference -> Line: instrument: instrument,
+  Line 2026: Reference -> Line: await supabase.from('avatars').delete().in('user_id', toDelete);
+  Line 2048: Reference -> Line: .select('user_id, instrument, is_stage_ready')
+  Line 2054: Reference -> Line: .select('user_id, instrument, status')
+  Line 2063: Reference -> Line: const isVocal = (sk.instrument || '').toLowerCase().includes('vocal') || (sk.instrument || '').toLowerCase().includes('gesang');
+  Line 2068: Reference -> Line: const isVocal = (sl.instrument || '').toLowerCase().includes('vocal') || (sl.instrument || '').toLowerCase().includes('gesang');
+  Line 2287: Reference -> Line: .select('*, songs(title, artist, instrumentation), band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
+  Line 2576: Reference -> Line: .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs!inner(title, artist, is_campus_active, is_groovelab_active)')
+  Line 2637: Reference -> Line: const inst = (s.instrument || '').toLowerCase().trim();
+  Line 2919: Reference -> Line: const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
+  Line 2920: Reference -> Line: const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+  Line 2928: Reference -> Line: photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
+  Line 2929: Reference -> Line: avatar_url: studentAvatarUrl,
+  Line 2932: Reference -> Line: instrument: studentInstrument,
+  Line 2941: Reference -> Line: await supabase.from('avatars').upsert({
+  Line 2943: Reference -> Line: avatar_style: 'Premium_Hero',
+  Line 2944: Reference -> Line: instrument_type: getInstrumentTypeKey(studentInstrument),
+  Line 2947: Reference -> Line: asset_path: studentAvatarUrl,
+  Line 2953: Reference -> Line: setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' });
+  Line 2957: Reference -> Line: const parseBulkInput = (text: string, currentInstrument: string) => {
+  Line 2973: Reference -> Line: instrument: currentInstrument
+  Line 2988: Reference -> Line: const isVocalist = student.instrument === 'Gesang';
+  Line 2989: Reference -> Line: const studentInstrument = isVocalist ? 'Vocals' : student.instrument;
+  Line 2990: Reference -> Line: const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+  Line 2998: Reference -> Line: photo_url: '/avatar_ghost.jpg',
+  Line 2999: Reference -> Line: avatar_url: studentAvatarUrl,
+  Line 3002: Reference -> Line: instrument: studentInstrument,
+  Line 3015: Reference -> Line: const avatarsToInsert = data.map(dbStudent => {
+  Line 3016: Reference -> Line: const studentInstrument = dbStudent.instrument || 'Gitarre';
+  Line 3017: Reference -> Line: const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+  Line 3020: Reference -> Line: avatar_style: 'Premium_Hero',
+  Line 3021: Reference -> Line: instrument_type: getInstrumentTypeKey(studentInstrument),
+  Line 3024: Reference -> Line: asset_path: studentAvatarUrl,
+  Line 3029: Reference -> Line: await supabase.from('avatars').upsert(avatarsToInsert);
+  Line 3046: Reference -> Line: const studentInstrument = editingStudent.instrument || 'Gitarre';
+  Line 3047: Reference -> Line: const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+  Line 3057: Reference -> Line: instrument: studentInstrument,
+  Line 3058: Reference -> Line: avatar_url: studentAvatarUrl,
+  Line 3065: Reference -> Line: await supabase.from('avatars').upsert({
+  Line 3067: Reference -> Line: avatar_style: 'Premium_Hero',
+  Line 3068: Reference -> Line: instrument_type: getInstrumentTypeKey(studentInstrument),
+  Line 3070: Reference -> Line: asset_path: studentAvatarUrl
+  Line 3075: Reference -> Line: avatar_url: studentAvatarUrl
+  Line 3191: Reference -> Line: instrument: m.instrument,
+  Line 3206: Reference -> Line: instrument: 'Coach'
+  Line 3222: Reference -> Line: instrument: m.instrument
+  Line 3257: Reference -> Line: instrument: newTeacher.instrument || '',
+  Line 3262: Reference -> Line: else if (data) { setTeachers([...teachers, data]); setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }
+  Line 3308: Reference -> Line: groovelab_instrument: editingTeacher.groovelab_instrument,
+  Line 3348: Reference -> Line: instrument: 'Tablet',
+  Line 3805: Reference -> Line: instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 },
+  Line 3850: Reference -> Line: instrumentation: newSong.instrumentation,
+  Line 3870: Reference -> Line: setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } });
+  Line 3893: Reference -> Line: instrumentation: editingSong.instrumentation
+  Line 4068: Reference -> Line: instXp[s.instrument] = (instXp[s.instrument] || 0) + xp;
+  Line 4086: Reference -> Line: topInstrument: topInst,
+  Line 4250: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Avatar URL (Optional)</label>
+  Line 4274: Reference -> Line: setSelectedMembers([...selectedMembers, { user_id: s.id, instrument: 'E-Gitarre' }]);
+  Line 4282: Reference -> Line: <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+  Line 4297: Reference -> Line: <img src={student?.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+  Line 4302: Reference -> Line: value={m.instrument}
+  Line 4305: Reference -> Line: next[idx].instrument = e.target.value;
+  Line 4310: Reference -> Line: {Object.keys(ADMIN_INSTRUMENT_ICONS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+  Line 4408: Reference -> Line: src={t.photo_url || '/avatar_ghost.jpg'}
+  Line 4488: Reference -> Line: <img src={band.coach.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+  Line 4512: Reference -> Line: <div key={i} style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', border: '2px solid white', marginLeft: i === 0 ? 0 : '-12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', background: 'white' }} title={`${u?.first_name || m.external_name || 'Mitglied'} (${m.instrument})`}>
+  Line 4513: Reference -> Line: <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+  Line 4569: Reference -> Line: const vocalists = members.filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal') || (m.instrument || '').toLowerCase().includes('gesang'));
+  Line 4600: Reference -> Line: await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });
+  Line 4603: Reference -> Line: await supabase.from('band_song_slots').insert({ band_song_id: activeProject.id, user_id: s.id, instrument: 'Vocals', status: 'joined' });
+  Line 4614: Reference -> Line: <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  Line 4629: Reference -> Line: const vocalists = (band.band_members || []).filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal'));
+  Line 4659: Reference -> Line: await supabase.from('avatars').delete().in('user_id', studentIds);
+  Line 4753: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
+  Line 4755: Reference -> Line: value={newStudent.instrument || 'Gitarre'}
+  Line 4756: Reference -> Line: onChange={e => setNewStudent({...newStudent, instrument: e.target.value})}
+  Line 4813: Reference -> Line: onClick={() => setNewStudent({...newStudent, isExternalVocalist: !newStudent.isExternalVocalist, photoUrl: '/avatar_ghost.jpg'})}
+  Line 4857: Reference -> Line: {/* Clickable Instrument Avatars */}
+  Line 4859: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Klasse wählen (Instrument)</label>
+  Line 4876: Reference -> Line: const isActive = defaultInstrumentForBulk === inst.name;
+  Line 4882: Reference -> Line: setDefaultInstrumentForBulk(inst.name);
+  Line 4902: Reference -> Line: src={getInstrumentAvatarUrl(inst.name)}
+  Line 4922: Reference -> Line: parseBulkInput(e.target.value, defaultInstrumentForBulk);
+  Line 4981: Reference -> Line: <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>
+  Line 4983: Reference -> Line: value={editingStudent.instrument || 'Gitarre'}
+  Line 4984: Reference -> Line: onChange={e => setEditingStudent({...editingStudent, instrument: e.target.value})}
+  Line 5114: Reference -> Line: const inst = s.instrument?.toLowerCase() || 'gitarre';
+  Line 5115: Reference -> Line: let normInst = s.instrument || 'Gitarre';
+  Line 5122: Reference -> Line: if (instrumentFilter !== 'all' && normInst !== instrumentFilter) return false;
+  Line 5127: Reference -> Line: const avatarSrc = getInstrumentAvatarUrl(s.instrument);
+  Line 5167: Reference -> Line: src={activePlatform === 'campus' ? resolveCampusAvatar(s) : (s.photo_url || '/avatar_ghost.jpg')}
+  Line 5321: Reference -> Line: <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
+  Line 5324: Reference -> Line: const currentInstruments = (editingTeacher.groovelab_instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+  Line 5325: Reference -> Line: const isSelected = currentInstruments.includes(inst);
+  Line 5331: Reference -> Line: const next = isSelected ? currentInstruments.filter((s: string) => s !== inst) : [...currentInstruments, inst];
+  Line 5332: Reference -> Line: setEditingTeacher({...editingTeacher, groovelab_instrument: next.join(', ')});
+  Line 5346: Reference -> Line: <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
+  Line 5404: Reference -> Line: {/* Avatar */}
+  Line 5406: Reference -> Line: <img src={t.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+  Line 5465: Reference -> Line: {t.groovelab_instrument?.split(',')
+  Line 5470: Reference -> Line: <span>{ADMIN_INSTRUMENT_ICONS[inst] || '🎸'}</span> {inst}
+  Line 8861: Reference -> Line: {/* Acoustics & Instruments */}
+  Line 8864: Reference -> Line: const roomInsts = selectedRoom.room_instruments || (() => {
+  Line 8866: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8871: Reference -> Line: const unsuitableInsts = selectedRoom.unsuitable_instruments || (() => {
+  Line 8880: Reference -> Line: {/* Vorhandene Instrumente */}
+  Line 8883: Reference -> Line: Vorhandene Instrumente
+  Line 8890: Reference -> Line: const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+  Line 8898: Reference -> Line: onMouseEnter={() => setHoveredInstrumentIdx(idx)}
+  Line 8899: Reference -> Line: onMouseLeave={() => setHoveredInstrumentIdx(null)}
+  Line 8939: Reference -> Line: {inst.model && hoveredInstrumentIdx === idx && (
+  Line 8976: Reference -> Line: Keine Instrumente angegeben
+  Line 8981: Reference -> Line: {/* Ungeeignete Instrumente */}
+  Line 9448: Reference -> Line: ? 'Verwalte deine Songs, Instrumentierungen und Lehrwerke für den Campus.'
+  Line 9449: Reference -> Line: : 'Verwalte deine Songs und deren Instrumentierungen für GrooveLab.'}
+  Line 9567: Reference -> Line: <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+  Line 9570: Reference -> Line: const count = newSong.instrumentation?.[inst] || 0;
+  Line 9577: Reference -> Line: const currentInst = { ...newSong.instrumentation };
+  Line 9579: Reference -> Line: setNewSong({ ...newSong, instrumentation: currentInst });
+  Line 9635: Reference -> Line: {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+  Line 9663: Reference -> Line: const currentInst = { ...newSong.instrumentation };
+  Line 9665: Reference -> Line: setNewSong({ ...newSong, instrumentation: currentInst });
+  Line 9700: Reference -> Line: const currentInst = { ...newSong.instrumentation };
+  Line 9702: Reference -> Line: setNewSong({ ...newSong, instrumentation: currentInst });
+  Line 9791: Reference -> Line: <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
+  Line 9794: Reference -> Line: const count = editingSong.instrumentation?.[inst] || 0;
+  Line 9801: Reference -> Line: const currentInst = { ...editingSong.instrumentation };
+  Line 9803: Reference -> Line: setEditingSong({ ...editingSong, instrumentation: currentInst });
+  Line 9859: Reference -> Line: {renderInstrumentIcon(inst, isSelected ? '#a16207' : '#94a3b8', 26)}
+  Line 9887: Reference -> Line: const currentInst = { ...editingSong.instrumentation };
+  Line 9889: Reference -> Line: setEditingSong({ ...editingSong, instrumentation: currentInst });
+  Line 9924: Reference -> Line: const currentInst = { ...editingSong.instrumentation };
+  Line 9926: Reference -> Line: setEditingSong({ ...editingSong, instrumentation: currentInst });
+  Line 9981: Reference -> Line: const inst = song.instrumentation || {};
+  Line 9992: Reference -> Line: setEditingSong({...song, instrumentation: norm});
+  Line 11066: Reference -> Line: {/* Left: Challenges per Instrument */}
+  Line 11157: Reference -> Line: <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+  Line 11255: Reference -> Line: const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();
+  Line 11290: Reference -> Line: instrument: sub.instrument
+  Line 11538: Reference -> Line: src={activePlatform === 'campus' ? resolveCampusAvatar(student) : (student.photo_url || '/avatar_ghost.jpg')}
+  Line 11853: Reference -> Line: const norm = normalizeInstrument(sub.instrument);
+  Line 11889: Reference -> Line: src={activePlatform === 'campus' ? resolveCampusAvatar(sub.users) : (sub.users?.photo_url || '/avatar_ghost.jpg')}
+  Line 11907: Reference -> Line: background: INSTRUMENT_COLORS[norm] || '#cbd5e1',
+  Line 11911: Reference -> Line: {ADMIN_INSTRUMENT_ICONS[sub.instrument] || '🎸'}
+  Line 12290: Reference -> Line: {/* Top Info Section: Details left, Avatar right */}
+  Line 12292: Reference -> Line: {/* Right Side: Avatar Photo */}
+  Line 12294: Reference -> Line: src={qrAvatarDataUrl || '/avatar_ghost.jpg'}
+  Line 12296: Reference -> Line: crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
+  Line 12297: Reference -> Line: alt="Avatar"
+  Line 12383: Reference -> Line: src={qrAvatarDataUrl || '/avatar_ghost.jpg'}
+  Line 12385: Reference -> Line: crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
+  Line 12511: Reference -> Line: const handleUpdateInstrument = async (val: string) => {
+  Line 12513: Reference -> Line: setEditingStationInstrument(val);
+  Line 12514: Reference -> Line: setStations(prev => prev.map(s => s.id === activeEditStationId ? { ...s, instrument: val } : s));
+  Line 12515: Reference -> Line: await supabase.from('stations').update({ instrument: val }).eq('id', activeEditStationId);
+  Line 12607: Reference -> Line: <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>Bewege die iPads an ihre Plätze und konfiguriere die Instrumente.</p>
+  Line 12740: Reference -> Line: {station.instrument && (
+  Line 12742: Reference -> Line: {station.instrument === 'E-Piano' && '🎹'}
+  Line 12743: Reference -> Line: {station.instrument === 'E-Drums' && '🥁'}
+  Line 12744: Reference -> Line: {station.instrument === 'E-Gitarre' && '🎸'}
+  Line 12745: Reference -> Line: {station.instrument === 'E-Bass' && '🎸'}
+  Line 12746: Reference -> Line: {station.instrument === 'Vocals' && '🎤'}
+  Line 12747: Reference -> Line: <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{station.instrument}</span>
+  Line 12853: Reference -> Line: {/* Instrument Select */}
+  Line 12855: Reference -> Line: <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Musikinstrument</label>
+  Line 12857: Reference -> Line: value={editingStationInstrument}
+  Line 12858: Reference -> Line: onChange={e => handleUpdateInstrument(e.target.value)}
+  Line 12861: Reference -> Line: <option value="">-- Instrument wählen --</option>
+  Line 14500: Reference -> Line: setEditSongInstrumentation(song.instrumentation || {});
+  Line 14572: Reference -> Line: return name.includes(query) || (s.instrument || '').toLowerCase().includes(query);
+  Line 14697: Reference -> Line: onClick={(e) => { e.stopPropagation(); handleUnassignStudentFromSong(s.id, s.user_id, song.title, s.instrument); }}
+  Line 14767: Reference -> Line: selectedSongSkill.instrument,
+  Line 14818: Reference -> Line: selectedSongSkill.instrument,
+  Line 15907: Reference -> Line: photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
+  Line 15987: Reference -> Line: <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  Line 15996: Reference -> Line: <div style={{ fontSize: '0.7rem', fontWeight: 700, color: brandColor, textTransform: 'uppercase' }}>{m.instrument}</div>
+  Line 16046: Reference -> Line: <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+  Line 16054: Reference -> Line: <option value="" disabled>Instrument?</option>
+  Line 16055: Reference -> Line: {Object.keys(ADMIN_INSTRUMENT_ICONS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+  Line 16071: Reference -> Line: value={externalInstrument}
+  Line 16072: Reference -> Line: onChange={e => setExternalInstrument(e.target.value)}
+  Line 16075: Reference -> Line: {Object.keys(INSTRUMENT_COLORS).map(inst => <option key={inst} value={inst}>{inst}</option>)}
+  Line 16079: Reference -> Line: onClick={() => handleAddMember(showAddMember!, null, externalInstrument, externalName)}
+  Line 16243: Reference -> Line: backgroundImage: `url(${u.photo_url || '/avatar_ghost.jpg'})`,
+  Line 16544: Reference -> Line: backgroundImage: `url(${activeSession.profiles?.photo_url || '/avatar_ghost.jpg'})`,
+
+==========================================
+AUDIT REPORT FOR: SecretaryDashboard.tsx
+==========================================
+
+--- Brand Naming Violations ---
+  Line 1120: Found 'groovelab' -> Line: if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
+  Line 1242: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', activeTab);
+  Line 1246: Found 'groovelab' -> Line: localStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
+  Line 1250: Found 'groovelab' -> Line: localStorage.setItem('groovelab_campus_subtab', campusSubTab);
+  Line 1426: Found 'groovelab' -> Line: return localStorage.getItem('groovelab_holiday_xp_active') === 'true';
+  Line 1459: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`, value.toString());
+  Line 1498: Found 'groovelab' -> Line: else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
+  Line 1498: Found 'groovelab' -> Line: else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
+  Line 1499: Found 'groovelab' -> Line: else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
+  Line 2215: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
+  Line 2259: Found 'Groovelab' -> Line: link.setAttribute("download", `Aenderungsprotokoll_Campus_Groovelab_${new Date().toISOString().slice(0,10)}.csv`);
+  Line 2274: Found 'groovelab' -> Line: is_groovelab_active: 'Campus-Groovelab-Zugang',
+  Line 2423: Found 'groovelab' -> Line: .from('groovelab_tickets')
+  Line 2647: Found 'groovelab' -> Line: .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+  Line 2647: Found 'groovelab' -> Line: .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+  Line 2647: Found 'groovelab' -> Line: .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+  Line 2652: Found 'groovelab' -> Line: .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
+  Line 2702: Found 'groovelab' -> Line: setKioskToken(schoolData.groovelab_kiosk_token || '');
+  Line 3094: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_schedules_cache_${schoolId}`, JSON.stringify(allSchedulesData));
+  Line 3147: Found 'groovelab' -> Line: return JSON.parse(localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`) || '{}');
+  Line 3217: Found 'groovelab' -> Line: teacherId: 'groovelab',
+  Line 3290: Found 'groovelab' -> Line: .from('groovelab_tickets')
+  Line 3673: Found 'groovelab' -> Line: localStorage.setItem('groovelab_holiday_xp_active', newValue ? 'true' : 'false');
+  Line 3810: Found 'GrooveLab' -> Line: name: 'GrooveLab',
+  Line 3812: Found 'GrooveLab' -> Line: description: 'Automatisch angelegtes Fach für GrooveLab-Unterricht'
+  Line 3815: Found 'GrooveLab' -> Line: console.error('Error seeding GrooveLab subject:', insertErr);
+  Line 4456: Found 'GrooveLab' -> Line: alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich für GrooveLab angelegt.`);
+  Line 6315: Found 'Groovelab' -> Line: <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
+  Line 6401: Found 'groovelab' -> Line: <option value="groovelab">GrooveLab Aktiv</option>
+  Line 6401: Found 'GrooveLab' -> Line: <option value="groovelab">GrooveLab Aktiv</option>
+  Line 6585: Found 'campus-groovelab' -> Line: input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+  Line 6644: Found 'campus-groovelab' -> Line: input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+  Line 6684: Found 'groovelab' -> Line: background: student.is_groovelab_active ? '#fef3c7' : '#f5f5f7',
+  Line 6685: Found 'groovelab' -> Line: color: student.is_groovelab_active ? '#b45309' : '#86868b'
+  Line 7064: Found 'GrooveLab' -> Line: <strong style={{ display: 'block', fontSize: '0.82rem', color: '#1e293b' }}>GrooveLab Modul aktiv</strong>
+  Line 7065: Found 'GrooveLab' -> Line: <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Erlaubt dem Schüler die Nutzung der GrooveLab-App.</span>
+  Line 7129: Found 'Groovelab' -> Line: .eq('user_id', selectedGroovelabStudentId);
+  Line 7141: Found 'Groovelab' -> Line: .eq('user_id', selectedGroovelabStudentId);
+  Line 7165: Found 'Groovelab' -> Line: .eq('user_id', selectedGroovelabStudentId);
+  Line 7171: Found 'Groovelab' -> Line: .eq('user_id', selectedGroovelabStudentId);
+  Line 7177: Found 'Groovelab' -> Line: .eq('id', selectedGroovelabStudentId);
+  Line 7180: Found 'GrooveLab' -> Line: alert('Die Profile wurden erfolgreich verknüpft! Die GrooveLab-Daten wurden auf das Campus-Profil übertragen.');
+  Line 7182: Found 'Groovelab' -> Line: setSelectedGroovelabStudentId('');
+  Line 7504: Found 'GrooveLab' -> Line: alert(`GrooveLab-Zugang erfolgreich ${!currentVal ? 'aktiviert' : 'deaktiviert'}.`);
+  Line 7582: Found 'groovelab' -> Line: if (plan.teacherId === 'groovelab') {
+  Line 7721: Found 'groovelab' -> Line: if (p.teacherId === 'groovelab') {
+  Line 7748: Found 'groovelab' -> Line: localStorage.removeItem(`groovelab_matrix_allocations_draft_${schoolId}`);
+  Line 8000: Found 'Groovelab' -> Line: if (!confirm('Das Groovelab ist an diesem Tag geschlossen. Möchtest du die Zuweisung trotzdem durchführen?')) {
+  Line 8007: Found 'Groovelab' -> Line: if (!confirm(`Die Unterrichtszeit (${plan.startTime}–${plan.endTime}) liegt außerhalb der Öffnungszeiten des Groovelabs (${dayHours.start}–${dayHours.end}). Zuweisung trotzdem durchführen?`)) {
+  Line 8089: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+  Line 8093: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
+  Line 8097: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+  Line 8101: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
+  Line 8201: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+  Line 8205: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
+  Line 8209: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+  Line 8213: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_sonstiges_mappings_${schoolId}`, JSON.stringify(sonstiges));
+  Line 8416: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+  Line 8580: Found 'groovelab' -> Line: localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+  Line 8583: Found 'groovelab' -> Line: localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+  Line 8713: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
+  Line 8714: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_instrument_links_${schoolId}`, JSON.stringify(localLinkMap));
+  Line 8775: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8818: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8861: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8907: Found 'groovelab' -> Line: case 'groovelab':
+  Line 8913: Found 'GrooveLab' -> Line: default: return '🎸 GrooveLab Verwaltung';
+  Line 9783: Found 'GrooveLab' -> Line: {activeTab === 'secretary' ? 'Verwaltung' : activeTab === 'campus' ? 'Campus' : 'GrooveLab'}
+  Line 9886: Found 'groovelab' -> Line: {activeTab === 'groovelab' && [
+  Line 9901: Found 'groovelab' -> Line: <div className="sidebar-icon-circle groovelab">
+  Line 10006: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'secretary');
+  Line 10041: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'campus');
+  Line 10076: Found 'groovelab' -> Line: setActiveTab('groovelab');
+  Line 10077: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'groovelab');
+  Line 10077: Found 'groovelab' -> Line: localStorage.setItem('groovelab_active_workspace', 'groovelab');
+  Line 10085: Found 'groovelab' -> Line: background: activeTab === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.05)',
+  Line 10086: Found 'groovelab' -> Line: color: activeTab === 'groovelab' ? '#09090b' : '#b45309',
+  Line 10087: Found 'groovelab' -> Line: border: activeTab === 'groovelab' ? '1px solid #fbbc05' : '1px solid rgba(251, 188, 5, 0.18)',
+  Line 10094: Found 'groovelab' -> Line: zIndex: activeTab === 'groovelab' ? 2 : 1,
+  Line 10095: Found 'groovelab' -> Line: transform: activeTab === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
+  Line 10096: Found 'groovelab' -> Line: boxShadow: activeTab === 'groovelab' ? '0 -4px 16px rgba(251, 188, 5, 0.18)' : 'none',
+  Line 10103: Found 'groovelab' -> Line: <Music size={15} color={activeTab === 'groovelab' ? '#09090b' : '#b45309'} />
+  Line 10104: Found 'GrooveLab' -> Line: <span>GrooveLab</span>
+  Line 10399: Found 'groovelab' -> Line: {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
+  Line 14261: Found 'groovelab' -> Line: handleToggleTeacherModule(t, 'groovelab');
+  Line 14657: Found 'Groovelab' -> Line: <strong style={{ fontSize: '0.88rem', display: 'block', fontWeight: 800 }}>Groovelab geschlossen</strong>
+  Line 14658: Found 'Groovelab' -> Line: <span style={{ fontSize: '0.78rem', opacity: 0.9, fontWeight: 600 }}>Das Groovelab ist am {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][liveViewDay]} geschlossen. (Die hier gezeigten Timelines gelten für Groovelab-Räume)</span>
+  Line 14658: Found 'Groovelab' -> Line: <span style={{ fontSize: '0.78rem', opacity: 0.9, fontWeight: 600 }}>Das Groovelab ist am {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][liveViewDay]} geschlossen. (Die hier gezeigten Timelines gelten für Groovelab-Räume)</span>
+  Line 15388: Found 'groovelab' -> Line: {selectedDayPlan.teacherId === 'groovelab' ? (
+  Line 16638: Found 'groovelab' -> Line: id: 'groovelab',
+  Line 17244: Found 'groovelab' -> Line: {activeTab === 'groovelab' && (
+  Line 17249: Found 'groovelab' -> Line: {groovelabSubTab === 'live' && (() => {
+  Line 17281: Found 'groovelab' -> Line: localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+  Line 17559: Found 'groovelab' -> Line: {groovelabSubTab === 'students' && (() => {
+  Line 17583: Found 'groovelab' -> Line: (s.first_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
+  Line 17584: Found 'groovelab' -> Line: (s.last_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
+  Line 17585: Found 'groovelab' -> Line: (s.nickname || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim())
+  Line 17622: Found 'Groovelab' -> Line: setGroovelabStudentModalSearchQuery('');
+  Line 17670: Found 'groovelab' -> Line: {groovelabStudentSearchQuery.trim() !== '' && (
+  Line 17714: Found 'groovelab' -> Line: await handleToggleStudentModule(s, 'groovelab');
+  Line 17715: Found 'Groovelab' -> Line: setGroovelabStudentSearchQuery('');
+  Line 17936: Found 'GrooveLab' -> Line: if (window.confirm(`Möchtest du den GrooveLab-Zugang für ${studentName} wirklich beenden?`)) {
+  Line 17937: Found 'groovelab' -> Line: await handleToggleStudentModule(student, 'groovelab');
+  Line 18007: Found 'groovelab' -> Line: (s.first_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
+  Line 18008: Found 'groovelab' -> Line: (s.last_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
+  Line 18009: Found 'groovelab' -> Line: (s.nickname || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim())
+  Line 18046: Found 'groovelab' -> Line: await handleToggleStudentModule(s, 'groovelab');
+  Line 18088: Found 'Groovelab' -> Line: <form onSubmit={handleCreateStudentGroovelab}>
+  Line 18194: Found 'groovelab' -> Line: {groovelabSubTab === 'coaches' && (() => {
+  Line 18341: Found 'groovelab' -> Line: await handleToggleTeacherModule(t, 'groovelab');
+  Line 18562: Found 'groovelab' -> Line: handleToggleTeacherModule(t, 'groovelab');
+  Line 18669: Found 'groovelab' -> Line: await handleToggleTeacherModule(t, 'groovelab');
+  Line 18711: Found 'Groovelab' -> Line: <form onSubmit={handleCreateCoachForGroovelab}>
+  Line 18802: Found 'groovelab' -> Line: {groovelabSubTab === 'kiosk' && (
+  Line 18995: Found 'GrooveLab' -> Line: <span><strong>Kombi-Vorteil sichern:</strong> Campus (7,99 €) &amp; GrooveLab (4,99 €) im Bundle für nur <strong>9,99 € / Mo.</strong> statt 12,98 € / Mo. (du sparst dauerhaft 2,99 € jeden Monat)!</span>
+  Line 19066: Found 'Groovelab' -> Line: borderColor: hasGroovelabSub ? '#eab308' : 'rgba(0,0,0,0.06)',
+  Line 19067: Found 'Groovelab' -> Line: boxShadow: hasGroovelabSub ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
+  Line 19084: Found 'Groovelab' -> Line: borderColor: hasGroovelabSub ? '#eab308' : '#cbd5e1',
+  Line 19085: Found 'Groovelab' -> Line: background: hasGroovelabSub ? '#eab308' : 'transparent',
+  Line 19092: Found 'Groovelab' -> Line: {hasGroovelabSub && '✓'}
+  Line 19104: Found 'Groovelab' -> Line: <span style={{ color: hasGroovelabSub ? '#a16207' : '#94a3b8', fontWeight: 800 }}>{hasGroovelabSub ? 'Aktiviert' : 'Bereit'}</span>
+  Line 19104: Found 'Groovelab' -> Line: <span style={{ color: hasGroovelabSub ? '#a16207' : '#94a3b8', fontWeight: 800 }}>{hasGroovelabSub ? 'Aktiviert' : 'Bereit'}</span>
+  Line 19124: Found 'Groovelab' -> Line: background: (!hasCampusSub && !hasGroovelabSub) ? '#cbd5e1' : '#10b981',
+  Line 19128: Found 'Groovelab' -> Line: cursor: (!hasCampusSub && !hasGroovelabSub) ? 'not-allowed' : 'pointer',
+  Line 19129: Found 'Groovelab' -> Line: boxShadow: (!hasCampusSub && !hasGroovelabSub) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.15)',
+  Line 19467: Found 'GrooveLab' -> Line: <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
+  Line 19467: Found 'GrooveLab' -> Line: <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
+  Line 19765: Found 'Groovelab' -> Line: <span>Server- &amp; Cloud-Infrastruktur ({[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' + ')}):</span>
+  Line 19765: Found 'GrooveLab' -> Line: <span>Server- &amp; Cloud-Infrastruktur ({[hasCampusSub && 'Campus', hasGroovelabSub && 'GrooveLab'].filter(Boolean).join(' + ')}):</span>
+  Line 20089: Found 'Groovelab' -> Line: <span>Server- &amp; Cloud-Infrastruktur Groovelab:</span>
+  Line 20621: Found 'Groovelab' -> Line: <span>Server &amp; Service Gebühren Groovelab:</span>
+  Line 20625: Found 'Groovelab' -> Line: <span>Kombi-Rabatt (Campus + Groovelab):</span>
+  Line 20639: Found 'Groovelab' -> Line: <span>Server &amp; Service Gebühren Groovelab:</span>
+  Line 21297: Found 'groovelab' -> Line: return JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+  Line 21326: Found 'groovelab' -> Line: else if (roomFilterStatus === 'groovelab') matchesStatus = r.is_groovelab_active;
+  Line 21326: Found 'groovelab' -> Line: else if (roomFilterStatus === 'groovelab') matchesStatus = r.is_groovelab_active;
+  Line 21327: Found 'groovelab' -> Line: else if (roomFilterStatus === 'inactive') matchesStatus = (r.is_campus_active === false) && !r.is_groovelab_active;
+  Line 21623: Found 'GrooveLab' -> Line: <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
+  Line 21624: Found 'groovelab' -> Line: <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{rooms.filter(r => r.is_groovelab_active).length}</strong>
+  Line 22100: Found 'groovelab' -> Line: <option value="groovelab">Groovelab</option>
+  Line 22100: Found 'Groovelab' -> Line: <option value="groovelab">Groovelab</option>
+  Line 22306: Found 'groovelab' -> Line: background: room.is_groovelab_active ? '#fef3c7' : '#f1f5f9',
+  Line 22307: Found 'groovelab' -> Line: color: room.is_groovelab_active ? '#a16207' : '#64748b',
+  Line 22437: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
+  Line 22529: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+  Line 22600: Found 'groovelab' -> Line: localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
+  Line 22793: Found 'Groovelab' -> Line: border: roomFormIsGroovelabActive ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+  Line 22794: Found 'Groovelab' -> Line: background: roomFormIsGroovelabActive ? '#fce8e6' : '#ffffff',
+  Line 22810: Found 'Groovelab' -> Line: <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Groovelab</span>
+  Line 22811: Found 'Groovelab' -> Line: <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Für Groovelab freischalten</span>
+  Line 23075: Found 'groovelab' -> Line: {selectedDayPlan.teacherId === 'groovelab' ? (
+  Line 23078: Found 'GrooveLab' -> Line: <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>GrooveLab Betriebszeit</span>
+  Line 24142: Found 'Groovelab' -> Line: <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID & Integration Link (Campus & Groovelab)</strong>
+  Line 24149: Found 'campus-groovelab' -> Line: value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`}
+  Line 24349: Found 'GrooveLab' -> Line: <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>⚡ Synchronisation (Campus &amp; GrooveLab)</strong>
+  Line 24566: Found 'Groovelab' -> Line: downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
+  Line 24838: Found 'groovelab' -> Line: } else if (newPlatform === 'groovelab') {
+  Line 24839: Found 'Groovelab' -> Line: setGroovelabSubTab('live');
+  Line 25183: Found 'GrooveLab' -> Line: <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Music size={15} style={{ color: '#64748b' }} /> GrooveLab Freigabe</span>
+  Line 25748: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales, jedoch rein komplementäres Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs, der organisatorischen Infrastruktur sowie zur pädagogischen Lernbegleitung mittels Gamification-Elementen.</p>
+  Line 25889: Found 'GrooveLab' -> Line: <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+  Line 25904: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
+  Line 25909: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+  Line 25914: Found 'GrooveLab' -> Line: <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>GrooveLab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+
+--- Color Violations ---
+  Line 5129: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: '#137333',
+  Line 5406: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+  Line 5709: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: c.status === 'active' ? '#137333' : c.status === 'pending' ? '#b45309' : '#86868b',
+  Line 6215: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+  Line 6624: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: student.is_campus_active ? '#137333' : '#86868b',
+  Line 6723: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: '#137333',
+  Line 9871: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: background: isSelected ? '#34a853' : '#e6f4ea',
+  Line 9911: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <div style={{ borderTop: activeTab === 'campus' ? '1px solid #d1fae5' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
+  Line 12040: Green theme elements in Admin/Secretariat: ['#e6f4ea', '#137333'] -> Line: <span style={{ fontSize: '0.78rem', background: pendingCount > 0 ? (isToday ? '#fee2e2' : '#f1f5f9') : '#e6f4ea', color: pendingCount > 0 ? '#dc2626' : '#137333', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
+  Line 12153: Green theme elements in Admin/Secretariat: ['#e6f4ea', '#137333'] -> Line: <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+  Line 12161: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: const rateBg = successRate >= 80 ? '#d1fae5' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
+  Line 12270: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: background: sickTeachers.length === 0 ? '#e6f4ea' : '#fee2e2',
+  Line 12906: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: isActive ? '#137333' : '#86868b',
+  Line 13807: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: <ClipboardList size={18} style={{ color: '#137333' }} />
+  Line 13812: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: <AlertCircle size={20} style={{ color: '#137333', flexShrink: 0 }} />
+  Line 13822: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: <Key size={20} style={{ color: '#137333', flexShrink: 0 }} />
+  Line 14010: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+  Line 14132: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: #137333;
+  Line 14311: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: '#137333',
+  Line 14808: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: let themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
+  Line 15856: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isActive ? '#d1fae5' : '#f1f5f9',
+  Line 15941: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isActive ? '#d1fae5' : '#f1f5f9',
+  Line 16028: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: '#137333',
+  Line 16049: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isActive ? '#d1fae5' : '#f1f5f9',
+  Line 16231: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isSelected ? '#d1fae5' : '#f1f5f9',
+  Line 16346: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isActive ? '#d1fae5' : '#f1f5f9',
+  Line 16414: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isActive ? '#d1fae5' : '#f1f5f9',
+  Line 16497: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: isSelected ? '#d1fae5' : '#f1f5f9',
+  Line 18858: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.74rem', color: '#15803d', background: '#d1fae5', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+  Line 18972: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 1 von 4</span>
+  Line 19146: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 2 von 4</span>
+  Line 19333: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: 2. Jahresbeitrag bei Aktivierung <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>10% Rabatt</span>
+  Line 19364: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: 3. Einmalige Komplett-Aktivierung zum Schuljahresstart <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>20% Rabatt</span>
+  Line 19519: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 4</span>
+  Line 19737: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
+  Line 19755: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #d1fae5', paddingBottom: '6px' }}>
+  Line 19757: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', color: '#047857', background: '#d1fae5', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>14 Tage Zahlungsziel</span>
+  Line 19782: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <div style={{ fontSize: '0.62rem', color: '#047857', borderTop: '1px solid #d1fae5', paddingTop: '6px', marginTop: '4px' }}>
+  Line 20219: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: '#d1fae5',
+  Line 20464: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.74rem', background: '#d1fae5', color: '#065f46', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+  Line 20519: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+  Line 21220: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: billingPayer === 'student' ? '#d1fae5' : '#ffedd5',
+  Line 21232: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: background: inv.status === 'Versendet' ? '#d1fae5' : inv.status === 'Bezahlt' ? '#e0f2fe' : '#fef3c7',
+  Line 21883: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+  Line 22279: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: background: room.is_campus_active !== false ? '#e6f4ea' : '#f1f5f9',
+  Line 22280: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: room.is_campus_active !== false ? '#137333' : '#86868b',
+  Line 22481: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+  Line 24733: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: let badgeBg = '#e6f4ea';
+  Line 24734: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: let badgeColor = '#137333';
+  Line 24853: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: const avatarBgColor = activeTab === 'campus' ? '#e6f4ea' : '#fef3c7';
+  Line 24854: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: const avatarTextColor = activeTab === 'campus' ? '#137333' : '#b45309';
+  Line 24923: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: e.currentTarget.style.background = '#e6f4ea';
+  Line 24924: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: e.currentTarget.style.color = '#137333';
+  Line 24942: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
+  Line 25023: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: border: `1px solid ${active ? '#137333' : '#e2e8f0'}`,
+  Line 25024: Green theme elements in Admin/Secretariat: ['#e6f4ea'] -> Line: background: active ? '#e6f4ea' : 'white',
+  Line 25025: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: color: active ? '#137333' : '#64748b',
+  Line 25208: Green theme elements in Admin/Secretariat: ['#137333'] -> Line: accentColor: '#137333',
+  Line 25362: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: {isCurrentActive && <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>Aktuell aktiv</span>}
+  Line 25497: Green theme elements in Admin/Secretariat: ['#d1fae5'] -> Line: <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '100px', fontWeight: 800, display: 'inline-block' }}>
+
+--- Emoji/Colored Icon Violations ---
+  Line 2374: Found emoji(s) '➔' -> Line: <span style={{ color: '#94a3b8' }}>➔</span>
+  Line 3547: Found emoji(s) '🍏' -> Line: const alertMessage = `🍏 LEHRKRAFT GESUND (Verwaltung): Lehrkraft ${teacherName} wurde durch die Verwaltung wieder gesund gemeldet.`;
+  Line 3925: Found emoji(s) '📅🔗' -> Line: alert('Kalender-Feeds erfolgreich gespeichert! 📅🔗');
+  Line 3953: Found emoji(s) '🏢' -> Line: alert('Stammdaten der Musikschule erfolgreich gespeichert! 🏢');
+  Line 3983: Found emoji(s) '🎨🔗' -> Line: alert('Schul- und Kalendereinstellungen erfolgreich gespeichert! 🎨🔗');
+  Line 5017: Found emoji(s) '📥' -> Line: 📥 Fächer importieren
+  Line 5161: Found emoji(s) '✕' -> Line: ✕
+  Line 5305: Found emoji(s) '📄' -> Line: 📄 Sammel-Onboarding (CSV) {isCooperationCsvExpanded ? '▲' : '▼'}
+  Line 5327: Found emoji(s) '➕' -> Line: ➕ Kooperation anlegen
+  Line 5368: Found emoji(s) '⚡' -> Line: ⚡ Smart Auto-Zuweisung:
+  Line 5471: Found emoji(s) '🔍' -> Line: <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+  Line 5503: Found emoji(s) '🎺' -> Line: <option value="All">🎺 Alle Unterrichtsfächer</option>
+  Line 5519: Found emoji(s) '👥' -> Line: <option value="All">👥 Alle Lehrer</option>
+  Line 5536: Found emoji(s) '⚡' -> Line: <option value="All">⚡ Alle Statuspartner</option>
+  Line 5537: Found emoji(s) '🟢' -> Line: <option value="active">🟢 Aktiv</option>
+  Line 5538: Found emoji(s) '🟡' -> Line: <option value="pending">🟡 Ausstehend</option>
+  Line 5539: Found emoji(s) '⚪' -> Line: <option value="inactive">⚪ Inaktiv</option>
+  Line 5610: Found emoji(s) '🏫' -> Line: 🏫 {c.name}
+  Line 5614: Found emoji(s) '👤' -> Line: <span>👤 {c.contact_person}</span>
+  Line 5617: Found emoji(s) '📞' -> Line: <span>📞 {c.phone}</span>
+  Line 5648: Found emoji(s) '📯' -> Line: <option value="">📯 Unterrichtsfach wählen</option>
+  Line 5680: Found emoji(s) '👥' -> Line: <option value="">👥 Zuweisen...</option>
+  Line 5717: Found emoji(s) '🟢' -> Line: <option value="active">🟢 Aktiv</option>
+  Line 5718: Found emoji(s) '🟡' -> Line: <option value="pending">🟡 Ausstehend</option>
+  Line 5719: Found emoji(s) '⚪' -> Line: <option value="inactive">⚪ Inaktiv</option>
+  Line 5740: Found emoji(s) '✉' -> Line: ✉️
+  Line 5848: Found emoji(s) '➕' -> Line: ➕ Neue Kooperation anlegen
+  Line 5854: Found emoji(s) '✕' -> Line: ✕
+  Line 5914: Found emoji(s) '📯' -> Line: <option value="">📯 Fach wählen...</option>
+  Line 5927: Found emoji(s) '👥' -> Line: <option value="">👥 Lehrkraft zuweisen...</option>
+  Line 6066: Found emoji(s) '📄' -> Line: 📄 Sammel-Onboarding (CSV) {isStudentCsvExpanded ? '▲' : '▼'}
+  Line 6088: Found emoji(s) '➕' -> Line: ➕ Schüler anlegen
+  Line 6140: Found emoji(s) '⚡' -> Line: ⚡ Smart Auto-Zuweisung:
+  Line 6926: Found emoji(s) '➕' -> Line: ➕ Neuen Schüler anlegen
+  Line 6932: Found emoji(s) '✕' -> Line: ✕
+  Line 8891: Found emoji(s) '📊' -> Line: case 'briefing': return '📊 Tägliches Briefing & Status';
+  Line 8892: Found emoji(s) '🚨' -> Line: case 'crisis': return '🚨 Operations-Cockpit: Krisen-Dashboard';
+  Line 8893: Found emoji(s) '🎸' -> Line: case 'equipment': return '🎸 Instrumente & Ausstattung';
+  Line 8894: Found emoji(s) '👥' -> Line: case 'employees': return '👥 Mitarbeiterverwaltung';
+  Line 8895: Found emoji(s) '💳' -> Line: case 'licenses': return '💳 Abrechnung & Infrastruktur';
+  Line 8896: Found emoji(s) '⚙' -> Line: case 'setup': return '⚙️ Setup & Systemeinstellungen';
+  Line 8897: Found emoji(s) '💼' -> Line: default: return '💼 Verwaltung';
+  Line 8901: Found emoji(s) '🎓' -> Line: case 'briefing': return '🎓 Campus-Zentrale';
+  Line 8905: Found emoji(s) '🎓' -> Line: default: return '🎓 Campus Verwaltung';
+  Line 8913: Found emoji(s) '🎸' -> Line: default: return '🎸 GrooveLab Verwaltung';
+  Line 9018: Found emoji(s) '🎸' -> Line: 🎸
+  Line 9263: Found emoji(s) '✕' -> Line: ✕
+  Line 9308: Found emoji(s) '📖' -> Line: 📖 Raumbuchungen Logbuch
+  Line 9337: Found emoji(s) '✕' -> Line: ✕
+  Line 9493: Found emoji(s) '✓' -> Line: {b.status === 'pending' ? '⏳ Vorläufig' : '✓ Bestätigt'}
+  Line 9497: Found emoji(s) '📍' -> Line: <span style={{ marginRight: '12px' }}>📍 Raum: <strong>{roomName}</strong></span>
+  Line 9498: Found emoji(s) '👤' -> Line: <span style={{ marginRight: '12px' }}>👤 Gebucht von: <strong>{teacherName}</strong></span>
+  Line 9499: Found emoji(s) '📅' -> Line: <span>📅 {dateFormatted} ({b.start_time.substring(0, 5)} - {b.end_time.substring(0, 5)})</span>
+  Line 9632: Found emoji(s) '✕' -> Line: ✕
+  Line 9654: Found emoji(s) '📝' -> Line: let actionIcon = '📝';
+  Line 9660: Found emoji(s) '👤' -> Line: actionIcon = '👤';
+  Line 9676: Found emoji(s) '✅' -> Line: actionIcon = '✅';
+  Line 9681: Found emoji(s) '🚫' -> Line: actionIcon = '🚫';
+  Line 9686: Found emoji(s) '⚡' -> Line: actionIcon = '⚡';
+  Line 9708: Found emoji(s) '📅' -> Line: 📅 {dateStr} • Durchgeführt von: <strong>{changerName}</strong>
+  Line 10193: Found emoji(s) '✕' -> Line: ✕
+  Line 10332: Found emoji(s) '🛠' -> Line: <span>🛠️</span>
+  Line 10358: Found emoji(s) '✨' -> Line: <span>✨</span>
+  Line 10556: Found emoji(s) '📧' -> Line: <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>📧</div>
+  Line 10629: Found emoji(s) '✕' -> Line: ✕
+  Line 10824: Found emoji(s) '👋' -> Line: 👋
+  Line 11068: Found emoji(s) '👍' -> Line: <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>👍</div>
+  Line 11125: Found emoji(s) '📅' -> Line: 📅 {daysLabel} ({data.slotsCount} {data.slotsCount === 1 ? 'Termin' : 'Termine'})
+  Line 11194: Found emoji(s) '🎉' -> Line: <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🎉</div>
+  Line 11598: Found emoji(s) '🚨' -> Line: RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: '🚨 Akuter Ausfall', dot: '#ef4444' },
+  Line 11600: Found emoji(s) '✓' -> Line: GREEN:  { leftBar: '#10b981', bg: 'linear-gradient(135deg, rgba(240, 253, 244, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(16, 185, 129, 0.25)', badge: '#10b981', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#10b981' },
+  Line 11659: Found emoji(s) '⚠' -> Line: ⚠️ Ausfall in unter 2h - telefonischer Sofort-Kontakt empfohlen!
+  Line 11877: Found emoji(s) '🧹' -> Line: 🧹 {liveTickets.filter(n => getUrgency(n) === 'GREEN').length} erledigte Ausfälle archivieren
+  Line 12154: Found emoji(s) '✓' -> Line: ✓ {successCount} Schüler erreicht
+  Line 12157: Found emoji(s) '❌' -> Line: {failedCount > 0 ? `❌ ${failedCount} nicht erreicht` : 'Alle erreicht'}
+  Line 12232: Found emoji(s) '✓❌' -> Line: {isSuccess ? '✓ Erfolgreich informiert' : '❌ Nicht rechtzeitig informiert'}
+  Line 12378: Found emoji(s) '✕' -> Line: >Filter aufheben ✕</button>
+  Line 12566: Found emoji(s) '⚡' -> Line: ⚡ Smart Auto-Zuweisung:
+  Line 12952: Found emoji(s) '🎓' -> Line: const subject = encodeURIComponent('Dein Campus-Mitarbeiterzugang 🎓');
+  Line 12957: Found emoji(s) '👉' -> Line: `👉 ${emp.ausweis_nummer}\n\n` +
+  Line 13021: Found emoji(s) '➕' -> Line: ➕ Neuen Mitarbeiter hinzufügen
+  Line 13027: Found emoji(s) '✕' -> Line: ✕
+  Line 13473: Found emoji(s) '🎓' -> Line: <span style={{ fontSize: '1.5rem' }}>🎓</span>
+  Line 13497: Found emoji(s) '⚠' -> Line: <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+  Line 14342: Found emoji(s) '✕' -> Line: ✕
+  Line 14478: Found emoji(s) '🎓' -> Line: 🎓 Campus Raum-Koordinationsboard
+  Line 14542: Found emoji(s) '⚡' -> Line: ⚡ Auto
+  Line 14553: Found emoji(s) '🔄' -> Line: 🔄 Zurücksetzen
+  Line 14560: Found emoji(s) '💾' -> Line: 💾 Speichern & Freigeben
+  Line 14641: Found emoji(s) '🏫' -> Line: <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+  Line 14697: Found emoji(s) '⚠' -> Line: ⚠️ KOLLISION
+  Line 14847: Found emoji(s) '⚡' -> Line: {plan.id.startsWith('adhoc_') ? '⚡ Spontan' : plan.instrument}
+  Line 14855: Found emoji(s) '☕' -> Line: ☕ Frei · Keine Zuweisungen
+  Line 14879: Found emoji(s) '🏫' -> Line: <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+  Line 14986: Found emoji(s) '⚠' -> Line: return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+  Line 15024: Found emoji(s) '⚠' -> Line: ⚠️ Nicht geeignet
+  Line 15127: Found emoji(s) '⚠' -> Line: {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
+  Line 15142: Found emoji(s) '⚠' -> Line: return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+  Line 15210: Found emoji(s) '⚡' -> Line: alert('Spontanbelegung erfolgreich eingebucht! ⚡');
+  Line 15215: Found emoji(s) '⚡' -> Line: <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>⚡ Spontanbelegung buchen</h3>
+  Line 15312: Found emoji(s) '🎸' -> Line: <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+  Line 15362: Found emoji(s) '🔗' -> Line: 🔗 Aufteilung aufheben (Zusammenfügen)
+  Line 15375: Found emoji(s) '✂' -> Line: ✂️ Block teilen an Pause um {pt.time} ({pt.duration} Min.)
+  Line 15411: Found emoji(s) '☕' -> Line: {isBreak ? '☕ Pause' : slot.student_name}
+  Line 16331: Found emoji(s) '👥' -> Line: 👥
+  Line 16855: Found emoji(s) '✅' -> Line: Alle Tage erfolgreich zugeteilt! ✅
+  Line 17974: Found emoji(s) '✕' -> Line: ✕
+  Line 18598: Found emoji(s) '✕' -> Line: ✕
+  Line 18805: Found emoji(s) '🔌' -> Line: <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>🔌 Tablets &amp; Kiosk-Integration</h3>
+  Line 18828: Found emoji(s) '☀' -> Line: <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>☀️ Ferien &amp; Feiertage</h3>
+  Line 18859: Found emoji(s) '🔒' -> Line: 🔒 100% DSGVO-konform auf deutschen Servern
+  Line 18993: Found emoji(s) '🎉' -> Line: <span style={{ fontSize: '1.2rem' }}>🎉</span>
+  Line 19038: Found emoji(s) '✓' -> Line: {hasCampusSub && '✓'}
+  Line 19092: Found emoji(s) '✓' -> Line: {hasGroovelabSub && '✓'}
+  Line 19110: Found emoji(s) '💡' -> Line: <span>💡</span>
+  Line 19137: Found emoji(s) '➔' -> Line: <span>➔</span>
+  Line 19151: Found emoji(s) '⚠' -> Line: ⚠️ Hinweis: Aktivierungen können nur für das Campus-Modul auf Schüler/Eltern umgelegt werden. GrooveLab-Aktivierungen werden immer von der Schule getragen.
+  Line 19182: Found emoji(s) '🏫' -> Line: 🏫 Musikschule übernimmt alle Kosten (Sammelzahler)
+  Line 19197: Found emoji(s) '✓' -> Line: {billingPayer === 'school' && '✓'}
+  Line 19235: Found emoji(s) '👥' -> Line: 👥 Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)
+  Line 19250: Found emoji(s) '✓' -> Line: {billingPayer === 'student' && '✓'}
+  Line 19466: Found emoji(s) '💡' -> Line: <span>💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Direktabrechnung zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).</span>
+  Line 19467: Found emoji(s) '💡' -> Line: <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
+  Line 19510: Found emoji(s) '➔' -> Line: Weiter zur Abrechnungsmethode <span>➔</span>
+  Line 19634: Found emoji(s) '💡' -> Line: 💡 Nach Abschluss erhalten die Eltern bei der Registrierung in der App ihren persönlichen Aktivierungscode und die Kontoverbindung von Campus-Groovelab.
+  Line 19677: Found emoji(s) '➔' -> Line: Weiter zur Zusammenfassung <span>➔</span>
+  Line 19783: Found emoji(s) '📍' -> Line: 📍 Rechnungsadresse: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}
+  Line 19853: Found emoji(s) '💡' -> Line: 💡 <strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an Campus-Groovelab. Die Musikschule hat dadurch **0,00 € Kosten** und keinen Verwaltungsaufwand.
+  Line 19859: Found emoji(s) '📍' -> Line: 📍 Rechnungsadresse für Aktivierungen: {customActivationBillingName}, {customActivationBillingStreet}, {customActivationBillingZip} {customActivationBillingCity}
+  Line 19922: Found emoji(s) '✓' -> Line: ✓ Gutscheincode active: {couponDiscount}% Rabatt auf Rechnung A (System &amp; Infrastruktur) angewendet!
+  Line 20032: Found emoji(s) '➔' -> Line: Zahlungspflichtig buchen &amp; freischalten <span>➔</span>
+  Line 20069: Found emoji(s) '💡' -> Line: <span>💡 Aktivierungs-Vorteil: Durch {activeStudentsCount_global} aktive Schüler sparst du monatlich {(activeStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € Infrastrukturgebühr!</span>
+  Line 20228: Found emoji(s) '✓' -> Line: ✓
+  Line 20254: Found emoji(s) '➔' -> Line: Zum Dashboard wechseln ➔
+  Line 20289: Found emoji(s) '✓' -> Line: }}>{isCancelled ? '!' : '✓'}</div>
+  Line 20846: Found emoji(s) '💳' -> Line: <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.02em' }}>💳 Lastschrift / Abbuchung</span>
+  Line 20870: Found emoji(s) '💵' -> Line: <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>💵 Barzahlung / Rechnung</span>
+  Line 21444: Found emoji(s) '📄' -> Line: 📄 Sammel-Onboarding (CSV) {isRoomCsvExpanded ? '▲' : '▼'}
+  Line 21466: Found emoji(s) '➕' -> Line: ➕ Raum anlegen
+  Line 21500: Found emoji(s) '⚡' -> Line: ⚡ smarte-auto-zuweisung:
+  Line 21515: Found emoji(s) '🏢' -> Line: 🏢 {roomFilterFloor}
+  Line 21535: Found emoji(s) '🏠' -> Line: 🏠 {buildingMap[selectedBuildingId]?.name || 'Ohne Zuordnung'}
+  Line 21654: Found emoji(s) '🏢' -> Line: 🏢 Alle Gebäude ({uniqueRooms.length})
+  Line 21675: Found emoji(s) '❓' -> Line: ❓ Ohne Zuordnung ({uniqueRooms.filter(r => !r.building_id).length})
+  Line 21700: Found emoji(s) '🏠' -> Line: 🏠 {b.name} ({count})
+  Line 21735: Found emoji(s) '📥' -> Line: 📥 PDF Export
+  Line 21788: Found emoji(s) '⚠' -> Line: title={hasConflict ? '⚠️ Zeitliche Überschneidung in diesem Raum!' : undefined}
+  Line 21863: Found emoji(s) '➕' -> Line: ➕ Gebäude anlegen
+  Line 21884: Found emoji(s) '🏢' -> Line: 🏢
+  Line 21944: Found emoji(s) '❓' -> Line: ❓
+  Line 22009: Found emoji(s) '🏠' -> Line: 🏠
+  Line 22017: Found emoji(s) '📍' -> Line: 📍 {b.address}
+  Line 22030: Found emoji(s) '✏' -> Line: ✏️
+  Line 22036: Found emoji(s) '🗑' -> Line: 🗑️
+  Line 22059: Found emoji(s) '🔍' -> Line: <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+  Line 22085: Found emoji(s) '🏢' -> Line: <option value="All">🏢 Alle Stockwerke</option>
+  Line 22122: Found emoji(s) '🚪' -> Line: <div style={{ fontSize: '3rem', opacity: 0.65 }}>🚪</div>
+  Line 22151: Found emoji(s) '➕' -> Line: ➕ Raum anlegen
+  Line 22229: Found emoji(s) '🏠' -> Line: 🏠 {buildingMap[room.building_id]?.name || 'Gebäude'}
+  Line 22334: Found emoji(s) '🎸' -> Line: 🎸 {formatInstrumentName(inst)}
+  Line 22458: Found emoji(s) '➕' -> Line: ➕ Stockwerk anlegen
+  Line 22482: Found emoji(s) '🏢' -> Line: 🏢
+  Line 22608: Found emoji(s) '🗑' -> Line: 🗑️
+  Line 23067: Found emoji(s) '🎸' -> Line: <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+  Line 23093: Found emoji(s) '☕' -> Line: <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+  Line 23125: Found emoji(s) '🏢' -> Line: {selectedRoom ? `🏢 Instrumente in „${selectedRoom.name}“` : 'Alle Instrumente & Ausstattungen'}
+  Line 23506: Found emoji(s) '✕' -> Line: ✕
+  Line 23510: Found emoji(s) '📦' -> Line: <span>📦 Pool / Frei</span>
+  Line 23572: Found emoji(s) '🔧' -> Line: 🔧 Instrument bearbeiten
+  Line 23729: Found emoji(s) '⚠' -> Line: ⚠️ {editingEquipmentGroup.instances.length - editGroupQty} Exemplar(e) werden gelöscht
+  Line 23862: Found emoji(s) '🏢' -> Line: 🏢 Alle Räume
+  Line 23911: Found emoji(s) '🚪' -> Line: 🚪 {rm.name}
+  Line 24172: Found emoji(s) '✓' -> Line: {copiedSchoolLink ? '✓ Kopiert!' : 'Link kopieren'}
+  Line 24349: Found emoji(s) '⚡' -> Line: <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>⚡ Synchronisation (Campus &amp; GrooveLab)</strong>
+  Line 24380: Found emoji(s) '📅' -> Line: <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>📅 Abonnierte iCal Kalender-Links (ICS Feeds)</strong>
+  Line 25132: Found emoji(s) '📥' -> Line: 📥 QR-Code speichern (SVG)
+  Line 25476: Found emoji(s) '✕' -> Line: ✕
+  Line 25747: Found emoji(s) '📋' -> Line: <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+
+--- Avatar Violations / References ---
+  Line 51: Reference -> Line: function formatInstrumentName(name: string): string {
+  Line 72: Reference -> Line: tasteninstrumente: 'Tasteninstrumente',
+  Line 73: Reference -> Line: saiteninstrumente: 'Saiteninstrumente',
+  Line 74: Reference -> Line: blasinstrumente: 'Blasinstrumente',
+  Line 106: Reference -> Line: instrument: string;
+  Line 129: Reference -> Line: instrument: string;
+  Line 172: Reference -> Line: const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
+  Line 181: Reference -> Line: if (hasError || !src) return '/avatar_ghost.jpg';
+  Line 211: Reference -> Line: className={`avatar-image-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
+  Line 454: Reference -> Line: <AvatarImage src={sess.users?.photo_url} user={sess.users} />
+  Line 527: Reference -> Line: <AvatarImage src={c.users?.photo_url || c.photo_url} user={c.users || c} />
+  Line 562: Reference -> Line: const instrument = teacher.instrument || 'Nicht festgelegt';
+  Line 656: Reference -> Line: <span style={{ fontSize: '12px', fontWeight: 500, color: isDark ? '#71717a' : '#64748b' }}>Fach/Instrument</span>
+  Line 657: Reference -> Line: <span style={{ fontSize: '12px', fontWeight: 700, color: isDark ? '#ffffff' : '#0f172a' }}>{instrument}</span>
+  Line 750: Reference -> Line: avatarBg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+  Line 751: Reference -> Line: avatarColor: '#475569'
+  Line 758: Reference -> Line: const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  Line 759: Reference -> Line: const avatarColor = `hsl(${hue}, 90%, 25%)`;
+  Line 760: Reference -> Line: return { avatarBg, avatarColor };
+  Line 767: Reference -> Line: avatarBg: '#f1f5f9',
+  Line 768: Reference -> Line: avatarColor: '#475569'
+  Line 775: Reference -> Line: const avatarBg = `hsl(${hue}, 80%, 93%)`;
+  Line 776: Reference -> Line: const avatarColor = `hsl(${hue}, 90%, 25%)`;
+  Line 777: Reference -> Line: return { avatarBg, avatarColor };
+  Line 812: Reference -> Line: const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  Line 813: Reference -> Line: const avatarColor = `hsl(${hue}, 90%, 25%)`;
+  Line 814: Reference -> Line: return { avatarBg, avatarColor };
+  Line 1232: Reference -> Line: .select('id, first_name, last_name, nickname, photo_url, role, roles, email, instrument, qr_token, teacher_qr_token')
+  Line 1263: Reference -> Line: const instrumentsMap = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 1270: Reference -> Line: const localInstruments = instrumentsMap[rm.id];
+  Line 1274: Reference -> Line: if (localFloor || localInstruments || localUnsuitable || localSonstiges) {
+  Line 1277: Reference -> Line: if (localInstruments && localInstruments.length > 0) updatePayload.room_instruments = localInstruments;
+  Line 1278: Reference -> Line: if (localUnsuitable && localUnsuitable.length > 0) updatePayload.unsuitable_instruments = localUnsuitable;
+  Line 1348: Reference -> Line: instrument: updatedData.instrument,
+  Line 1474: Reference -> Line: const [studentFilterInstrument, setStudentFilterInstrument] = useState<string>('All');
+  Line 1492: Reference -> Line: const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
+  Line 1501: Reference -> Line: return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
+  Line 1507: Reference -> Line: }, [students, studentSearchQuery, studentFilterInstrument, studentFilterTeacher, studentFilterStatus]);
+  Line 1543: Reference -> Line: const [newStudentInstrument, setNewStudentInstrument] = useState<string>('');
+  Line 1915: Reference -> Line: const [roomFormUnsuitableInstruments, setRoomFormUnsuitableInstruments] = useState<string[]>([]);
+  Line 1916: Reference -> Line: const [roomFormRoomInstruments, setRoomFormRoomInstruments] = useState<Array<{ name: string, model: string }>>([]);
+  Line 1918: Reference -> Line: const [newInstrumentName, setNewInstrumentName] = useState('');
+  Line 1919: Reference -> Line: const [newInstrumentModel, setNewInstrumentModel] = useState('');
+  Line 1920: Reference -> Line: const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
+  Line 1934: Reference -> Line: const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
+  Line 1954: Reference -> Line: const [coachInstrument, setCoachInstrument] = useState<string>('');
+  Line 1966: Reference -> Line: const [teacherFilterInstrument, setTeacherFilterInstrument] = useState<string>('All');
+  Line 1969: Reference -> Line: const [coachFilterInstrument, setCoachFilterInstrument] = useState<string>('All');
+  Line 1972: Reference -> Line: const [groovelabStudentFilterInstrument, setGroovelabStudentFilterInstrument] = useState<string>('All');
+  Line 1985: Reference -> Line: const [newTeacherInstrument, setNewTeacherInstrument] = useState<string>('');
+  Line 2005: Reference -> Line: return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
+  Line 2036: Reference -> Line: const [dragHoveredInstrument, setDragHoveredInstrument] = useState<string | null>(null);
+  Line 2150: Reference -> Line: student:users!crisis_notifications_student_id_fkey (first_name, last_name, personal_pin, ausweis_id, instrument),
+  Line 2652: Reference -> Line: .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
+  Line 2660: Reference -> Line: .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+  Line 2797: Reference -> Line: const instrument = pending?.instrument || activeUser?.instrument || 'Instrument';
+  Line 2802: Reference -> Line: instrument,
+  Line 2837: Reference -> Line: const userInstrumentMap: Record<string, string> = {};
+  Line 2847: Reference -> Line: userInstrumentMap[u.id] = u.instrument || '';
+  Line 2871: Reference -> Line: instrument: u.instrument || '',
+  Line 2895: Reference -> Line: instrument: u.instrument || '',
+  Line 2916: Reference -> Line: instrument: u.instrument || '',
+  Line 2941: Reference -> Line: userInstrumentMap[ps.id] = ps.instrument || '';
+  Line 2951: Reference -> Line: instrument: ps.instrument || 'Nicht festgelegt',
+  Line 2974: Reference -> Line: instrument: u.instrument || '',
+  Line 3016: Reference -> Line: const localInstruments = (() => {
+  Line 3018: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 3031: Reference -> Line: equipment: r.allowed_instruments || [],
+  Line 3032: Reference -> Line: unsuitable_instruments: r.unsuitable_instruments || localUnsuitable,
+  Line 3033: Reference -> Line: room_instruments: r.room_instruments || localInstruments,
+  Line 3164: Reference -> Line: student_instrument: s.student_id ? userInstrumentMap[s.student_id] || '' : ''
+  Line 3189: Reference -> Line: const instrument = userInstrumentMap[teacherId] || teacherProfile?.instrument || 'Gitarre';
+  Line 3195: Reference -> Line: instrument,
+  Line 3219: Reference -> Line: instrument: 'Plattform',
+  Line 3589: Reference -> Line: const instrument = parts[2]?.trim() || 'Nicht festgelegt';
+  Line 3611: Reference -> Line: instrument,
+  Line 4029: Reference -> Line: const instrument = parts[2]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'ohne Zuweisung');
+  Line 4042: Reference -> Line: instrument: instrument,
+  Line 4087: Reference -> Line: instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
+  Line 4103: Reference -> Line: setNewTeacherInstrument('');
+  Line 4129: Reference -> Line: instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
+  Line 4145: Reference -> Line: setNewTeacherInstrument('');
+  Line 4171: Reference -> Line: instrument: coachInstrument || 'Nicht festgelegt',
+  Line 4186: Reference -> Line: setCoachInstrument('');
+  Line 4402: Reference -> Line: instrument: newStudentInstrument || 'Nicht festgelegt',
+  Line 4416: Reference -> Line: setNewStudentInstrument('');
+  Line 4441: Reference -> Line: instrument: newStudentInstrument || 'Nicht festgelegt',
+  Line 4463: Reference -> Line: setNewStudentInstrument('');
+  Line 4531: Reference -> Line: let instrument = 'Nicht festgelegt';
+  Line 4562: Reference -> Line: instrument = parts[3]?.trim() || 'Nicht festgelegt';
+  Line 4566: Reference -> Line: instrument = p2 || 'Nicht festgelegt';
+  Line 4583: Reference -> Line: instrument = foundSelected.instrument || 'Nicht festgelegt';
+  Line 4603: Reference -> Line: instrument: instrument,
+  Line 4643: Reference -> Line: let instrument = 'ohne Zuweisung';
+  Line 4649: Reference -> Line: instrument = parts[1].trim() || 'Nicht festgelegt';
+  Line 4668: Reference -> Line: let finalInstrument = instrument;
+  Line 4677: Reference -> Line: finalInstrument = foundSelected.instrument || 'Nicht festgelegt';
+  Line 4696: Reference -> Line: const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
+  Line 4710: Reference -> Line: instrument: finalInstrument || 'Nicht festgelegt',
+  Line 4711: Reference -> Line: avatar_url: defaultAvatarUrl,
+  Line 4726: Reference -> Line: await supabase.from('avatars').insert({
+  Line 4728: Reference -> Line: avatar_style: 'Standard_Silhouette',
+  Line 4729: Reference -> Line: instrument_type: instrument || 'Nicht festgelegt',
+  Line 5074: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(s.name);
+  Line 5099: Reference -> Line: background: avatarBg,
+  Line 5100: Reference -> Line: color: avatarColor,
+  Line 5198: Reference -> Line: <option value="Saiteninstrumente">Saiteninstrumente</option>
+  Line 5199: Reference -> Line: <option value="Tasteninstrumente">Tasteninstrumente</option>
+  Line 5201: Reference -> Line: <option value="Blasinstrumente">Blasinstrumente</option>
+  Line 5261: Reference -> Line: const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+  Line 5262: Reference -> Line: const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+  Line 5349: Reference -> Line: const tAvatarBg = getAvatarGradient(teacherName);
+  Line 5350: Reference -> Line: const tAvatarColor = getAvatarTextColor(teacherName);
+  Line 5386: Reference -> Line: background: tAvatarBg,
+  Line 5387: Reference -> Line: color: tAvatarColor,
+  Line 5574: Reference -> Line: {/* Avatar & Name */}
+  Line 5588: Reference -> Line: background: getAvatarGradient(c.name || 'Kooperation'),
+  Line 5589: Reference -> Line: color: getAvatarTextColor(c.name || 'Kooperation'),
+  Line 5971: Reference -> Line: const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Nicht festgelegt')));
+  Line 5993: Reference -> Line: const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+  Line 5994: Reference -> Line: const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+  Line 6104: Reference -> Line: <>Format pro Zeile: <code>Vorname; Nachname; Geburtstag (optional); Instrument (optional); Lehrkraft (optional)</code></>
+  Line 6113: Reference -> Line: const instName = selectedT.instrument || 'Gitarre';
+  Line 6115: Reference -> Line: const tAvatarBg = getAvatarGradient(teacherName);
+  Line 6116: Reference -> Line: const tAvatarColor = getAvatarTextColor(teacherName);
+  Line 6121: Reference -> Line: const instAvatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 86%) 100%)`;
+  Line 6122: Reference -> Line: const instAvatarColor = `hsl(${hue}, 90%, 25%)`;
+  Line 6158: Reference -> Line: background: tAvatarBg,
+  Line 6159: Reference -> Line: color: tAvatarColor,
+  Line 6180: Reference -> Line: {/* Instrument Pill */}
+  Line 6195: Reference -> Line: background: instAvatarBg,
+  Line 6196: Reference -> Line: color: instAvatarColor,
+  Line 6210: Reference -> Line: Instrument
+  Line 6359: Reference -> Line: value={studentFilterInstrument}
+  Line 6361: Reference -> Line: setStudentFilterInstrument(e.target.value);
+  Line 6366: Reference -> Line: <option value="All">Alle Instrumente</option>
+  Line 6367: Reference -> Line: {uniqueInstruments.map(inst => (
+  Line 6442: Reference -> Line: {/* Avatar & Name */}
+  Line 6459: Reference -> Line: background: getAvatarGradient(`${student.first_name || ''} ${student.last_name || ''}`),
+  Line 6460: Reference -> Line: color: getAvatarTextColor(`${student.first_name || ''} ${student.last_name || ''}`),
+  Line 6493: Reference -> Line: {/* Instrument Badge */}
+  Line 6507: Reference -> Line: {student.instrument || 'Nicht festgelegt'}
+  Line 6990: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente *</label>
+  Line 6992: Reference -> Line: {INSTRUMENT_TAGS.map((tag) => {
+  Line 6993: Reference -> Line: const checked = newStudentInstrument.split(',').map(s => s.trim()).includes(tag);
+  Line 7000: Reference -> Line: const currentChecked = newStudentInstrument ? newStudentInstrument.split(',').map(s => s.trim()).filter(Boolean) : [];
+  Line 7007: Reference -> Line: setNewStudentInstrument(nextChecked.join(', '));
+  Line 7206: Reference -> Line: const handleUpdateTeacherInstrument = async (teacherId: string, newInstrument: string) => {
+  Line 7210: Reference -> Line: .update({ instrument: newInstrument })
+  Line 7535: Reference -> Line: const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
+  Line 7536: Reference -> Line: const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
+  Line 7546: Reference -> Line: const isRoomUnsuitable = (r: any, instrumentName: string) => {
+  Line 7547: Reference -> Line: if (!r || !instrumentName) return false;
+  Line 7548: Reference -> Line: const unsuitable = r.unsuitable_instruments || (() => {
+  Line 7554: Reference -> Line: return unsuitable.some((inst: string) => inst.toLowerCase() === instrumentName.toLowerCase());
+  Line 7595: Reference -> Line: const instr = plan.instrument?.toLowerCase() || '';
+  Line 7621: Reference -> Line: if (prRoom && !isRoomUnsuitable(prRoom, plan.instrument)) {
+  Line 7639: Reference -> Line: if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
+  Line 7654: Reference -> Line: if (isRoomUnsuitable(room, plan.instrument)) continue;
+  Line 7671: Reference -> Line: if (isRoomUnsuitable(room, plan.instrument)) continue;
+  Line 8019: Reference -> Line: const unsuitable = room.unsuitable_instruments || (() => {
+  Line 8025: Reference -> Line: if (unsuitable.some((inst: string) => inst.toLowerCase() === plan.instrument?.toLowerCase())) {
+  Line 8026: Reference -> Line: alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${plan.instrument}".`);
+  Line 8092: Reference -> Line: unsuitable[editingRoom.id] = roomFormUnsuitableInstruments;
+  Line 8095: Reference -> Line: const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8096: Reference -> Line: instruments[editingRoom.id] = roomFormRoomInstruments;
+  Line 8097: Reference -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+  Line 8109: Reference -> Line: allowed_instruments: roomFormEquipment,
+  Line 8116: Reference -> Line: unsuitable_instruments: roomFormUnsuitableInstruments,
+  Line 8117: Reference -> Line: room_instruments: roomFormRoomInstruments,
+  Line 8123: Reference -> Line: if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+  Line 8127: Reference -> Line: allowed_instruments: roomFormEquipment,
+  Line 8143: Reference -> Line: allowed_instruments: roomFormEquipment,
+  Line 8151: Reference -> Line: unsuitable_instruments: roomFormUnsuitableInstruments,
+  Line 8152: Reference -> Line: room_instruments: roomFormRoomInstruments,
+  Line 8160: Reference -> Line: allowed_instruments: roomFormEquipment,
+  Line 8168: Reference -> Line: unsuitable_instruments: roomFormUnsuitableInstruments,
+  Line 8169: Reference -> Line: room_instruments: roomFormRoomInstruments,
+  Line 8177: Reference -> Line: if (error && (error.message.includes("floor") || error.message.includes("column") || error.message.includes("unsuitable_instruments") || error.message.includes("room_instruments") || error.message.includes("sonstiges"))) {
+  Line 8182: Reference -> Line: allowed_instruments: roomFormEquipment,
+  Line 8204: Reference -> Line: unsuitable[data.id] = roomFormUnsuitableInstruments;
+  Line 8207: Reference -> Line: const instruments = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8208: Reference -> Line: instruments[data.id] = roomFormRoomInstruments;
+  Line 8209: Reference -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(instruments));
+  Line 8229: Reference -> Line: setRoomFormUnsuitableInstruments([]);
+  Line 8230: Reference -> Line: setRoomFormRoomInstruments([]);
+  Line 8390: Reference -> Line: allowed_instruments: [],
+  Line 8423: Reference -> Line: equipment: data.allowed_instruments || []
+  Line 8467: Reference -> Line: const localInstruments = (() => {
+  Line 8469: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8480: Reference -> Line: setRoomFormUnsuitableInstruments(Array.isArray(room.unsuitable_instruments) ? room.unsuitable_instruments : localUnsuitable);
+  Line 8481: Reference -> Line: setRoomFormRoomInstruments(Array.isArray(room.room_instruments) ? room.room_instruments : localInstruments);
+  Line 8483: Reference -> Line: setNewInstrumentName('');
+  Line 8484: Reference -> Line: setNewInstrumentModel('');
+  Line 8495: Reference -> Line: setRoomFormUnsuitableInstruments([]);
+  Line 8496: Reference -> Line: setRoomFormRoomInstruments([]);
+  Line 8498: Reference -> Line: setNewInstrumentName('');
+  Line 8499: Reference -> Line: setNewInstrumentModel('');
+  Line 8550: Reference -> Line: const base = editGroupName.trim() || 'Instrument';
+  Line 8580: Reference -> Line: localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+  Line 8583: Reference -> Line: localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+  Line 8603: Reference -> Line: if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+  Line 8604: Reference -> Line: const updatedRoomInsts = targetRoom.room_instruments.filter((_: any, idx: number) => idx !== inst.roomInstIdx);
+  Line 8605: Reference -> Line: setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+  Line 8606: Reference -> Line: await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+  Line 8636: Reference -> Line: if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+  Line 8637: Reference -> Line: const updatedRoomInsts = [...targetRoom.room_instruments];
+  Line 8644: Reference -> Line: setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+  Line 8645: Reference -> Line: await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
+  Line 8696: Reference -> Line: if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
+  Line 8697: Reference -> Line: const updatedRoomInsts = [...targetRoom.room_instruments];
+  Line 8704: Reference -> Line: setRooms(prev => prev.map(r => r.id === originalInst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
+  Line 8705: Reference -> Line: await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', originalInst.roomId);
+  Line 8713: Reference -> Line: localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
+  Line 8714: Reference -> Line: localStorage.setItem(`groovelab_instrument_links_${schoolId}`, JSON.stringify(localLinkMap));
+  Line 8739: Reference -> Line: setRooms((roomsData || []).map(r => ({ ...r, equipment: r.allowed_instruments || [] })));
+  Line 8756: Reference -> Line: const handleDropInstrumentOnRoom = async (instrumentName: string, roomId: string) => {
+  Line 8760: Reference -> Line: const currentInsts = Array.isArray(targetRoom.room_instruments)
+  Line 8761: Reference -> Line: ? targetRoom.room_instruments
+  Line 8764: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8769: Reference -> Line: const updatedInsts = [...currentInsts, { name: instrumentName, model: 'Standard' }];
+  Line 8773: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8775: Reference -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8781: Reference -> Line: setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
+  Line 8786: Reference -> Line: room_instruments: updatedInsts
+  Line 8789: Reference -> Line: if (error && error.message.includes("room_instruments")) {
+  Line 8790: Reference -> Line: console.warn("Supabase room_instruments column missing, using local storage fallback.");
+  Line 8795: Reference -> Line: console.error("Error saving room instruments:", err);
+  Line 8799: Reference -> Line: const handleRemoveRoomInstrument = async (roomId: string, idxToRemove: number) => {
+  Line 8803: Reference -> Line: const currentInsts = Array.isArray(targetRoom.room_instruments)
+  Line 8804: Reference -> Line: ? targetRoom.room_instruments
+  Line 8807: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8816: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8818: Reference -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8824: Reference -> Line: setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
+  Line 8829: Reference -> Line: room_instruments: updatedInsts
+  Line 8832: Reference -> Line: if (error && error.message.includes("room_instruments")) {
+  Line 8833: Reference -> Line: console.warn("Supabase room_instruments column missing, using local storage fallback.");
+  Line 8838: Reference -> Line: console.error("Error removing room instrument:", err);
+  Line 8842: Reference -> Line: const handleSaveRoomInstrumentEdit = async (name: string, model: string) => {
+  Line 8843: Reference -> Line: if (!editingRoomInstrument) return;
+  Line 8844: Reference -> Line: const { roomId, index } = editingRoomInstrument;
+  Line 8849: Reference -> Line: const currentInsts = Array.isArray(targetRoom.room_instruments)
+  Line 8850: Reference -> Line: ? [...targetRoom.room_instruments]
+  Line 8859: Reference -> Line: const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+  Line 8861: Reference -> Line: localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
+  Line 8867: Reference -> Line: setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: currentInsts } : r));
+  Line 8872: Reference -> Line: room_instruments: currentInsts
+  Line 8875: Reference -> Line: if (error && error.message.includes("room_instruments")) {
+  Line 8876: Reference -> Line: console.warn("Supabase room_instruments column missing, using local storage fallback.");
+  Line 8881: Reference -> Line: console.error("Error saving room instrument edit:", err);
+  Line 8884: Reference -> Line: setEditingRoomInstrument(null);
+  Line 8893: Reference -> Line: case 'equipment': return '🎸 Instrumente & Ausstattung';
+  Line 9811: Reference -> Line: { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
+  Line 11075: Reference -> Line: const groupedPending: Record<string, { teacherName: string, instrument: string, days: number[], slotsCount: number }> = {};
+  Line 11081: Reference -> Line: instrument: '',
+  Line 11593: Reference -> Line: const subject = t.student?.instrument || 'Musikunterricht';
+  Line 12221: Reference -> Line: {t.student?.instrument || 'Musikunterricht'} &bull; {tStr} Uhr
+  Line 12548: Reference -> Line: const { avatarBg: instAvatarBg, avatarColor: instAvatarColor } = getAlphabeticalColor(roleName);
+  Line 12583: Reference -> Line: background: instAvatarBg,
+  Line 12584: Reference -> Line: color: instAvatarColor,
+  Line 12734: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(empName);
+  Line 12764: Reference -> Line: {/* Avatar & Name Info */}
+  Line 12783: Reference -> Line: background: avatarBg,
+  Line 12784: Reference -> Line: color: avatarColor,
+  Line 13522: Reference -> Line: Instrument: {stud.instrument}
+  Line 13850: Reference -> Line: const uniqueInstruments = Array.from(new Set(allUniqueTeachers.map(t => t.instrument || 'Nicht festgelegt')));
+  Line 13866: Reference -> Line: const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
+  Line 13867: Reference -> Line: const filterInst = teacherFilterInstrument.toLowerCase();
+  Line 13868: Reference -> Line: const matchesInstrument = teacherFilterInstrument === 'All' || instrument === filterInst;
+  Line 13870: Reference -> Line: return matchesSearch && matchesStatus && matchesInstrument;
+  Line 13948: Reference -> Line: Format pro Zeile: <code>Vorname; Nachname; Hauptinstrument (optional)</code>
+  Line 13952: Reference -> Line: {teacherFilterInstrument && teacherFilterInstrument !== 'All' && (() => {
+  Line 13953: Reference -> Line: const instName = teacherFilterInstrument;
+  Line 13954: Reference -> Line: const { avatarBg: instAvatarBg, avatarColor: instAvatarColor } = getAlphabeticalColor(instName);
+  Line 13975: Reference -> Line: {/* Instrument Pill */}
+  Line 13990: Reference -> Line: background: instAvatarBg,
+  Line 13991: Reference -> Line: color: instAvatarColor,
+  Line 14005: Reference -> Line: Instrument
+  Line 14011: Reference -> Line: Hauptinstrument wird automatisch verknüpft!
+  Line 14021: Reference -> Line: teacherFilterInstrument && teacherFilterInstrument !== 'All'
+  Line 14071: Reference -> Line: value={teacherFilterInstrument}
+  Line 14072: Reference -> Line: onChange={(e) => setTeacherFilterInstrument(e.target.value)}
+  Line 14085: Reference -> Line: <option value="All">Alle Instrumente</option>
+  Line 14086: Reference -> Line: {uniqueInstruments.map(inst => (
+  Line 14172: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(teacherName);
+  Line 14199: Reference -> Line: {/* Avatar & Name Info */}
+  Line 14205: Reference -> Line: background: avatarBg,
+  Line 14206: Reference -> Line: color: avatarColor,
+  Line 14229: Reference -> Line: {/* Instrument Badge */}
+  Line 14243: Reference -> Line: {t.instrument || 'Nicht festgelegt'}
+  Line 14388: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente/Fächer *</label>
+  Line 14391: Reference -> Line: selectedString={newTeacherInstrument}
+  Line 14392: Reference -> Line: onChange={setNewTeacherInstrument}
+  Line 14836: Reference -> Line: title={`${getPlanDisplayName(plan)} (${plan.instrument}) : ${plan.startTime} - ${plan.endTime}`}
+  Line 14847: Reference -> Line: {plan.id.startsWith('adhoc_') ? '⚡ Spontan' : plan.instrument}
+  Line 14956: Reference -> Line: title={`${getPlanDisplayName(plan)} (${plan.instrument})`}
+  Line 14974: Reference -> Line: <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
+  Line 15005: Reference -> Line: if (draggedPlan && draggedPlan.instrument) {
+  Line 15006: Reference -> Line: const unsuitable = room.unsuitable_instruments || (() => {
+  Line 15012: Reference -> Line: isCompatible = !unsuitable.some((inst: string) => inst.toLowerCase() === draggedPlan.instrument.toLowerCase());
+  Line 15129: Reference -> Line: <span style={{ pointerEvents: 'none', fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
+  Line 15177: Reference -> Line: const instrument = chosenTeacher ? chosenTeacher.instrument : 'Instrument';
+  Line 15191: Reference -> Line: instrument: instrument,
+  Line 15232: Reference -> Line: <option key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.instrument})</option>
+  Line 15312: Reference -> Line: <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+  Line 15414: Reference -> Line: {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+  Line 15533: Reference -> Line: <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt die Definition spezifischer Instrumente & Fächer für Lehrkräfte.</div>
+  Line 15751: Reference -> Line: const instrumentCounts = allUniqueTeachers.reduce((acc: Record<string, number>, t: any) => {
+  Line 15752: Reference -> Line: const inst = t.instrument || 'Nicht festgelegt';
+  Line 15757: Reference -> Line: const sortedInstruments = [...activeSubjectsList].sort((a, b) => a.localeCompare(b, 'de'));
+  Line 15775: Reference -> Line: Instrumente
+  Line 15779: Reference -> Line: Klicke auf ein Instrument, um das Sammel-Onboarding zu filtern und Lehrer direkt dafür anzulegen.
+  Line 15783: Reference -> Line: {/* Instrument List */}
+  Line 15786: Reference -> Line: {/* "Alle Instrumente anzeigen" Row */}
+  Line 15788: Reference -> Line: const isActive = teacherFilterInstrument === 'All';
+  Line 15789: Reference -> Line: const isHovered = dragHoveredInstrument === 'All';
+  Line 15792: Reference -> Line: onClick={() => setTeacherFilterInstrument('All')}
+  Line 15795: Reference -> Line: setDragHoveredInstrument('All');
+  Line 15797: Reference -> Line: onDragLeave={() => setDragHoveredInstrument(null)}
+  Line 15801: Reference -> Line: handleUpdateTeacherInstrument(teacherId, 'Allgemein');
+  Line 15803: Reference -> Line: setDragHoveredInstrument(null);
+  Line 15844: Reference -> Line: Alle Instrumente anzeigen
+  Line 15869: Reference -> Line: {/* Individual Instrument Rows */}
+  Line 15870: Reference -> Line: {sortedInstruments.map((instName) => {
+  Line 15871: Reference -> Line: const isActive = teacherFilterInstrument === instName;
+  Line 15872: Reference -> Line: const isHovered = dragHoveredInstrument === instName;
+  Line 15873: Reference -> Line: const count = instrumentCounts[instName] || 0;
+  Line 15875: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(instName);
+  Line 15880: Reference -> Line: onClick={() => setTeacherFilterInstrument(isActive ? 'All' : instName)}
+  Line 15883: Reference -> Line: setDragHoveredInstrument(instName);
+  Line 15885: Reference -> Line: onDragLeave={() => setDragHoveredInstrument(null)}
+  Line 15889: Reference -> Line: handleUpdateTeacherInstrument(teacherId, instName);
+  Line 15891: Reference -> Line: setDragHoveredInstrument(null);
+  Line 15920: Reference -> Line: background: avatarBg,
+  Line 15921: Reference -> Line: color: avatarColor,
+  Line 15968: Reference -> Line: const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+  Line 15969: Reference -> Line: const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+  Line 16157: Reference -> Line: const avatarBg = getAvatarGradient(teacherName);
+  Line 16158: Reference -> Line: const avatarColor = getAvatarTextColor(teacherName);
+  Line 16206: Reference -> Line: background: avatarBg,
+  Line 16207: Reference -> Line: color: avatarColor,
+  Line 16223: Reference -> Line: {t.instrument || 'Lehrer'}
+  Line 16260: Reference -> Line: (t.instrument || '').toLowerCase().includes('kooperation')
+  Line 16263: Reference -> Line: const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
+  Line 16264: Reference -> Line: const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
+  Line 16431: Reference -> Line: const tAvatarBg = getAvatarGradient(teacherName);
+  Line 16432: Reference -> Line: const tAvatarColor = getAvatarTextColor(teacherName);
+  Line 16465: Reference -> Line: background: tAvatarBg,
+  Line 16466: Reference -> Line: color: tAvatarColor,
+  Line 16489: Reference -> Line: {t.instrument || 'Lehrer'}
+  Line 16625: Reference -> Line: const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[], isUnsubmitted: boolean }> = {};
+  Line 16641: Reference -> Line: instrument: 'Plattform',
+  Line 16648: Reference -> Line: instrument: t.instrument || 'Lehrkraft',
+  Line 16659: Reference -> Line: instrument: p.instrument,
+  Line 16795: Reference -> Line: <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 500 }}>{data.instrument}</span>
+  Line 16905: Reference -> Line: const unsuitable = room.unsuitable_instruments || (() => {
+  Line 16911: Reference -> Line: if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
+  Line 16912: Reference -> Line: alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
+  Line 17495: Reference -> Line: inst={station.rawStation.instrument || 'Tablet'}
+  Line 17542: Reference -> Line: inst={station.instrument || 'Tablet'}
+  Line 17572: Reference -> Line: const instrument = (s.instrument || 'Nicht festgelegt').toLowerCase();
+  Line 17573: Reference -> Line: const filterInst = groovelabStudentFilterInstrument.toLowerCase();
+  Line 17574: Reference -> Line: const matchesInstrument = groovelabStudentFilterInstrument === 'All' || instrument === filterInst;
+  Line 17576: Reference -> Line: return matchesSearch && matchesInstrument;
+  Line 17589: Reference -> Line: const uniqueInstruments = Array.from(new Set(activeGroovelabStudents.map(s => s.instrument || 'Nicht festgelegt')));
+  Line 17709: Reference -> Line: <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{s.instrument || 'Kein Instrument'}</span>
+  Line 17779: Reference -> Line: value={groovelabStudentFilterInstrument}
+  Line 17780: Reference -> Line: onChange={(e) => setGroovelabStudentFilterInstrument(e.target.value)}
+  Line 17793: Reference -> Line: <option value="All">Alle Instrumente</option>
+  Line 17794: Reference -> Line: {uniqueInstruments.map(inst => (
+  Line 17821: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(studentName);
+  Line 17840: Reference -> Line: {/* Avatar & Name Info */}
+  Line 17849: Reference -> Line: background: avatarBg,
+  Line 17850: Reference -> Line: color: avatarColor,
+  Line 17873: Reference -> Line: {/* Instrument Badge */}
+  Line 17887: Reference -> Line: {student.instrument || 'Nicht festgelegt'}
+  Line 18041: Reference -> Line: {s.instrument || 'Kein Fach'}
+  Line 18139: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrument / Fach</label>
+  Line 18142: Reference -> Line: selectedString={newStudentInstrument}
+  Line 18143: Reference -> Line: onChange={setNewStudentInstrument}
+  Line 18207: Reference -> Line: const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
+  Line 18208: Reference -> Line: const filterInst = coachFilterInstrument.toLowerCase();
+  Line 18209: Reference -> Line: const matchesInstrument = coachFilterInstrument === 'All' || instrument === filterInst;
+  Line 18211: Reference -> Line: return matchesSearch && matchesInstrument;
+  Line 18224: Reference -> Line: const uniqueInstruments = Array.from(new Set(activeCoaches.map(t => t.instrument || 'Nicht festgelegt')));
+  Line 18336: Reference -> Line: <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.email} • {t.instrument || 'Kein Instrument'}</span>
+  Line 18405: Reference -> Line: value={coachFilterInstrument}
+  Line 18406: Reference -> Line: onChange={(e) => setCoachFilterInstrument(e.target.value)}
+  Line 18419: Reference -> Line: <option value="All">Alle Instrumente</option>
+  Line 18420: Reference -> Line: {uniqueInstruments.map(inst => (
+  Line 18447: Reference -> Line: const { avatarBg, avatarColor } = getAlphabeticalColor(teacherName);
+  Line 18468: Reference -> Line: {/* Avatar & Name Info */}
+  Line 18474: Reference -> Line: background: avatarBg,
+  Line 18475: Reference -> Line: color: avatarColor,
+  Line 18493: Reference -> Line: {/* Instrument Badge */}
+  Line 18507: Reference -> Line: {t.instrument || 'Nicht festgelegt'}
+  Line 18664: Reference -> Line: {t.instrument || 'Kein Fach'}
+  Line 18752: Reference -> Line: <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente/Fächer *</label>
+  Line 18755: Reference -> Line: selectedString={newTeacherInstrument}
+  Line 18756: Reference -> Line: onChange={setNewTeacherInstrument}
+  Line 19099: Reference -> Line: <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Bandprofile &amp; coole Musiker-Avatare</span>
+  Line 20860: Reference -> Line: <span style={{ color: '#64748b', fontSize: '0.68rem' }}>{s.instrument || 'Allgemein'}</span>
+  Line 20903: Reference -> Line: <span style={{ color: '#64748b', fontSize: '0.68rem' }}>{s.instrument || 'Allgemein'}</span>
+  Line 21288: Reference -> Line: const INSTRUMENT_COLOR: Record<string, string> = {
+  Line 21769: Reference -> Line: const { avatarBg: bg, avatarColor: color } = getAlphabeticalUniColor(plan.teacherName || 'Allgemein');
+  Line 21791: Reference -> Line: <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
+  Line 22159: Reference -> Line: const unsuitableInsts: string[] = Array.isArray(room.unsuitable_instruments)
+  Line 22160: Reference -> Line: ? room.unsuitable_instruments
+  Line 22192: Reference -> Line: {/* Top Row: Avatar, Room Info, Specs, Delete */}
+  Line 22209: Reference -> Line: background: rColor.avatarBg,
+  Line 22210: Reference -> Line: color: rColor.avatarColor,
+  Line 22334: Reference -> Line: 🎸 {formatInstrumentName(inst)}
+  Line 22354: Reference -> Line: title={`Akustisch ungeeignet für ${formatInstrumentName(inst)}`}
+  Line 22357: Reference -> Line: {formatInstrumentName(inst)}
+  Line 22510: Reference -> Line: const avatarInitials = flName.substring(0, 2).toUpperCase();
+  Line 22575: Reference -> Line: background: colorSet.avatarBg,
+  Line 22576: Reference -> Line: color: colorSet.avatarColor,
+  Line 22585: Reference -> Line: {avatarInitials}
+  Line 22817: Reference -> Line: {/* Akustisch ungeeignete Instrumente */}
+  Line 22824: Reference -> Line: const isUnsuitable = roomFormUnsuitableInstruments.includes(inst);
+  Line 22831: Reference -> Line: setRoomFormUnsuitableInstruments(prev => prev.filter(i => i !== inst));
+  Line 22833: Reference -> Line: setRoomFormUnsuitableInstruments(prev => [...prev, inst]);
+  Line 22855: Reference -> Line: {/* Vorhandene Instrumente */}
+  Line 22858: Reference -> Line: <Music size={12} color="#ea4335" /> Vorhandene Instrumente (mit Modell)
+  Line 22862: Reference -> Line: {roomFormRoomInstruments.length > 0 && (
+  Line 22864: Reference -> Line: {roomFormRoomInstruments.map((inst, idx) => (
+  Line 22871: Reference -> Line: onClick={() => setRoomFormRoomInstruments(prev => prev.filter((_, i) => i !== idx))}
+  Line 22881: Reference -> Line: {/* Add Instrument Form Inline */}
+  Line 22885: Reference -> Line: value={newInstrumentName}
+  Line 22886: Reference -> Line: onChange={e => setNewInstrumentName(e.target.value)}
+  Line 22891: Reference -> Line: value={newInstrumentModel}
+  Line 22892: Reference -> Line: onChange={e => setNewInstrumentModel(e.target.value)}
+  Line 22898: Reference -> Line: if (!newInstrumentName.trim()) return;
+  Line 22899: Reference -> Line: setRoomFormRoomInstruments(prev => [...prev, { name: newInstrumentName.trim(), model: newInstrumentModel.trim() }]);
+  Line 22900: Reference -> Line: setNewInstrumentName('');
+  Line 22901: Reference -> Line: setNewInstrumentModel('');
+  Line 23067: Reference -> Line: <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+  Line 23095: Reference -> Line: {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+  Line 23125: Reference -> Line: {selectedRoom ? `🏢 Instrumente in „${selectedRoom.name}“` : 'Alle Instrumente & Ausstattungen'}
+  Line 23129: Reference -> Line: ? `Es werden nur Instrumente angezeigt, die dem Raum „${selectedRoom.name}“ zugeordnet sind. Klicke auf ein Instrument, um es zu bearbeiten.`
+  Line 23130: Reference -> Line: : 'Hier werden alle Instrumente der Musikschule aufgelistet. Ziehe freie Instrumente auf die Räume rechts, um sie zuzuweisen.'
+  Line 23135: Reference -> Line: {/* Unified Instruments List Widget */}
+  Line 23160: Reference -> Line: placeholder='Neues Instrument anlegen...'
+  Line 23210: Reference -> Line: placeholder="Instrumente durchsuchen..."
+  Line 23237: Reference -> Line: <span>Freie Instrumente</span>
+  Line 23250: Reference -> Line: Array.isArray(rm.room_instruments) &&
+  Line 23251: Reference -> Line: rm.room_instruments.some((inst: any, idx: number) => {
+  Line 23262: Reference -> Line: ? assignedRm.room_instruments.findIndex((inst: any) => inst.name === eq.name)
+  Line 23264: Reference -> Line: const roomInst = assignedRm?.room_instruments?.[roomInstIdx];
+  Line 23268: Reference -> Line: const localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
+  Line 23281: Reference -> Line: const localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
+  Line 23302: Reference -> Line: if (Array.isArray(rm.room_instruments)) {
+  Line 23303: Reference -> Line: rm.room_instruments.forEach((inst: any, idx: number) => {
+  Line 23370: Reference -> Line: {selectedRoom ? 'Keine Instrumente in diesem Raum' : 'Keine Instrumente im Pool'}
+  Line 23427: Reference -> Line: title="Instrument online ansehen"
+  Line 23449: Reference -> Line: setEditingRoomInstrument({
+  Line 23477: Reference -> Line: title={isInstAssigned ? "Klicken zum Bearbeiten des Modells in diesem Raum" : "Ziehe dieses freie Instrument auf einen Raum"}
+  Line 23486: Reference -> Line: await handleRemoveRoomInstrument(inst.roomId!, inst.roomInstIdx);
+  Line 23543: Reference -> Line: {/* EDIT ROOM INSTRUMENT MODAL */}
+  Line 23544: Reference -> Line: {editingRoomInstrument && (
+  Line 23572: Reference -> Line: 🔧 Instrument bearbeiten
+  Line 23600: Reference -> Line: onClick={() => handleSaveRoomInstrumentEdit(editRoomInstFormName, editRoomInstFormModel)}
+  Line 23607: Reference -> Line: onClick={() => setEditingRoomInstrument(null)}
+  Line 23762: Reference -> Line: placeholder="https://example.com/instrument-info"
+  Line 23894: Reference -> Line: await handleDropInstrumentOnRoom(instName, rm.id);
+  Line 23918: Reference -> Line: {/* Short summary of configured instruments */}
+  Line 23919: Reference -> Line: {rm.room_instruments && rm.room_instruments.length > 0 && (
+  Line 23921: Reference -> Line: {rm.room_instruments.map((inst: any, idx: number) => (
+  Line 24853: Reference -> Line: const avatarBgColor = activeTab === 'campus' ? '#e6f4ea' : '#fef3c7';
+  Line 24854: Reference -> Line: const avatarTextColor = activeTab === 'campus' ? '#137333' : '#b45309';
+  Line 24873: Reference -> Line: {/* Header with gradient and large dynamic initials avatar */}
+  Line 24888: Reference -> Line: background: avatarBgColor,
+  Line 24889: Reference -> Line: color: avatarTextColor,
+  Line 24991: Reference -> Line: <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Instrumente/Fächer</label>
+  Line 24994: Reference -> Line: selectedString={manageTeacher.instrument}
+  Line 24995: Reference -> Line: onChange={(val) => setManageTeacher({ ...manageTeacher, instrument: val })}
+
+==========================================
+AUDIT REPORT FOR: index.css
+==========================================
+
+--- Brand Naming Violations ---
+  None found
+
+--- Color Violations ---
+  None found
+
+--- Emoji/Colored Icon Violations ---
+  None found
+
+--- Avatar Violations / References ---
+  None found
+
+==========================================
+AUDIT REPORT FOR: App.css
+==========================================
+
+--- Brand Naming Violations ---
+  None found
+
+--- Color Violations ---
+  None found
+
+--- Emoji/Colored Icon Violations ---
+  None found
+
+--- Avatar Violations / References ---
+  None found
