@@ -1676,7 +1676,7 @@ export function AdminDashboard({
   const [manualCoords, setManualCoords] = useState<Record<string, string>>({});
   const [showManualInput, setShowManualInput] = useState<string | null>(null);
   const [showBatchiPadModal, setShowBatchiPadModal] = useState<{ roomId: string } | null>(null);
-  const [batchiPadCount, setBatchiPadCount] = useState<number>(1);
+  const [batchiPadCount, setBatchiPadCount] = useState<string>('1');
 
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
@@ -3399,13 +3399,13 @@ export function AdminDashboard({
 
   const triggerBatchAddStations = (roomId: string) => {
     setShowBatchiPadModal({ roomId });
-    setBatchiPadCount(1);
+    setBatchiPadCount('1');
   };
 
   const executeBatchAddStations = async () => {
     if (!showBatchiPadModal) return;
     const roomId = showBatchiPadModal.roomId;
-    const count = batchiPadCount;
+    const count = parseInt(batchiPadCount, 10);
     if (isNaN(count) || count <= 0) {
       alert("Bitte eine gültige Anzahl (Zahl größer als 0) eingeben.");
       return;
@@ -12039,7 +12039,7 @@ export function AdminDashboard({
               min="1"
               max="50"
               value={batchiPadCount}
-              onChange={e => setBatchiPadCount(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={e => setBatchiPadCount(e.target.value)}
               style={{
                 width: '100%',
                 padding: '7px 10px',
