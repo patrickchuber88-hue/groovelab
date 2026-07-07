@@ -51,6 +51,8 @@ interface MeisterwerkDocumentationModalProps {
   teacherId?: string;
   initialLehrwerkId?: string;
   onProfileClick?: (student: Student) => void;
+  readOnly?: boolean;
+  isEmbed?: boolean;
 }
 
 interface ProgressItem {
@@ -189,7 +191,7 @@ export const getCleanPageNotes = (notes: any): string => {
     .trim();
 };
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
 
   useEffect(() => {
@@ -2716,41 +2718,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? getSongColor(activeSong.songs?.title || 'Song') 
       : null;
 
-  return (
+  const content = (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 9999,
-      background: 'rgba(9, 9, 11, 0.65)',
-      backdropFilter: 'blur(20px)',
+      background: useNotebookLayout 
+        ? (bookColor 
+            ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
+            : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
+        : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
+      borderRadius: '32px',
+      width: '100%',
+      maxWidth: '1360px',
+      height: isEmbed ? '100%' : '92vh',
+      boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      fontFamily: '"Inter", sans-serif'
-    }}>
-
-
-      <div style={{
-        background: useNotebookLayout 
-          ? (bookColor 
-              ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
-              : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
-          : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
-        borderRadius: '32px',
-        width: '100%',
-        maxWidth: '1360px',
-        height: '92vh',
-        boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        border: useNotebookLayout 
-          ? 'none' 
-          : '1px solid rgba(0, 0, 0, 0.05)',
-        padding: useNotebookLayout ? '6px' : '0',
-        position: 'relative'
-      }} className="animation-slide-up">
+      flexDirection: 'column',
+      overflow: 'hidden',
+      border: useNotebookLayout 
+        ? 'none' 
+        : '1px solid rgba(0, 0, 0, 0.05)',
+      padding: useNotebookLayout ? '6px' : '0',
+      position: 'relative'
+    }} className="animation-slide-up">
         {/* Header - Apple-style compact redesign */}
         <div style={{
           padding: '16px 20px',
@@ -2875,34 +2863,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </button>
 
             {/* Close Button */}
-            <button
-              onClick={handleClose}
-              style={{
-                background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
-                border: useNotebookLayout ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
-                borderRadius: '50%',
-                width: '30px',
-                height: '30px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: useNotebookLayout ? '#c5d8cf' : '#8e8e93',
-                transition: 'all 0.18s ease',
-                flexShrink: 0
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.3)' : 'rgba(120,120,128,0.16)';
-                e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
-                e.currentTarget.style.color = useNotebookLayout ? '#c5d8cf' : '#8e8e93';
-              }}
-              className="hover-scale"
-            >
-              <X size={13} />
-            </button>
+            {!isEmbed && (
+              <button
+                onClick={handleClose}
+                style={{
+                  background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
+                  border: useNotebookLayout ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: useNotebookLayout ? '#c5d8cf' : '#8e8e93',
+                  transition: 'all 0.18s ease',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.3)' : 'rgba(120,120,128,0.16)';
+                  e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
+                  e.currentTarget.style.color = useNotebookLayout ? '#c5d8cf' : '#8e8e93';
+                }}
+                className="hover-scale"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -3873,111 +3863,113 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     Lehrwerke & Übungen
                   </h3>
                   
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                      style={{
-                        background: '#000',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Plus size={14} /> Zuweisen
-                    </button>
-                    
-                    {showAssignDropdown && (
-                      <div style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: '36px',
-                        background: 'white',
-                        border: '1px solid #e8e8ed',
-                        borderRadius: '16px',
-                        boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
-                        zIndex: 40,
-                        minWidth: '220px',
-                        padding: '6px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px'
-                      }}>
-                        {globalLehrwerke
-                          .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
-                          .map(g => (
-                            <button
-                              key={g.id}
-                              type="button"
-                              onClick={() => handleAssignLehrwerk(g.id)}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                padding: '8px 12px',
-                                borderRadius: '10px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                color: '#000',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                            >
-                              {(() => {
-                                const bookColor = getLehrwerkColor(g.title);
-                                return (
-                                  <div style={{
-                                    width: '24px',
-                                    height: '32px',
-                                    background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                    borderRadius: '3px',
-                                    border: 'none',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-                                    position: 'relative',
-                                    flexShrink: 0,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}>
-                                    <BookOpen size={11} color={bookColor.text} />
+                  {!readOnly && (
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                        style={{
+                          background: '#000',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '20px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Plus size={14} /> Zuweisen
+                      </button>
+                      
+                      {showAssignDropdown && (
+                        <div style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '36px',
+                          background: 'white',
+                          border: '1px solid #e8e8ed',
+                          borderRadius: '16px',
+                          boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
+                          zIndex: 40,
+                          minWidth: '220px',
+                          padding: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px'
+                        }}>
+                          {globalLehrwerke
+                            .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
+                            .map(g => (
+                              <button
+                                key={g.id}
+                                type="button"
+                                onClick={() => handleAssignLehrwerk(g.id)}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  padding: '8px 12px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  color: '#000',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              >
+                                {(() => {
+                                  const bookColor = getLehrwerkColor(g.title);
+                                  return (
                                     <div style={{
-                                      position: 'absolute',
-                                      left: 0,
-                                      top: 0,
-                                      bottom: 0,
-                                      width: '3px',
-                                      background: 'rgba(0,0,0,0.08)',
-                                      borderRight: '1px solid rgba(255,255,255,0.1)'
-                                    }} />
-                                  </div>
-                                );
-                              })()}
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
-                            </button>
-                          ))
-                        }
-                        {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
-                          <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '8px', textAlign: 'center', fontStyle: 'italic' }}>
-                            Alle Lehrwerke zugewiesen
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                                      width: '24px',
+                                      height: '32px',
+                                      background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                      borderRadius: '3px',
+                                      border: 'none',
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                                      position: 'relative',
+                                      flexShrink: 0,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}>
+                                      <BookOpen size={11} color={bookColor.text} />
+                                      <div style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        width: '3px',
+                                        background: 'rgba(0,0,0,0.08)',
+                                        borderRight: '1px solid rgba(255,255,255,0.1)'
+                                      }} />
+                                    </div>
+                                  );
+                                })()}
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
+                              </button>
+                            ))
+                          }
+                          {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
+                            <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '8px', textAlign: 'center', fontStyle: 'italic' }}>
+                              Alle Lehrwerke zugewiesen
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {assignedLehrwerke.length === 0 ? (
@@ -5889,31 +5881,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
                               📝 Zusätzliche Hausaufgaben-Bemerkungen
                             </label>
-                            <button
-                              type="button"
-                              onClick={toggleSpeechRecognition}
-                              style={{
-                                background: isListening ? '#ef4444' : '#f1f5f9',
-                                color: isListening ? 'white' : '#475569',
-                                border: 'none',
-                                padding: '4px 8px',
-                                borderRadius: '12px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
-                              title={isListening ? "Aufnahme stoppen..." : "Diktieren (Speech-to-AI)"}
-                            >
-                              <span>🎤</span>
-                              <span>{isListening ? "Stopp..." : "Diktieren"}</span>
-                            </button>
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={toggleSpeechRecognition}
+                                style={{
+                                  background: isListening ? '#ef4444' : '#f1f5f9',
+                                  color: isListening ? 'white' : '#475569',
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s'
+                                }}
+                                title={isListening ? "Aufnahme stoppen..." : "Diktieren (Speech-to-AI)"}
+                              >
+                                <span>🎤</span>
+                                <span>{isListening ? "Stopp..." : "Diktieren"}</span>
+                              </button>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {isNotesExpanded && (
+                            {!readOnly && isNotesExpanded && (
                               <button
                                 type="button"
                                 onClick={handleAddNote}
@@ -5935,7 +5929,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 {saving ? 'Speichert...' : 'Bemerkung speichern'}
                               </button>
                             )}
-                            {isNotesExpanded && (
+                            {!readOnly && isNotesExpanded && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5964,26 +5958,40 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </div>
                         </div>
                         <textarea
-                          placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
+                          placeholder={readOnly ? "Keine zusätzlichen Bemerkungen hinterlegt." : "Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."}
                           value={homeworkNotes}
-                          onChange={(e) => {
+                          readOnly={readOnly}
+                          onChange={readOnly ? undefined : (e) => {
                             setHomeworkNotes(e.target.value);
                             setHasChanges(true);
                           }}
-                          onFocus={() => setIsNotesFocused(true)}
-                          onBlur={() => {
+                          onFocus={readOnly ? undefined : () => setIsNotesFocused(true)}
+                          onBlur={readOnly ? undefined : () => {
                             setTimeout(() => {
                               const activeEl = document.activeElement;
                               if (activeEl && (
                                 activeEl.closest('.preset-btn') || 
                                 activeEl.closest('.save-note-btn')
                               )) {
-                                return;
+                                  return;
                               }
                               setIsNotesFocused(false);
                             }, 200);
                           }}
-                          style={{
+                          style={readOnly ? {
+                            width: '100%',
+                            minHeight: '120px',
+                            padding: '12px 14px',
+                            border: 'none',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            outline: 'none',
+                            resize: 'none',
+                            background: 'transparent',
+                            fontFamily: 'inherit',
+                            color: '#1e293b',
+                            pointerEvents: 'none'
+                          } : {
                             width: '100%',
                             height: isNotesExpanded ? '280px' : '90px',
                             padding: '12px 14px',
@@ -8003,9 +8011,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       })()}
       </div>
       </div>
-    </div>
-  );
-};
+    );
+
+    if (isEmbed) {
+      return (
+        <div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '600px', fontFamily: '"Inter", sans-serif' }}>
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(9, 9, 11, 0.65)',
+        backdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        fontFamily: '"Inter", sans-serif'
+      }}>
+        {content}
+      </div>
+    );
+  };
 
 const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
   return (
