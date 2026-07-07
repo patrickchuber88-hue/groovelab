@@ -48,7 +48,7 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
 
 const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
   const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
-  if (isTeacher) return '/avatar_teacher_male.jpg';
+  if (isTeacher) return '/avatar_ghost.jpg';
   
   if (!instrument) return '/avatars/student_eguitar_1.png';
   const inst = instrument.toLowerCase().trim();
