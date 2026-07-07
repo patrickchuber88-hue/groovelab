@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -9,6 +9,7 @@ import {
 
 import { renderInstrumentIcon } from '../utils/instruments';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const brandColor = 'var(--primary-color)';
 
@@ -61,6 +62,10 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 };
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, onOpenTageskompass, activePlatform, onSwitchPlatform }) => {
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+  const [showQrOverlay, setShowQrOverlay] = useState<boolean>(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(activePlatform === 'groovelab' && (student.is_groovelab_active ?? student.isGroovelabActive ?? false) ? 'groovelab' : 'campus');
   const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
@@ -111,7 +116,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       student.photo_url.includes('oboe_avatar')
     );
     if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
-      displayAvatarSrc = getDefaultMusicianAvatarUrl(student.instrument, student.role);
+      displayAvatarSrc = '/avatar_ghost.jpg';
     }
   }
 
@@ -1028,7 +1033,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const currentXP = avatar?.xp || ((skills.filter((s: any) => { 
     const isVocal = (s.instrument || '').toLowerCase().includes('vocal') || (s.instrument || '').toLowerCase().includes('gesang'); 
     return s.is_stage_ready && !isVocal; 
-  }).length + vocalsSongIds.size) * 100) || 30;
+  }).length + vocalsSongIds.size) * 100) || 0;
 
   const verifiedSongsCount = skills.filter((s: any) => s.is_stage_ready).length + vocalsSongIds.size;
   const focusMinutes = studentStats?.total_focus_minutes || studentStats?.monthly_focus_minutes || 0;
@@ -1100,6 +1105,32 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowQrOverlay(true)}
+            style={{
+              marginLeft: 'auto',
+              marginRight: '60px',
+              border: '1.5px solid rgba(0, 0, 0, 0.05)',
+              borderRadius: '99px',
+              padding: '6px 14px',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+              background: localTab === 'campus' ? 'linear-gradient(135deg, #137333 0%, #064e3b 100%)' : '#1e293b',
+              color: '#ffffff',
+              boxShadow: localTab === 'campus' ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
+            }}
+            className="hover-scale"
+          >
+            <Award size={14} />
+            <span>{localTab === 'campus' ? 'Campus Pass' : 'Member Pass'}</span>
+          </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start', marginTop: '20px' }}>
@@ -1117,7 +1148,29 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <img src={displayAvatarSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1 }}>{student.first_name} {student.last_name}</h2>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{student.first_name} {maskLastName(student.last_name)}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleRealNames()}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: showRealNames ? '#ea4335' : '#64748b',
+                      padding: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={showRealNames ? "Nachname ausblenden" : "Nachname einblenden (für 10s)"}
+                    className="hover-scale-mini"
+                  >
+                    {showRealNames ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </h2>
                 <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                     <Calendar size={14} /> Member seit {memberSince}
@@ -1343,21 +1396,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 marginTop: '8px',
                 alignItems: 'stretch'
               }}>
-                {/* GL Card 1: GrooveLab XP (Orange/Red — GrooveLab brand) */}
+                {/* GL Card 1: GrooveLab XP (Yellow/Gold) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #f97316, #c2410c)',
-                  color: 'white',
+                  background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                  color: '#1e293b',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 6px 15px rgba(194, 65, 12, 0.15)',
+                  boxShadow: '0 6px 15px rgba(202, 138, 4, 0.15)',
                   height: '100%',
                   boxSizing: 'border-box'
                 }}>
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
+                    background: 'rgba(30, 41, 59, 0.1)',
                     borderRadius: '10px',
                     width: '32px',
                     height: '32px',
@@ -1366,7 +1419,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <Star size={18} fill="white" color="white" />
+                    <Star size={18} fill="#1e293b" color="#1e293b" />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
@@ -1378,16 +1431,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </div>
                 </div>
 
-                {/* GL Card 2: Anzahl Songs (Purple) */}
+                {/* GL Card 2: Anzahl Songs (Blue) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                   color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 6px 15px rgba(109, 40, 217, 0.15)',
+                  boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
                   height: '100%',
                   boxSizing: 'border-box'
                 }}>
@@ -1411,6 +1464,81 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       SONGS GEMEISTERT
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Meilenstein-Sticker / Badges */}
+            {(streakDays >= 3 || currentXP >= 100 || focusMinutes >= 30) && (
+              <div style={{
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '20px',
+                padding: '16px',
+                marginTop: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Award size={18} style={{ color: '#137333' }} />
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                    Errungenschaften &amp; Badges
+                  </h4>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {streakDays >= 3 && (
+                    <div style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#9a3412',
+                      background: '#ffedd5',
+                      border: '1px solid #fed7aa',
+                      padding: '6px 12px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontFamily: 'Urbanist'
+                    }} title="Übe-Streak aktiv!">
+                      🔥 Streak-Kaiser
+                    </div>
+                  )}
+                  {currentXP >= 100 && (
+                    <div style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#1e40af',
+                      background: '#dbeafe',
+                      border: '1px solid #bfdbfe',
+                      padding: '6px 12px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontFamily: 'Urbanist'
+                    }} title="XP Level Legende">
+                      ⭐ XP-Legende
+                    </div>
+                  )}
+                  {focusMinutes >= 30 && (
+                    <div style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#5b21b6',
+                      background: '#ede9fe',
+                      border: '1px solid #ddd6fe',
+                      padding: '6px 12px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontFamily: 'Urbanist'
+                    }} title="Fokus-Zeit gemeistert">
+                      🎯 Fokus-Meister
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1778,142 +1906,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           </div>
 
           {/* RIGHT COLUMN: Pass first, then settings (campus only) */}
-          <aside style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-
-            {isPlatformCampus ? (
-              /* ============ CAMPUS RIGHT COLUMN ============ */
-              <>
-                {/* 1. Ausweis (Campus Pass) — always on top */}
-                <div className="hover-scale" style={{ 
-                  background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
-                  borderRadius: '32px', 
-                  padding: '28px', 
-                  color: 'white',
-                  boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-                  border: '1.5px solid rgba(52, 168, 83, 0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  width: '100%',
-                  height: 'auto',
-                  minHeight: '480px',
-                  boxSizing: 'border-box',
-                  gap: '20px'
-                }}>
-                  {/* Sheen effect */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
-                    pointerEvents: 'none'
-                  }} />
-
-                  {/* CAMPUS PASS Header */}
-                  <span style={{ 
-                    fontSize: '0.68rem', 
-                    fontWeight: 900, 
-                    color: '#fbbf24', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.2em',
-                    zIndex: 1,
-                    marginBottom: '-4px'
-                  }}>
-                    CAMPUS PASS
-                  </span>
-
-                  {/* Top Info Section: Details left, Avatar right */}
-                  <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
-                    {/* Right Side: Avatar Photo */}
-                    <img 
-                      src={displayAvatarSrc} 
-                      alt="Avatar" 
-                      style={{ 
-                        width: '92px', 
-                        height: '92px', 
-                        borderRadius: '22px', 
-                        objectFit: 'cover',
-                        border: '3px solid #22c55e',
-                        boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)',
-                        flexShrink: 0,
-                        marginTop: '2px'
-                      }} 
-                    />
-                    
-                    {/* Left Side: Identity Details */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                      <div>
-                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
-                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                          {student.first_name} {student.last_name}
-                        </div>
-                      </div>
- 
-                      <div>
-                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
-                          {schoolName}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dashed divider line */}
-                  <div style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
-
-                  {/* QR Code Scan area */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
-                    <div style={{ 
-                      background: '#ffffff', 
-                      padding: '16px', 
-                      borderRadius: '24px', 
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.35)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      border: '1.5px solid rgba(52, 168, 83, 0.3)'
-                    }}>
-                      <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* QR Code regenerate button — below pass for campus */}
-                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                  <button
-                    onClick={handleRegenerateQrToken}
-                    className="google-btn-secondary"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '0.8rem',
-                      fontWeight: 850,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      background: '#fff1f2',
-                      border: '1.5px solid #fecdd3',
-                      color: '#e11d48',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      marginTop: '-16px',
-                      boxShadow: '0 4px 12px rgba(225, 29, 72, 0.05)',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#ffe4e6';
-                      e.currentTarget.style.borderColor = '#fda4af';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#fff1f2';
-                      e.currentTarget.style.borderColor = '#fecdd3';
-                    }}
-                  >
-                    <RefreshCw size={14} /> QR-Code sperren &amp; neu generieren
-                  </button>
-                )}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                 {/* Onboarding-Link button */}
                 {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
@@ -2554,21 +2547,206 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
               )}
             </section>
-              </>
-            ) : (
-              /* ============ GROOVELAB RIGHT COLUMN — Pass only ============ */
+          </aside>
+        </div>
+      </div>
 
-              /* GrooveLab Member access card — on top, no settings widget below */
-              <div className="hover-scale" style={{
+      {/* CAMPUS / MEMBER PASS OVERLAY MODAL */}
+      {showQrOverlay && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 4000,
+            background: 'rgba(15, 23, 42, 0.82)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowQrOverlay(false)}
+        >
+          {/* Viewport-level Close Button */}
+          <button 
+            onClick={() => setShowQrOverlay(false)}
+            style={{
+              position: 'absolute',
+              top: '32px',
+              right: '32px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#ffffff',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              zIndex: 4100
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Schließen"
+          >
+            <X size={22} />
+          </button>
+
+          <div 
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '380px'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+
+            {localTab === 'campus' ? (
+              /* ============ CAMPUS PASS OVERLAY ============ */
+              <div style={{ 
+                background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+                borderRadius: '32px', 
+                padding: '32px', 
+                color: 'white',
+                boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 40px rgba(52, 168, 83, 0.25)',
+                border: '1.5px solid rgba(52, 168, 83, 0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative',
+                overflow: 'hidden',
+                boxSizing: 'border-box',
+                gap: '24px'
+              }}>
+                {/* Sheen effect */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* CAMPUS PASS Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
+                  <span style={{ 
+                    fontSize: '0.7rem', 
+                    fontWeight: 900, 
+                    color: '#fbbf24', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.22em',
+                  }}>
+                    CAMPUS PASS
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '20px' }}>
+                    Aktiv
+                  </span>
+                </div>
+
+                {/* Top Info Section */}
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1, flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between' }}>
+                  <img 
+                    src={displayAvatarSrc} 
+                    alt="Avatar" 
+                    style={{ 
+                      width: '76px', 
+                      height: '76px', 
+                      borderRadius: '24px', 
+                      objectFit: 'cover', 
+                      border: '3px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '0 8px 24px rgba(2, 44, 34, 0.2)'
+                    }} 
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.1' }}>
+                        {student.first_name} {maskLastName(student.last_name)}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, lineHeight: '1.2' }}>
+                        {schoolName}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+
+                {/* QR Code Container */}
+                <div style={{ 
+                  background: 'white', 
+                  padding: '16px', 
+                  borderRadius: '24px', 
+                  boxShadow: '0 15px 35px rgba(0,0,0,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '8px 0',
+                  zIndex: 1
+                }}>
+                  <QRCode value={`${window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`} size={150} style={{ width: '150px', height: '150px' }} />
+                </div>
+
+                {/* Actions */}
+                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 1 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerateQrToken();
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.12)',
+                        color: '#ffffff',
+                        border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                        borderRadius: '16px',
+                        padding: '12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                      }}
+                    >
+                      <RefreshCw size={14} />
+                      QR-Code sperren &amp; neu generieren
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ============ GROOVELAB MEMBER PASS OVERLAY ============ */
+              <div style={{
                 background: 'white',
                 borderRadius: '32px',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 20px 45px rgba(0,0,0,0.1)',
+                boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
                 overflow: 'hidden',
-                width: '100%',
-                minHeight: '480px',
-                height: 'auto',
                 border: '1.5px solid #e2e8f0',
                 boxSizing: 'border-box'
               }}>
@@ -2590,11 +2768,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
 
                 {/* Content Area */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 24px 20px 24px', gap: '12px', flex: 1, justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 28px', gap: '16px' }}>
                   {/* Portrait */}
                   <div style={{ 
-                    width: '105px', 
-                    height: '105px', 
+                    width: '92px', 
+                    height: '92px', 
                     borderRadius: '50%', 
                     border: `3px solid ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'}`,
                     padding: '3px',
@@ -2619,8 +2797,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                   {/* Identity */}
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.first_name} {student.last_name}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.first_name} {maskLastName(student.last_name)}</div>
                   </div>
+
 
                   {/* QR Code Container */}
                   <div style={{ 
@@ -2631,9 +2810,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    width: '100%'
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${localQrToken || student.qr_token || student.id || ''}`} size={135} />
+                    <QRCode value={`${window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`} size={150} style={{ width: '150px', height: '150px' }} />
                   </div>
 
                   <p style={{ 
@@ -2649,17 +2829,44 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </p>
                 </div>
 
-                {/* Bottom Brand Stripe */}
-                <div style={{ 
-                  height: '12px', 
-                  background: `linear-gradient(90deg, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'}, #1e293b, ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'})` 
-                }} />
+                {/* Actions */}
+                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                  <div style={{ padding: '0 28px 24px 28px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerateQrToken();
+                      }}
+                      style={{
+                        width: '100%',
+                        background: '#fff1f2',
+                        color: '#e11d48',
+                        border: '1.5px solid #fecdd3',
+                        borderRadius: '16px',
+                        padding: '12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = '#ffe4e6'}
+                      onMouseOut={e => e.currentTarget.style.background = '#fff1f2'}
+                    >
+                      <RefreshCw size={14} />
+                      QR-Code sperren &amp; neu generieren
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-
-          </aside>
+          </div>
         </div>
-      </div>
+      )}
       {showFullPhoto && (
         <div 
           onClick={() => setShowFullPhoto(false)}

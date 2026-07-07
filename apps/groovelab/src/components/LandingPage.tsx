@@ -1886,7 +1886,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   🛡️ Das Campus-Groovelab Sicherheitsversprechen
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#137333', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  13-stufiges Sicherheits- & Datenschutzkonzept
+                  14-stufiges Sicherheits- & Datenschutzkonzept
                 </span>
               </div>
               <button 
@@ -1909,6 +1909,24 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
                 Als deutscher App-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde von Grund auf nach dem Prinzip <strong>Privacy by Design</strong> entwickelt und setzt fortschrittliche kryptografische Härtungen ein, um ein maximales Sicherheitsniveau zu garantieren:
               </p>
+
+              <div style={{
+                background: '#e6f4ea',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '20px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                textAlign: 'left'
+              }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#137333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  💡 Datensparsamkeit als aktive Härtung (Warum wir weniger Daten speichern)
+                </span>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.5, opacity: 0.9 }}>
+                  Da Campus-Groovelab als interaktives Lehr- und Organisations-Add-on agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, E-Mail-Adressen von Kindern/Lehrern oder Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die Freigabe durch Behörden/Datenschützer und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
+                </p>
+              </div>
 
               {/* 10 Stufen Grid/Liste */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1965,6 +1983,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   {
                     title: '13. Modul-Kapselung & QR-Sperre vor Ort (Schulbetrieb)',
                     desc: 'Auf gemeinsam genutzten Schul-Geräten (Lab-Modus) wird das datensensible Campus-Modul physisch gekapselt. Schüler können nicht ohne Weiteres dorthin wechseln; sie müssen sich vor Ort per schnellem QR-Scan erneut verifizieren.'
+                  },
+                  {
+                    title: '14. DSGVO-konforme Nachnamensmaskierung (Schulterblick-Schutz)',
+                    desc: 'Im laufenden Betrieb auf den Dashboards werden Schülernachnamen standardmäßig unkenntlich gemacht (z. B. „Mxxxxx“). Erst durch eine bewusste Klick-Interaktion (Auge-Symbol) können berechtigte Lehrkräfte oder Verwaltungsmitarbeiter die Nachnamen für ein Zeitfenster von genau 10 Sekunden einblenden. Dies verhindert das Mitlesen durch Dritte an Arbeitsplätzen und im Unterrichtsraum.'
                   }
                 ].map((stufe, idx) => (
                   <div key={idx} style={{

@@ -4700,7 +4700,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             missedDate.setDate(tempDate.getDate() + i);
             const weekOfMissed = getISOWeek(missedDate);
             
-            if (!lastJokerWeek || weekOfMissed > lastJokerWeek) {
+            if (currentDecayedStreak > 0 && (!lastJokerWeek || weekOfMissed > lastJokerWeek)) {
               lastJokerWeek = weekOfMissed;
               latestJokerDate = new Date(missedDate.getFullYear(), missedDate.getMonth(), missedDate.getDate(), 12, 0, 0);
               jokerChanged = true;
@@ -8486,7 +8486,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     letterSpacing: '-0.02em'
                   }}>
                     Hi, <span style={{ 
-                      background: 'linear-gradient(135deg, #4f46e5 0%, #007aff 100%)',
+                      background: 'linear-gradient(135deg, #137333 0%, #10b981 100%)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       fontWeight: 950

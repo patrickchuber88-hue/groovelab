@@ -1406,7 +1406,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           // Admins and secretaries bypass activation flags and always land in the administration module under briefing
           localStorage.setItem('groovelab_active_workspace', 'secretary');
           localStorage.setItem('groovelab_active_platform', 'campus');
-          localStorage.setItem('campus_active_tab', 'briefing');
+          localStorage.setItem('campus_active_tab', 'live');
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
@@ -2482,7 +2482,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (isTokenLogin) {
         if (isUuid) {
-          query = query.eq('qr_token', cleanPin);
+          query = query.or(`qr_token.eq.${cleanPin},id.eq.${cleanPin}`);
         } else {
           query = query.eq('teacher_qr_token', cleanPin);
         }
@@ -2608,7 +2608,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
       if (!isQrLogin) {
         const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-        const isPinActivated = user.role === 'student' ? !!studentBirthDay : user.is_pin_activated;
+        const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
 
         if (!isPinActivated) {
           setPinSetupUser(user);
@@ -2751,7 +2751,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
       if (isUuid) {
-        query = query.eq('qr_token', qrToken);
+        query = query.or(`qr_token.eq.${qrToken},id.eq.${qrToken}`);
       } else {
         query = query.eq('teacher_qr_token', qrToken);
       }
@@ -2884,7 +2884,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
       const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
-      const isPinActivated = user.role === 'student' ? !!studentBirthDay : user.is_pin_activated;
+      const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
 
       if (!isPinActivated) {
         setPinSetupUser(user);
@@ -6602,11 +6602,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={async () => {
                 const dayOfBirthVal = Array.isArray(pinVerificationUser.activation_days) ? pinVerificationUser.activation_days[0]?.day_of_birth : pinVerificationUser.activation_days?.day_of_birth;
                 const studentBirthDay = dayOfBirthVal ? String(dayOfBirthVal).padStart(2, '0') : '';
-                const expectedLength = pinVerificationUser.role === 'student' ? 2 : 4;
+                const expectedLength = (pinVerificationUser.role === 'student' && studentBirthDay) ? 2 : 4;
                 if (pinVerificationInput.length !== expectedLength) return;
                 
                 let isMatch = false;
-                if (pinVerificationUser.role === 'student') {
+                if (pinVerificationUser.role === 'student' && studentBirthDay) {
                   isMatch = parseInt(pinVerificationInput) === parseInt(studentBirthDay);
                 } else {
                   const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {

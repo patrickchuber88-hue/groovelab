@@ -5613,18 +5613,19 @@ function App() {
 
     // Default start tab: Always open the briefing board for all users in Campus, and for staff/teachers in GrooveLab.
     // GrooveLab students start on the 'live' tab.
-    localStorage.setItem('campus_active_tab', 'briefing');
+    const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
+    localStorage.setItem('campus_active_tab', isStaff ? 'live' : 'briefing');
     if (userToLogin?.role === 'student') {
       localStorage.setItem('groovelab_active_tab', 'live');
       if (mode === 'lab') {
         localStorage.setItem('groovelab_active_platform', 'groovelab');
       }
     } else {
-      localStorage.setItem('groovelab_active_tab', 'briefing');
+      localStorage.setItem('groovelab_active_tab', 'live');
     }
     
     const resolvedPlatform = mode === 'lab' && userToLogin?.role === 'student' ? 'groovelab' : (localStorage.getItem('groovelab_active_platform') || 'groovelab');
-    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'briefing';
+    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : (resolvedPlatform === 'campus' && isStaff ? 'live' : 'briefing');
     setActiveStudentTab(startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
@@ -7495,6 +7496,10 @@ function App() {
               <div 
                 onClick={() => {
                   setActivePlatform('campus');
+                  const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+                  const startTab = isStaff ? 'live' : 'briefing';
+                  setActiveStudentTab(startTab);
+                  localStorage.setItem('campus_active_tab', startTab);
                 }}
                 style={{
                   display: 'flex',

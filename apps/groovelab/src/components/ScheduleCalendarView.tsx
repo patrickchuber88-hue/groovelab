@@ -21,7 +21,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -83,6 +83,8 @@ export function ScheduleCalendarView({
   hasSubmittedSchedule = true,
   scheduleStatus = 'none'
 }: ScheduleCalendarViewProps) {
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -4001,9 +4003,9 @@ export function ScheduleCalendarView({
 
                   const displayNames = isGroup 
                     ? (isGruppenunterricht 
-                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(' & ')
-                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join(', '))
-                    : `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim();
+                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join(' & ')
+                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join(', '))
+                    : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim();
 
                   return (
                     <React.Fragment key={group.key}>
@@ -4016,7 +4018,7 @@ export function ScheduleCalendarView({
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
                         onMouseEnter={(e) => {
                           const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join('\n')
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join('\n')
                             : (isBreak ? undefined : displayNames);
                           if (text) {
                             setHoveredTooltip({
@@ -4029,7 +4031,7 @@ export function ScheduleCalendarView({
                         }}
                         onMouseMove={(e) => {
                           const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim()).join('\n')
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join('\n')
                             : (isBreak ? undefined : displayNames);
                           if (text) {
                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
@@ -4345,7 +4347,7 @@ export function ScheduleCalendarView({
                                     ) : (
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
                                         <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name)}` : 'Ensemble'}
                                         </span>
                                         <span style={{ 
                                           background: 'rgba(0, 0, 0, 0.05)', 
@@ -4489,7 +4491,7 @@ export function ScheduleCalendarView({
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name}` : 'Ensemble'}
+                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name)}` : 'Ensemble'}
                                       </div>
                                       <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                         Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
@@ -4505,7 +4507,7 @@ export function ScheduleCalendarView({
                                       scrollbarWidth: 'none'
                                     }}>
                                       {occurrencesInGroup.map(o => {
-                                        const name = `${o.student?.first_name || ''} ${o.student?.last_name || ''}`.trim();
+                                        const name = `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim();
                                         const acknowledged = o.student_acknowledged;
                                         return (
                                           <span 

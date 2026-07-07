@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
@@ -1068,6 +1069,7 @@ const parseRoomName = (name: string) => {
 };
 
 export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched }: SecretaryDashboardProps) {
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const getSchoolNumericId = (id: string): number => {
     if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
     let hash = 0;
@@ -6399,9 +6401,36 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   <option value="all">Alle Tarife</option>
                   <option value="campus">Campus Aktiv</option>
                   <option value="groovelab">GrooveLab Aktiv</option>
-                  <option value="inactive">Inaktiv</option>
                 </select>
               </div>
+
+              {/* 👁️ Global Eye toggle to temporarily reveal names */}
+              <button
+                type="button"
+                onClick={() => toggleRealNames()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  background: showRealNames ? '#fee2e2' : '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: showRealNames ? '#ef4444' : '#64748b',
+                  cursor: 'pointer',
+                  fontFamily: 'Urbanist',
+                  transition: 'all 0.2s',
+                  height: '35px',
+                  boxSizing: 'border-box'
+                }}
+                title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+              >
+                {showRealNames ? <EyeOff size={15} /> : <Eye size={15} />}
+                <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
+              </button>
             </div>
 
             {/* LIST ROW VIEW CONTAINER */}
@@ -6480,7 +6509,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             }}
                             className="student-title-text"
                           >
-                            {student.first_name} {student.last_name}
+                            {student.first_name} {showRealNames ? student.last_name : maskLastName(student.last_name)}
                           </span>
                           {student.nickname && (
                             <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
@@ -15969,18 +15998,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
 
                 return (
-                  <div className="google-card" style={{
-                    width: '340px',
-                    flexShrink: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '20px',
-                    padding: '24px',
-                    borderRadius: '24px',
-                    border: '1.5px solid #cbd5e1',
-                    background: '#ffffff',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
-                  }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '340px', flexShrink: 0 }}>
+                    <div className="google-card" style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px',
+                      padding: '24px',
+                      borderRadius: '24px',
+                      border: '1.5px solid #cbd5e1',
+                      background: '#ffffff',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+                    }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Users size={20} style={{ color: '#0f172a' }} />
                       <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
@@ -16243,7 +16271,69 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       })}
                     </div>
                   </div>
-                );
+
+                  {/* Datenschutz-Compliance-Ampel */}
+                  <div className="google-card" style={{
+                    padding: '24px',
+                    borderRadius: '24px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldCheck size={20} style={{ color: '#137333' }} />
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        Datenschutz-Cockpit
+                      </h3>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
+                      Übersicht der aktiven DSGVO-Sicherheitsstufen für Campus-Groovelab an dieser Musikschule.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {[
+                        { title: 'PGP-Datenverschlüsselung', value: '100% Aktiv', desc: 'Schülervornamen verschlüsselt in Datenbank.' },
+                        { title: 'Schüler-Datenminimierung', value: '0 Kinder-E-Mails', desc: 'Keine E-Mails/Adressen erfasst.' },
+                        { title: 'Schulterblick-Schutz', value: 'Maskierung aktiv', desc: 'Standardmäßige Nachnamen-Sperre.' },
+                        { title: 'Serverstandort', value: 'Falkenstein (DE)', desc: 'ISO 27001 zertifiziertes RZ.' },
+                        { title: 'Zero-Cloud Biometrie', value: '100% Lokal', desc: 'Keine Videoübertragung an Server.' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          background: '#f8fafc',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #f1f5f9'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>{item.title}</span>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 900,
+                              color: '#137333',
+                              background: '#e6f4ea',
+                              padding: '2px 8px',
+                              borderRadius: '20px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+                              {item.value}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 500 }}>{item.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
               })()}
 
               {/* Cooperations Sidebar */}
@@ -17860,7 +17950,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {studentName}
+                                  {student.first_name} {showRealNames ? student.last_name : maskLastName(student.last_name)}
                                 </span>
                                 {student.nickname && (
                                   <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
@@ -25097,7 +25187,7 @@ status: status,
               {(() => {
                 const token = manageTeacher.teacherQrToken || '';
                 const isActive = manageTeacher.isActive || manageTeacher.is_active;
-                const link = token ? (token.startsWith('http') ? token : `https://campus-groovelab.de/qr/${token}`) : '';
+                const link = token ? (token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`) : '';
                 const label = isActive ? 'Login-QR-Code (Ausweis)' : 'Aktivierungs-QR-Code';
                 return link ? (
                   <div style={{

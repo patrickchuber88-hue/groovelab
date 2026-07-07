@@ -475,11 +475,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
 
         // Vorab Namen des Schülers holen
-        const { data: userData, error: userError } = await supabase
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+        let query = supabase
           .from('users')
-          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals')
-          .eq('qr_token', token)
-          .single();
+          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals');
+
+        if (isUuid) {
+          query = query.or(`qr_token.eq.${token},id.eq.${token}`);
+        } else {
+          query = query.eq('qr_token', token);
+        }
+
+        const { data: userData, error: userError } = await query.single();
 
         if (userError || !userData) {
           sessionStorage.removeItem('groovelab_qr_token');

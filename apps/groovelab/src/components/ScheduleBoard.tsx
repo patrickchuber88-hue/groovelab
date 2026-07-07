@@ -17,9 +17,12 @@ import {
   Info,
   X,
   Search,
-  Upload
+  Upload,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 interface Student {
   id: string;
@@ -124,6 +127,8 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
 }
 
 export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
 
@@ -2874,6 +2879,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
                 </div>
               )}
+              {/* Eye icon for toggling pupil last names */}
+              <button
+                type="button"
+                onClick={() => toggleRealNames()}
+                style={{
+                  background: showRealNames ? '#fce8e6' : 'rgba(255, 255, 255, 0.6)',
+                  color: showRealNames ? '#ea4335' : '#1d1d1f',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  fontWeight: 600,
+                  padding: '6px 10px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = showRealNames ? '#fce8e6' : 'rgba(255,255,255,0.9)'}
+                onMouseOut={e => e.currentTarget.style.background = showRealNames ? '#fce8e6' : 'rgba(255,255,255,0.6)'}
+                title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+              >
+                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setShowAddBoardForm(true)}
@@ -3821,7 +3852,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 </div>
                               </div>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {bs.first_name} {bs.last_name}
+                                {bs.first_name} {maskLastName(bs.last_name)}
                               </span>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name[0]}.`).join(', ')}
@@ -3918,7 +3949,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </div>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <InstrumentBadge instrument={bs.instrument} color={textColor} />
-                            {bs.first_name} {bs.last_name}
+                            {bs.first_name} {maskLastName(bs.last_name)}
                           </span>
                           {cardHeightPx > 52 && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#065f46' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>

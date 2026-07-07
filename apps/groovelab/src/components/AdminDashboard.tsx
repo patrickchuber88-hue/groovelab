@@ -12342,7 +12342,7 @@ export function AdminDashboard({
                     justifyContent: 'center',
                     border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
+                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
                   </div>
                 </div>
               </>
@@ -12412,7 +12412,7 @@ export function AdminDashboard({
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={150} />
+                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={150} />
                   </div>
                   
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
@@ -16268,7 +16268,7 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <QRCode value={`https://campus-groovelab.de/qr/${u.qr_token || u.id || ''}`} size={110} />
+                  <QRCode value={`${window.location.origin}/qr/${u.qr_token || u.id || ''}`} size={110} />
                 </div>
               </div>
 

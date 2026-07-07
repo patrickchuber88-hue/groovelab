@@ -20,8 +20,11 @@ import {
   Box,
   Lock,
   Star,
-  Palmtree
+  Palmtree,
+  Eye,
+  EyeOff
 } from 'lucide-react';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const timeToMinutes = (timeStr: string): number => {
   if (!timeStr) return 0;
@@ -49,6 +52,8 @@ interface CampusTeacherDashboardProps {
 }
 
 export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, initialBoard = 'compass' }: CampusTeacherDashboardProps) {
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+
   // Navigation State
   const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>(initialBoard);
 
@@ -1897,6 +1902,19 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             </div>
           </div>
           <button
+            type="button"
+            onClick={() => toggleRealNames()}
+            className={`w-full mb-2 py-2 px-3 flex items-center justify-center gap-2 rounded-lg text-xs font-bold transition-all border ${
+              showRealNames
+                ? 'bg-red-950/20 text-red-400 border-red-900/50 hover:bg-red-950/30'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
+            title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+          >
+            {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+            <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+          </button>
+          <button
             onClick={onLogout}
             className="w-full py-2 bg-slate-800 hover:bg-red-950/30 hover:text-red-400 text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-700"
           >
@@ -2178,7 +2196,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                   }} 
                                 />
                               )}
-                              {sched.student ? `${sched.student.first_name} ${sched.student.last_name}` : '☕ Pause (45 Min.)'}
+                              {sched.student ? `${sched.student.first_name} ${maskLastName(sched.student.last_name)}` : '☕ Pause (45 Min.)'}
                             </h3>
                             <div className="flex gap-2">
                               {sched.student?.instrument && (
@@ -2319,7 +2337,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     <img src={student.photo_url || '/avatar_ghost.jpg'} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-white">{student.first_name} {student.last_name}</h3>
+                    <h3 className="font-bold text-white">{student.first_name} {maskLastName(student.last_name)}</h3>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{student.instrument || 'Instrument unbestimmt'}</p>
                     <span className="text-[10px] text-slate-500 font-semibold block mt-1">Ausweis-ID: {student.ausweis_id || 'Keine'}</span>
                   </div>
@@ -2335,7 +2353,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   <div>
                     <h2 className="text-xl font-bold text-white">Fortschritts-Kartei</h2>
                     <p className="text-xs text-slate-400 font-bold uppercase mt-1 text-emerald-400">
-                      {selectedStudentHistory.student.first_name} {selectedStudentHistory.student.last_name}
+                      {selectedStudentHistory.student.first_name} {maskLastName(selectedStudentHistory.student.last_name)}
                     </p>
                   </div>
                   <button 
@@ -3332,6 +3350,31 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                         <span className="text-[9px] text-slate-500 font-medium">Fingersatz einhalten</span>
                       </div>
                     </button>
+                  </div>
+                </div>
+
+                {/* 1-Klick-Feedback Schnelltasten */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">🚀 1-Klick-Feedback (Schnelltasten):</label>
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {[
+                      { label: '🥁 Rhythmus sitzt', text: 'Der Rhythmus war heute super stabil und präzise!' },
+                      { label: '🎵 Melodie gelernt', text: 'Melodie komplett auswendig gelernt, tolle Arbeit!' },
+                      { label: '⚡ Konzentration top', text: 'Heute extrem konzentriert gearbeitet und super Fortschritte gemacht.' },
+                      { label: '🌟 Hausaufgabe perfekt', text: 'Hausaufgabe fehlerfrei vorbereitet, weiter so!' },
+                      { label: '🖐️ Handhaltung', text: 'Achte bei den nächsten Malen noch mehr auf eine entspannte Handhaltung.' }
+                    ].map((tag, idx) => (
+                       <button
+                         key={idx}
+                         type="button"
+                         onClick={() => {
+                           setNewDocNotes(prev => prev ? `${prev}\n${tag.text}` : tag.text);
+                         }}
+                         className="px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-[10px] font-bold text-slate-200 border border-slate-700/35 transition"
+                       >
+                         {tag.label}
+                       </button>
+                    ))}
                   </div>
                 </div>
 

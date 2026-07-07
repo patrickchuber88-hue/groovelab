@@ -135,7 +135,7 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
 
   const downloadQrCode = () => {
     if (!teacherQrToken) return;
-    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`https://campus-groovelab.de/qr/${teacherQrToken}`)}`;
+    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`${window.location.origin}/qr/${teacherQrToken}`)}`;
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
@@ -481,7 +481,7 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                    <QRCode value={`https://campus-groovelab.de/qr/${teacherQrToken}`} size={130} />
+                    <QRCode value={`${window.location.origin}/qr/${teacherQrToken}`} size={130} />
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>QR Code wird generiert...</div>
