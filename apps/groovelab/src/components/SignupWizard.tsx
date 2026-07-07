@@ -77,6 +77,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [schoolEmail, setSchoolEmail] = useState('');
+  const [isAccessGranted, setIsAccessGranted] = useState(false);
+  const [accessCodeInput, setAccessCodeInput] = useState('');
 
   // Step 2: Owner Info
   const [adminFirstName, setAdminFirstName] = useState('');
@@ -462,10 +464,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
       <div style={{
         width: '100%',
-        maxWidth: (step === 4 || step === 3) ? '440px' : '580px',
+        maxWidth: (step === 4 || step === 3 || !isAccessGranted) ? '440px' : '580px',
         background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '24px',
-        padding: step === 3 ? '24px' : '38px',
+        padding: (step === 3 || !isAccessGranted) ? '24px' : '38px',
         boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
         border: '1px solid rgba(0, 0, 0, 0.08)',
         display: 'flex',
@@ -478,8 +480,66 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         overflowY: 'auto',
         color: '#1e293b'
       }}>
-        {/* Header (except for provisioning step) */}
-        {step < 3 && (
+        {!isAccessGranted ? (
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (accessCodeInput.trim().toLowerCase() === 'campus-test') {
+                setIsAccessGranted(true);
+                setError(null);
+              } else {
+                setError('Ungültiger Zugangscode. Zugriff verweigert.');
+              }
+            }} 
+            style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', color: '#ea4335', justifyContent: 'center' }}>
+                  <ShieldCheck size={22} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Zugangsschutz (Beta-Test)</span>
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, textAlign: 'left' }}>
+                {error}
+              </div>
+            )}
+
+            <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: '1.5', margin: '0' }}>
+              Diese Plattform befindet sich derzeit in der geschlossenen Entwicklungsphase. Bitte gib das Passwort ein, um die Registrierung freizuschalten.
+            </p>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Passwort / Zugangscode *</label>
+              <input
+                type="password"
+                required
+                value={accessCodeInput}
+                onChange={(e) => setAccessCodeInput(e.target.value)}
+                placeholder="Passwort eingeben"
+                style={inputStyle}
+                className="signup-input"
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button type="button" onClick={onBackToLogin} style={backButtonStyle} className="signup-btn-back">Zurück</button>
+              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
+                Zugang freischalten <ArrowRight size={16} />
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {/* Header (except for provisioning step) */}
+            {step < 3 && (
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', color: '#10b981', justifyContent: 'center' }}>
@@ -928,6 +988,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </button>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
