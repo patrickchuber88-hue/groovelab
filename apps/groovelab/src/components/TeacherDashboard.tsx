@@ -665,8 +665,8 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
 const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 12px #eab308' }}></span>
+      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 12px #22c55e' }}></span>
         Coaches vor Ort
       </div>
       <div style={{ 
@@ -703,7 +703,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
             >
               <div 
                 onClick={() => c.users && onProfileSelect(c.users)}
-                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #eab308' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(234,179,8,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #22c55e' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
