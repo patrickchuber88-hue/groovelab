@@ -5217,11 +5217,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Manuel Wagner Bypass */}
-          {import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN && (
+          {(import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN) && (
             <button
               onClick={async () => {
                 try {
-                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
+                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN || import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
                   console.log('[Bypass] Attempting Manuel Wagner login...');
                   // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
                   sessionStorage.setItem('groovelab_qr_token', token);
