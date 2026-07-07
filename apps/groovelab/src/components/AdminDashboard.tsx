@@ -2235,7 +2235,7 @@ export function AdminDashboard({
               missingLehrerInserts.push({
                 room_id: room.id,
                 name: 'Lehrer iPad',
-                color: '#eab308'
+                color: '#22c55e'
               });
             }
           }
