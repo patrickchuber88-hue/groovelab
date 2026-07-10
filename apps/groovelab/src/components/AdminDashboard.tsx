@@ -5173,9 +5173,8 @@ export function AdminDashboard({
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {s.last_name}</div>
+                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#7d7d82', fontFamily: 'monospace', fontWeight: 600 }}>ID: {s.id.split('-')[0].toUpperCase()}</div>
                         {s.is_trial ? (
                           <div style={{ padding: '1px 5px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             ⏳ PROBE
@@ -13211,55 +13210,67 @@ export function AdminDashboard({
             fontFamily: '"Inter", sans-serif'
           }}>
             <div style={{
-              // The notebook frame/cover matches the book cover's gradient!
-              background: `radial-gradient(circle, ${gradient.from} 0%, ${gradient.to} 100%)`,
+              background: '#f3f3f6',
               borderRadius: '32px',
               width: '100%',
               maxWidth: '1100px',
               height: '80vh',
-              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0,0,0,0.3)',
+              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: `2px solid ${gradient.text}`,
-              padding: '10px',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Absolute Close Button */}
-              <button
-                onClick={() => { setSelectedLehrwerkForDetail(null); setSelectedStudentForProgress(null); }}
-                style={{
-                  position: 'absolute',
-                  top: '24px',
-                  right: '24px',
-                  zIndex: 100,
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)'}
-              >
-                <X size={16} />
-              </button>
+              {/* Header - Waldgrün Header */}
+              <div style={{
+                padding: '16px 24px',
+                background: '#456355',
+                borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                zIndex: 50,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <BookOpen size={20} color="#ffffff" />
+                  <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', fontFamily: 'Urbanist' }}>
+                    Lehrwerk-Details: {book.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => { setSelectedLehrwerkForDetail(null); setSelectedStudentForProgress(null); }}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.18s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
 
               {/* Inside Pages of the Notebook (Left/Right Pages) */}
               <div style={{
                 display: 'flex',
                 flex: 1,
                 overflow: 'hidden',
-                borderRadius: '20px',
-                boxShadow: 'inset 0 10px 30px rgba(0,0,0,0.1)',
                 position: 'relative'
               }}>
                 
@@ -13269,32 +13280,10 @@ export function AdminDashboard({
                   minWidth: 0,
                   padding: '32px',
                   overflowY: 'auto',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
-                  borderRight: '1px dashed #cbd5e1',
+                  background: '#ffffff',
+                  borderRight: '1px solid #cbd5e1',
                   position: 'relative'
                 }}>
-                  {/* Left binder holes on the right edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    right: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container (shifted to not overlap binder holes) */}
                   <div style={{ paddingRight: '12px' }}>
@@ -13940,31 +13929,9 @@ export function AdminDashboard({
                   minWidth: 0,
                   padding: '32px',
                   overflowY: 'auto',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
+                  background: '#f8fafc',
                   position: 'relative'
                 }}>
-                  {/* Right binder holes on the left edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    left: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container */}
                   <div style={{ paddingLeft: '12px' }}>
@@ -14196,45 +14163,7 @@ export function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Ringbook Spine overlay (Golden Rings) */}
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  bottom: '20px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-around',
-                  zIndex: 30,
-                  pointerEvents: 'none'
-                }}>
-                  {Array.from({ length: 8 }).map((_, idx) => (
-                    <div key={idx} style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <div style={{
-                        width: '28px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: 'transparent',
-                        border: '3px solid #d4af37',
-                        borderTopColor: '#ffe57f',
-                        borderLeftColor: '#ffc107',
-                        borderRightColor: '#ffc107',
-                        borderBottomColor: '#b78a02',
-                        boxShadow: '0 3px 5px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
-                        transform: 'scaleY(0.8)'
-                      }} />
-                    </div>
-                  ))}
-                </div>
+
 
               </div>
             </div>
@@ -14269,59 +14198,72 @@ export function AdminDashboard({
             fontFamily: '"Inter", sans-serif'
           }}>
             <div style={{
-              background: `radial-gradient(circle, ${gradient.from} 0%, ${gradient.to} 100%)`,
+              background: '#f3f3f6',
               borderRadius: '32px',
               width: '100%',
               maxWidth: '1100px',
               height: '80vh',
-              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0,0,0,0.3)',
+              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: `2px solid ${gradient.text}`,
-              padding: '10px',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Absolute Close Button */}
-              <button
-                onClick={async () => {
-                  await triggerAutoSaveSongProgress();
-                  setSelectedSongForDetail(null);
-                  setSelectedStudentForProgress(null);
-                  setSelectedSongSkill(null);
-                }}
-                style={{
-                  position: 'absolute',
-                  top: '24px',
-                  right: '24px',
-                  zIndex: 100,
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)'}
-              >
-                <X size={16} />
-              </button>
+              {/* Header - Waldgrün Header */}
+              <div style={{
+                padding: '16px 24px',
+                background: '#456355',
+                borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                zIndex: 50,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Music size={20} color="#ffffff" />
+                  <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', fontFamily: 'Urbanist' }}>
+                    Song-Details: {song.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={async () => {
+                    await triggerAutoSaveSongProgress();
+                    setSelectedSongForDetail(null);
+                    setSelectedStudentForProgress(null);
+                    setSelectedSongSkill(null);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.18s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
 
               {/* Inside Pages of the Notebook */}
               <div style={{
                 display: 'flex',
                 flex: 1,
                 overflow: 'hidden',
-                borderRadius: '20px',
-                boxShadow: 'inset 0 10px 30px rgba(0,0,0,0.1)',
                 position: 'relative'
               }}>
                 
@@ -14331,32 +14273,10 @@ export function AdminDashboard({
                   minWidth: 0,
                   padding: '32px',
                   overflowY: 'auto',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
-                  borderRight: '1px dashed #cbd5e1',
+                  background: '#ffffff',
+                  borderRight: '1px solid #cbd5e1',
                   position: 'relative'
                 }}>
-                  {/* Left binder holes on the right edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    right: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container */}
                   <div style={{ paddingRight: '12px' }}>
@@ -14874,33 +14794,11 @@ export function AdminDashboard({
                   minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
+                  background: '#f8fafc',
                   position: 'relative',
                   height: '100%',
                   overflow: 'hidden'
                 }}>
-                  {/* Right binder holes on the left edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    left: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container (Scrollable) */}
                   <div style={{ flex: 1, overflowY: 'auto', padding: '32px 32px 85px 44px', width: '100%' }}>
@@ -15382,45 +15280,7 @@ export function AdminDashboard({
                   )}
                 </div>
 
-                {/* Ringbook Spine overlay (Golden Rings) */}
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  bottom: '20px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-around',
-                  zIndex: 30,
-                  pointerEvents: 'none'
-                }}>
-                  {Array.from({ length: 8 }).map((_, idx) => (
-                    <div key={idx} style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <div style={{
-                        width: '28px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: 'transparent',
-                        border: '3px solid #d4af37',
-                        borderTopColor: '#ffe57f',
-                        borderLeftColor: '#ffc107',
-                        borderRightColor: '#ffc107',
-                        borderBottomColor: '#b78a02',
-                        boxShadow: '0 3px 5px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
-                        transform: 'scaleY(0.8)'
-                      }} />
-                    </div>
-                  ))}
-                </div>
+
 
               </div>
             </div>

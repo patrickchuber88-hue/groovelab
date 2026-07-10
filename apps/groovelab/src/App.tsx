@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -2833,10 +2833,9 @@ function App() {
         const showDetailedStats = campusSettings.show_detailed_stats !== false;
         const flamesActive = campusSettings.flames_active !== false;
         
-        const allowedTabs = ['briefing', 'mediathek', 'events', 'profile', 'all_appointments', 'messages', 'settings'];
+        const allowedTabs = ['briefing', 'homework_book', 'mediathek', 'events', 'profile', 'all_appointments', 'messages', 'settings'];
         if (flamesActive) allowedTabs.push('practice_board');
         if (showLeaderboard) allowedTabs.push('campus_cup');
-        if (showDetailedStats) allowedTabs.push('flashback');
 
         if (!allowedTabs.includes(activeStudentTab)) {
           console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
@@ -5573,6 +5572,7 @@ function App() {
     const rolesArray = Array.isArray(userToLogin?.roles) ? userToLogin.roles : [];
     const hasAdminRole = rolesArray.includes('admin');
     const hasSecretaryRole = rolesArray.includes('secretary');
+    const isTeacher = userToLogin?.role === 'teacher';
     
     if (hasAdminRole || hasSecretaryRole) {
       const finalAdminRole = hasAdminRole ? 'admin' : 'secretary';
@@ -5583,6 +5583,9 @@ function App() {
           .eq('id', userId);
       }
       localStorage.setItem('groovelab_active_workspace', 'secretary');
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'briefing');
+    } else if (isTeacher) {
       localStorage.setItem('groovelab_active_platform', 'campus');
       localStorage.setItem('campus_active_tab', 'briefing');
     }
@@ -5614,7 +5617,7 @@ function App() {
     // Default start tab: Always open the briefing board for all users in Campus, and for staff/teachers in GrooveLab.
     // GrooveLab students start on the 'live' tab.
     const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
-    localStorage.setItem('campus_active_tab', isStaff ? 'live' : 'briefing');
+    localStorage.setItem('campus_active_tab', 'briefing');
     if (userToLogin?.role === 'student') {
       localStorage.setItem('groovelab_active_tab', 'live');
       if (mode === 'lab') {
@@ -5625,7 +5628,7 @@ function App() {
     }
     
     const resolvedPlatform = mode === 'lab' && userToLogin?.role === 'student' ? 'groovelab' : (localStorage.getItem('groovelab_active_platform') || 'groovelab');
-    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : (resolvedPlatform === 'campus' && isStaff ? 'live' : 'briefing');
+    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'briefing';
     setActiveStudentTab(startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
@@ -6156,13 +6159,13 @@ function App() {
 
       if (newRole === 'teacher') {
         localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'live');
+        localStorage.setItem('campus_active_tab', 'briefing');
         setActivePlatform('campus');
-        setActiveStudentTab('live');
+        setActiveStudentTab('briefing');
       } else if (newRole === 'admin' || newRole === 'secretary') {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'live');
+        localStorage.setItem('campus_active_tab', 'briefing');
         // Let the workspace state inside SecretaryDashboard load from localStorage
       }
 
@@ -7122,6 +7125,9 @@ function App() {
                   <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
                     <Monitor size={20} /> Briefing
                   </button>
+                  <button onClick={() => setActiveStudentTab('homework_book')} className={`sidebar-item ${activeStudentTab === 'homework_book' ? `active ${activePlatform}` : ''}`}>
+                    <BookOpen size={22} /> Hausaufgaben
+                  </button>
                   {flamesActive && (
                     <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
                       <Zap size={20} /> Übe-Pfad
@@ -7138,11 +7144,7 @@ function App() {
                       <Trophy size={20} /> Performance & Highlights
                     </button>
                   )}
-                  {showDetailedStats && (
-                    <button onClick={() => setActiveStudentTab('flashback')} className={`sidebar-item ${activeStudentTab === 'flashback' ? `active ${activePlatform}` : ''}`}>
-                      <Clock size={20} /> Flashback
-                    </button>
-                  )}
+
                   <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                     <Mail size={20} /> Nachrichten
                     {campusUnreadCount > 0 && (
@@ -7985,7 +7987,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && ['briefing', 'mediathek', 'practice_board', 'campus_cup', 'flashback', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
+            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && ['briefing', 'homework_book', 'mediathek', 'practice_board', 'campus_cup', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>
@@ -12665,6 +12667,9 @@ function App() {
                     <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
                       <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
                     </button>
+                    <button onClick={() => setActiveStudentTab('homework_book')} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Hausaufgaben">
+                      <BookOpen size={isCompact ? 22 : 20} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Hausaufgaben</span>}
+                    </button>
                     {flamesActive && (
                       <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
                         <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Pfad</span>}
@@ -12681,11 +12686,7 @@ function App() {
                         <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
                       </button>
                     )}
-                    {showDetailedStats && (
-                      <button onClick={() => setActiveStudentTab('flashback')} style={getMobileButtonStyle('flashback', 'campus')} className="hover-scale" title="Flashback">
-                        <Clock size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Flashback</span>}
-                      </button>
-                    )}
+
                     <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
                       <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
                     </button>

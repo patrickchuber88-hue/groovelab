@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
@@ -1028,12 +1028,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setError(null);
       
       const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*')
-        .eq('is_master_admin', true)
-        .eq('master_admin_username', adminUsernameInput.trim())
-        .eq('master_admin_password', adminPasswordInput.trim())
-        .maybeSingle();
+        .rpc('login_master_admin', {
+          p_username: adminUsernameInput.trim(),
+          p_password: adminPasswordInput.trim()
+        });
 
       if (userErr || !user) {
         throw new Error('Ungültige Master-Admin Anmeldedaten.');
@@ -2750,10 +2748,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let query = supabase.from('users').select('*, schools(*)');
       
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
-      if (isUuid) {
-        query = query.or(`qr_token.eq.${qrToken},id.eq.${qrToken}`);
+      const isTokenLogin = qrToken.startsWith('t_') || isUuid;
+
+      if (isTokenLogin) {
+        if (isUuid) {
+          query = query.or(`qr_token.eq.${qrToken},id.eq.${qrToken}`);
+        } else {
+          query = query.eq('teacher_qr_token', qrToken);
+        }
       } else {
-        query = query.eq('teacher_qr_token', qrToken);
+        query = query.or(`ausweis_nummer.eq.${qrToken.toUpperCase()},teacher_qr_token.eq.${qrToken}`);
       }
       
       const { data: user, error: userErr } = await query.maybeSingle();
@@ -2960,18 +2964,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }}>
             <div style={{
               width: '64px', height: '64px', borderRadius: '50%', 
-              background: isSecretary ? '#e6f4ea' : '#22c55e20',
+              background: isSecretary ? '#fce8e6' : '#22c55e20',
               display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
             }}>
-              <Check size={36} color={isSecretary ? '#137333' : '#22c55e'} strokeWidth={3} />
+              <Check size={36} color={isSecretary ? '#ea4335' : '#22c55e'} strokeWidth={3} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#137333' : '#22c55e', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#ea4335' : '#22c55e', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
               Registrierung erfolgreich!
             </h1>
             <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0', fontWeight: 600 }}>
               {isSecretary 
-                ? 'Dein Campus Administrator-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'
-                : 'Dein GrooveLab Coach-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'}
+                ? 'Dein Campus-Groovelab Administrator-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'
+                : 'Dein Campus-Groovelab Coach-Ausweis wurde erstellt. Mache einen Screenshot oder drucke diesen QR-Code aus, um dich ab sofort einzuloggen.'}
             </p>
             
             {/* ID Card Wrapper */}
@@ -3008,7 +3012,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 
                 <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#137333' : '#eab308' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#ea4335' : '#eab308' }}>
                   {schoolName || 'GrooveLab Academy'}
                 </div>
               </div>
@@ -3018,9 +3022,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={() => onLogin(registeredUser.id, true)}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#ea4335' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
                 transition: 'all 0.2s', outline: 'none'
               }}
             >
@@ -3051,19 +3055,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{
-              background: isSecretary ? '#e6f4ea' : '#eab308', 
+              background: isSecretary ? '#fce8e6' : '#eab308', 
               padding: '10px', borderRadius: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
+              boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.08)' : 'none'
             }}>
               {isSecretary ? (
-                <School size={24} color="#137333" strokeWidth={2.5} />
+                <School size={24} color="#ea4335" strokeWidth={2.5} />
               ) : (
                 <Music size={24} color="#0f172a" />
               )}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#137333' : '#ffffff' }}>
-              {isSecretary ? 'Campus Admin Einladung' : 'GrooveLab Einladung'}
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#ea4335' : '#ffffff' }}>
+              {isSecretary ? 'Campus-Groovelab Admin Einladung' : 'Campus-Groovelab Coach Einladung'}
             </div>
           </div>
 
@@ -3074,7 +3078,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {isSecretary 
               ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
-            <strong style={{ color: isSecretary ? '#137333' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'GrooveLab Academy')}</strong> beizutreten.
+            <strong style={{ color: isSecretary ? '#ea4335' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -3128,7 +3132,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   role: finalRole,
                   first_name: firstName.trim(),
                   last_name: lastName.trim(),
-                  qr_token: newQrToken
+                  qr_token: newQrToken,
+                  photo_url: isSecretary ? '/campus_login_hero.png' : null
                 })
                 .select()
                 .single();
@@ -3157,9 +3162,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${firstNameFocused ? '#137333' : '#dadce0'}` 
+                    ? `1px solid ${firstNameFocused ? '#ea4335' : '#dadce0'}` 
                     : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
+                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(234, 67, 53, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3181,9 +3186,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${lastNameFocused ? '#137333' : '#dadce0'}` 
+                    ? `1px solid ${lastNameFocused ? '#ea4335' : '#dadce0'}` 
                     : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
+                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(234, 67, 53, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3196,9 +3201,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={signingUp}
               style={{
                 marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#ea4335' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
             >
@@ -3285,7 +3290,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               letterSpacing: '-0.04em',
               textShadow: '0 4px 12px rgba(0,0,0,0.2)'
             }}>
-              Campus
+              Campus-Groovelab
             </h2>
             <p style={{
               fontSize: '1.25rem',
@@ -3337,10 +3342,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             zIndex: 2
           }}>
             {[
-              "🎸 Lerne deine Lieblingssongs spielerisch leicht",
-              "📊 Verfolge deine Übezeiten & Ziele in Echtzeit",
-              "🏆 Meistere Levels & sammle Helden-Momente"
-            ].map((text, idx) => (
+              { icon: <Music size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Lerne deine Lieblingssongs spielerisch leicht" },
+              { icon: <Timer size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Verfolge deine Übezeiten & Ziele in Echtzeit" },
+              { icon: <Trophy size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Meistere Levels & sammle Helden-Momente" }
+            ].map(({ icon, text }, idx) => (
               <div key={idx} style={{
                 fontSize: '1rem',
                 fontWeight: 650,
@@ -3350,7 +3355,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 gap: '10px',
                 textShadow: '0 1px 2px rgba(0,0,0,0.1)'
               }}>
-                {text}
+                {icon}
+                <span>{text}</span>
               </div>
             ))}
           </div>
@@ -3812,7 +3818,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
               <School size={16} color="#a7f3d0" />
-              Neue Schule registrieren (30 Tage kostenlos)
+              Neue Schule registrieren (Software-Lizenz 100% kostenlos)
             </button>
           </div>
         )}
@@ -5216,23 +5222,148 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Admin Bypass for Localhost */}
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Manuel Wagner Bypass */}
-          {(import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN) && (
+          {/* Patrick Huber Bypass (Teacher) */}
+          {import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN && (
             <button
               onClick={async () => {
                 try {
-                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN || import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
-                  console.log('[Bypass] Attempting Manuel Wagner login...');
-                  // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
+                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
+                  console.log('[Bypass] Attempting Patrick Huber login with token:', token);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
                     .select('id, role')
-                    .eq('qr_token', token)
+                    .or(`qr_token.eq.${token},id.eq.${token}`)
                     .maybeSingle();
 
                   if (error) {
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    console.error('[Bypass] Supabase Error:', error);
+                    alert('Datenbank-Fehler: ' + error.message);
+                    return;
+                  }
+
+                  if (user) {
+                    console.log('[Bypass] Patrick Huber found, logging in:', user.id);
+                    sessionStorage.setItem('groovelab_user_id', user.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    onLogin(user.id, true);
+                  } else {
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    console.warn('[Bypass] No user found with Patrick Huber token:', token);
+                    alert('Patrick Huber wurde in der Datenbank nicht gefunden. Token: ' + token);
+                  }
+                } catch (err: any) {
+                  sessionStorage.removeItem('groovelab_qr_token');
+                  console.error('[Bypass] Runtime Error:', err);
+                  alert('Ein Fehler ist aufgetreten: ' + err.message);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '2px solid rgba(16, 185, 129, 0.25)',
+                borderRadius: '24px',
+                color: '#a7f3d0',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16,185,129,0.1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'; }}
+            >
+              🔓 BYPASS: PATRICK HUBER (LEHRER)
+            </button>
+          )}
+
+          {/* Elisabeth Zimmerman Bypass (Schülerin) */}
+          {import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN && (
+            <button
+              onClick={async () => {
+                try {
+                  const token = import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN;
+                  console.log('[Bypass] Attempting Elisabeth Zimmerman login with token:', token);
+                  sessionStorage.setItem('groovelab_qr_token', token);
+                  
+                  const { data: user, error } = await supabase
+                    .from('users')
+                    .select('id, role')
+                    .or(`qr_token.eq.${token},id.eq.${token}`)
+                    .maybeSingle();
+
+                  if (error) {
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    console.error('[Bypass] Supabase Error:', error);
+                    alert('Datenbank-Fehler: ' + error.message);
+                    return;
+                  }
+
+                  if (user) {
+                    console.log('[Bypass] Elisabeth Zimmerman found, logging in:', user.id);
+                    sessionStorage.setItem('groovelab_user_id', user.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    onLogin(user.id, true);
+                  } else {
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    console.warn('[Bypass] No user found with Elisabeth Zimmerman token:', token);
+                    alert('Elisabeth Zimmerman wurde in der Datenbank nicht gefunden. Token: ' + token);
+                  }
+                } catch (err: any) {
+                  sessionStorage.removeItem('groovelab_qr_token');
+                  console.error('[Bypass] Runtime Error:', err);
+                  alert('Ein Fehler ist aufgetreten: ' + err.message);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: 'rgba(19, 115, 51, 0.08)',
+                border: '2px solid rgba(19, 115, 51, 0.25)',
+                borderRadius: '24px',
+                color: '#d1fae5',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(19,115,51,0.1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(19, 115, 51, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(19, 115, 51, 0.08)'; }}
+            >
+              🔓 BYPASS: ELISABETH ZIMMERMAN (SCHÜLERIN)
+            </button>
+          )}
+
+          {/* Manuel Wagner Bypass (Admin/Verwaltung) */}
+
+          {import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN && (
+            <button
+              onClick={async () => {
+                try {
+                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN;
+                  console.log('[Bypass] Attempting Manuel Wagner login with token:', token);
+                  sessionStorage.setItem('groovelab_qr_token', token);
+                  
+                  const { data: user, error } = await supabase
+                    .from('users')
+                    .select('id, role')
+                    .or(`qr_token.eq.${token},id.eq.${token}`)
+                    .maybeSingle();
+
+                  if (error) {
+                    sessionStorage.removeItem('groovelab_qr_token');
                     console.error('[Bypass] Supabase Error:', error);
                     alert('Datenbank-Fehler: ' + error.message);
                     return;
@@ -5241,12 +5372,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (user) {
                     console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
                     sessionStorage.setItem('groovelab_user_id', user.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
                     onLogin(user.id, true);
                   } else {
-                    console.warn('[Bypass] No user found with Manuel Wagner token.');
-                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden.');
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    console.warn('[Bypass] No user found with Manuel Wagner token:', token);
+                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden. Token: ' + token);
                   }
                 } catch (err: any) {
+                  sessionStorage.removeItem('groovelab_qr_token');
                   console.error('[Bypass] Runtime Error:', err);
                   alert('Ein Fehler ist aufgetreten: ' + err.message);
                 }
@@ -5254,22 +5388,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{
                 width: '100%',
                 padding: '16px',
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '2px solid rgba(59, 130, 246, 0.25)',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '2px solid rgba(239, 68, 68, 0.25)',
                 borderRadius: '24px',
-                color: '#93c5fd',
+                color: '#fca5a5',
                 fontWeight: 800,
                 fontSize: '13px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(59,130,246,0.1)',
+                boxShadow: '0 4px 12px rgba(239,68,68,0.1)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.02em',
                 backdropFilter: 'blur(10px)',
                 WebkitBackdropFilter: 'blur(10px)',
                 transition: 'all 0.2s'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; }}
             >
               🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
             </button>
@@ -5281,17 +5415,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={async () => {
                 try {
                   const token = import.meta.env.VITE_BYPASS_ADMIN_TOKEN;
-                  console.log('[Bypass] Attempting Admin login...');
+                  console.log('[Bypass] Attempting Admin login with token:', token);
                   // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
                   sessionStorage.setItem('groovelab_qr_token', token);
 
                   const { data: user, error } = await supabase
                     .from('users')
                     .select('id, role')
-                    .eq('qr_token', token)
+                    .or(`qr_token.eq.${token},id.eq.${token}`)
                     .maybeSingle();
 
                   if (error) {
+                    sessionStorage.removeItem('groovelab_qr_token');
                     console.error('[Bypass] Supabase Error:', error);
                     alert('Datenbank-Fehler: ' + error.message);
                     return;
@@ -5300,12 +5435,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (user) {
                     console.log('[Bypass] Admin found, logging in:', user.id);
                     sessionStorage.setItem('groovelab_user_id', user.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
                     onLogin(user.id, true);
                   } else {
+                    sessionStorage.removeItem('groovelab_qr_token');
                     console.warn('[Bypass] No user found with Admin token.');
                     alert('Admin wurde in der Datenbank nicht gefunden.');
                   }
                 } catch (err: any) {
+                  sessionStorage.removeItem('groovelab_qr_token');
                   console.error('[Bypass] Runtime Error:', err);
                   alert('Ein Fehler ist aufgetreten: ' + err.message);
                 }

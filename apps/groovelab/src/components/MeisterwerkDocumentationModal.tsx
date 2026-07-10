@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
+// @ts-ignore
+import lamejs from 'lamejs';
 
 export const ALL_STICKERS = [
   // Meilensteine / Üben
@@ -382,6 +384,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation'>('document');
 
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
@@ -392,15 +395,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [audioDuration, setAudioDuration] = useState(0);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
+  const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
   const accumulatedTranscriptRef = React.useRef<string>('');
-  const [useNotebookLayout, setUseNotebookLayout] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('meisterwerk_notebook_layout');
-      return saved !== 'false'; // defaults to true if not explicitly set to 'false'
-    }
-    return true;
-  });
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
   const [pageUndoStack, setPageUndoStack] = useState<{ lehrwerkId: string, pageNum: number, prevStatus: any }[]>([]);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
 
@@ -504,7 +508,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         const saveAudioMetadata = async (audioUrlString: string) => {
           try {
-            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}${audioLabel.trim() ? `|${audioLabel.trim()}` : ''}`;
+            const creatorRole = readOnly ? 'student' : 'teacher';
+            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}`;
             setHomeworkNotesList(prev => [...prev, audioMetaStr]);
             
             const updatedList = [...homeworkNotesList, audioMetaStr];
@@ -523,13 +528,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const filePath = `avatars/audio_feedback_${fileName}`;
           
           const { error: uploadErr } = await supabase.storage
-            .from('groovelab-assets')
+            .from('campus-assets')
             .upload(filePath, blob);
             
           if (uploadErr) throw uploadErr;
           
           const { data: publicUrlData } = supabase.storage
-            .from('groovelab-assets')
+            .from('campus-assets')
             .getPublicUrl(filePath);
             
           const uploadedUrl = publicUrlData.publicUrl;
@@ -1166,25 +1171,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.fillText(pillText, 0, 0);
       ctx.restore();
 
-      // 7. Student Details
+      // 7. Student Details (Dynamic layout to avoid overlapping)
+      let textY = tY + 670;
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
+      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, textY);
 
       if (studentInstrument) {
+        textY += 45;
         ctx.fillStyle = '#94a3b8';
         ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
-        ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
+        ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
       }
 
+      textY += 60;
       ctx.fillStyle = sticker.color || '#10b981';
       ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
+      ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
+      textY += 55;
       ctx.fillStyle = '#cbd5e1';
       ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(sticker.desc, 600, tY + 845);
+      ctx.fillText(sticker.desc, 600, textY);
 
       // 8. Translucent Badge Pill for School Name
       const badgeText = schoolName.toUpperCase();
@@ -1280,25 +1289,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.fillText(pillText, 0, 0);
       ctx.restore();
 
-      // 7. Student Details
+      // 7. Student Details (Dynamic layout to avoid overlapping)
+      let textY = tY + 670;
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, tY + 680);
+      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, textY);
 
       if (studentInstrument) {
+        textY += 45;
         ctx.fillStyle = '#64748b';
         ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
-        ctx.fillText(studentInstrument.toUpperCase(), 600, tY + 725);
+        ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
       }
 
+      textY += 60;
       ctx.fillStyle = sticker.color || '#10b981';
       ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(sticker.title.toUpperCase(), 600, tY + 785);
+      ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
+      textY += 55;
       ctx.fillStyle = '#475569';
       ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(sticker.desc, 600, tY + 845);
+      ctx.fillText(sticker.desc, 600, textY);
 
       // 8. Translucent Badge Pill for School Name
       const badgeText = schoolName.toUpperCase();
@@ -1622,12 +1635,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         const parts = noteToDelete.substring(6).split('|');
         const audioUrlString = parts[0];
         if (audioUrlString && audioUrlString.startsWith("http")) {
-          const marker = '/storage/v1/object/public/groovelab-assets/';
+          const marker = '/storage/v1/object/public/campus-assets/';
           const markerIndex = audioUrlString.indexOf(marker);
           if (markerIndex !== -1) {
             const filePath = audioUrlString.substring(markerIndex + marker.length);
             console.log("Deleting audio file from storage:", filePath);
-            await supabase.storage.from('groovelab-assets').remove([filePath]);
+            await supabase.storage.from('campus-assets').remove([filePath]);
           }
         }
       }
@@ -2742,22 +2755,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         {/* Header - Apple-style compact redesign */}
         <div style={{
           padding: '16px 20px',
-          background: useNotebookLayout 
-            ? '#456355' 
-            : 'rgba(255, 255, 255, 0.82)',
-          backdropFilter: useNotebookLayout ? 'none' : 'blur(20px) saturate(190%)',
-          borderBottom: useNotebookLayout 
-            ? '1px solid rgba(50, 72, 62, 0.8)' 
-            : '1px solid rgba(0, 0, 0, 0.06)',
-          borderRadius: useNotebookLayout ? '24px 24px 0 0' : '0',
+          background: '#456355',
+          backdropFilter: 'none',
+          borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+          borderRadius: '0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '16px',
           zIndex: 50,
-          boxShadow: useNotebookLayout 
-            ? '0 2px 8px rgba(0,0,0,0.12)' 
-            : '0 1px 0 rgba(0,0,0,0.04)'
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
         }}>
           {/* Left: Avatar + Student Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -2770,8 +2777,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 borderRadius: '10px',
                 overflow: 'hidden',
                 flexShrink: 0,
-                boxShadow: useNotebookLayout ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
-                border: useNotebookLayout ? '1.5px solid rgba(255, 213, 79, 0.2)' : '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                border: '1.5px solid rgba(255, 213, 79, 0.2)',
                 cursor: onProfileClick ? 'pointer' : 'default',
                 transition: 'opacity 0.2s'
               }}
@@ -2796,7 +2803,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   margin: 0,
                   fontSize: '1rem',
                   fontWeight: 700,
-                  color: useNotebookLayout ? '#ffffff' : '#1d1d1f',
+                  color: '#ffffff',
                   letterSpacing: '-0.02em',
                   lineHeight: 1.2,
                   whiteSpace: 'nowrap',
@@ -2812,54 +2819,137 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   if (onProfileClick) e.currentTarget.style.opacity = '1';
                 }}
               >
-                {student.first_name} {student.last_name}
+                {student.first_name}
               </h2>
               <span style={{
                 fontSize: '0.68rem',
-                color: useNotebookLayout ? 'rgba(197,216,207,0.85)' : '#8e8e93',
+                color: 'rgba(197,216,207,0.85)',
                 fontWeight: 500,
                 letterSpacing: '0.01em'
               }}>
                 Schüler-Protokoll
               </span>
             </div>
+            
+            {/* Recordings Gallery & Loopstation Toggle Buttons */}
+            {isCampusActive && (
+              <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode(activeViewMode === 'recordings' ? 'document' : 'recordings')}
+                  style={{
+                    background: activeViewMode === 'recordings' 
+                      ? '#137333' 
+                      : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <Mic size={14} />
+                  <span>{activeViewMode === 'recordings' ? 'Protokoll' : 'Aufnahmen'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode(activeViewMode === 'loopstation' ? 'document' : 'loopstation')}
+                  style={{
+                    background: activeViewMode === 'loopstation' 
+                      ? '#137333' 
+                      : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <Sliders size={14} />
+                  <span>{activeViewMode === 'loopstation' ? 'Protokoll' : 'Loopstation'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Right: Design Toggle + Close */}
+          {/* Right: Close Button only */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {/* Compact Design Toggle */}
+            {/* Archiv Button */}
             <button
               type="button"
-              title={useNotebookLayout ? 'Modernes Design' : 'Notizbuch-Design'}
               onClick={() => {
-                const nextVal = !useNotebookLayout;
-                setUseNotebookLayout(nextVal);
-                localStorage.setItem('meisterwerk_notebook_layout', String(nextVal));
+                if (activeSubView === 'history' && activeViewMode === 'document') {
+                  setActiveSubView('hub');
+                } else {
+                  setActiveViewMode('document');
+                  setActiveSubView('history');
+                  // Pre-select the most recent week if available
+                  const existingWeeks = progressItems
+                    .filter(item => item.updated_at)
+                    .map(item => getItemWeek(item))
+                    .filter(Boolean);
+                  let weeks: string[] = [];
+                  if (existingWeeks.length > 0) {
+                    const sortedExisting = [...existingWeeks].sort();
+                    const earliestWeek = sortedExisting[0];
+                    const currentWeek = getISOWeek();
+                    const latestExisting = sortedExisting[sortedExisting.length - 1];
+                    const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
+                    weeks = getWeeksBetween(earliestWeek, endWeek);
+                  } else {
+                    weeks = [getISOWeek()];
+                  }
+                  if (weeks.length > 0) {
+                    setSelectedHistoryWeek(weeks[0]);
+                  }
+                }
               }}
               style={{
-                background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
-                border: useNotebookLayout ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.07)',
-                color: useNotebookLayout ? '#e0ede7' : '#3c3c43',
+                background: (activeSubView === 'history' && activeViewMode === 'document')
+                  ? '#137333'
+                  : 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#ffffff',
                 padding: '6px 12px',
                 borderRadius: '20px',
-                fontSize: '0.72rem',
-                fontWeight: 600,
+                fontSize: '0.75rem',
+                fontWeight: 800,
                 cursor: 'pointer',
-                transition: 'all 0.18s ease',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                letterSpacing: '0.01em'
+                gap: '6px',
+                transition: 'all 0.2s ease',
+                marginRight: '4px'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.28)' : 'rgba(120,120,128,0.14)';
+                if (!(activeSubView === 'history' && activeViewMode === 'document')) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
+                if (!(activeSubView === 'history' && activeViewMode === 'document')) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                }
               }}
+              className="hover-scale"
             >
-              <Book size={12} style={{ opacity: 0.85 }} />
-              <span>{useNotebookLayout ? 'Modern' : 'Notizbuch'}</span>
+              <History size={14} />
+              <span>Archiv</span>
             </button>
 
             {/* Close Button */}
@@ -2867,8 +2957,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <button
                 onClick={handleClose}
                 style={{
-                  background: useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)',
-                  border: useNotebookLayout ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.05)',
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '50%',
                   width: '30px',
                   height: '30px',
@@ -2876,17 +2966,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  color: useNotebookLayout ? '#c5d8cf' : '#8e8e93',
+                  color: '#ffffff',
                   transition: 'all 0.18s ease',
                   flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.3)' : 'rgba(120,120,128,0.16)';
-                  e.currentTarget.style.color = useNotebookLayout ? '#ffd54f' : '#1d1d1f';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                  e.currentTarget.style.color = '#ffffff';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = useNotebookLayout ? 'rgba(0,0,0,0.18)' : 'rgba(120,120,128,0.08)';
-                  e.currentTarget.style.color = useNotebookLayout ? '#c5d8cf' : '#8e8e93';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  e.currentTarget.style.color = '#ffffff';
                 }}
                 className="hover-scale"
               >
@@ -2910,7 +3000,361 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           padding: '0',
           position: 'relative'
         }} className="flex-col lg:flex-row">
-          {activeModalTab === 'document' ? (
+          {activeViewMode === 'loopstation' ? (
+            <GrooveLoopstation
+              student={student}
+              homeworkNotesList={homeworkNotesList}
+              setHomeworkNotesList={setHomeworkNotesList}
+              syncHomeworkNotes={syncHomeworkNotes}
+              fetchProgress={fetchProgress}
+              notifyHomeworkChange={notifyHomeworkChange}
+              readOnly={readOnly}
+              setActiveViewMode={setActiveViewMode}
+              useNotebookLayout={useNotebookLayout}
+            />
+          ) : activeViewMode === 'recordings' ? (
+            <>
+              {/* LEFT PAGE: Lehrer Aufnahmen */}
+              <div style={{
+                flex: '1 1 0%',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                background: useNotebookLayout ? '#faf8f2' : 'white',
+                borderRadius: useNotebookLayout ? '0 0 0 20px' : '0',
+                boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+                borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
+                position: 'relative',
+                padding: '28px'
+              }}>
+                {useNotebookLayout && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    bottom: '20px',
+                    right: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-around',
+                    zIndex: 25
+                  }}>
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#121214',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                      }} />
+                    ))}
+                  </div>
+                )}
+                
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: 850,
+                  color: '#137333',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Mic size={16} /> Aufnahmen vom Lehrer
+                </h3>
+
+                {(() => {
+                  const teacherAudios = homeworkNotesList
+                    .map((note, originalIdx) => ({ note, originalIdx }))
+                    .filter(item => item.note.startsWith("AUDIO:"))
+                    .map(item => {
+                      const parts = item.note.substring(6).split('|');
+                      return {
+                        url: parts[0],
+                        duration: parseInt(parts[1] || '0', 10),
+                        date: parts[2],
+                        label: parts[3] || 'Play-Along',
+                        role: parts[4] || 'teacher',
+                        originalIdx: item.originalIdx
+                      };
+                    })
+                    .filter(aud => aud.role === 'teacher');
+
+                  if (teacherAudios.length === 0) {
+                    return (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', padding: '40px 0' }}>
+                        Keine Aufnahmen vom Lehrer vorhanden.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                      {teacherAudios.map((aud, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
+                          <RetroCassettePlayer
+                            url={aud.url}
+                            duration={aud.duration}
+                            index={idx}
+                            label={aud.label}
+                            onDelete={readOnly ? undefined : () => handleDeleteNote(aud.originalIdx)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* RIGHT PAGE: Schüler Aufnahmen */}
+              <div style={{
+                flex: '1 1 0%',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                background: useNotebookLayout ? 'white' : '#f8fafc',
+                backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+                borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+                borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
+                boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+                position: 'relative',
+                padding: '28px'
+              }}>
+                {useNotebookLayout && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: '42px',
+                    width: '2px',
+                    background: '#fca5a5',
+                    zIndex: 10
+                  }} />
+                )}
+                {useNotebookLayout && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    bottom: '20px',
+                    left: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-around',
+                    zIndex: 25
+                  }}>
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#121214',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                      }} />
+                    ))}
+                  </div>
+                )}
+
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: 850,
+                  color: '#137333',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <Music size={16} /> Eigene Aufnahmen (Schüler)
+                </h3>
+
+                {/* For student: render the recording widget on their page inside the gallery */}
+                {readOnly && (
+                  <div style={{
+                    margin: '0 0 24px 0',
+                    padding: '16px',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {(() => {
+                      const audios = homeworkNotesList
+                        .map((note, originalIdx) => ({ note, originalIdx }))
+                        .filter(item => item.note.startsWith("AUDIO:"))
+                        .map(item => {
+                          const parts = item.note.substring(6).split('|');
+                          return {
+                            url: parts[0],
+                            duration: parseInt(parts[1] || '0', 10),
+                            date: parts[2],
+                            label: parts[3] || 'Play-Along',
+                            role: parts[4] || 'teacher',
+                            originalIdx: item.originalIdx
+                          };
+                        });
+                      
+                      const now = new Date();
+                      const currentMonth = now.getMonth();
+                      const currentYear = now.getFullYear();
+                      const currentMonthAudios = audios.filter(aud => {
+                        if (!aud.date) return false;
+                        const d = new Date(aud.date);
+                        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                      });
+                      const totalUsedSeconds = currentMonthAudios.reduce((sum, aud) => sum + aud.duration, 0);
+                      const monthlyLimitSeconds = 240;
+                      const isLimitReached = totalUsedSeconds >= monthlyLimitSeconds;
+
+                      return (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>Neue Aufnahme erstellen (max. 60s)</span>
+                              </span>
+                              {!isRecordingAudio ? (
+                                <button
+                                  type="button"
+                                  onClick={startRecordingAudio}
+                                  disabled={isUploadingAudio || isLimitReached}
+                                  style={{
+                                    background: isLimitReached ? '#94a3b8' : '#137333',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                  <span>Aufnahme starten</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => stopRecordingAudio()}
+                                  style={{
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
+                                  <span>Stopp ({audioDuration}s / 60s)</span>
+                                </button>
+                              )}
+                            </div>
+                            
+                            {!isRecordingAudio && !isLimitReached && (
+                              <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Kassetten-Beschriftung (z.B. Mein Übe-Versuch)"
+                                  value={audioLabel}
+                                  onChange={(e) => setAudioLabel(e.target.value)}
+                                  style={{
+                                    flex: 1,
+                                    fontSize: '0.74rem',
+                                    padding: '6px 12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    outline: 'none',
+                                    fontFamily: 'monospace'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ 
+                            fontSize: '0.72rem', 
+                            color: isLimitReached ? '#ef4444' : '#475569', 
+                            fontWeight: 700, 
+                            marginTop: '2px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span>
+                              {isLimitReached 
+                                ? '⚠️ Monatliches Aufnahme-Limit (240 Sek.) erreicht.'
+                                : `Aufnahmezeit diesen Monat: ${totalUsedSeconds}s / ${monthlyLimitSeconds}s verbraucht.`}
+                            </span>
+                          </div>
+
+                          {isUploadingAudio && (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>⏳</span> Lade Audio-Feedback hoch...
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {(() => {
+                  const studentAudios = homeworkNotesList
+                    .map((note, originalIdx) => ({ note, originalIdx }))
+                    .filter(item => item.note.startsWith("AUDIO:"))
+                    .map(item => {
+                      const parts = item.note.substring(6).split('|');
+                      return {
+                        url: parts[0],
+                        duration: parseInt(parts[1] || '0', 10),
+                        date: parts[2],
+                        label: parts[3] || 'Play-Along',
+                        role: parts[4] || 'teacher',
+                        originalIdx: item.originalIdx
+                      };
+                    })
+                    .filter(aud => aud.role === 'student');
+
+                  if (studentAudios.length === 0) {
+                    return (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', padding: '40px 0' }}>
+                        Keine eigenen Aufnahmen vorhanden.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                      {studentAudios.map((aud, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
+                          <RetroCassettePlayer
+                            url={aud.url}
+                            duration={aud.duration}
+                            index={idx}
+                            label={aud.label}
+                            onDelete={readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          ) : activeModalTab === 'document' ? (
             <>
           
           {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
@@ -5307,118 +5751,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       Dokumentiere den heutigen Unterricht für den Schüler.
                     </p>
                   </div>
-                  
-                  {/* Sticky Note Button for History */}
-                  <div 
-                    style={{
-                      filter: 'drop-shadow(0 5px 10px rgba(0,0,0,0.08)) drop-shadow(0 2px 4px rgba(0,0,0,0.05))',
-                      transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                      transform: 'rotate(3deg)',
-                      flexShrink: 0,
-                      cursor: 'pointer',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px) rotate(4.5deg) scale(1.06)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'rotate(3deg)';
-                    }}
-                  >
-                    {/* Matte Pushpin positioned on top of the paper */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '-10px',
-                      left: '50%',
-                      transform: 'translateX(-50%) rotate(-8deg)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      zIndex: 10,
-                      pointerEvents: 'none'
-                    }}>
-                      <div style={{
-                        width: '14px',
-                        height: '14px',
-                        borderRadius: '50%',
-                        background: 'radial-gradient(circle at 4px 4px, #ef4444 0%, #b91c1c 80%, #7f1d1d 100%)', // Matte red pin
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 -1px 2px rgba(0,0,0,0.3)',
-                        position: 'relative'
-                      }} />
-                      <div style={{
-                        width: '2px',
-                        height: '10px',
-                        background: 'linear-gradient(90deg, #94a3b8 0%, #475569 100%)', // Toned-down metal shaft
-                        marginTop: '-1px',
-                        boxShadow: '1px 1px 2px rgba(0,0,0,0.1)'
-                      }} />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubView('history');
-                        // Pre-select the most recent week if available
-                        const existingWeeks = progressItems
-                          .filter(item => item.updated_at)
-                          .map(item => getItemWeek(item))
-                          .filter(Boolean);
-                        let weeks: string[] = [];
-                        if (existingWeeks.length > 0) {
-                          const sortedExisting = [...existingWeeks].sort();
-                          const earliestWeek = sortedExisting[0];
-                          const currentWeek = getISOWeek();
-                          const latestExisting = sortedExisting[sortedExisting.length - 1];
-                          const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
-                          weeks = getWeeksBetween(earliestWeek, endWeek);
-                        } else {
-                          weeks = [getISOWeek()];
-                        }
-                        if (weeks.length > 0) {
-                          setSelectedHistoryWeek(weeks[0]);
-                        }
-                      }}
-                      style={{
-                        // Layered very thin fold lines to simulate a finely crumpled paper (feiner geknicktes Papier)
-                        background: 'linear-gradient(120deg, transparent 49.8%, rgba(0,0,0,0.04) 50%, rgba(255,255,255,0.08) 50.1%, transparent 50.3%), linear-gradient(35deg, transparent 29.8%, rgba(0,0,0,0.04) 30%, rgba(255,255,255,0.08) 30.1%, transparent 30.3%), linear-gradient(165deg, transparent 74.8%, rgba(0,0,0,0.03) 75%, rgba(255,255,255,0.08) 75.1%, transparent 75.3%), linear-gradient(85deg, transparent 59.8%, rgba(0,0,0,0.03) 60%, rgba(255,255,255,0.08) 60.1%, transparent 60.3%), repeating-linear-gradient(45deg, rgba(0,0,0,0.003) 0px, rgba(0,0,0,0.003) 1px, transparent 1px, transparent 4px), linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)',
-                        border: 'none',
-                        clipPath: 'polygon(2% 2%, 23% 1%, 43% 3%, 63% 1%, 83% 2%, 98% 1%, 99% 19%, 97% 38%, 99% 58%, 98% 78%, 99% 98%, 79% 97%, 59% 99%, 39% 97%, 19% 98%, 2% 99%, 1% 79%, 3% 59%, 1% 39%, 2% 19%)',
-                        padding: '22px 14px 12px 14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '2px',
-                        fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
-                        flexShrink: 0,
-                        minWidth: '98px',
-                        minHeight: '78px'
-                      }}
-                    >
-                      <span style={{ 
-                        fontSize: '0.66rem', 
-                        fontWeight: 800, 
-                        color: '#a16207', 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.04em', 
-                        lineHeight: 1 
-                      }}>
-                        Hausaufgaben
-                      </span>
-                      <span style={{ 
-                        fontSize: '0.86rem', 
-                        fontWeight: 900, 
-                        color: '#854d0e', 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.06em', 
-                        lineHeight: 1.1,
-                        marginTop: '1px'
-                      }}>
-                        Archiv
-                      </span>
-                    </button>
-                  </div>
                 </div>
 
                 {/* The Main Input Form Card */}
@@ -6035,122 +6367,124 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }
                         `}} />
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              ⚡ Schnellbaukasten Presets:
-                            </span>
-                            <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>
-                              Wische für mehr ➔
-                            </span>
-                          </div>
+                        {!readOnly && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                ⚡ Schnellbaukasten Presets:
+                              </span>
+                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>
+                                Wische für mehr ➔
+                              </span>
+                            </div>
 
-                          <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
-                            <div 
-                              style={{ 
-                                display: 'flex', 
-                                gap: '8px', 
-                                overflowX: 'auto', 
-                                padding: '4px 2px 8px 2px', 
-                                scrollbarWidth: 'thin',
-                                WebkitOverflowScrolling: 'touch',
-                              }}
-                              className="presets-scrollbar-container"
-                            >
-                              {(() => {
-                                const allPresets = [
-                                  {
-                                    label: '⏱️ Tempo halten',
-                                    desc: 'Metronom BPM',
-                                    onClick: () => {
-                                      const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                      const bpmText = bpm ? `${bpm} BPM` : "X BPM";
-                                      const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                      setIsCurrentHomework(true);
-                                      setHasChanges(true);
-                                    }
-                                  },
-                                  {
-                                    label: '✨ Sauber spielen',
-                                    desc: 'Klarer Klang',
-                                    onClick: () => {
-                                      const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
-                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                      setIsCurrentHomework(true);
-                                      setHasChanges(true);
-                                    }
-                                  },
-                                  {
-                                    label: '🥁 Rhythmus-Metronom',
-                                    desc: 'Timing & Takt',
-                                    onClick: () => {
-                                      const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
-                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                      setIsCurrentHomework(true);
-                                      setHasChanges(true);
-                                    }
-                                  },
-                                  {
-                                    label: '🖖 Fingersatz üben',
-                                    desc: 'Fingersatz einhalten',
-                                    onClick: () => {
-                                      const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
-                                      setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                      setIsCurrentHomework(true);
-                                      setHasChanges(true);
-                                    }
-                                  },
-                                  ...textbausteine
-                                    .filter((tb: any) => tb.active)
-                                    .map((tpl: any) => ({
-                                      label: `📝 ${tpl.label}`,
-                                      desc: 'Textbaustein',
+                            <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
+                              <div 
+                                style={{ 
+                                  display: 'flex', 
+                                  gap: '8px', 
+                                  overflowX: 'auto', 
+                                  padding: '4px 2px 8px 2px', 
+                                  scrollbarWidth: 'thin',
+                                  WebkitOverflowScrolling: 'touch',
+                                }}
+                                className="presets-scrollbar-container"
+                              >
+                                {(() => {
+                                  const allPresets = [
+                                    {
+                                      label: '⏱️ Tempo halten',
+                                      desc: 'Metronom BPM',
                                       onClick: () => {
-                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                        const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                                        const bpmText = bpm ? `${bpm} BPM` : "X BPM";
+                                        const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                        setIsCurrentHomework(true);
                                         setHasChanges(true);
                                       }
-                                    }))
-                                ];
+                                    },
+                                    {
+                                      label: '✨ Sauber spielen',
+                                      desc: 'Klarer Klang',
+                                      onClick: () => {
+                                        const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
+                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                        setIsCurrentHomework(true);
+                                        setHasChanges(true);
+                                      }
+                                    },
+                                    {
+                                      label: '🥁 Rhythmus-Metronom',
+                                      desc: 'Timing & Takt',
+                                      onClick: () => {
+                                        const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
+                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                        setIsCurrentHomework(true);
+                                        setHasChanges(true);
+                                      }
+                                    },
+                                    {
+                                      label: '🖖 Fingersatz üben',
+                                      desc: 'Fingersatz einhalten',
+                                      onClick: () => {
+                                        const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
+                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                        setIsCurrentHomework(true);
+                                        setHasChanges(true);
+                                      }
+                                    },
+                                    ...textbausteine
+                                      .filter((tb: any) => tb.active)
+                                      .map((tpl: any) => ({
+                                        label: `📝 ${tpl.label}`,
+                                        desc: 'Textbaustein',
+                                        onClick: () => {
+                                          setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                          setHasChanges(true);
+                                        }
+                                      }))
+                                  ];
 
-                                return allPresets.map((item, idx) => (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={item.onClick}
-                                    style={{
-                                      flexShrink: 0,
-                                      background: '#f8fafc',
-                                      color: '#1e293b',
-                                      border: '1px solid #cbd5e1',
-                                      padding: '6px 12px',
-                                      borderRadius: '12px',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'flex-start',
-                                      gap: '1px',
-                                      textAlign: 'left',
-                                      outline: 'none'
-                                    }}
-                                    className="preset-chip-card preset-btn"
-                                  >
-                                    <span style={{ fontWeight: 800, fontSize: '0.70rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
-                                      {item.label}
-                                    </span>
-                                    <span style={{ fontSize: '0.56rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                                      {item.desc}
-                                    </span>
-                                  </button>
-                                ));
-                              })()}
+                                  return allPresets.map((item, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={item.onClick}
+                                      style={{
+                                        flexShrink: 0,
+                                        background: '#f8fafc',
+                                        color: '#1e293b',
+                                        border: '1px solid #cbd5e1',
+                                        padding: '6px 12px',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        gap: '1px',
+                                        textAlign: 'left',
+                                        outline: 'none'
+                                      }}
+                                      className="preset-chip-card preset-btn"
+                                    >
+                                      <span style={{ fontWeight: 800, fontSize: '0.70rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                        {item.label}
+                                      </span>
+                                      <span style={{ fontSize: '0.56rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                        {item.desc}
+                                      </span>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                         {/* Audio Play-Along Cassette Widget */}
-                        {isCampusActive && (
+                        {isCampusActive && !readOnly && (
                           <div style={{
                             margin: '12px 0',
                             padding: '16px',
@@ -6171,7 +6505,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     url: parts[0],
                                     duration: parseInt(parts[1] || '0', 10),
                                     date: parts[2],
-                                    label: parts[3],
+                                    label: parts[3] || 'Play-Along',
+                                    role: parts[4] || 'teacher', // default legacy to teacher
                                     originalIdx: item.originalIdx
                                   };
                                 });
@@ -6193,7 +6528,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span>📼</span> Play-Along Aufnahme (max. 60s)
+                                        <span>Play-Along Aufnahme (max. 60s)</span>
                                       </span>
                                       {!isRecordingAudio ? (
                                         <button
@@ -6214,7 +6549,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             gap: '4px'
                                           }}
                                         >
-                                          🔴 Aufnahme starten
+                                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                          <span>Aufnahme starten</span>
                                         </button>
                                       ) : (
                                         <button
@@ -6234,7 +6570,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             gap: '4px'
                                           }}
                                         >
-                                          ⏹️ Stopp ({audioDuration}s / 60s)
+                                          <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
+                                          <span>Stopp ({audioDuration}s / 60s)</span>
                                         </button>
                                       )}
                                     </div>
@@ -6920,133 +7257,133 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '65px 40px 40px 40px',
                           zIndex: 2,
                           boxSizing: 'border-box'
                         }}>
-                          {/* Action Headline Pill */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '65px',
-                            fontSize: '28px', 
-                            fontWeight: 900, 
-                            color: '#ffffff', 
-                            background: st.color || '#10b981',
-                            padding: '10px 30px',
-                            borderRadius: '30px',
-                            transform: 'rotate(-2deg) skewX(-6deg)',
-                            letterSpacing: '0.06em', 
-                            fontFamily: '"Arial Black", sans-serif', 
-                            textTransform: 'uppercase', 
-                            textAlign: 'center',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                          }}>
-                            GEMEISTERT!
-                          </span>
-
-                          {/* Giant Sticker Display */}
+                          {/* Upper section to flow naturally without overlapping */}
                           <div style={{
-                            position: 'absolute',
-                            top: '260px',
-                            left: '240px',
-                            width: '360px',
-                            height: '360px',
-                            borderRadius: '50%',
-                            border: '6px solid #ffffff',
-                            boxShadow: `0 0 40px ${(st.color || '#10b981')}60`,
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            boxSizing: 'border-box'
-                          }}>
-                            <img 
-                              src={`/stickers/${st.id}.png?v=1`} 
-                              alt={st.title} 
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const span = document.createElement('span');
-                                  span.style.fontSize = '8rem';
-                                  span.innerText = st.emoji;
-                                  parent.appendChild(span);
-                                }
-                              }}
-                            />
-                          </div>
-
-                          {/* Student Name */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '680px',
-                            fontSize: '54px', 
-                            fontWeight: 900, 
-                            color: '#ffffff', 
-                            textAlign: 'center', 
-                            letterSpacing: '-0.01em',
-                            width: '100%',
-                            fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                          }}>
-                            {student.first_name} {student.last_name}
-                          </span>
-
-                          {/* Student Instrument */}
-                          {studentInstrument && (
-                            <span style={{ 
-                              position: 'absolute',
-                              top: '745px',
-                              fontSize: '24px', 
-                              fontWeight: 900, 
-                              color: '#94a3b8', 
-                              letterSpacing: '0.12em', 
-                              textTransform: 'uppercase',
-                              width: '100%',
-                              textAlign: 'center',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {studentInstrument}
-                            </span>
-                          )}
-
-                          {/* Sticker Milestone Title */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '795px',
-                            fontSize: '48px', 
-                            fontWeight: 900, 
-                            color: st.color || '#10b981', 
-                            fontFamily: '"Arial Black", sans-serif', 
-                            textTransform: 'uppercase', 
-                            textAlign: 'center',
-                            transform: 'skewX(-6deg)',
                             width: '100%'
                           }}>
-                            {st.title}
-                          </span>
+                            {/* Action Headline Pill */}
+                            <span style={{ 
+                              fontSize: '28px', 
+                              fontWeight: 900, 
+                              color: '#ffffff', 
+                              background: st.color || '#10b981',
+                              padding: '10px 30px',
+                              borderRadius: '30px',
+                              transform: 'rotate(-2deg) skewX(-6deg)',
+                              letterSpacing: '0.06em', 
+                              fontFamily: '"Arial Black", sans-serif', 
+                              textTransform: 'uppercase', 
+                              textAlign: 'center',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                            }}>
+                              GEMEISTERT!
+                            </span>
 
-                          {/* Challenge Description */}
-                          <p style={{ 
-                            position: 'absolute',
-                            top: '865px',
-                            fontSize: '28px', 
-                            color: '#cbd5e1', 
-                            fontWeight: 750, 
-                            margin: 0, 
-                            textAlign: 'center', 
-                            padding: '0 40px', 
-                            lineHeight: '1.3',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                          }}>
-                            {st.desc}
-                          </p>
+                            {/* Giant Sticker Display */}
+                            <div style={{
+                              marginTop: '80px',
+                              width: '360px',
+                              height: '360px',
+                              borderRadius: '50%',
+                              border: '6px solid #ffffff',
+                              boxShadow: `0 0 40px ${(st.color || '#10b981')}60`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              boxSizing: 'border-box'
+                            }}>
+                              <img 
+                                src={`/stickers/${st.id}.png?v=1`} 
+                                alt={st.title} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const parent = e.currentTarget.parentElement;
+                                  if (parent) {
+                                    const span = document.createElement('span');
+                                    span.style.fontSize = '8rem';
+                                    span.innerText = st.emoji;
+                                    parent.appendChild(span);
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            {/* Student Name */}
+                            <span style={{ 
+                              marginTop: '35px',
+                              fontSize: '54px', 
+                              fontWeight: 900, 
+                              color: '#ffffff', 
+                              textAlign: 'center', 
+                              letterSpacing: '-0.01em',
+                              width: '100%',
+                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                            }}>
+                              {student.first_name} {student.last_name}
+                            </span>
+
+                            {/* Student Instrument */}
+                            {studentInstrument && (
+                              <span style={{ 
+                                marginTop: '8px',
+                                fontSize: '24px', 
+                                fontWeight: 900, 
+                                color: '#94a3b8', 
+                                letterSpacing: '0.12em', 
+                                textTransform: 'uppercase',
+                                width: '100%',
+                                textAlign: 'center',
+                                fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                              }}>
+                                {studentInstrument}
+                              </span>
+                            )}
+
+                            {/* Sticker Milestone Title */}
+                            <span style={{ 
+                              marginTop: studentInstrument ? '12px' : '20px',
+                              fontSize: '48px', 
+                              fontWeight: 900, 
+                              color: st.color || '#10b981', 
+                              fontFamily: '"Arial Black", sans-serif', 
+                              textTransform: 'uppercase', 
+                              textAlign: 'center',
+                              transform: 'skewX(-6deg)',
+                              width: '100%'
+                            }}>
+                              {st.title}
+                            </span>
+
+                            {/* Challenge Description */}
+                            <p style={{ 
+                              marginTop: '15px',
+                              fontSize: '28px', 
+                              color: '#cbd5e1', 
+                              fontWeight: 750, 
+                              margin: 0, 
+                              textAlign: 'center', 
+                              padding: '0 40px', 
+                              lineHeight: '1.3',
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                            }}>
+                              {st.desc}
+                            </p>
+                          </div>
 
                           {/* Footer Section */}
                           <div style={{
-                            position: 'absolute',
-                            bottom: '40px',
                             width: '100%',
                             display: 'flex',
                             flexDirection: 'column',
@@ -7148,133 +7485,133 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '65px 40px 40px 40px',
                           zIndex: 2,
                           boxSizing: 'border-box'
                         }}>
-                          {/* Action Headline Pill (Light) */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '65px',
-                            fontSize: '28px', 
-                            fontWeight: 900, 
-                            color: '#ffffff', 
-                            background: st.color || '#10b981',
-                            padding: '10px 30px',
-                            borderRadius: '30px',
-                            transform: 'rotate(-2deg) skewX(-6deg)',
-                            letterSpacing: '0.06em', 
-                            fontFamily: '"Arial Black", sans-serif', 
-                            textTransform: 'uppercase', 
-                            textAlign: 'center',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                          }}>
-                            GEMEISTERT!
-                          </span>
-
-                          {/* Giant Sticker Display */}
+                          {/* Upper section to flow naturally without overlapping */}
                           <div style={{
-                            position: 'absolute',
-                            top: '260px',
-                            left: '240px',
-                            width: '360px',
-                            height: '360px',
-                            borderRadius: '50%',
-                            border: '6px solid #ffffff',
-                            boxShadow: `0 0 40px ${(st.color || '#10b981')}45`,
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            boxSizing: 'border-box'
-                          }}>
-                            <img 
-                              src={`/stickers/${st.id}.png?v=1`} 
-                              alt={st.title} 
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const span = document.createElement('span');
-                                  span.style.fontSize = '8rem';
-                                  span.innerText = st.emoji;
-                                  parent.appendChild(span);
-                                }
-                              }}
-                            />
-                          </div>
-
-                          {/* Student Name */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '680px',
-                            fontSize: '54px', 
-                            fontWeight: 900, 
-                            color: '#0f172a', 
-                            textAlign: 'center', 
-                            letterSpacing: '-0.01em',
-                            width: '100%',
-                            fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                          }}>
-                            {student.first_name} {student.last_name}
-                          </span>
-
-                          {/* Student Instrument */}
-                          {studentInstrument && (
-                            <span style={{ 
-                              position: 'absolute',
-                              top: '745px',
-                              fontSize: '24px', 
-                              fontWeight: 900, 
-                              color: '#64748b', 
-                              letterSpacing: '0.12em', 
-                              textTransform: 'uppercase',
-                              width: '100%',
-                              textAlign: 'center',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {studentInstrument}
-                            </span>
-                          )}
-
-                          {/* Sticker Milestone Title */}
-                          <span style={{ 
-                            position: 'absolute',
-                            top: '795px',
-                            fontSize: '48px', 
-                            fontWeight: 900, 
-                            color: st.color || '#10b981', 
-                            fontFamily: '"Arial Black", sans-serif', 
-                            textTransform: 'uppercase', 
-                            textAlign: 'center',
-                            transform: 'skewX(-6deg)',
                             width: '100%'
                           }}>
-                            {st.title}
-                          </span>
+                            {/* Action Headline Pill (Light) */}
+                            <span style={{ 
+                              fontSize: '28px', 
+                              fontWeight: 900, 
+                              color: '#ffffff', 
+                              background: st.color || '#10b981',
+                              padding: '10px 30px',
+                              borderRadius: '30px',
+                              transform: 'rotate(-2deg) skewX(-6deg)',
+                              letterSpacing: '0.06em', 
+                              fontFamily: '"Arial Black", sans-serif', 
+                              textTransform: 'uppercase', 
+                              textAlign: 'center',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                            }}>
+                              GEMEISTERT!
+                            </span>
 
-                          {/* Challenge Description */}
-                          <p style={{ 
-                            position: 'absolute',
-                            top: '865px',
-                            fontSize: '28px', 
-                            color: '#475569', 
-                            fontWeight: 750, 
-                            margin: 0, 
-                            textAlign: 'center', 
-                            padding: '0 40px', 
-                            lineHeight: '1.3',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                          }}>
-                            {st.desc}
-                          </p>
+                            {/* Giant Sticker Display */}
+                            <div style={{
+                              marginTop: '80px',
+                              width: '360px',
+                              height: '360px',
+                              borderRadius: '50%',
+                              border: '6px solid #ffffff',
+                              boxShadow: `0 0 40px ${(st.color || '#10b981')}45`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              boxSizing: 'border-box'
+                            }}>
+                              <img 
+                                src={`/stickers/${st.id}.png?v=1`} 
+                                alt={st.title} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const parent = e.currentTarget.parentElement;
+                                  if (parent) {
+                                    const span = document.createElement('span');
+                                    span.style.fontSize = '8rem';
+                                    span.innerText = st.emoji;
+                                    parent.appendChild(span);
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            {/* Student Name */}
+                            <span style={{ 
+                              marginTop: '35px',
+                              fontSize: '54px', 
+                              fontWeight: 900, 
+                              color: '#0f172a', 
+                              textAlign: 'center', 
+                              letterSpacing: '-0.01em',
+                              width: '100%',
+                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                            }}>
+                              {student.first_name} {student.last_name}
+                            </span>
+
+                            {/* Student Instrument */}
+                            {studentInstrument && (
+                              <span style={{ 
+                                marginTop: '8px',
+                                fontSize: '24px', 
+                                fontWeight: 900, 
+                                color: '#64748b', 
+                                letterSpacing: '0.12em', 
+                                textTransform: 'uppercase',
+                                width: '100%',
+                                textAlign: 'center',
+                                fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                              }}>
+                                {studentInstrument}
+                              </span>
+                            )}
+
+                            {/* Sticker Milestone Title */}
+                            <span style={{ 
+                              marginTop: studentInstrument ? '12px' : '20px',
+                              fontSize: '48px', 
+                              fontWeight: 900, 
+                              color: st.color || '#10b981', 
+                              fontFamily: '"Arial Black", sans-serif', 
+                              textTransform: 'uppercase', 
+                              textAlign: 'center',
+                              transform: 'skewX(-6deg)',
+                              width: '100%'
+                            }}>
+                              {st.title}
+                            </span>
+
+                            {/* Challenge Description */}
+                            <p style={{ 
+                              marginTop: '15px',
+                              fontSize: '28px', 
+                              color: '#475569', 
+                              fontWeight: 750, 
+                              margin: 0, 
+                              textAlign: 'center', 
+                              padding: '0 40px', 
+                              lineHeight: '1.3',
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
+                            }}>
+                              {st.desc}
+                            </p>
+                          </div>
 
                           {/* Footer Section */}
                           <div style={{
-                            position: 'absolute',
-                            bottom: '40px',
                             width: '100%',
                             display: 'flex',
                             flexDirection: 'column',
@@ -8334,3 +8671,2630 @@ const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: numb
     />
   );
 };
+
+interface Track {
+  id: number;
+  url: string | null;
+  blob: Blob | null;
+  volume: number;
+  isMuted: boolean;
+  isRecording: boolean;
+  isWaiting: boolean;
+  isSoloed?: boolean;
+}
+
+interface GrooveLoopstationProps {
+  student: any;
+  homeworkNotesList: string[];
+  setHomeworkNotesList: React.Dispatch<React.SetStateAction<string[]>>;
+  syncHomeworkNotes: (notesList: string[]) => Promise<void>;
+  fetchProgress: () => Promise<void>;
+  notifyHomeworkChange: () => void;
+  readOnly: boolean;
+  setActiveViewMode: (mode: 'document' | 'recordings' | 'loopstation') => void;
+  useNotebookLayout: boolean;
+}
+
+const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
+  student,
+  homeworkNotesList,
+  setHomeworkNotesList,
+  syncHomeworkNotes,
+  fetchProgress,
+  notifyHomeworkChange,
+  readOnly,
+  setActiveViewMode,
+  useNotebookLayout
+}) => {
+  const [tracks, setTracks] = useState<Track[]>([
+    { id: 1, url: null, blob: null, volume: 80, isMuted: false, isRecording: false, isWaiting: false, isSoloed: false },
+    { id: 2, url: null, blob: null, volume: 80, isMuted: false, isRecording: false, isWaiting: false, isSoloed: false },
+  ]);
+
+  const pauseBars = 4;
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [masterLoopDuration, setMasterLoopDuration] = useState<number | null>(null); // in ms
+  const [playbackProgress, setPlaybackProgress] = useState(0); // 0 to 100
+  const [currentBar, setCurrentBar] = useState<number>(1); // 1, 2, 3, or 4
+  const [isMetronomeActive, setIsMetronomeActive] = useState(false);
+  const [bpm, setBpm] = useState(120);
+  const [isExporting, setIsExporting] = useState(false);
+  const [countInBeats, setCountInBeats] = useState<number | string | null>(null); // null, 4.4, 1.1 etc.
+  const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
+  const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
+  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const syncOffsetMsRef = useRef<number>(0);
+  const isManualLatencyAdjustmentRef = useRef<boolean>(false);
+  useEffect(() => { syncOffsetMsRef.current = syncOffsetMs; }, [syncOffsetMs]);
+  const [useHeadphones, setUseHeadphones] = useState(false);
+  const useHeadphonesRef = useRef(false);
+  const isManualHeadphonesRef = useRef(false);
+  useEffect(() => { useHeadphonesRef.current = useHeadphones; }, [useHeadphones]);
+  const processorNodeRef = useRef<AudioNode | null>(null);
+
+  const [desiredTrackCount, setDesiredTrackCount] = useState(4);
+  const maxAllowedTracks = useHeadphones ? desiredTrackCount : Math.min(2, desiredTrackCount);
+
+  useEffect(() => {
+    setTracks((prev) => {
+      const currentLength = prev.length;
+      if (currentLength === maxAllowedTracks) return prev;
+      if (currentLength < maxAllowedTracks) {
+        const newTracks = [...prev];
+        for (let i = currentLength + 1; i <= maxAllowedTracks; i++) {
+          newTracks.push({
+            id: i,
+            url: null,
+            blob: null,
+            volume: 80,
+            isMuted: false,
+            isRecording: false,
+            isWaiting: false,
+            isSoloed: false
+          });
+        }
+        return newTracks;
+      } else {
+        const newTracks = prev.slice(0, maxAllowedTracks);
+        prev.slice(maxAllowedTracks).forEach((t) => {
+          if (t.url) URL.revokeObjectURL(t.url);
+          delete audioBuffersRef.current[t.id];
+          if (activeSourcesRef.current[t.id]) {
+            try { activeSourcesRef.current[t.id].stop(); } catch (e) {}
+            delete activeSourcesRef.current[t.id];
+          }
+          delete gainNodesRef.current[t.id];
+        });
+        return newTracks;
+      }
+    });
+  }, [maxAllowedTracks]);
+  const audioBuffersRef = useRef<{ [key: number]: AudioBuffer }>({});
+  const activeSourcesRef = useRef<{ [key: number]: AudioBufferSourceNode }>({});
+  const gainNodesRef = useRef<{ [key: number]: GainNode }>({});
+  const highClickTemplateRef = useRef<Float32Array | null>(null);
+  const lowClickTemplateRef = useRef<Float32Array | null>(null);
+  const masterCompressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const mediaRecordersRef = useRef<{ [key: number]: MediaRecorder }>({});
+  const recordStartTimesRef = useRef<{ [key: number]: number }>({});
+  const progressIntervalRef = useRef<any>(null);
+  const startTimeRef = useRef<number>(0);
+  const loopTimeoutRef = useRef<any>(null);
+  const clickIntervalRef = useRef<any>(null);
+  const tapTimesRef = useRef<number[]>([]);
+  const sequenceIntervalRef = useRef<any>(null);
+
+  // Web Audio Scheduler Refs
+  const nextNoteTimeRef = useRef<number>(0);
+  const currentTickRef = useRef<number>(0);
+  const lookaheadTimerRef = useRef<any>(null);
+  const uiSyncFrameRef = useRef<any>(null);
+  const uiEventsQueueRef = useRef<{ time: number, type: string, data?: any }[]>([]);
+  const audioEventsQueueRef = useRef<{ time: number, type: string, data?: any }[]>([]);
+  const isAutoSequenceActiveRef = useRef<boolean>(false);
+  const continuousRecordStartTimeRef = useRef<number>(0);
+  const isComponentMountedRef = useRef<boolean>(true);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const tracksRef = useRef<Track[]>([]);
+  const sequenceStartTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  // Dynamic Real-Time Ducking based on Track Age to prevent feedback build-up
+  useEffect(() => {
+    const activeTrack = tracks.find(t => t.isRecording || t.isWaiting);
+    const activeTrackId = activeTrack ? activeTrack.id : null;
+    const ctx = audioContextRef.current;
+    
+    tracks.forEach((t) => {
+      const gainNode = gainNodesRef.current[t.id];
+      if (gainNode) {
+        const hasAnySolo = tracks.some(x => x.isSoloed);
+        const isActive = (hasAnySolo ? t.isSoloed : !t.isMuted);
+        const baseVolume = isActive ? (t.volume / 100) : 0;
+        
+        let multiplier = 1.0;
+        if (activeTrackId !== null && t.id < activeTrackId) {
+          const age = activeTrackId - t.id;
+          if (useHeadphones) {
+            multiplier = 1.0; // No ducking for headphones!
+          } else {
+            multiplier = Math.max(0.05, 1.0 - 0.55 * age); // Aggressive ducking for speakers
+          }
+        }
+        
+        const targetVolume = baseVolume * multiplier;
+        
+        if (ctx && ctx.state !== 'suspended') {
+          try {
+            gainNode.gain.linearRampToValueAtTime(targetVolume, ctx.currentTime + 0.05);
+          } catch (e) {
+            gainNode.gain.setValueAtTime(targetVolume, ctx.currentTime);
+          }
+        } else {
+          gainNode.gain.setValueAtTime(targetVolume, 0);
+        }
+      }
+    });
+  }, [tracks, useHeadphones]);
+
+  useEffect(() => {
+    if (processorNodeRef.current) {
+      try {
+        (processorNodeRef.current as any).port?.postMessage({ type: 'SET_HEADPHONES', value: useHeadphones });
+      } catch (e) {}
+    }
+  }, [useHeadphones]);
+
+  useEffect(() => {
+    handleReset();
+  }, [student?.id]);
+
+  const detectHeadphones = async (stream?: MediaStream) => {
+    if (isManualHeadphonesRef.current) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      let isBluetooth = false;
+      let hasExternalAudio = devices.some((device) => {
+        const label = device.label.toLowerCase();
+        const match = (device.kind === 'audiooutput' || device.kind === 'audioinput') &&
+          (label.includes('headphone') ||
+            label.includes('kopfhörer') ||
+            label.includes('earphone') ||
+            label.includes('airpods') ||
+            label.includes('bluetooth') ||
+            label.includes('extern') ||
+            label.includes('lineout') ||
+            label.includes('headset'));
+        if (match && (label.includes('bluetooth') || label.includes('airpods') || label.includes('wireless') || label.includes('beats') || label.includes('freebuds'))) {
+          isBluetooth = true;
+        }
+        return match;
+      });
+
+      if (!hasExternalAudio && stream) {
+        stream.getAudioTracks().forEach((track) => {
+          const trackLabel = track.label.toLowerCase();
+          const match = trackLabel.includes('headphone') ||
+            trackLabel.includes('kopfhörer') ||
+            trackLabel.includes('earphone') ||
+            trackLabel.includes('airpods') ||
+            trackLabel.includes('bluetooth') ||
+            trackLabel.includes('extern') ||
+            trackLabel.includes('headset');
+          if (match && (trackLabel.includes('bluetooth') || trackLabel.includes('airpods') || trackLabel.includes('wireless') || trackLabel.includes('beats') || trackLabel.includes('freebuds'))) {
+            isBluetooth = true;
+          }
+          if (match) hasExternalAudio = true;
+        });
+      }
+
+      if (hasExternalAudio) {
+        setUseHeadphones(true);
+        if (!isManualLatencyAdjustmentRef.current && !isAutoSequenceActiveRef.current) {
+          const ctx = audioContextRef.current;
+          const hasNativeLatency = !!(ctx && ctx.outputLatency && ctx.outputLatency > 0.05);
+          const outLatency = hasNativeLatency
+            ? ctx.outputLatency!
+            : (isBluetooth ? 0.220 : 0.010);
+          const estimatedRoundtrip = outLatency + 0.015; // 15ms input latency
+          const defaultOffsetMs = hasNativeLatency
+            ? 0
+            : Math.round((estimatedRoundtrip - 0.025) * 1000);
+          setSyncOffsetMs(defaultOffsetMs);
+        }
+      } else {
+        setUseHeadphones(false);
+        if (!isManualLatencyAdjustmentRef.current && !isAutoSequenceActiveRef.current) {
+          const ctx = audioContextRef.current;
+          const hasNativeLatency = !!(ctx && ctx.outputLatency && ctx.outputLatency > 0.05);
+          const outLatency = hasNativeLatency
+            ? ctx.outputLatency!
+            : 0.020;
+          const estimatedRoundtrip = outLatency + 0.015; // 15ms input latency
+          const defaultOffsetMs = hasNativeLatency
+            ? 0
+            : Math.round((estimatedRoundtrip - 0.025) * 1000);
+          setSyncOffsetMs(defaultOffsetMs);
+        }
+      }
+    } catch (e) {
+      console.warn("Headphone detection failed:", e);
+    }
+  };
+
+  useEffect(() => {
+    detectHeadphones();
+    if (navigator.mediaDevices) {
+      const handleDeviceChange = () => detectHeadphones();
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      };
+    }
+  }, []);
+
+  const initAudio = async () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    if (ctx && !isManualLatencyAdjustmentRef.current && !isAutoSequenceActiveRef.current) {
+      const isBluetooth = syncOffsetMs === 210;
+      const hasExternalAudio = useHeadphones;
+      const hasNativeLatency = !!(ctx.outputLatency && ctx.outputLatency > 0.05);
+      const outLatency = hasNativeLatency
+        ? ctx.outputLatency
+        : (isBluetooth ? 0.220 : (hasExternalAudio ? 0.010 : 0.020));
+      const estimatedRoundtrip = outLatency + 0.015; // 15ms input latency
+      const defaultOffsetMs = hasNativeLatency
+        ? 0
+        : Math.round((estimatedRoundtrip - 0.025) * 1000);
+      setSyncOffsetMs(defaultOffsetMs);
+    }
+
+    // Create master dynamics compressor (limiter) to prevent clipping distortion
+    if (!masterCompressorRef.current) {
+      const compressor = ctx.createDynamicsCompressor();
+      // Set typical limiter settings to act as a safety barrier against clipping
+      compressor.threshold.setValueAtTime(-1.0, ctx.currentTime); // start limiting just below 0dBFS
+      compressor.knee.setValueAtTime(0, ctx.currentTime);         // hard knee
+      compressor.ratio.setValueAtTime(20.0, ctx.currentTime);     // high ratio acting as a limiter
+      compressor.attack.setValueAtTime(0.003, ctx.currentTime);   // fast attack (3ms)
+      compressor.release.setValueAtTime(0.1, ctx.currentTime);    // release (100ms)
+      
+      masterCompressorRef.current = compressor;
+    }
+    
+    // Create master gain to tame the overall volume slightly (since recordings sum up)
+    if (!masterGainRef.current) {
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.8, ctx.currentTime); // Reduce master mix slightly to prevent hot levels
+      
+      masterGainRef.current = masterGain;
+      
+      // Connect: Track GainNodes -> MasterGain -> DynamicsCompressor -> Destination
+      masterGainRef.current.connect(masterCompressorRef.current);
+      masterCompressorRef.current.connect(ctx.destination);
+    }
+  };
+
+  // Synthesize clean wooden metronome click sound
+  const playClickSound = (isHigh = false, time?: number) => {
+    try {
+      initAudio();
+      const ctx = audioContextRef.current;
+      if (!ctx) return;
+      const playTime = time !== undefined ? time : ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 0; // Initialize to 0 to prevent any pop from default 1.0 gain
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      // Auto-Quiet Metronome: Completely mute (0%) after Spur 1 has been recorded to prevent click accumulation (bypassed for headphones)
+      const hasTrack1 = !!tracksRef.current[0]?.url;
+      const baseMetronomeGain = 0.05;
+      const targetMetronomeGain = (hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain;
+      
+      // Clear, short percussive click (800Hz / 600Hz) with 8ms decay to prevent low-frequency build-up and room feedback coloration
+      osc.frequency.setValueAtTime(isHigh ? 800 : 600, playTime);
+      
+      if (targetMetronomeGain > 0) {
+        gainNode.gain.setValueAtTime(targetMetronomeGain, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.008);
+      } else {
+        gainNode.gain.setValueAtTime(0, playTime);
+      }
+      
+      osc.start(playTime);
+      osc.stop(playTime + 0.008);
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  // Metronome Click Loop
+  useEffect(() => {
+    if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+
+    if (isMetronomeActive && isPlaying && !isAutoSequenceActive) {
+      const intervalMs = (60 / bpm) * 1000;
+      let beatCount = 0;
+      clickIntervalRef.current = setInterval(() => {
+        playClickSound(beatCount % 4 === 0);
+        beatCount++;
+      }, intervalMs);
+    }
+
+    return () => {
+      if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+    };
+  }, [isMetronomeActive, isPlaying, bpm, isAutoSequenceActive]);
+
+  // Tap Tempo handler
+  const handleTapTempo = () => {
+    const now = Date.now();
+    tapTimesRef.current = [...tapTimesRef.current, now].slice(-4);
+    if (tapTimesRef.current.length >= 2) {
+      const diffs = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        diffs.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
+      }
+      const avgDiff = diffs.reduce((sum, d) => sum + d, 0) / diffs.length;
+      const calculatedBpm = Math.round(60000 / avgDiff);
+      if (calculatedBpm >= 40 && calculatedBpm <= 240) {
+        setBpm(calculatedBpm);
+      }
+    }
+    // Audio feedback for tapping
+    playClickSound(true);
+  };
+
+  const alignAudioBuffer = (
+    decoded: AudioBuffer, 
+    tStart: number, 
+    t1Start: number, 
+    beatSecs: number, 
+    trackDurationMs: number,
+    earlyStartBeats: number = 0.25
+  ) => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return decoded;
+    
+    const sampleRate = decoded.sampleRate;
+    const loopSamples = Math.round((trackDurationMs / 1000) * sampleRate);
+    
+    // Create new buffer of exact loop length
+    const aligned = ctx.createBuffer(decoded.numberOfChannels, loopSamples, sampleRate);
+    
+    // Professional DAW Latency Compensation
+    // outputLatency is dynamic. inputLatency is typical mic/ADC capture latency (approx. 20-30ms).
+    // Plus a small 10ms margin for MediaRecorder packetization/encoding overhead.
+    const outputLatency = ctx.outputLatency || 0.025;
+    const inputLatency = 0.025;
+    const packetizationLatency = 0.010;
+    const totalLatencySec = outputLatency + inputLatency + packetizationLatency;
+    
+    const earlyStartSamples = Math.round(earlyStartBeats * beatSecs * sampleRate);
+    const latencySamples = Math.round(totalLatencySec * sampleRate);
+    
+    // Discard both early-start warmup and the hardware roundtrip latency
+    const srcStart = Math.min(earlyStartSamples + latencySamples, decoded.length);
+    
+    for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
+      const srcData = decoded.getChannelData(channel);
+      const dstData = aligned.getChannelData(channel);
+      
+      const copyLength = Math.min(srcData.length - srcStart, loopSamples);
+      if (copyLength > 0) {
+        dstData.set(srcData.subarray(srcStart, srcStart + copyLength), 0);
+      }
+    }
+    return aligned;
+  };
+
+  const startAutoSequence = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
+      return;
+    }
+    handleReset();
+    setIsAutoSequenceActive(true);
+    isAutoSequenceActiveRef.current = true;
+    setAutoSequenceStatus('WARTE AUF MIKROFON...');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+      mediaStreamRef.current = stream;
+      await detectHeadphones(stream);
+      
+      setAutoSequenceStatus('BEAT-EINZÄHLER...');
+      await initAudio();
+      const beatMs = (60 / bpm) * 1000;
+      const barMs = beatMs * 4;
+      const trackDurationMs = barMs * 4; // Exactly 4 bars per track (16 beats)
+
+      // === DAW Continuous PCM Recording (Web Audio Worklet) ===
+      const ctx = audioContextRef.current!;
+      const sourceNode = ctx.createMediaStreamSource(stream);
+      
+      const workletCode = `
+        class RecorderProcessor extends AudioWorkletProcessor {
+          constructor() { 
+            super(); 
+            this.isActive = true; 
+          }
+          process(inputs, outputs) {
+            if (!this.isActive) return true;
+            const input = inputs[0];
+            if (input && input.length > 0 && input[0]) {
+              this.port.postMessage({ data: input[0], time: currentTime });
+            }
+            // Explicitly zero out outputs to prevent whistling/feedback noise
+            const output = outputs[0];
+            if (output) {
+              for (let channel = 0; channel < output.length; channel++) {
+                output[channel].fill(0);
+              }
+            }
+            return true;
+          }
+        }
+        registerProcessor('recorder-worklet', RecorderProcessor);
+      `;
+      const blob = new Blob([workletCode], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      
+      let processorNode: AudioNode;
+      try {
+        await ctx.audioWorklet.addModule(workletUrl);
+        const workletNode = new AudioWorkletNode(ctx, 'recorder-worklet');
+        workletNode.port.postMessage({ type: 'SET_HEADPHONES', value: useHeadphonesRef.current });
+        processorNode = workletNode;
+        processorNodeRef.current = workletNode;
+      } catch (e) {
+        console.warn("AudioWorklet fallback", e);
+        processorNode = ctx.createScriptProcessor(4096, 1, 1);
+        processorNodeRef.current = processorNode;
+      }
+      URL.revokeObjectURL(workletUrl);
+
+      const muteNode = ctx.createGain();
+      muteNode.gain.value = 0; // Prevent acoustic feedback!
+
+      const continuousPCMData: Float32Array[] = [];
+      let totalSamplesRecorded = 0;
+      let isFirstBlock = true;
+
+      if (processorNode instanceof AudioWorkletNode) {
+        processorNode.port.onmessage = (e) => {
+          if (!isAutoSequenceActiveRef.current) return;
+          if (isFirstBlock) {
+            continuousRecordStartTimeRef.current = e.data.time;
+            isFirstBlock = false;
+          }
+          const inputData = e.data.data;
+          continuousPCMData.push(new Float32Array(inputData));
+          totalSamplesRecorded += inputData.length;
+        };
+      } else {
+        (processorNode as ScriptProcessorNode).onaudioprocess = (e) => {
+          if (!isAutoSequenceActiveRef.current) return;
+          if (isFirstBlock) {
+            const bufferDuration = e.inputBuffer.length / e.inputBuffer.sampleRate;
+            continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
+            isFirstBlock = false;
+          }
+          const inputData = e.inputBuffer.getChannelData(0);
+          continuousPCMData.push(new Float32Array(inputData));
+          totalSamplesRecorded += inputData.length;
+          
+          // Explicitly zero out ScriptProcessor output to prevent noise/whistling
+          const outputData = e.outputBuffer.getChannelData(0);
+          outputData.fill(0);
+        };
+      }
+
+      const getFullPCMBuffer = (): AudioBuffer | null => {
+        if (totalSamplesRecorded === 0) return null;
+        const fullBuffer = ctx.createBuffer(1, totalSamplesRecorded, ctx.sampleRate);
+        const channelData = fullBuffer.getChannelData(0);
+        let offset = 0;
+        for (const chunk of continuousPCMData) {
+          channelData.set(chunk, offset);
+          offset += chunk.length;
+        }
+        return fullBuffer;
+      };
+
+      const sliceContinuousBuffer = (
+        continuousBuffer: AudioBuffer,
+        tStartTicks: number,
+        tEndTicks: number,
+        beatSecs: number,
+        tDurationMs: number
+      ) => {
+        const sampleRate = continuousBuffer.sampleRate;
+        const loopSamples = Math.round((tDurationMs / 1000) * sampleRate);
+        const aligned = ctx.createBuffer(1, loopSamples, sampleRate);
+
+        // Calculate Web Audio time offsets
+        const trackStartAudioTime = sequenceStartTimeRef.current + tStartTicks * beatSecs;
+        
+        // Exact hardware DAC/ADC latency compensation
+        const outputLatency = ctx.outputLatency || 0.025;
+        let inputLatency = 0.025;
+        if (syncOffsetMsRef.current !== 0) {
+          inputLatency = 0.025 + (syncOffsetMsRef.current / 1000);
+        }
+        const packetizationLatency = 0.003; 
+        const totalLatencySec = outputLatency + inputLatency + packetizationLatency;
+
+        const elapsedStartSec = trackStartAudioTime - continuousRecordStartTimeRef.current;
+        const sliceStartSec = elapsedStartSec + totalLatencySec;
+
+        const srcStart = Math.max(0, Math.min(Math.round(sliceStartSec * sampleRate), continuousBuffer.length));
+        
+        const srcData = continuousBuffer.getChannelData(0);
+        const dstData = aligned.getChannelData(0);
+        const copyLength = Math.min(srcData.length - srcStart, loopSamples);
+        if (copyLength > 0) {
+          dstData.set(srcData.subarray(srcStart, srcStart + copyLength), 0);
+        }
+
+        // Apply a quick 3ms fade-in and fade-out at loop boundaries to prevent zero-crossing clicks (knacken)
+        const fadeSamples = Math.round(0.003 * sampleRate);
+        for (let i = 0; i < fadeSamples; i++) {
+          if (i < dstData.length) {
+            dstData[i] *= (i / fadeSamples);
+          }
+          const endIdx = dstData.length - 1 - i;
+          if (endIdx >= 0) {
+            dstData[endIdx] *= (i / fadeSamples);
+          }
+        }
+
+        return aligned;
+      };
+
+      const applyMetronomeGate = (buffer: AudioBuffer, bSecs: number) => {
+        // Disabled to avoid transient loss due to ducking
+        return;
+      };
+
+      const finalizeTrackBuffer = (trackId: number, tStartTicks: number, tEndTicks: number) => {
+        const fullBuffer = getFullPCMBuffer();
+        if (!fullBuffer) return;
+        const beatSecs = 60.0 / bpm;
+        const sliced = sliceContinuousBuffer(fullBuffer, tStartTicks, tEndTicks, beatSecs, trackDurationMs);
+        if (sliced) {
+          if (!useHeadphonesRef.current && trackId === 1) {
+            applyMetronomeGate(sliced, beatSecs);
+          }
+          audioBuffersRef.current[trackId] = sliced;
+          // Update track state immediately to unblock UI and scheduler
+          setTracks((prev) =>
+            prev.map((t) => (t.id === trackId ? { ...t, isWaiting: false } : t))
+          );
+
+          // Defer the heavy WAV encoding and perform a second slice to catch late-arriving samples
+          setTimeout(() => {
+            if (!isComponentMountedRef.current || !isAutoSequenceActiveRef.current) return;
+            try {
+              const freshFull = getFullPCMBuffer();
+              if (freshFull) {
+                const completeSliced = sliceContinuousBuffer(freshFull, tStartTicks, tEndTicks, beatSecs, trackDurationMs);
+                if (completeSliced) {
+                  if (!useHeadphonesRef.current && trackId === 1) {
+                    applyMetronomeGate(completeSliced, beatSecs);
+                  }
+                  
+                  // Store the complete buffer
+                  audioBuffersRef.current[trackId] = completeSliced;
+                  // Safe swap if currently playing:
+                  const currentSource = activeSourcesRef.current[trackId];
+                  if (currentSource && isAutoSequenceActiveRef.current) {
+                    const playTime = ctx.currentTime;
+                    const elapsed = playTime - (sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs);
+                    const trackDurationSec = trackDurationMs / 1000;
+                    const playOffset = Math.max(0, elapsed % trackDurationSec);
+                    
+                    // Create new source with complete buffer
+                    const newSource = ctx.createBufferSource();
+                    newSource.buffer = completeSliced;
+                    newSource.loop = true;
+                    
+                    const gainNode = ctx.createGain();
+                    const trackInfo = tracksRef.current.find(tr => tr.id === trackId);
+                    const volume = trackInfo ? trackInfo.volume : 80;
+                    const activeTrack = tracksRef.current.find(t => t.isRecording || t.isWaiting);
+                    const activeTrackId = activeTrack ? activeTrack.id : null;
+                    let multiplier = 1.0;
+                    if (activeTrackId !== null && trackId < activeTrackId) {
+                      const age = activeTrackId - trackId;
+                      if (useHeadphonesRef.current) {
+                        multiplier = 1.0;
+                      } else {
+                        multiplier = Math.max(0.05, 1.0 - 0.55 * age);
+                      }
+                    }
+                    const targetVolume = (volume / 100) * multiplier;
+                    gainNode.gain.setValueAtTime(targetVolume, playTime);
+                    newSource.connect(gainNode);
+                    gainNode.connect(masterGainRef.current || ctx.destination);
+                    
+                    // Crossfade out old source to prevent clicks (5ms fade)
+                    const oldGain = gainNodesRef.current[trackId];
+                    if (oldGain) {
+                      try {
+                        oldGain.gain.setValueAtTime(oldGain.gain.value, playTime);
+                        oldGain.gain.exponentialRampToValueAtTime(0.0001, playTime + 0.005);
+                        currentSource.stop(playTime + 0.005);
+                      } catch (e) {}
+                    }
+                    
+                    // Start new source
+                    newSource.start(playTime, playOffset);
+                    activeSourcesRef.current[trackId] = newSource;
+                    gainNodesRef.current[trackId] = gainNode;
+                  }
+                  
+                  const wavBlob = bufferToWav(completeSliced);
+                  const url = URL.createObjectURL(wavBlob);
+                  setTracks((prev) =>
+                    prev.map((t) => (t.id === trackId ? { ...t, url, blob: wavBlob } : t))
+                  );
+                }
+              }
+            } catch (e) {
+              console.error("Deferred WAV encoding/buffer swap failed:", e);
+            }
+          }, 150);
+          
+          if (trackId === 1) {
+            setMasterLoopDuration(trackDurationMs);
+            setIsPlaying(true);
+          }
+          const loopStartOffset = sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs;
+          const elapsed = ctx.currentTime - loopStartOffset;
+          const trackDurationSec = trackDurationMs / 1000;
+          const playOffset = Math.max(0, elapsed % trackDurationSec);
+          
+          const trackInfo = tracksRef.current.find(tr => tr.id === trackId);
+          const hasAnySolo = tracksRef.current.some(tr => tr.isSoloed);
+          const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+          if (isActive && trackId < maxAllowedTracks) {
+            const playTime = Math.max(ctx.currentTime, 0);
+            if (activeSourcesRef.current[trackId]) {
+              try { activeSourcesRef.current[trackId].stop(playTime); } catch (e) {}
+            }
+            const source = ctx.createBufferSource();
+            source.buffer = sliced;
+            source.loop = true;
+            const gainNode = ctx.createGain();
+            const volume = trackInfo ? trackInfo.volume : 80;
+            // Age-based Auto-Ducking
+            const activeTrack = tracksRef.current.find(t => t.isRecording || t.isWaiting);
+            const activeTrackId = activeTrack ? activeTrack.id : null;
+            let multiplier = 1.0;
+            if (activeTrackId !== null && trackId < activeTrackId) {
+              const age = activeTrackId - trackId;
+              if (useHeadphonesRef.current) {
+                multiplier = 1.0;
+              } else {
+                multiplier = Math.max(0.05, 1.0 - 0.55 * age);
+              }
+            }
+            const targetVolume = (volume / 100) * multiplier;
+            gainNode.gain.setValueAtTime(targetVolume, playTime);
+            source.connect(gainNode);
+            gainNode.connect(masterGainRef.current || ctx.destination);
+            activeSourcesRef.current[trackId] = source;
+            gainNodesRef.current[trackId] = gainNode;
+            source.start(playTime, playOffset);
+          }
+          console.log(`DAW Alignment: Track ${trackId} sample-accurately sliced and playback started.`);
+        }
+      };
+
+
+
+      if (useHeadphonesRef.current) {
+        sourceNode.connect(processorNode);
+      } else {
+        const inputHPF = ctx.createBiquadFilter();
+        inputHPF.type = 'highpass';
+        inputHPF.frequency.setValueAtTime(80, ctx.currentTime);
+
+        const inputLPF = ctx.createBiquadFilter();
+        inputLPF.type = 'lowpass';
+        inputLPF.frequency.setValueAtTime(8000, ctx.currentTime);
+
+        sourceNode.connect(inputHPF);
+        inputHPF.connect(inputLPF);
+        inputLPF.connect(processorNode);
+      }
+      processorNode.connect(muteNode);
+      muteNode.connect(ctx.destination);
+      // continuousRecordStartTimeRef.current is now set accurately in onaudioprocess
+
+      setIsMetronomeActive(true);
+
+      const highlightTrackRecording = (trackId: number) => {
+        setAutoSequenceStatus(`AUFNAHME SPUR ${trackId}...`);
+        setTracks((prev) =>
+          prev.map((t) => (t.id === trackId ? { ...t, isRecording: true, isWaiting: false } : t))
+        );
+      };
+
+      const unhighlightTrackRecording = (trackId: number) => {
+        setTracks((prev) =>
+          prev.map((t) => (t.id === trackId ? { ...t, isRecording: false, isWaiting: true } : t))
+        );
+        if (trackId < maxAllowedTracks) {
+          setAutoSequenceStatus("PAUSE (NÄCHSTE SPUR...)");
+        }
+      };
+
+      const pauseLen = pauseBars * 4;
+      const trackBoundaries: { start: number; end: number }[] = [];
+      let nextStartTick = 4;
+      for (let i = 0; i < maxAllowedTracks; i++) {
+        trackBoundaries.push({
+          start: nextStartTick,
+          end: nextStartTick + 16
+        });
+        nextStartTick = nextStartTick + 16 + pauseLen;
+      }
+      const totalTicks = trackBoundaries[trackBoundaries.length - 1].end;
+
+      // Set sequence start time exactly when tick 0 will execute (at currentTime + 0.35)
+      sequenceStartTimeRef.current = audioContextRef.current!.currentTime + 0.35;
+
+      // === WEB AUDIO SCHEDULER ===
+      const beatSecs = 60.0 / bpm;
+      // Start scheduling 350ms in the future to allow audio hardware warmup during mic activation
+      nextNoteTimeRef.current = audioContextRef.current!.currentTime + 0.35; 
+      currentTickRef.current = 0;
+      uiEventsQueueRef.current = [];
+      audioEventsQueueRef.current = [];
+
+      const scheduleNote = (tickIndex: number, time: number) => {
+        playClickSound(tickIndex % 4 === 0, time);
+        uiEventsQueueRef.current.push({ time, type: 'TICK', data: { tickIndex } });
+        audioEventsQueueRef.current.push({ time, type: 'TICK', data: { tickIndex } });
+      };
+
+      const playTrackBufferAtTime = (trackId: number, time: number) => {
+        const buffer = audioBuffersRef.current[trackId];
+        const ctx = audioContextRef.current;
+        if (!buffer || !ctx) return;
+
+        if (activeSourcesRef.current[trackId]) {
+          try { activeSourcesRef.current[trackId].stop(time); } catch (e) {}
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+
+        const gainNode = ctx.createGain();
+        const trackInfo = tracksRef.current.find(t => t.id === trackId);
+        const volume = trackInfo ? trackInfo.volume : 80;
+        const isMuted = trackInfo ? trackInfo.isMuted : false;
+        const isSoloed = trackInfo ? trackInfo.isSoloed : false;
+
+        const hasAnySolo = tracksRef.current.some(t => t.isSoloed);
+        const active = hasAnySolo ? isSoloed : !isMuted;
+        
+        const activeTrack = tracksRef.current.find(tr => tr.isRecording || tr.isWaiting);
+        const activeTrackId = activeTrack ? activeTrack.id : null;
+        let multiplier = 1.0;
+        if (activeTrackId !== null && trackId < activeTrackId) {
+          const age = activeTrackId - trackId;
+          if (useHeadphonesRef.current) {
+            multiplier = Math.max(0.20, 1.0 - 0.30 * age);
+          } else {
+            multiplier = Math.max(0.05, 1.0 - 0.55 * age);
+          }
+        }
+        const baseVolume = active ? (volume / 100) : 0;
+        const targetVolume = baseVolume * multiplier;
+        gainNode.gain.setValueAtTime(targetVolume, time);
+
+        source.connect(gainNode);
+        gainNode.connect(masterGainRef.current || ctx.destination);
+
+        source.loop = true;
+        activeSourcesRef.current[trackId] = source;
+        gainNodesRef.current[trackId] = gainNode;
+
+        source.start(time);
+      };
+
+      const scheduler = () => {
+        if (!audioContextRef.current || !isAutoSequenceActiveRef.current) return;
+        
+        // Detect if the scheduler has fallen behind the Web Audio clock by more than 150ms (thread lag)
+        const lag = audioContextRef.current.currentTime - nextNoteTimeRef.current;
+        if (lag > 0.15) {
+          console.error("Loopstation timing lag detected:", lag);
+          handleReset();
+          alert("Audio-Timing-Fehler: Der Browser war kurz überlastet und die Loopstation lief asynchron. Die Aufnahme wurde gestoppt. Bitte starte sie neu.");
+          return;
+        }
+
+        while (nextNoteTimeRef.current < audioContextRef.current.currentTime + 0.1) {
+          const tickIndex = currentTickRef.current;
+          if (tickIndex <= totalTicks) {
+            scheduleNote(tickIndex, nextNoteTimeRef.current);
+            
+            // Loop playback start triggers aligned with recording phase starts (no phase shift)
+            trackBoundaries.forEach((boundary, index) => {
+              if (index > 0 && tickIndex === boundary.start) {
+                const playTime = nextNoteTimeRef.current;
+                const tracksToPlay = Array.from({ length: index }, (_, k) => k + 1);
+                tracksToPlay.forEach((tId) => {
+                  if (audioBuffersRef.current[tId]) {
+                    const trackInfo = tracksRef.current.find(tr => tr.id === tId);
+                    const hasAnySolo = tracksRef.current.some(tr => tr.isSoloed);
+                    const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+                    if (isActive) playTrackBufferAtTime(tId, playTime);
+                  }
+                });
+              }
+              if (useHeadphonesRef.current && tickIndex === boundary.end && (index + 1) < maxAllowedTracks) {
+                const playTime = nextNoteTimeRef.current;
+                const tracksToPlay = Array.from({ length: index + 1 }, (_, k) => k + 1);
+                tracksToPlay.forEach((tId) => {
+                  if (audioBuffersRef.current[tId]) {
+                    const trackInfo = tracksRef.current.find(tr => tr.id === tId);
+                    const hasAnySolo = tracksRef.current.some(tr => tr.isSoloed);
+                    const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+                    if (isActive) playTrackBufferAtTime(tId, playTime);
+                  }
+                });
+              }
+            });
+          }
+          nextNoteTimeRef.current += beatSecs;
+          currentTickRef.current++;
+        }
+        lookaheadTimerRef.current = setTimeout(scheduler, 25);
+      };
+
+      const syncUI = () => {
+        if (!audioContextRef.current || !isAutoSequenceActiveRef.current) return;
+        const currentTime = audioContextRef.current.currentTime;
+
+
+        // 1. Process discrete UI trigger events (highlight tracks & finalize slices exactly on time)
+        while (uiEventsQueueRef.current.length > 0 && uiEventsQueueRef.current[0].time <= currentTime) {
+          const event = uiEventsQueueRef.current.shift();
+          if (!event || event.type !== 'TICK') continue;
+          
+          const tickIndex = event.data.tickIndex;
+
+          // captureClickTemplate extracts the high/low acoustic signature of the metronome
+          const captureClickTemplate = (expectedClickTime: number, isHigh: boolean) => {
+            const fullBuffer = getFullPCMBuffer();
+            if (!fullBuffer) return;
+            const data = fullBuffer.getChannelData(0);
+            const sampleRate = fullBuffer.sampleRate;
+            const recordStartTime = continuousRecordStartTimeRef.current;
+            const expectedClickIndex = Math.floor((expectedClickTime - recordStartTime) * sampleRate);
+            
+            if (expectedClickIndex < 0 || expectedClickIndex >= data.length) return;
+            
+            const searchEnd = Math.min(data.length, expectedClickIndex + Math.floor(0.25 * sampleRate));
+            let peakIndex = -1;
+            let maxVal = 0;
+            for (let i = expectedClickIndex; i < searchEnd; i++) {
+              const absVal = Math.abs(data[i]);
+              if (absVal > maxVal) {
+                maxVal = absVal;
+                peakIndex = i;
+              }
+            }
+            
+            if (peakIndex !== -1 && maxVal > 0.005) {
+              const templateLength = Math.floor(0.035 * sampleRate);
+              const template = new Float32Array(templateLength);
+              for (let j = 0; j < templateLength; j++) {
+                if (peakIndex + j < data.length) {
+                  template[j] = data[peakIndex + j];
+                }
+              }
+              if (isHigh) {
+                highClickTemplateRef.current = template;
+                console.log("Captured HIGH click template (1000Hz):", templateLength, "samples");
+              } else {
+                lowClickTemplateRef.current = template;
+                console.log("Captured LOW click template (700Hz):", templateLength, "samples");
+              }
+              
+              // Latency Calibration on LOW click (beat 1 of count-in)
+              if (!isHigh) {
+                const peakTime = recordStartTime + (peakIndex / sampleRate);
+                const rawLatencySec = peakTime - expectedClickTime;
+                if (rawLatencySec > 0 && rawLatencySec < 0.5) {
+                   const inputLatency = rawLatencySec - (audioContextRef.current!.outputLatency || 0.025);
+                   const finalOffsetMs = Math.round(inputLatency * 1000) - 25;
+                   setSyncOffsetMs(finalOffsetMs);
+                }
+              }
+            }
+          };
+
+          let matchedBoundaryEvent = false;
+          trackBoundaries.forEach((boundary, index) => {
+            const trackId = index + 1;
+            if (tickIndex === boundary.start) {
+              highlightTrackRecording(trackId);
+              matchedBoundaryEvent = true;
+            } else if (tickIndex === boundary.end) {
+              unhighlightTrackRecording(trackId);
+              matchedBoundaryEvent = true;
+              
+              if (trackId === maxAllowedTracks) {
+                // End of entire auto-sequence
+                clearTimeout(lookaheadTimerRef.current);
+                cancelAnimationFrame(uiSyncFrameRef.current);
+                setIsAutoSequenceActive(false);
+                isAutoSequenceActiveRef.current = false;
+                setIsMetronomeActive(false);
+                setAutoSequenceStatus('FERTIG!');
+                
+                finalizeTrackBuffer(trackId, boundary.start, boundary.end);
+                
+                try { processorNode.disconnect(); } catch (e) {}
+                try { sourceNode.disconnect(); } catch (e) {}
+                try { muteNode.disconnect(); } catch (e) {}
+                if (mediaStreamRef.current) {
+                  mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                  mediaStreamRef.current = null;
+                }
+                
+                playAll();
+              } else {
+                setTimeout(() => finalizeTrackBuffer(trackId, boundary.start, boundary.end), 0);
+              }
+            }
+          });
+
+          if (!matchedBoundaryEvent) {
+            if (tickIndex === 0) {
+              // Count-in beat 0 (HIGH Click)
+              setTimeout(() => {
+                if (isAutoSequenceActiveRef.current) {
+                  captureClickTemplate(sequenceStartTimeRef.current, true);
+                }
+              }, 150);
+            }
+            else if (tickIndex === 1) {
+              // Count-in beat 1 (LOW Click + Latency Calibration)
+              setTimeout(() => {
+                if (isAutoSequenceActiveRef.current) {
+                  captureClickTemplate(sequenceStartTimeRef.current + beatSecs, false);
+                }
+              }, 150);
+            }
+            else if (tickIndex === 3) {
+              // Noise check (0.2s to 0.05s BEFORE the first click, tickIndex 3 runs at count-in beat 3)
+              setTimeout(() => {
+                if (!isAutoSequenceActiveRef.current) return;
+                const fullBuffer = getFullPCMBuffer();
+                if (!fullBuffer) return;
+                const data = fullBuffer.getChannelData(0);
+                const sampleRate = fullBuffer.sampleRate;
+                const expectedClickTime = sequenceStartTimeRef.current;
+                const recordStartTime = continuousRecordStartTimeRef.current;
+                const expectedClickIndex = Math.floor((expectedClickTime - recordStartTime) * sampleRate);
+                
+                if (expectedClickIndex >= 0 && expectedClickIndex < data.length) {
+                  const noiseCheckStart = Math.max(0, expectedClickIndex - Math.floor(0.2 * sampleRate));
+                  const noiseCheckEnd = Math.max(0, expectedClickIndex - Math.floor(0.05 * sampleRate));
+                  let maxNoise = 0;
+                  for (let i = noiseCheckStart; i < noiseCheckEnd; i++) {
+                    if (Math.abs(data[i]) > maxNoise) maxNoise = Math.abs(data[i]);
+                  }
+                  
+                  if (maxNoise > 0.08) {
+                    clearTimeout(lookaheadTimerRef.current);
+                    cancelAnimationFrame(uiSyncFrameRef.current);
+                    setIsAutoSequenceActive(false);
+                    isAutoSequenceActiveRef.current = false;
+                    setIsMetronomeActive(false);
+                    setAutoSequenceStatus('ABBRUCH: ZU LAUT BEIM EINZÄHLEN');
+                    try { processorNode.disconnect(); } catch (e) {}
+                    try { sourceNode.disconnect(); } catch (e) {}
+                    try { muteNode.disconnect(); } catch (e) {}
+                    if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach(t => t.stop());
+                    alert("Warnung: Es war zu laut beim Einzählen! Bitte spiele erst NACH dem 4. Klick, damit wir die Aufnahme-Latenz kalibrieren können.");
+                    return;
+                  }
+                }
+              }, 150);
+            }
+          }
+        }
+
+        // 2. Continuous smooth progress ring & text UI updates
+        const elapsedSecs = currentTime - sequenceStartTimeRef.current;
+        const currentTick = elapsedSecs / beatSecs;
+
+        if (currentTick < 4) {
+          // Count-in (4 beats count up: TAKT 1/4 to 4/4)
+          const beatInBar = Math.floor(currentTick) + 1;
+          setCountInBeats(beatInBar + "/4");
+          setPlaybackProgress((currentTick / 4) * 100);
+          setCurrentBar(1);
+        } else {
+          setCountInBeats(null);
+          
+          let currentBoundaryIndex = -1;
+          let isInPauseIndex = -1;
+          
+          for (let i = 0; i < trackBoundaries.length; i++) {
+            const boundary = trackBoundaries[i];
+            if (currentTick >= boundary.start && currentTick < boundary.end) {
+              currentBoundaryIndex = i;
+              break;
+            }
+            if (i < trackBoundaries.length - 1) {
+              const nextBoundary = trackBoundaries[i + 1];
+              if (currentTick >= boundary.end && currentTick < nextBoundary.start) {
+                isInPauseIndex = i;
+                break;
+              }
+            }
+          }
+          
+          if (currentBoundaryIndex !== -1) {
+            const boundary = trackBoundaries[currentBoundaryIndex];
+            const elapsed = currentTick - boundary.start;
+            setPlaybackProgress((elapsed / 16) * 100);
+            setCurrentBar(Math.floor(elapsed / 4) + 1);
+            setAutoSequenceStatus(`AUFNAHME SPUR ${currentBoundaryIndex + 1}...`);
+          } else if (isInPauseIndex !== -1) {
+            const boundary = trackBoundaries[isInPauseIndex];
+            const nextBoundary = trackBoundaries[isInPauseIndex + 1];
+            const elapsed = currentTick - boundary.end;
+            const pauseLengthTicks = nextBoundary.start - boundary.end;
+            setPlaybackProgress((elapsed / pauseLengthTicks) * 100);
+            setCurrentBar(Math.floor(elapsed / 4) + 1);
+            setAutoSequenceStatus("ZWISCHENPAUSE...");
+          }
+        }
+        
+        uiSyncFrameRef.current = requestAnimationFrame(syncUI);
+      };
+
+      // Start the loops
+      scheduler();
+      syncUI();
+
+    } catch (err) {
+      console.error(err);
+      alert('Mikrofonfehler.');
+      setIsAutoSequenceActive(false);
+    }
+  };
+
+  const handlePlayToggle = () => {
+    initAudio();
+    if (isPlaying) {
+      stopAll();
+    } else {
+      playAll();
+    }
+  };
+
+  const playTrackBuffer = (trackId: number, offset = 0, loop = false, startTime = 0) => {
+    const buffer = audioBuffersRef.current[trackId];
+    const ctx = audioContextRef.current;
+    if (!buffer || !ctx) return;
+
+    if (activeSourcesRef.current[trackId]) {
+      try {
+        if (startTime > 0) {
+          activeSourcesRef.current[trackId].stop(startTime);
+        } else {
+          activeSourcesRef.current[trackId].stop();
+        }
+      } catch (e) {}
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    if (loop) {
+      source.loop = true;
+    }
+
+    let gainNode = gainNodesRef.current[trackId];
+    if (!gainNode) {
+      gainNode = ctx.createGain();
+      gainNode.connect(masterGainRef.current || ctx.destination);
+      gainNodesRef.current[trackId] = gainNode;
+    }
+
+    const trackInfo = tracks.find(t => t.id === trackId);
+    const hasAnySolo = tracks.some(t => t.isSoloed);
+    const vol = trackInfo ? trackInfo.volume / 100 : 0.8;
+    const isActive = (hasAnySolo ? (trackInfo ? trackInfo.isSoloed : false) : true) && (trackInfo ? !trackInfo.isMuted : true);
+    const activeTrack = tracks.find(tr => tr.isRecording || tr.isWaiting);
+    const activeTrackId = activeTrack ? activeTrack.id : null;
+    let multiplier = 1.0;
+    if (activeTrackId !== null && trackId < activeTrackId) {
+      const age = activeTrackId - trackId;
+      if (useHeadphonesRef.current) {
+        multiplier = Math.max(0.20, 1.0 - 0.30 * age);
+      } else {
+        multiplier = Math.max(0.05, 1.0 - 0.55 * age);
+      }
+    }
+    const targetVol = isActive ? vol : 0;
+    const finalVol = targetVol * multiplier;
+    gainNode.gain.setValueAtTime(finalVol, ctx.currentTime);
+
+    source.connect(gainNode);
+    const startAt = startTime > 0 ? startTime : ctx.currentTime;
+    source.start(startAt, offset);
+    activeSourcesRef.current[trackId] = source;
+  };
+
+  const startProgressLoop = (customStartTime?: number) => {
+    if (progressIntervalRef.current) {
+      cancelAnimationFrame(progressIntervalRef.current);
+    }
+    if (masterLoopDuration) {
+      const duration = masterLoopDuration;
+      startTimeRef.current = customStartTime || Date.now();
+      const loopProgressSync = () => {
+        const elapsed = (Date.now() - startTimeRef.current) % duration;
+        setPlaybackProgress((elapsed / duration) * 100);
+        const bar = Math.floor((elapsed / duration) * 4) + 1;
+        setCurrentBar(bar);
+        progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
+      };
+      progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
+    }
+  };
+
+  const playAll = () => {
+    setIsPlaying(true);
+    startTimeRef.current = Date.now();
+
+    const ctx = audioContextRef.current;
+    const playTime = ctx ? ctx.currentTime + 0.05 : 0; // 50ms lookahead for absolute synchronization
+
+    tracksRef.current.forEach((track) => {
+      const hasAudio = !!audioBuffersRef.current[track.id];
+      if (hasAudio && !track.isMuted) {
+        playTrackBuffer(track.id, 0, true, playTime);
+      }
+    });
+
+    startProgressLoop(Date.now() + 50);
+  };
+
+  const stopAll = () => {
+    setIsPlaying(false);
+    setPlaybackProgress(0);
+    isAutoSequenceActiveRef.current = false;
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      cancelAnimationFrame(progressIntervalRef.current);
+    }
+    if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
+    if (sequenceIntervalRef.current) {
+      clearInterval(sequenceIntervalRef.current);
+      sequenceIntervalRef.current = null;
+    }
+    if (lookaheadTimerRef.current) {
+      clearTimeout(lookaheadTimerRef.current);
+      lookaheadTimerRef.current = null;
+    }
+    if (uiSyncFrameRef.current) {
+      cancelAnimationFrame(uiSyncFrameRef.current);
+      uiSyncFrameRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    tracks.forEach((track) => {
+      if (activeSourcesRef.current[track.id]) {
+        try {
+          activeSourcesRef.current[track.id].stop();
+        } catch (e) {}
+        delete activeSourcesRef.current[track.id];
+      }
+    });
+  };
+
+  const handleReset = () => {
+    isAutoSequenceActiveRef.current = false;
+    setIsAutoSequenceActive(false);
+    stopAll();
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    Object.values(mediaRecordersRef.current).forEach((rec: any) => {
+      if (rec && rec.state !== 'inactive') rec.stop();
+    });
+
+    tracks.forEach((t) => {
+      if (t.url) URL.revokeObjectURL(t.url);
+    });
+
+    const resetTracks: Track[] = [];
+    for (let i = 1; i <= maxAllowedTracks; i++) {
+      resetTracks.push({
+        id: i,
+        url: null,
+        blob: null,
+        volume: 80,
+        isMuted: false,
+        isRecording: false,
+        isWaiting: false,
+        isSoloed: false
+      });
+    }
+    setTracks(resetTracks);
+    setMasterLoopDuration(null);
+    audioBuffersRef.current = {};
+    activeSourcesRef.current = {};
+    gainNodesRef.current = {};
+    mediaRecordersRef.current = {};
+    recordStartTimesRef.current = {};
+    setCountInBeats(null);
+  };
+
+  const startRecording = async (trackId: number) => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
+      return;
+    }
+    initAudio();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+      mediaStreamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (e: any) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        if (mediaStreamRef.current === stream) mediaStreamRef.current = null;
+        
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+
+        // Decode array buffer
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          if (audioContextRef.current) {
+            const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
+            audioBuffersRef.current[trackId] = decoded;
+          }
+        } catch (decodeErr) {
+          console.error("Decoding error:", decodeErr);
+        }
+
+        setTracks((prev) =>
+          prev.map((t) => (t.id === trackId ? { ...t, url, blob, isRecording: false, isWaiting: false } : t))
+        );
+
+        if (trackId === 1) {
+          const duration = Date.now() - recordStartTimesRef.current[1];
+          setMasterLoopDuration(duration);
+          setIsPlaying(true);
+          startTimeRef.current = Date.now();
+          playTrackBuffer(1, 0);
+
+          const loopProgressSync = () => {
+             const elapsed = (Date.now() - startTimeRef.current) % duration;
+             setPlaybackProgress((elapsed / duration) * 100);
+             progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
+          };
+          progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
+
+          const scheduleNextLoop = () => {
+            loopTimeoutRef.current = setTimeout(() => {
+              if (!isPlaying) return;
+              startTimeRef.current = Date.now();
+              tracksRef.current.forEach((t) => {
+                if (t.url && !t.isMuted) {
+                  playTrackBuffer(t.id, 0);
+                }
+              });
+              scheduleNextLoop();
+            }, duration);
+          };
+          scheduleNextLoop();
+        }
+      };
+
+      mediaRecordersRef.current[trackId] = mediaRecorder;
+
+      if (trackId === 1) {
+        // Count-in logic (Exactly 4 beats = 1 bar)
+        const intervalMs = (60 / bpm) * 1000;
+        setCountInBeats(4);
+        let count = 4;
+        
+        setIsMetronomeActive(true);
+
+        const countTimer = setInterval(() => {
+          count--;
+          if (count > 0) {
+            setCountInBeats(count);
+          } else {
+            clearInterval(countTimer);
+            setCountInBeats(null);
+            // Start recording
+            recordStartTimesRef.current[1] = Date.now();
+            mediaRecorder.start();
+            setTracks((prev) =>
+              prev.map((t) => (t.id === 1 ? { ...t, isRecording: true } : t))
+            );
+          }
+        }, intervalMs);
+      } else {
+        setTracks((prev) =>
+          prev.map((t) => (t.id === trackId ? { ...t, isWaiting: true } : t))
+        );
+
+        const msToNextCycle = masterLoopDuration
+          ? masterLoopDuration - ((Date.now() - startTimeRef.current) % masterLoopDuration)
+          : 0;
+
+        setTimeout(() => {
+          recordStartTimesRef.current[trackId] = Date.now();
+          mediaRecorder.start();
+          setTracks((prev) =>
+            prev.map((t) => (t.id === trackId ? { ...t, isRecording: true, isWaiting: false } : t))
+          );
+
+          setTimeout(() => {
+            if (mediaRecorder.state !== 'inactive') {
+              mediaRecorder.stop();
+            }
+          }, masterLoopDuration || 5000);
+
+        }, msToNextCycle);
+      }
+    } catch (err) {
+      console.error('Mic error:', err);
+      alert('Mikrofonzugriff verweigert.');
+    }
+  };
+
+  const stopRecording = (trackId: number) => {
+    const recorder = mediaRecordersRef.current[trackId];
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+  };
+
+  const handleVolumeChange = (trackId: number, vol: number) => {
+    setTracks((prev) =>
+      prev.map((t) => (t.id === trackId ? { ...t, volume: vol } : t))
+    );
+    const gainNode = gainNodesRef.current[trackId];
+    if (gainNode && audioContextRef.current) {
+      const isMuted = tracks.find(t => t.id === trackId)?.isMuted;
+      gainNode.gain.setValueAtTime(isMuted ? 0 : vol / 100, audioContextRef.current.currentTime);
+    }
+  };
+
+  const handleMuteToggle = (trackId: number) => {
+    setTracks((prev) => {
+      const nextTracks = prev.map((t) => (t.id === trackId ? { ...t, isMuted: !t.isMuted } : t));
+      const hasAnySolo = nextTracks.some((t) => t.isSoloed);
+      
+      nextTracks.forEach((t) => {
+        const gainNode = gainNodesRef.current[t.id];
+        if (gainNode && audioContextRef.current) {
+          const vol = t.volume / 100;
+          const isActive = (hasAnySolo ? t.isSoloed : true) && !t.isMuted;
+          gainNode.gain.setValueAtTime(isActive ? vol : 0, audioContextRef.current.currentTime);
+        }
+      });
+      return nextTracks;
+    });
+  };
+
+  const handleSoloToggle = (trackId: number) => {
+    setTracks((prev) => {
+      const nextTracks = prev.map((t) => (t.id === trackId ? { ...t, isSoloed: !t.isSoloed } : t));
+      const hasAnySolo = nextTracks.some((t) => t.isSoloed);
+      
+      nextTracks.forEach((t) => {
+        const gainNode = gainNodesRef.current[t.id];
+        if (gainNode && audioContextRef.current) {
+          const vol = t.volume / 100;
+          const isActive = (hasAnySolo ? t.isSoloed : true) && !t.isMuted;
+          gainNode.gain.setValueAtTime(isActive ? vol : 0, audioContextRef.current.currentTime);
+        }
+      });
+      return nextTracks;
+    });
+  };
+
+  const handleDeleteTrack = (trackId: number) => {
+    if (tracksRef.current[trackId - 1]?.url) {
+      const confirmDelete = window.confirm("Möchtest du diese Aufnahme wirklich löschen?");
+      if (!confirmDelete) return;
+    }
+    if (activeSourcesRef.current[trackId]) {
+      try { activeSourcesRef.current[trackId].stop(); } catch(e) {}
+      delete activeSourcesRef.current[trackId];
+    }
+    delete audioBuffersRef.current[trackId];
+    delete gainNodesRef.current[trackId];
+
+    if (tracksRef.current[trackId - 1]?.url) {
+      URL.revokeObjectURL(tracksRef.current[trackId - 1].url!);
+    }
+
+    setTracks((prev) =>
+      prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null, isRecording: false, isWaiting: false, isSoloed: false } : t))
+    );
+
+    if (trackId === 1) {
+      stopAll();
+      setMasterLoopDuration(null);
+    }
+  };
+
+  // Mixdown Master Export to Homework
+  const bufferToWav = (buffer: AudioBuffer) => {
+    const numOfChan = buffer.numberOfChannels;
+    const length = buffer.length * numOfChan * 2 + 44;
+    const bufferArr = new ArrayBuffer(length);
+    const view = new DataView(bufferArr);
+    const channels: Float32Array[] = [];
+    let pos = 0;
+
+    const setUint16 = (data: number) => {
+      view.setUint16(pos, data, true);
+      pos += 2;
+    };
+
+    const setUint32 = (data: number) => {
+      view.setUint32(pos, data, true);
+      pos += 4;
+    };
+
+    // write WAV header
+    setUint32(0x46464952);                         // "RIFF"
+    setUint32(length - 8);                         // file length - 8
+    setUint32(0x45564157);                         // "WAVE"
+    
+    setUint32(0x20746d66);                         // "fmt " chunk
+    setUint32(16);                                 // chunk length
+    setUint16(1);                                  // sample format (raw PCM)
+    setUint16(numOfChan);
+    setUint32(buffer.sampleRate);
+    setUint32(buffer.sampleRate * 2 * numOfChan); // byte rate
+    setUint16(numOfChan * 2);                      // block align
+    setUint16(16);                                 // bits per sample
+    
+    setUint32(0x61746164);                         // "data" - chunk
+    setUint32(length - pos - 4);                   // chunk length
+
+    for (let i = 0; i < numOfChan; i++) {
+      channels.push(buffer.getChannelData(i));
+    }
+    
+    let offset = 0;
+    while (pos < length) {
+      for (let i = 0; i < numOfChan; i++) {
+        let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(pos, sample, true);
+        pos += 2;
+      }
+      offset++;
+    }
+
+    return new Blob([bufferArr], { type: 'audio/wav' });
+  };
+
+  const bufferToMp3 = (buffer: AudioBuffer) => {
+    const channels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const Mp3EncoderClass = lamejs.Mp3Encoder || (lamejs as any).default?.Mp3Encoder || (window as any).lamejs?.Mp3Encoder;
+    if (!Mp3EncoderClass) {
+      throw new Error("LameJS Mp3Encoder constructor not found.");
+    }
+    const mp3encoder = new Mp3EncoderClass(channels, sampleRate, 128);
+    
+    const mp3Data: Int8Array[] = [];
+    const samples = buffer.getChannelData(0);
+    
+    const sampleBlockSize = 1152;
+    const int16Samples = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      let sample = Math.max(-1, Math.min(1, samples[i]));
+      int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+    
+    if (channels === 2) {
+      const samples2 = buffer.getChannelData(1);
+      const int16Samples2 = new Int16Array(samples2.length);
+      for (let i = 0; i < samples2.length; i++) {
+        let sample = Math.max(-1, Math.min(1, samples2[i]));
+        int16Samples2[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      }
+      for (let i = 0; i < int16Samples.length; i += sampleBlockSize) {
+        const chunk1 = int16Samples.subarray(i, i + sampleBlockSize);
+        const chunk2 = int16Samples2.subarray(i, i + sampleBlockSize);
+        const mp3buf = mp3encoder.encodeBuffer(chunk1, chunk2);
+        if (mp3buf.length > 0) mp3Data.push(mp3buf);
+      }
+    } else {
+      for (let i = 0; i < int16Samples.length; i += sampleBlockSize) {
+        const chunk = int16Samples.subarray(i, i + sampleBlockSize);
+        const mp3buf = mp3encoder.encodeBuffer(chunk);
+        if (mp3buf.length > 0) mp3Data.push(mp3buf);
+      }
+    }
+    
+    const mp3buf = mp3encoder.flush();
+    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+    
+    return new Blob(mp3Data as unknown as BlobPart[], { type: 'audio/mp3' });
+  };
+
+  // Mixdown Master Export to Homework (Instant & offline rendering)
+  const handleExportMix = async () => {
+    if (!masterLoopDuration) return;
+    setIsExporting(true);
+    let label = "Mein Loop-Mix";
+    try {
+      const inputLabel = prompt("Gib deinem Loop einen Namen:", "Mein Loop-Mix");
+      if (inputLabel === null) {
+        setIsExporting(false);
+        return; // user cancelled
+      }
+      label = inputLabel;
+      const sanitizedLabel = label.replace(/\|/g, '-').trim() || 'Loop-Mix';
+      
+      const offlineCtx = new OfflineAudioContext(
+        2,
+        Math.round((masterLoopDuration / 1000) * 44100),
+        44100
+      );
+      
+      tracksRef.current.forEach((track) => {
+        const buffer = audioBuffersRef.current[track.id];
+        if (buffer && track.url) {
+          const hasAnySolo = tracksRef.current.some(t => t.isSoloed);
+          const isActive = (hasAnySolo ? track.isSoloed : true) && !track.isMuted;
+          if (!isActive) return;
+
+          const source = offlineCtx.createBufferSource();
+          source.buffer = buffer;
+          
+          const gainNode = offlineCtx.createGain();
+          const vol = track.volume / 100;
+          gainNode.gain.setValueAtTime(vol, 0);
+          
+          source.connect(gainNode);
+          gainNode.connect(offlineCtx.destination);
+          
+          source.start(0);
+        }
+      });
+      
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      // Attempt MP3 conversion, fallback to WAV
+      let mixBlob: Blob;
+      let contentType = 'audio/mp3';
+      let fileExt = 'mp3';
+      try {
+        mixBlob = bufferToMp3(renderedBuffer);
+      } catch (mp3Err) {
+        console.warn("MP3 conversion failed, falling back to WAV format:", mp3Err);
+        mixBlob = bufferToWav(renderedBuffer);
+        contentType = 'audio/wav';
+        fileExt = 'wav';
+      }
+      
+      const fileName = `${student.id}_loopmix_${Date.now()}.${fileExt}`;
+      const filePath = `avatars/audio_feedback_${fileName}`;
+      
+      const { error } = await supabase.storage
+        .from('campus-assets')
+        .upload(filePath, mixBlob, { contentType });
+        
+      if (error) throw error;
+      
+      const publicUrl = supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl;
+      const creatorRole = readOnly ? 'student' : 'teacher';
+      const audioMetaStr = `AUDIO:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
+      
+      setHomeworkNotesList(prev => [...prev, audioMetaStr]);
+      const updatedList = [...homeworkNotesList, audioMetaStr];
+      await syncHomeworkNotes(updatedList);
+      await fetchProgress();
+      notifyHomeworkChange();
+      alert("Loop-Mix erfolgreich im Campus-Groovelab Hausaufgabenheft gespeichert!");
+      setActiveViewMode('recordings');
+    } catch (err: any) {
+      console.error("Export mix failed:", err);
+      alert(`Cloud-Speicherung im Campus-Groovelab Hausaufgabenheft fehlgeschlagen: ${err.message || err}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDownloadMix = async () => {
+    if (!masterLoopDuration) return;
+    setIsExporting(true);
+    try {
+      const label = prompt("Gib deinem Loop einen Namen für den Download:", "Mein Loop-Mix");
+      if (label === null) {
+        setIsExporting(false);
+        return; // user cancelled
+      }
+      const sanitizedLabel = label.replace(/\|/g, '-').trim() || 'Loop-Mix';
+      
+      const offlineCtx = new OfflineAudioContext(
+        2,
+        Math.round((masterLoopDuration / 1000) * 44100),
+        44100
+      );
+      
+      tracksRef.current.forEach((track) => {
+        const buffer = audioBuffersRef.current[track.id];
+        if (buffer && track.url) {
+          const hasAnySolo = tracksRef.current.some(t => t.isSoloed);
+          const isActive = (hasAnySolo ? track.isSoloed : true) && !track.isMuted;
+          if (!isActive) return;
+
+          const source = offlineCtx.createBufferSource();
+          source.buffer = buffer;
+          
+          const gainNode = offlineCtx.createGain();
+          const vol = track.volume / 100;
+          gainNode.gain.setValueAtTime(vol, 0);
+          
+          source.connect(gainNode);
+          gainNode.connect(offlineCtx.destination);
+          
+          source.start(0);
+        }
+      });
+      
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      // Attempt MP3 conversion, fallback to WAV
+      let mixBlob: Blob;
+      let fileExt = 'mp3';
+      try {
+        mixBlob = bufferToMp3(renderedBuffer);
+      } catch (mp3Err) {
+        console.warn("MP3 conversion failed, falling back to WAV format for download:", mp3Err);
+        mixBlob = bufferToWav(renderedBuffer);
+        fileExt = 'wav';
+      }
+      
+      const downloadUrl = URL.createObjectURL(mixBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${sanitizedLabel.toLowerCase().replace(/\s+/g, '_')}.${fileExt}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+      
+      alert("Loop-Mix erfolgreich heruntergeladen!");
+    } catch (err) {
+      console.error(err);
+      alert("Herunterladen des Mixdowns fehlgeschlagen.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  useEffect(() => {
+    isComponentMountedRef.current = true;
+    return () => {
+      isComponentMountedRef.current = false;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        cancelAnimationFrame(progressIntervalRef.current);
+      }
+      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
+      if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
+      if (lookaheadTimerRef.current) clearTimeout(lookaheadTimerRef.current);
+      if (uiSyncFrameRef.current) cancelAnimationFrame(uiSyncFrameRef.current);
+      
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      Object.values(activeSourcesRef.current).forEach((source) => {
+        try { source.stop(); } catch (e) {}
+      });
+
+      // Stop mic stream tracks to turn off recording light
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+
+      // Close AudioContext
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(e => console.warn(e));
+        audioContextRef.current = null;
+        masterCompressorRef.current = null;
+        masterGainRef.current = null;
+        processorNodeRef.current = null;
+      }
+
+      // Revoke URLs
+      tracksRef.current.forEach((t) => {
+        if (t.url) URL.revokeObjectURL(t.url);
+      });
+    };
+  }, []);
+
+  // LED Level Meter Animation
+  const [meterHeights, setMeterHeights] = useState<{ [key: number]: number }>({ 1: 0, 2: 0, 3: 0, 4: 0 });
+
+  useEffect(() => {
+    let animId: any;
+    const updateMeters = () => {
+      const hasAnySolo = tracks.some(t => t.isSoloed);
+      const newMeters: { [key: number]: number } = {};
+      
+      tracks.forEach((track) => {
+        const hasAudio = !!track.url;
+        const isTrackPlaying = isPlaying && hasAudio && !track.isMuted && (!hasAnySolo || track.isSoloed);
+        
+        if (track.isRecording) {
+          newMeters[track.id] = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
+        } else if (isTrackPlaying) {
+          newMeters[track.id] = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
+        } else {
+          newMeters[track.id] = 0;
+        }
+      });
+      
+      setMeterHeights(newMeters);
+      animId = setTimeout(updateMeters, 100);
+    };
+    
+    updateMeters();
+    return () => clearTimeout(animId);
+  }, [isPlaying, tracks]);
+
+  const isPause = isAutoSequenceActive && autoSequenceStatus.startsWith("PAUSE");
+  const ringColor = isAutoSequenceActive 
+    ? '#ea4335' // Red during the entire auto-sequence (including count-in, pauses, and recording)
+    : isPlaying 
+      ? '#137333' // Green during playback
+      : '#e5e5e7'; // default/ready
+
+  return (
+    <div style={{
+      display: 'flex',
+      flex: 1,
+      background: 'linear-gradient(135deg, #f5f6f8 0%, #eef0f3 100%)',
+      borderTop: '1px solid #e2e8f0',
+      borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
+      minHeight: '520px',
+      color: '#1d1d1f',
+      padding: '32px 28px',
+      gap: '24px',
+      boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+    }} className="flex-col lg:flex-row">
+      
+      {/* Left Column: Loop Progress, Metronom & Controls */}
+      <div style={{
+        flex: '1 1 0%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        gap: '20px',
+        padding: '28px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '20px',
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Subtle decorative top line matching state */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: ringColor,
+          opacity: 0.8,
+          transition: 'background 0.3s ease'
+        }} />
+
+        {/* Central Jog Wheel / Status Ring */}
+        <div style={{
+          position: 'relative',
+          width: '180px',
+          height: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          margin: '4px 0'
+        }}>
+          {/* Animated SVG Progress Sweep */}
+          <svg 
+            viewBox="0 0 200 200"
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              transform: 'rotate(-90deg) translate3d(0,0,0)',
+              willChange: 'transform'
+            }}
+          >
+            <circle
+              cx="100"
+              cy="100"
+              r="84"
+              stroke="#f1f3f5"
+              strokeWidth="6"
+              fill="none"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r="84"
+              stroke={ringColor}
+              strokeWidth="8"
+              fill="none"
+              strokeDasharray="527.8 527.8"
+              strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
+              strokeLinecap="round"
+              style={{
+                transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
+                willChange: 'stroke-dashoffset',
+                filter: isPlaying || isAutoSequenceActive ? `drop-shadow(0 0 6px ${ringColor}80)` : 'none'
+              }}
+            />
+          </svg>
+
+          {/* Central Plate */}
+          <div style={{
+            position: 'absolute',
+            width: '138px',
+            height: '138px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffff 60%, #f8f9fa 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.06), 0 10px 20px rgba(0,0,0,0.04)'
+          }}>
+            <span style={{ 
+              fontSize: '2.2rem', 
+              fontWeight: 800, 
+              fontFamily: 'SF Mono, Monaco, Consolas, monospace', 
+              letterSpacing: '-0.05em', 
+              color: ringColor === '#e5e5e7' ? '#2d3748' : ringColor,
+              transition: 'color 0.3s ease'
+            }}>
+              {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
+            </span>
+            <span style={{ 
+              fontSize: '0.58rem', 
+              color: '#718096', 
+              fontWeight: 800, 
+              letterSpacing: '0.15em', 
+              marginTop: '4px', 
+              textTransform: 'uppercase' 
+            }}>
+              {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
+            </span>
+          </div>
+        </div>
+
+        {/* Auto-Sequence Action Center */}
+        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <button
+            type="button"
+            onClick={startAutoSequence}
+            disabled={isAutoSequenceActive}
+            style={{
+              width: '100%',
+              background: isAutoSequenceActive 
+                ? 'linear-gradient(135deg, #d93025 0%, #b31412 100%)' 
+                : 'linear-gradient(135deg, #137333 0%, #0f5c29 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '14px',
+              height: '50px',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              boxShadow: isAutoSequenceActive 
+                ? '0 6px 20px rgba(217, 48, 37, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)' 
+                : '0 6px 20px rgba(19, 115, 51, 0.25), inset 0 1px 0 rgba(255,255,255,0.2)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              textTransform: 'uppercase',
+              transform: 'translateY(0px)'
+            }}
+            onMouseDown={(e) => {
+              if (!isAutoSequenceActive) e.currentTarget.style.transform = 'translateY(1px)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'translateY(0px)';
+            }}
+          >
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: '#ffffff',
+              boxShadow: '0 0 10px #ffffff',
+              animation: isAutoSequenceActive ? 'pulse 1s infinite alternate' : 'none',
+              opacity: isAutoSequenceActive ? 1 : 0.8
+            }} />
+            <span>{isAutoSequenceActive ? autoSequenceStatus : 'AUTO-SEQUENCE START'}</span>
+          </button>
+          {isAutoSequenceActive && (
+            <span style={{ 
+              fontSize: '0.58rem', 
+              color: '#ea4335', 
+              letterSpacing: '0.08em', 
+              fontWeight: 800, 
+              textAlign: 'center', 
+              textTransform: 'uppercase',
+              animation: 'pulse 1.5s infinite'
+            }}>
+              Aufnahme läuft - bitte weiterspielen!
+            </span>
+          )}
+          
+          {/* Kopfhörer Modus Toggle Card */}
+          <div 
+            onClick={() => {
+              if (!isAutoSequenceActive) {
+                isManualHeadphonesRef.current = true;
+                setUseHeadphones(!useHeadphones);
+              }
+            }}
+            style={{
+              width: '100%',
+              background: useHeadphones ? '#e6f4ea' : '#f8f9fa',
+              border: useHeadphones ? '1.5px solid #137333' : '1.5px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              transition: 'all 0.25s ease',
+              marginTop: '2px',
+              opacity: isAutoSequenceActive ? 0.6 : 1,
+              boxShadow: useHeadphones ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: useHeadphones ? '#137333' : '#e2e8f0',
+                color: useHeadphones ? '#ffffff' : '#718096',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                boxShadow: useHeadphones ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none'
+              }}>
+                <Headphones size={18} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: useHeadphones ? '#137333' : '#2d3748', letterSpacing: '0.02em' }}>
+                  KOPFHÖRER-MODUS
+                </span>
+                <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 500 }}>
+                  Studio-Qualität & Mehrspur
+                </span>
+              </div>
+            </div>
+            
+            <div style={{
+              width: '38px',
+              height: '22px',
+              borderRadius: '11px',
+              background: useHeadphones ? '#137333' : '#cbd5e0',
+              position: 'relative',
+              transition: 'all 0.2s ease',
+              padding: '2px',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: '#ffffff',
+                position: 'absolute',
+                left: useHeadphones ? '18px' : '2px',
+                top: '2px',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }} />
+            </div>
+          </div>
+
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            width: '100%',
+            marginTop: '2px',
+            padding: '4px 0'
+          }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#4a5568', letterSpacing: '0.03em' }}>
+              SPUR-ANZAHL:
+            </span>
+            <select
+              value={desiredTrackCount}
+              onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
+              disabled={isAutoSequenceActive || !useHeadphones}
+              style={{
+                background: '#ffffff',
+                border: '1.5px solid #cbd5e0',
+                borderRadius: '10px',
+                padding: '5px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: useHeadphones ? '#2d3748' : '#a0aec0',
+                cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <option value={2}>2 Spuren (Boxen-Limit)</option>
+              <option value={3}>3 Spuren</option>
+              <option value={4}>4 Spuren</option>
+              <option value={5}>5 Spuren (Max)</option>
+            </select>
+          </div>
+          <span style={{ fontSize: '0.54rem', color: '#718096', lineHeight: 1.4, textAlign: 'center', marginTop: '2px', maxWidth: '260px' }}>
+            Tipp: Bei Rückkopplungen oder Pfeifen verwende bitte Kopfhörer oder reduziere die Mikrofon-Eingangslautstärke in deinen macOS-Systemeinstellungen.
+          </span>
+        </div>
+
+        {/* Global Controls */}
+        <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+          <button
+            type="button"
+            onClick={handlePlayToggle}
+            disabled={!masterLoopDuration}
+            style={{
+              flex: 2,
+              background: isPlaying ? 'linear-gradient(135deg, #d93025 0%, #b31412 100%)' : '#ffffff',
+              color: isPlaying ? '#ffffff' : '#137333',
+              border: isPlaying ? 'none' : '1.5px solid #137333',
+              borderRadius: '12px',
+              height: '44px',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              cursor: masterLoopDuration ? 'pointer' : 'not-allowed',
+              opacity: masterLoopDuration ? 1 : 0.45,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: isPlaying ? '0 4px 12px rgba(217,48,37,0.2)' : '0 2px 4px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isPlaying ? <Square size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" />}
+            <span>{isPlaying ? 'STOP' : 'PLAY'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              flex: 1,
+              background: '#ffffff',
+              color: '#718096',
+              border: '1.5px solid #cbd5e0',
+              borderRadius: '12px',
+              height: '44px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <RotateCcw size={13} />
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em' }}>RESET</span>
+          </button>
+        </div>
+
+        {/* Metronome Panel */}
+        <div style={{
+          background: '#f8f9fa',
+          border: '1px solid #e9ecef',
+          borderRadius: '16px',
+          padding: '14px 18px',
+          width: '100%',
+          maxWidth: '280px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          marginTop: '2px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 800, letterSpacing: '0.08em' }}>TEMPO / UTILITY</span>
+            <button
+              type="button"
+              onClick={() => setIsMetronomeActive(!isMetronomeActive)}
+              style={{
+                background: isMetronomeActive ? '#137333' : '#edf2f7',
+                border: 'none',
+                color: isMetronomeActive ? '#ffffff' : '#4a5568',
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                borderRadius: '6px',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                letterSpacing: '0.06em',
+                boxShadow: isMetronomeActive ? '0 2px 5px rgba(19, 115, 51, 0.2)' : 'none'
+              }}
+            >
+              {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleTapTempo}
+              style={{
+                flex: 1.2,
+                background: '#ffffff',
+                color: '#137333',
+                border: '1px solid #d1e7dd',
+                borderRadius: '10px',
+                height: '34px',
+                fontSize: '0.64rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.02em',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              TAP TEMPO
+            </button>
+            
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                style={{ width: '30px', height: '34px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#2d3748', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
+              >
+                -
+              </button>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, fontFamily: 'SF Mono, monospace', minWidth: '38px', textAlign: 'center', color: '#2d3748' }}>
+                {bpm}
+              </span>
+              <button
+                type="button"
+                onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                style={{ width: '30px', height: '34px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#2d3748', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          
+          {/* Hardware Latency Calibration Slider */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e9ecef', paddingTop: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                SYNC LATENCY
+              </span>
+              <span style={{ fontSize: '0.62rem', color: '#137333', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>
+                {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input 
+                type="range" 
+                min="-150" 
+                max="350" 
+                value={syncOffsetMs} 
+                onChange={(e) => {
+                  setSyncOffsetMs(parseInt(e.target.value));
+                  isManualLatencyAdjustmentRef.current = true;
+                }} 
+                style={{ flex: 1, accentColor: '#137333', height: '4px', cursor: 'pointer' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Master Mixdown Export Buttons */}
+        {masterLoopDuration && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+            <button
+              type="button"
+              onClick={handleExportMix}
+              disabled={isExporting}
+              style={{
+                background: 'linear-gradient(180deg, #137333 0%, #0f5c29 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '14px 20px',
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)'
+              }}
+            >
+              <span>{isExporting ? 'SPEICHERE...' : 'IM HAUSAUFGABENHEFT SPEICHERN'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMix}
+              disabled={isExporting}
+              style={{
+                background: '#f8f9fa',
+                color: '#2d3748',
+                border: '1px solid #cbd5e0',
+                borderRadius: '14px',
+                padding: '12px 20px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Right Column: 4 DAW Console Mixer Strips */}
+      <div style={{
+        flex: '1.2 1 0%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        padding: '2px 0',
+        justifyContent: 'flex-start'
+      }}>
+        {tracks.map((track) => {
+          const hasAudio = !!track.url;
+          const hasAnySolo = tracks.some(t => t.isSoloed);
+          const isImplicitlyMuted = hasAnySolo && !track.isSoloed && !track.isMuted;
+          return (
+            <div
+              key={track.id}
+              style={{
+                background: '#ffffff',
+                border: track.isRecording 
+                  ? '1.5px solid #ea4335' 
+                  : track.isWaiting 
+                    ? '1.5px solid #d97706'
+                    : '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '20px',
+                position: 'relative',
+                opacity: isImplicitlyMuted ? 0.45 : 1,
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: track.isRecording 
+                  ? '0 6px 18px rgba(234, 67, 53, 0.08)' 
+                  : track.isWaiting
+                    ? '0 6px 18px rgba(217, 119, 6, 0.06)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.015)',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Left-side DAW status color strip */}
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '6px',
+                borderTopLeftRadius: '16px',
+                borderBottomLeftRadius: '16px',
+                background: track.isRecording 
+                  ? '#ea4335' 
+                  : track.isWaiting 
+                    ? '#d97706' 
+                    : hasAudio 
+                      ? '#137333' 
+                      : '#e2e8f0',
+                transition: 'background 0.3s ease'
+              }} />
+
+              {/* Playback progress bar */}
+              {isPlaying && hasAudio && !track.isMuted && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: '6px',
+                  right: 0,
+                  height: '3px',
+                  background: '#137333',
+                  opacity: 0.8
+                }} />
+              )}
+
+              {/* DAW Channel Arm Button */}
+              <div>
+                {track.isRecording ? (
+                  <button
+                    type="button"
+                    onClick={() => stopRecording(track.id)}
+                    style={{
+                      background: '#fce8e6',
+                      color: '#ea4335',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '44px',
+                      height: '44px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(234, 67, 53, 0.15)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Square size={12} fill="currentColor" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startRecording(track.id)}
+                    disabled={track.isWaiting || (track.id > 1 && !masterLoopDuration) || countInBeats !== null}
+                    style={{
+                      background: track.isWaiting 
+                        ? '#fef3c7' 
+                        : hasAudio 
+                          ? '#f7fafc' 
+                          : '#e6f4ea',
+                      color: track.isWaiting 
+                        ? '#d97706' 
+                        : hasAudio 
+                          ? '#718096' 
+                          : '#137333',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '44px',
+                      height: '44px',
+                      cursor: (track.isWaiting || (track.id > 1 && !masterLoopDuration)) ? 'not-allowed' : 'pointer',
+                      opacity: (track.id > 1 && !masterLoopDuration) ? 0.35 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Mic size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Volume Slider & Label */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, fontFamily: 'SF Mono, Monaco, Consolas, monospace', color: '#4a5568', letterSpacing: '0.05em' }}>
+                    CH.0{track.id}
+                  </span>
+                  <span style={{ 
+                    fontSize: '0.52rem', 
+                    color: track.isRecording ? '#ea4335' : track.isWaiting ? '#d97706' : hasAudio ? '#137333' : '#a0aec0', 
+                    fontWeight: 800, 
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase'
+                  }}>
+                    {track.isRecording ? 'RECORDING' : track.isWaiting ? 'PENDING' : hasAudio ? 'ONLINE' : 'EMPTY'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: hasAudio ? 1 : 0.3 }}>
+                  <span style={{ fontSize: '0.52rem', color: '#a0aec0', fontFamily: 'monospace', width: '22px' }}>-inf</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={track.volume}
+                    onChange={(e) => handleVolumeChange(track.id, Number(e.target.value))}
+                    style={{
+                      flex: 1,
+                      height: '4px',
+                      borderRadius: '2px',
+                      background: '#edf2f7',
+                      outline: 'none',
+                      accentColor: '#137333',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <span style={{ fontSize: '0.52rem', color: '#718096', fontFamily: 'monospace', width: '28px', textAlign: 'right' }}>
+                    {track.volume === 0 ? 'Mute' : `${Math.round(track.volume / 100 * 6)}dB`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Clean LED Level Meter */}
+              <div style={{
+                display: 'flex',
+                gap: '2px',
+                padding: '4px 6px',
+                background: '#edf2f7',
+                borderRadius: '6px',
+                minWidth: '32px',
+                justifyContent: 'center',
+                alignItems: 'flex-end',
+                height: '26px',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+              }}>
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const isActive = meterHeights[track.id] >= (8 - idx);
+                  let color = '#137333'; // Campus green
+                  if (idx <= 2) color = '#ea4335'; // Red
+                  else if (idx <= 4) color = '#f59e0b'; // Orange
+                  
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        width: '3px',
+                        height: '3px',
+                        borderRadius: '50%',
+                        background: isActive ? color : '#e5e5e7',
+                        boxShadow: isActive ? `0 0 5px ${color}` : 'none',
+                        transition: 'background 0.05s ease'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Actions: Mute & Solo */}
+              <div style={{ display: 'flex', gap: '4px', opacity: hasAudio ? 1 : 0.2, pointerEvents: hasAudio ? 'auto' : 'none' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSoloToggle(track.id)}
+                  style={{
+                    background: track.isSoloed ? '#fef3c7' : 'transparent',
+                    color: track.isSoloed ? '#d97706' : '#a0aec0',
+                    borderRadius: '8px',
+                    padding: '5px 8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontWeight: 800,
+                    fontSize: '0.6rem',
+                    minWidth: '24px',
+                    textAlign: 'center',
+                    border: '1px solid ' + (track.isSoloed ? '#fef3c7' : '#e2e8f0'),
+                    boxShadow: track.isSoloed ? '0 1px 3px rgba(217, 119, 6, 0.15)' : 'none'
+                  }}
+                >
+                  SOLO
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleMuteToggle(track.id)}
+                  style={{
+                    background: track.isMuted ? '#fce8e6' : 'transparent',
+                    color: track.isMuted ? '#ea4335' : '#a0aec0',
+                    borderRadius: '8px',
+                    padding: '5px 8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontWeight: 800,
+                    fontSize: '0.6rem',
+                    minWidth: '24px',
+                    textAlign: 'center',
+                    border: '1px solid ' + (track.isMuted ? '#fce8e6' : '#e2e8f0'),
+                    boxShadow: track.isMuted ? '0 1px 3px rgba(234, 67, 53, 0.1)' : 'none'
+                  }}
+                >
+                  MUTE
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTrack(track.id)}
+                  style={{
+                    background: 'transparent',
+                    color: '#7f8c8d',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ea4335'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#7f8c8d'; }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+

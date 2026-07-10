@@ -12,6 +12,7 @@ import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip }
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
+import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 
 const showMissionsFeature = false;
 
@@ -2840,7 +2841,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       let mapped = parentActiveTab;
       if (mapped === 'mediathek') mapped = 'songs';
       if (mapped === 'termine' || mapped === 'all_appointments') mapped = 'events';
-      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile', 'settings'].includes(mapped)) {
+      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile', 'settings', 'homework_book'].includes(mapped)) {
         setActiveTab(mapped as any);
       }
     }
@@ -8239,6 +8240,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         />
       )}
 
+      {activeTab === 'homework_book' && studentUser && (
+        <div style={{ marginTop: '24px', width: '100%' }}>
+          <MeisterwerkDocumentationModal
+            student={{
+              id: studentId,
+              first_name: studentUser.first_name,
+              last_name: studentUser.last_name,
+              photo_url: studentUser.photo_url || '/avatar_ghost.jpg',
+              is_campus_active: studentUser.is_campus_active
+            }}
+            onClose={() => {}}
+            teacherId={studentUser.teacher_id}
+            readOnly={true}
+            isEmbed={true}
+          />
+        </div>
+      )}
+
       {activeTab === 'briefing' && (
         isMobile ? (
           <MobileBriefingView
@@ -11212,54 +11231,67 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             fontFamily: '"Inter", sans-serif'
           }}>
             <div style={{
-              background: `radial-gradient(circle, ${gradient.from} 0%, ${gradient.to} 100%)`,
+              background: '#f3f3f6',
               borderRadius: '32px',
               width: '100%',
               maxWidth: '1100px',
               height: '80vh',
-              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0,0,0,0.3)',
+              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: `2px solid ${gradient.text}`,
-              padding: '10px',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Absolute Close Button */}
-              <button
-                onClick={() => setSelectedLehrwerkForDetail(null)}
-                style={{
-                  position: 'absolute',
-                  top: '24px',
-                  right: '24px',
-                  zIndex: 100,
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '44px',
-                  height: '44px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)'}
-              >
-                <X size={20} />
-              </button>
+              {/* Header - Waldgrün Header */}
+              <div style={{
+                padding: '16px 24px',
+                background: '#456355',
+                borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                zIndex: 50,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <BookOpen size={20} color="#ffffff" />
+                  <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', fontFamily: 'Urbanist' }}>
+                    Lehrwerk-Details: {book.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setSelectedLehrwerkForDetail(null)}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.18s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
 
               {/* Inside Pages of the Notebook (Left/Right Pages) */}
               <div style={{
                 display: 'flex',
                 flex: 1,
                 overflow: 'hidden',
-                borderRadius: '20px',
-                boxShadow: 'inset 0 10px 30px rgba(0,0,0,0.1)',
                 position: 'relative'
               }}>
                 
@@ -11268,32 +11300,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: 1,
                   padding: '32px',
                   overflowY: 'auto',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
-                  borderRight: '1px dashed #cbd5e1',
+                  background: '#ffffff',
+                  borderRight: '1px solid #e2e8f0',
                   position: 'relative'
                 }}>
-                  {/* Left binder holes on the right edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    right: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container */}
                   <div style={{ paddingRight: '12px' }}>
@@ -11352,31 +11362,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: 1,
                   padding: '32px',
                   overflowY: 'auto',
-                  background: '#faf8f2',
-                  backgroundImage: 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)',
+                  background: '#f8fafc',
                   position: 'relative'
                 }}>
-                  {/* Right binder holes on the left edge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    left: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
 
                   {/* Content Container */}
                   <div style={{ paddingLeft: '12px' }}>
@@ -11444,45 +11432,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
 
-                {/* Ringbook Spine overlay (Golden Rings) */}
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  bottom: '20px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '32px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-around',
-                  zIndex: 30,
-                  pointerEvents: 'none'
-                }}>
-                  {Array.from({ length: 8 }).map((_, idx) => (
-                    <div key={idx} style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <div style={{
-                        width: '28px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        background: 'transparent',
-                        border: '3px solid #d4af37',
-                        borderTopColor: '#ffe57f',
-                        borderLeftColor: '#ffc107',
-                        borderRightColor: '#ffc107',
-                        borderBottomColor: '#b78a02',
-                        boxShadow: '0 3px 5px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
-                        transform: 'scaleY(0.8)'
-                      }} />
-                    </div>
-                  ))}
-                </div>
+
 
               </div>
             </div>

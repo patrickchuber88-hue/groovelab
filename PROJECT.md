@@ -16,9 +16,9 @@
 | M2 | Database Migration | Apply schema migrations for event config and program points | None | DONE |
 | M3 | UI & Coordinator Layout | Secretary UI redesign: hide lessons, swap timeline to left, start coordinator sidebar (R1) | M2 | DONE |
 | M4 | Submission & Feedback Flow | Configure events, send announcements, support teacher program point submissions (R2/R3) | M3 | DONE |
-| M5 | Stage Planner & Assembly | Order points, assign stages, insert pauses, calculate timeline offsets (R2) | M4 | IN_PROGRESS |
-| M6 | Packlist & CSV Export | Consolidated equipment list and custom columns CSV exporter (R3/R4) | M5 | PLANNED |
-| M7 | E2E Pass & Hardening | Pass all E2E tests, write Tier 5 adversarial tests, achieve full robustness | M1, M6 | PLANNED |
+| M5 | Stage Planner & Assembly | Order points, assign stages, insert pauses, calculate timeline offsets (R2) | M4 | DONE |
+| M6 | Packlist & CSV Export | Consolidated equipment list and custom columns CSV exporter (R3/R4) | M5 | DONE |
+| M7 | E2E Pass & Hardening | Pass all E2E tests, write Tier 5 adversarial tests, achieve full robustness | M1, M6 | DONE |
 
 ## Code Layout
 - Component: `apps/groovelab/src/components/CampusEventsBoard.tsx`
