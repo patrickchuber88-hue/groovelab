@@ -61,6 +61,9 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps) {
   const brandColor = 'var(--primary-color)';
   const cardRef = useRef<HTMLDivElement>(null);
+  const qrOrigin = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+    ? 'https://app.campus-groovelab.de'
+    : window.location.origin;
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [schoolNameAndCity, setSchoolNameAndCity] = useState<string>('Campus Musikschule');
   const [localQrToken, setLocalQrToken] = useState<string>(user.qr_token || '');
@@ -545,7 +548,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 justifyContent: 'center',
                 border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
               }}>
-                <QRCode value={`${window.location.origin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
+                <QRCode value={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
               </div>
             </div>
           </div>
@@ -625,7 +628,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <QRCode value={`${window.location.origin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={150} />
+                <QRCode value={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={150} />
               </div>
 
               <p style={{ 
@@ -738,6 +741,39 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
             <span>Google Wallet</span>
           </button>
         </div>
+
+        {/* Developer Shortcut Button */}
+        <button 
+          onClick={() => window.open(`${window.location.origin}/qr/${localTeacherQrToken || localQrToken || ''}`, '_blank')}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '20px',
+            border: '1.5px dashed #cbd5e1',
+            background: '#f8fafc',
+            color: '#475569',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            marginTop: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.01)',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f1f5f9';
+            e.currentTarget.style.borderColor = '#94a3b8';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f8fafc';
+            e.currentTarget.style.borderColor = '#cbd5e1';
+          }}
+        >
+          <span>🔧 Entwickler-Link: Landing-Page öffnen</span>
+        </button>
 
         {/* Action button for managers to regenerate QR Code */}
         {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (

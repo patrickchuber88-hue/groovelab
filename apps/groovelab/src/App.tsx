@@ -7126,7 +7126,7 @@ function App() {
                     <Monitor size={20} /> Briefing
                   </button>
                   <button onClick={() => setActiveStudentTab('homework_book')} className={`sidebar-item ${activeStudentTab === 'homework_book' ? `active ${activePlatform}` : ''}`}>
-                    <BookOpen size={22} /> Hausaufgaben
+                    <BookOpen size={22} /> Aufgaben
                   </button>
                   {flamesActive && (
                     <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
@@ -7399,7 +7399,7 @@ function App() {
                 textOverflow: 'ellipsis',
                 marginBottom: '2px'
               }}>
-                {user.first_name}
+                {user.role === 'student' ? 'Hausaufgabenheft' : user.first_name}
               </div>
               <div style={{ 
                 fontSize: '0.68rem', 
@@ -8397,7 +8397,7 @@ function App() {
                   </div>
 
                   <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
-                    {user.role === 'student' ? user.first_name : `${user.first_name} ${user.last_name?.[0]}.`}
+                    {user.role === 'student' ? 'Hausaufgabenheft' : `${user.first_name} ${user.last_name?.[0]}.`}
                   </h1>
 
                   {/* Instrument Icons */}
@@ -10191,7 +10191,7 @@ function App() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
-                                {user.role === 'student' ? user.first_name : `${user.first_name} ${user.last_name || ''}`}
+                                {user.role === 'student' ? 'Hausaufgabenheft' : `${user.first_name} ${user.last_name || ''}`}
                               </div>
                               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                                 {dateFormatted}
@@ -12667,8 +12667,8 @@ function App() {
                     <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
                       <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
                     </button>
-                    <button onClick={() => setActiveStudentTab('homework_book')} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Hausaufgaben">
-                      <BookOpen size={isCompact ? 22 : 20} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Hausaufgaben</span>}
+                    <button onClick={() => setActiveStudentTab('homework_book')} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Aufgaben">
+                      <BookOpen size={isCompact ? 22 : 20} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Aufgaben</span>}
                     </button>
                     {flamesActive && (
                       <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">

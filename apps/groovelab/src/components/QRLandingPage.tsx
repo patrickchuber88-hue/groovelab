@@ -582,7 +582,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         // 3. Ansonsten immer auf die öffentliche Landingpage führen (für aktive & inaktive)
         sessionStorage.setItem('groovelab_qr_token', token);
-        setPageState('inactive_landing');
+        setPageState('profile');
       } catch (err: any) {
         sessionStorage.removeItem('groovelab_qr_token');
         sessionStorage.removeItem('groovelab_user_id');
@@ -746,7 +746,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // Realtime synchronization for teacher homework edits
   useEffect(() => {
-    if (pageState !== 'profile' || !profile?.id) return;
+    if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile?.id) return;
 
     const channel = supabase.channel(`realtime_student_progress_${profile.id}`);
     channel
@@ -1332,23 +1332,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const usesSensors = isMobile && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
 
+    let permission = 'denied';
     if (usesSensors && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission();
-        if (permission === 'granted') {
-          setPreStartCountdown(3);
-          setTimerRunning(true);
-        } else {
-          alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff! 📱");
-        }
+        permission = await Promise.race([
+          (DeviceOrientationEvent as any).requestPermission(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 800))
+        ]) as string;
       } catch (err) {
-        console.error("iOS Sensor Permission error:", err);
-        setPreStartCountdown(3);
-        setTimerRunning(true);
+        console.warn("Sensor permission request failed or timed out:", err);
+        permission = 'granted'; // Fallback to let the timer run
       }
     } else {
+      permission = 'granted';
+    }
+
+    if (permission === 'granted') {
       setPreStartCountdown(3);
       setTimerRunning(true);
+    } else {
+      alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff!");
     }
   };
 
@@ -1388,7 +1391,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         setPinInput('');
         
         if (pinPurpose === 'unlock_preview') {
-          setPageState('inactive_landing');
+          setPageState('profile');
         } else {
           await redirectToCampus(profile);
         }
@@ -1535,11 +1538,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return `${m}:${s}`;
   };
 
-  const renderHomeworkWidget = () => {
+  const renderHomeworkWidget = (compressed = false) => {
     const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
     const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
     const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek(undefined, lessonDay);
-    const notesList = getHomeworkNotes(latestWeek);
+    const notesList = compressed ? [] : getHomeworkNotes(latestWeek);
     const activeHWs = progressItems.filter(item => 
       item.is_current_homework && 
       !item.topic_name.startsWith('Hausaufgabe KW ')
@@ -1569,7 +1572,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (activeBooks.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
       return (
         <div style={{
-          background: '#f8fafc',
+          background: 'rgba(255, 255, 255, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           border: '1.5px dashed #cbd5e1',
           borderRadius: '24px',
           padding: '24px',
@@ -1577,7 +1582,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           color: '#64748b'
         }}>
           <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', fontWeight: 650 }}>
-            Keine aktuellen Hausaufgaben erfasst ✨
+            Keine aktuellen Hausaufgaben erfasst
           </p>
         </div>
       );
@@ -1587,17 +1592,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     return (
       <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #e2e8f0',
-        borderRadius: '24px',
+        ...styles.card,
         padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+        gap: '16px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#4f46e5', background: '#e0e7ff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#137333', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
             Hausaufgaben
           </span>
         </div>
@@ -1606,7 +1606,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {activeBooks.map(([bookTitle, pages]) => {
               const formattedPages = formatPageNumbers(pages.map(p => p.num));
-              const textNotes = pages
+              const textNotes = compressed ? '' : pages
                 .map(p => p.notes)
                 .filter(Boolean)
                 .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
@@ -1614,12 +1614,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               return (
                 <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                    📖 {bookTitle}
+                    <BookOpen size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {bookTitle}
                   </span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#6366f1', marginLeft: '22px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#137333', marginLeft: '22px' }}>
                     {formattedPages}
                   </span>
-                  {textNotes && (
+                  {!compressed && textNotes && (
                     <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
                       Bemerkung: {textNotes}
                     </span>
@@ -1635,9 +1635,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {otherHWs.map((item, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                  🎵 {item.topic_name}
+                  <Music size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {item.topic_name}
                 </span>
-                {item.teacher_notes && (
+                {!compressed && item.teacher_notes && (
                   <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
                     Bemerkung: {item.teacher_notes}
                   </span>
@@ -1647,7 +1647,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           </div>
         )}
 
-        {notesList.length > 0 && (() => {
+        {!compressed && notesList.length > 0 && (() => {
           let audioCount = 0;
           const filteredNotes = notesList.filter(note => !note.startsWith("STICKER:"));
           if (filteredNotes.length === 0) return null;
@@ -1673,7 +1673,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 }
                 return (
                   <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <span style={{ color: '#fbbf24', fontSize: '0.9rem', lineHeight: '1.2rem' }}>📌</span>
+                    <FileText size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 650, lineHeight: '1.3rem' }}>
                       {note}
                     </span>
@@ -1687,20 +1687,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     );
   };
 
-  const renderLessonInfoCard = (lesson: any, isToday: boolean) => {
+  const renderLessonInfoCard = (lesson: any, isToday: boolean, nextLesson?: any) => {
     if (isToday && lesson) {
       return (
         <div style={{
-          background: '#f8fafc',
-          border: '1.5px solid #e2e8f0',
-          borderRadius: '20px',
+          ...styles.card,
           padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#137333', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
               Heute Unterricht
             </span>
           </div>
@@ -1715,111 +1711,48 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <User size={16} color="#64748b" />
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Bei {lesson.teacher ? `${lesson.teacher.first_name} ${lesson.teacher.last_name}` : 'Lehrkraft'}
+                Bei {lesson.teacher ? lesson.teacher.first_name + ' ' + lesson.teacher.last_name : 'Lehrkraft'}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <MapPin size={16} color="#64748b" />
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                {lesson.room_name}
+                {lesson.room_name || (lesson.room && lesson.room.name) || 'Groovelab Raum'}
               </span>
             </div>
           </div>
-
-          {/* Chauffeur info toggle (deactivated for now)
-          <button
-            type="button"
-            onClick={handleDriverCycle}
-            style={{
-              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-              border: '1.5px solid #bfdbfe',
-              borderRadius: '16px',
-              padding: '12px 14px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              width: '100%',
-              transition: 'transform 0.15s, border-color 0.2s',
-              fontFamily: 'inherit',
-              outline: 'none',
-              marginTop: '4px'
-            }}
-            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
-            onMouseUp={e => e.currentTarget.style.transform = ''}
-          >
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: '#3b82f6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <Car size={16} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.58rem', fontWeight: 900, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Wer fährt heute?
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e3a8a', marginTop: '1px' }}>
-                {activeDriver === 'Du' ? 'Du fährst heute! 🚗' : `${activeDriver} fährt heute! 🚗`}
-              </div>
-            </div>
-          </button>
-          */}
         </div>
       );
-    }
-
-    // Standard Unterrichtstermin
-    const daysGerman = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-    const nextSchedule = schedules[0];
-    if (nextSchedule) {
+    } else if (nextLesson) {
       return (
         <div style={{
-          background: '#f8fafc',
-          border: '1.5px solid #e2e8f0',
-          borderRadius: '20px',
+          ...styles.card,
           padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
+          gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#475569', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-              Dein Unterrichtstermin
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#137333', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+              Nächster Unterrichtstermin
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Calendar size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
-                {daysGerman[nextSchedule.day_of_week]}s um {nextSchedule.time_slot?.substring(0, 5)} Uhr
+              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                {nextLesson.dateStr}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <User size={16} color="#64748b" />
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
-                Bei {nextSchedule.teacher ? `${nextSchedule.teacher.first_name} ${nextSchedule.teacher.last_name}` : 'Lehrkraft'}
+              <Clock size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
               </span>
             </div>
-            {nextSchedule.room?.name && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <MapPin size={16} color="#64748b" />
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>
-                  {nextSchedule.room.name}
-                </span>
-              </div>
-            )}
           </div>
         </div>
       );
     }
-
     return null;
   };
 
@@ -1855,7 +1788,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             gap: '6px'
           }}
         >
-          {isParentMode ? '👪 Schnell-Eingabe' : '📱 Üben'}
+          {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 6 }} /> Üben</>}
         </button>
         <button
           type="button"
@@ -1878,7 +1811,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             gap: '6px'
           }}
         >
-          📚 Hausaufgaben
+          <><BookOpen size={14} style={{ marginRight: 6 }} /> Hausaufgaben</>
         </button>
       </div>
     );
@@ -1986,7 +1919,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {/* Text descriptions */}
         <div>
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#14532d' }}>
-            {isGoalMet ? 'Tagesziel erreicht! 🎉' : 'Übung eingetragen! 🚀'}
+            {isGoalMet ? 'Tagesziel erreicht!' : 'Übung eingetragen!'}
           </h3>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
             Heute geübt: <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
@@ -2043,12 +1976,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <div style={{ ...styles.card, maxWidth: '360px', gap: '28px' }}>
           {/* Header */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: '#fce8e6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-              <Lock size={28} color="#ea4335" />
+            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <Lock size={28} color="#137333" />
             </div>
             {profile && (
               <h2 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 800, color: '#137333' }}>
-                Hallo {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}!
+                Hallo!
               </h2>
             )}
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
@@ -2067,7 +2000,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 height: '64px',
                 borderRadius: '16px',
                 background: '#f8fafc',
-                border: `2px solid ${pinInput.length > i ? '#ea4335' : '#e2e8f0'}`,
+                border: `2px solid ${pinInput.length > i ? '#137333' : '#e2e8f0'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2075,7 +2008,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 fontWeight: 900,
                 color: '#0f172a',
                 transition: 'border-color 0.2s',
-                boxShadow: pinInput.length > i ? '0 0 0 4px rgba(234,67,53,0.12)' : 'none'
+                boxShadow: pinInput.length > i ? '0 0 0 4px rgba(19,115,51,0.12)' : 'none'
               }}>
                 {pinInput[i] ? '●' : ''}
               </div>
@@ -2141,7 +2074,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 padding: '18px',
                 borderRadius: '16px',
                 border: 'none',
-                background: pinInput.length > 0 ? '#10b981' : '#e2e8f0',
+                background: pinInput.length > 0 ? '#137333' : '#e2e8f0',
                 color: pinInput.length > 0 ? 'white' : '#94a3b8',
                 fontSize: '1rem',
                 fontWeight: 900,
@@ -2164,6 +2097,32 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               )}
             </button>
           )}
+
+          <button
+            onClick={() => {
+              setPageState('profile');
+              setPinInput('');
+              setPinError(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '16px',
+              borderRadius: '16px',
+              border: 'none',
+              background: '#f1f5f9',
+              color: '#475569',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              marginTop: '-14px'
+            }}
+          >
+            <ArrowLeft size={16} /> Abbrechen
+          </button>
 
           <div style={styles.brandFooter}>
             <Music size={14} color="#10b981" />
@@ -2460,7 +2419,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     })()}
                   </div>
                 ) : (
-                  <p style={{margin: 0, fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', fontWeight: 550}}>Keine aktuellen Hausaufgaben erfasst ✨</p>
+                  <p style={{margin: 0, fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', fontWeight: 550}}>Keine aktuellen Hausaufgaben erfasst</p>
                 )}
               </div>
             </div>
@@ -2510,35 +2469,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </button>
                 </div>
 
-                {/* Vollständige App öffnen Button */}
-                <button
-                  onClick={async () => {
-                    if (!profile.has_parent_pin) {
-                      setIsInitialPinSetup(true);
-                    } else {
-                      setPinPurpose('unlock_app');
-                      setPageState('pin_required');
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '18px 20px',
-                    borderRadius: '16px',
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    fontWeight: 800,
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px'
-                  }}
-                >
-                  <Lock size={18} /> Vollständige App öffnen
-                </button>
+
               </div>
             ) : (
               // INACTIVE STUDENT WIDGETS
@@ -3151,6 +3082,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const todayStr = new Date().toLocaleDateString('en-CA');
     const currentDayOfWeek = new Date().getDay() || 7; // Monday = 1, ..., Sunday = 7
 
+    const getVirtualNextLesson = () => {
+      if (schedules.length === 0) return null;
+      const sch = schedules[0];
+      const dayOfWeek = sch.day_of_week;
+      const today = new Date();
+      const currentDay = today.getDay() || 7;
+      let diff = dayOfWeek - currentDay;
+      if (diff <= 0) {
+        diff += 7;
+      }
+      const nextDate = new Date();
+      nextDate.setDate(today.getDate() + diff);
+      return {
+        dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+        time: sch.time_slot
+      };
+    };
+
+    const nextLessonInfo = (() => {
+      if (occurrences.length > 0) {
+        const nextOcc = occurrences[0];
+        const d = new Date(nextOcc.date);
+        return {
+          dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
+          time: nextOcc.start_time
+        };
+      }
+      return getVirtualNextLesson();
+    })();
+
     // Check if there is an occurrence today
     const occurrenceToday = occurrences.find(o => o.date === todayStr);
 
@@ -3205,7 +3166,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Header Banner */}
           {!timerRunning && (
             <div style={{
-              background: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
+              background: 'linear-gradient(135deg, #137333 0%, #0d4d22 100%)',
               padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 20px 24px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -3217,7 +3178,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   Groovelab Campus
                 </span>
                 <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-                  {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}
+                  Mein Übe-Profil
                 </h1>
               </div>
               <div style={{
@@ -3231,11 +3192,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '1rem',
                 border: '1px solid rgba(255, 255, 255, 0.3)'
               }}>
-                {profile.first_name?.[0]}{profile.last_name?.[0]}
+                <Music size={18} />
               </div>
             </div>
           )}
@@ -3663,20 +3622,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 <div style={styles.loadingDot} />
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 650 }}>Lade Dashboard...</span>
               </div>
-            ) : !profile.is_campus_active ? (
-              /* ==============================================================
-                 WEG 1: Inactive for Campus
-                 ============================================================== */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {renderLessonInfoCard(lessonToday, isLessonDay)}
-                {renderHomeworkWidget()}
-              </div>
             ) : profile.app_usage_mode === 'parent_hybrid' ? (
               /* ==============================================================
                  WEG 3: PARENT_HYBRID (Jüngere Kinder & Eltern)
                  ============================================================== */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {renderLessonInfoCard(lessonToday, isLessonDay)}
+                {renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
                 {renderSegmentedControl()}
                 {activeTab === 'action' ? (
                   practiceLoggedToday ? (
@@ -3867,9 +3818,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                  WEG 2: STUDENT_ONLY (Selbstnutzer)
                  ============================================================== */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay)}
-                {!timerRunning && renderSegmentedControl()}
-                {activeTab === 'action' ? (
+                {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
+                {profile.is_campus_active ? <>
+                  {!timerRunning && renderSegmentedControl()}
+                  {activeTab === 'action' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     
                     {/* Gamification Streak/XP Row */}
@@ -3894,9 +3846,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             width: '32px',
                             height: '32px',
                             borderRadius: '50%',
-                            background: '#fff3cd'
+                            background: '#f1f5f9'
                           }}>
-                            <Flame size={18} color="#ff9500" fill="#ff9500" />
+                            <Flame size={18} color="#475569" />
                           </div>
                           <div>
                             <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
@@ -3927,9 +3879,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             width: '32px',
                             height: '32px',
                             borderRadius: '50%',
-                            background: '#e8f5e9'
+                            background: '#f1f5f9'
                           }}>
-                            <Sparkles size={18} color="#34c759" fill="#34c759" />
+                            <Sparkles size={18} color="#475569" />
                           </div>
                           <div>
                             <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
@@ -4120,7 +4072,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 padding: '16px',
                                 borderRadius: '18px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #007aff 0%, #0056b3 100%)',
+                                background: 'linear-gradient(135deg, #137333 0%, #0d4d22 100%)',
                                 color: '#ffffff',
                                 fontSize: '0.95rem',
                                 fontWeight: 800,
@@ -4129,7 +4081,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                boxShadow: '0 4px 15px rgba(0, 122, 255, 0.15)'
+                                boxShadow: '0 4px 15px rgba(19, 115, 51, 0.15)'
                               }}
                             >
                               <Play size={16} fill="#ffffff" /> Fokus starten
@@ -4156,7 +4108,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   boxShadow: '0 4px 15px rgba(52, 199, 89, 0.15)'
                                 }}
                               >
-                                🏁 Beenden
+                                Beenden
                               </button>
                               <button
                                 type="button"
@@ -4192,8 +4144,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     )}
                   </div>
                 ) : (
-                  renderHomeworkWidget()
+                  renderHomeworkWidget(false)
                 )}
+                </> : renderHomeworkWidget(true)}
+
+
               </div>
             )}
 
@@ -4474,14 +4429,17 @@ const styles = {
     overflowY: 'auto' as const,
   },
   card: {
-    background: 'white',
-    borderRadius: '32px',
+    background: 'rgba(255, 255, 255, 0.75)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    borderRadius: '28px',
     width: '100%',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.04)',
-    border: '1px solid #e5e5ea',
-    padding: '32px 28px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02)',
+    border: '1.5px solid rgba(255, 255, 255, 0.5)',
+    padding: '24px 20px',
     display: 'flex',
     flexDirection: 'column' as const,
+    boxSizing: 'border-box' as const,
   },
   brandFooter: {
     display: 'flex',

@@ -196,6 +196,12 @@ export const getCleanPageNotes = (notes: any): string => {
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
 
+  const displayedStudentName = useMemo(() => {
+    return readOnly
+      ? 'Hausaufgabenheft'
+      : `${student.first_name}${student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : ''}`;
+  }, [readOnly, student.first_name, student.last_name]);
+
   useEffect(() => {
     if (!student.id) return;
     if (typeof student.is_campus_active === 'boolean') {
@@ -384,7 +390,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation'>('document');
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>('document');
 
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
@@ -395,6 +401,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [audioDuration, setAudioDuration] = useState(0);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
   const accumulatedTranscriptRef = React.useRef<string>('');
@@ -402,6 +409,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return () => {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        } catch (e) {
+          console.warn("Failed to stop media recorder on unmount:", e);
+        }
+      }
+      if ((window as any).recognitionInstance) {
+        try {
+          (window as any).recognitionInstance.stop();
+        } catch (e) {
+          console.warn("Failed to stop speech recognition on unmount:", e);
+        }
       }
     };
   }, []);
@@ -540,13 +562,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const uploadedUrl = publicUrlData.publicUrl;
           await saveAudioMetadata(uploadedUrl);
         } catch (err: any) {
-          console.warn("Storage upload failed, falling back to local base64 data URL:", err);
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const dataUrl = reader.result as string;
-            await saveAudioMetadata(dataUrl);
-          };
-          reader.readAsDataURL(blob);
+          console.error("Storage upload failed, audio fallback aborted due to GDPR/COPPA database limits:", err);
+          alert("Fehler beim Hochladen der Audio-Datei. Die Aufnahme konnte aus Datenschutzgründen (Verbot großer Base64-Speicherungen) nicht gespeichert werden. Bitte überprüfe deine Internetverbindung.");
         } finally {
           setIsUploadingAudio(false);
         }
@@ -556,6 +573,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setIsRecordingAudio(true);
       recorder.start();
       setMediaRecorderInstance(recorder);
+      mediaRecorderRef.current = recorder;
       
       recordingTimerRef.current = setInterval(() => {
         durationInSeconds += 1;
@@ -1176,7 +1194,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, textY);
+      ctx.fillText(displayedStudentName, 600, textY);
 
       if (studentInstrument) {
         textY += 45;
@@ -1294,7 +1312,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${student.first_name} ${student.last_name}`, 600, textY);
+      ctx.fillText(displayedStudentName, 600, textY);
 
       if (studentInstrument) {
         textY += 45;
@@ -2819,10 +2837,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   if (onProfileClick) e.currentTarget.style.opacity = '1';
                 }}
               >
-                {readOnly 
-                  ? 'Hausaufgabenheft' 
-                  : `${student.first_name}${student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : ''}`
-                }
+                {displayedStudentName}
               </h2>
               <span style={{
                 fontSize: '0.68rem',
@@ -2885,6 +2900,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 >
                   <Sliders size={14} />
                   <span>{activeViewMode === 'loopstation' ? 'Protokoll' : 'Loopstation'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode(activeViewMode === 'practice' ? 'document' : 'practice')}
+                  style={{
+                    background: activeViewMode === 'practice' 
+                      ? '#137333' 
+                      : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <Music size={14} />
+                  <span>{activeViewMode === 'practice' ? 'Protokoll' : 'Übe-Begleiter'}</span>
                 </button>
               </div>
             )}
@@ -3013,6 +3053,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               notifyHomeworkChange={notifyHomeworkChange}
               readOnly={readOnly}
               setActiveViewMode={setActiveViewMode}
+              useNotebookLayout={useNotebookLayout}
+            />
+          ) : activeViewMode === 'practice' ? (
+            <GroovePracticeCompanion
               useNotebookLayout={useNotebookLayout}
             />
           ) : activeViewMode === 'recordings' ? (
@@ -7332,7 +7376,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               width: '100%',
                               fontFamily: '"Helvetica Neue", Inter, sans-serif'
                             }}>
-                              {student.first_name} {student.last_name}
+                              {displayedStudentName}
                             </span>
 
                             {/* Student Instrument */}
@@ -7560,7 +7604,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               width: '100%',
                               fontFamily: '"Helvetica Neue", Inter, sans-serif'
                             }}>
-                              {student.first_name} {student.last_name}
+                              {displayedStudentName}
                             </span>
 
                             {/* Student Instrument */}
@@ -8728,6 +8772,85 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
   const [isCalibratingLatency, setIsCalibratingLatency] = useState(false);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved'>('studio');
+  const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
+  const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
+  const calibrationStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedLoopAudioRef.current) {
+        savedLoopAudioRef.current.pause();
+      }
+      if (calibrationStreamRef.current) {
+        try {
+          calibrationStreamRef.current.getTracks().forEach(track => track.stop());
+        } catch (e) {
+          console.warn("Failed to stop calibration stream on unmount:", e);
+        }
+      }
+    };
+  }, []);
+
+  const handlePlaySavedLoop = (url: string) => {
+    if (playingSavedLoopUrl === url) {
+      if (savedLoopAudioRef.current) {
+        savedLoopAudioRef.current.pause();
+      }
+      setPlayingSavedLoopUrl(null);
+    } else {
+      if (savedLoopAudioRef.current) {
+        savedLoopAudioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      savedLoopAudioRef.current = audio;
+      setPlayingSavedLoopUrl(url);
+      audio.play().catch(e => {
+        console.error("Failed to play audio:", e);
+        setPlayingSavedLoopUrl(null);
+      });
+      audio.onended = () => {
+        setPlayingSavedLoopUrl(null);
+      };
+    }
+  };
+
+  const handleDeleteSavedLoop = async (originalStr: string) => {
+    const confirmDelete = window.confirm("Möchtest du diesen gespeicherten Loop wirklich löschen?");
+    if (!confirmDelete) return;
+    
+    if (playingSavedLoopUrl) {
+      if (savedLoopAudioRef.current) {
+        savedLoopAudioRef.current.pause();
+      }
+      setPlayingSavedLoopUrl(null);
+    }
+
+    try {
+      if (originalStr.startsWith("AUDIO:")) {
+        const parts = originalStr.substring(6).split('|');
+        const audioUrlString = parts[0];
+        if (audioUrlString && audioUrlString.startsWith("http")) {
+          const marker = '/storage/v1/object/public/campus-assets/';
+          const markerIndex = audioUrlString.indexOf(marker);
+          if (markerIndex !== -1) {
+            const filePath = audioUrlString.substring(markerIndex + marker.length);
+            console.log("Deleting loop audio file from storage:", filePath);
+            await supabase.storage.from('campus-assets').remove([filePath]);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete loop file from storage:", e);
+    }
+    
+    const updatedList = homeworkNotesList.filter(note => note !== originalStr);
+    setHomeworkNotesList(updatedList);
+    await syncHomeworkNotes(updatedList);
+    await fetchProgress();
+    notifyHomeworkChange();
+    alert("Loop-Aufnahme erfolgreich gelöscht!");
+  };
 
   const runAutoLatencyCalibration = async () => {
     if (isCalibratingLatency) return;
@@ -8747,6 +8870,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           autoGainControl: false
         }
       });
+      calibrationStreamRef.current = stream;
       
       const sourceNode = ctx.createMediaStreamSource(stream);
       
@@ -8780,6 +8904,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         } catch (e) {}
         if (stream) {
           stream.getTracks().forEach(t => t.stop());
+        }
+        if (calibrationStreamRef.current === stream) {
+          calibrationStreamRef.current = null;
         }
         if (ctx && ctx.state !== 'closed') {
           ctx.close().catch(e => console.warn(e));
@@ -10660,20 +10787,35 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       ? '#137333' // Green during playback
       : '#e5e5e7'; // default/ready
 
+  const savedLoops = homeworkNotesList
+    .filter(note => note.startsWith('AUDIO:'))
+    .map(note => {
+      const parts = note.replace('AUDIO:', '').split('|');
+      return {
+        url: parts[0],
+        duration: parts[1],
+        date: parts[2],
+        label: parts[3] || 'Loop-Mix',
+        creatorRole: parts[4] || 'student',
+        originalStr: note
+      };
+    });
+
   return (
     <div style={{
       display: 'flex',
+      flexDirection: 'column',
       flex: 1,
       background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
       minHeight: '520px',
       color: '#1d1d1f',
-      padding: '32px 28px',
-      gap: '24px',
+      padding: '24px 28px',
+      gap: '20px',
       boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-    }} className="flex-col lg:flex-row">
+    }}>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse-recording-card {
           0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.25); border-color: #ea4335; }
@@ -10745,6 +10887,68 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           border-color: rgba(0, 0, 0, 0.08) !important;
         }
       `}} />
+
+      {/* Segmented Switch Control */}
+      <div style={{
+        display: 'flex',
+        background: '#e5e5ea',
+        borderRadius: '10px',
+        padding: '2px',
+        width: '100%',
+        maxWidth: '340px',
+        alignSelf: 'center',
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)'
+      }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (playingSavedLoopUrl) {
+              if (savedLoopAudioRef.current) savedLoopAudioRef.current.pause();
+              setPlayingSavedLoopUrl(null);
+            }
+            setActiveSubTab('studio');
+          }}
+          className="tactile-btn"
+          style={{
+            flex: 1,
+            background: activeSubTab === 'studio' ? '#ffffff' : 'transparent',
+            color: activeSubTab === 'studio' ? '#1d1d1f' : '#86868b',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '0.74rem',
+            fontWeight: activeSubTab === 'studio' ? 700 : 600,
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'studio' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          Loopstation Studio
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('saved')}
+          className="tactile-btn"
+          style={{
+            flex: 1,
+            background: activeSubTab === 'saved' ? '#ffffff' : 'transparent',
+            color: activeSubTab === 'saved' ? '#1d1d1f' : '#86868b',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '0.74rem',
+            fontWeight: activeSubTab === 'saved' ? 700 : 600,
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'saved' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          Gespeicherte Loops
+        </button>
+      </div>
+
+      {activeSubTab === 'studio' ? (
+        <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
       
       {/* Left Column: Loop Progress, Metronom & Controls */}
       <div style={{
@@ -11524,6 +11728,682 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             </div>
           );
         })}
+      </div>
+      </div>
+      ) : (
+        /* Saved Loops List View */
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          background: '#ffffff',
+          borderRadius: '20px',
+          border: '1px solid #f1f3f5',
+          padding: '24px',
+          flex: 1
+        }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '8px' }}>Gespeicherte Loop-Aufnahmen</h3>
+          {savedLoops.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '8px', color: '#86868b' }}>
+              <Music size={24} />
+              <span style={{ fontSize: '0.74rem' }}>Noch keine gespeicherten Loops vorhanden.</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {savedLoops.map((loop, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: '#f5f5f7',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f' }}>{loop.label}</span>
+                    <span style={{ fontSize: '0.58rem', color: '#86868b' }}>
+                      {new Date(loop.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr • {loop.duration}s
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePlaySavedLoop(loop.url)}
+                      className="tactile-btn"
+                      style={{
+                        background: '#137333',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {playingSavedLoopUrl === loop.url ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSavedLoop(loop.originalStr)}
+                      className="tactile-btn"
+                      style={{
+                        background: 'transparent',
+                        color: '#86868b',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ea4335'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b'; }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// -------------------------------------------------------------
+// GroovePracticeCompanion (Student Metronome & Beat Generator)
+// -------------------------------------------------------------
+interface GroovePracticeCompanionProps {
+  useNotebookLayout: boolean;
+}
+
+const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [bpm, setBpm] = useState(120);
+  const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin'>('metronome');
+  const [volKick, setVolKick] = useState(80);
+  const [volSnare, setVolSnare] = useState(80);
+  const [volHat, setVolHat] = useState(80);
+  const [volMetronome, setVolMetronome] = useState(80);
+  
+  const [activeBeatIndex, setActiveBeatIndex] = useState<number | null>(null);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const nextNoteTimeRef = useRef(0.0);
+  const current16thNoteRef = useRef(0);
+  const timerIdRef = useRef<any>(null);
+  const noiseBufferRef = useRef<AudioBuffer | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+
+  // Refs to allow real-time volume adjustments without rebuilding the scheduler loop
+  const volKickRef = useRef(volKick);
+  const volSnareRef = useRef(volSnare);
+  const volHatRef = useRef(volHat);
+  const volMetronomeRef = useRef(volMetronome);
+
+  useEffect(() => { volKickRef.current = volKick; }, [volKick]);
+  useEffect(() => { volSnareRef.current = volSnare; }, [volSnare]);
+  useEffect(() => { volHatRef.current = volHat; }, [volHat]);
+  useEffect(() => { volMetronomeRef.current = volMetronome; }, [volMetronome]);
+
+  // Keep bpm and style in refs to update scheduler on the fly without closing AudioContext
+  const bpmRef = useRef(bpm);
+  const selectedStyleRef = useRef(selectedStyle);
+  const isPlayingRef = useRef(isPlaying);
+
+  useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+  useEffect(() => { selectedStyleRef.current = selectedStyle; }, [selectedStyle]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  const tapTimesRef = useRef<number[]>([]);
+  const handleTapTempo = () => {
+    const now = performance.now();
+    tapTimesRef.current = [...tapTimesRef.current.filter(t => now - t < 2000), now];
+    if (tapTimesRef.current.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        intervals.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
+      }
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const calculatedBpm = Math.round(60000 / avgInterval);
+      setBpm(Math.max(40, Math.min(240, calculatedBpm)));
+    }
+  };
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (timerIdRef.current) clearInterval(timerIdRef.current);
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+      setActiveBeatIndex(null);
+      return;
+    }
+
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioCtxRef.current = audioCtx;
+    
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.8;
+    masterGain.connect(audioCtx.destination);
+    masterGainRef.current = masterGain;
+
+    const bufferSize = audioCtx.sampleRate * 0.25;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+    noiseBufferRef.current = noiseBuffer;
+
+    nextNoteTimeRef.current = audioCtx.currentTime;
+    current16thNoteRef.current = 0;
+
+    const scheduler = () => {
+      while (nextNoteTimeRef.current < audioCtx.currentTime + 0.1) {
+        scheduleNote(current16thNoteRef.current, nextNoteTimeRef.current, audioCtx, masterGain);
+        advanceNote();
+      }
+    };
+
+    const advanceNote = () => {
+      const secondsPerBeat = 60.0 / bpmRef.current;
+      const isSwing = selectedStyleRef.current === 'swing';
+      const stepsInBar = isSwing ? 12 : 16;
+      const stepDuration = secondsPerBeat / (isSwing ? 3 : 4);
+      nextNoteTimeRef.current += stepDuration;
+      current16thNoteRef.current = (current16thNoteRef.current + 1) % stepsInBar;
+    };
+
+    timerIdRef.current = setInterval(scheduler, 25);
+    return () => {
+      clearInterval(timerIdRef.current);
+      if (audioCtxRef.current) audioCtxRef.current.close();
+    };
+  }, [isPlaying]);
+
+  const scheduleNote = (step: number, time: number, ctx: AudioContext, masterGain: GainNode) => {
+    const kVol = volKickRef.current / 100;
+    const sVol = volSnareRef.current / 100;
+    const hVol = volHatRef.current / 100;
+    const mVol = volMetronomeRef.current / 100;
+
+    const playKick = () => {
+      if (kVol <= 0.001) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.setValueAtTime(120, time);
+      osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.08);
+      gain.gain.setValueAtTime(kVol, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.1);
+      osc.start(time);
+      osc.stop(time + 0.12);
+    };
+
+    const playSnare = () => {
+      if (sVol <= 0.001) return;
+      if (!noiseBufferRef.current) return;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBufferRef.current;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 1200;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(sVol * 0.5, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+      noise.start(time);
+      noise.stop(time + 0.16);
+
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.frequency.value = 180;
+      oscGain.gain.setValueAtTime(sVol * 0.35, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.08);
+      osc.connect(oscGain);
+      oscGain.connect(masterGain);
+      osc.start(time);
+      osc.stop(time + 0.09);
+    };
+
+    const playHat = (isOpen = false) => {
+      if (hVol <= 0.001) return;
+      if (!noiseBufferRef.current) return;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBufferRef.current;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 8000;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(hVol * 0.2, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.18 : 0.03));
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+      noise.start(time);
+      noise.stop(time + (isOpen ? 0.2 : 0.05));
+    };
+
+    const playClick = (isAccent = false) => {
+      if (mVol <= 0.001) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.setValueAtTime(isAccent ? 1500 : 900, time);
+      gain.gain.setValueAtTime(mVol * 0.9, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    };
+
+    const triggerVisualBeat = (beatIdx: number) => {
+      ctx.resume().then(() => {
+        if (!isPlayingRef.current) return;
+        const msDiff = Math.max(0, (time - ctx.currentTime) * 1000);
+        setTimeout(() => {
+          if (isPlayingRef.current) {
+            setActiveBeatIndex(beatIdx);
+          }
+        }, msDiff);
+      });
+    };
+
+    const isSwing = selectedStyleRef.current === 'swing';
+    if (selectedStyleRef.current === 'metronome') {
+      if (step % 4 === 0) {
+        const beatIdx = Math.floor(step / 4);
+        playClick(beatIdx === 0);
+        triggerVisualBeat(beatIdx);
+      }
+    } else if (selectedStyleRef.current === 'rock') {
+      if (step === 0 || step === 8) playKick();
+      if (step === 4 || step === 12) playSnare();
+      if (step % 2 === 0) playHat(false);
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'hiphop') {
+      if (step === 0 || step === 2 || step === 8 || step === 11) playKick();
+      if (step === 4 || step === 12) playSnare();
+      if (step % 2 === 0) playHat(step === 14);
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (isSwing) {
+      if (step === 0 || step === 6) playKick();
+      if (step === 3 || step === 9) playSnare();
+      if (step === 0 || step === 2 || step === 3 || step === 5 || step === 6 || step === 8 || step === 9 || step === 11) {
+        playHat(step === 2 || step === 5 || step === 8 || step === 11);
+      }
+      if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
+    } else if (selectedStyleRef.current === 'latin') {
+      if (step === 0 || step === 4 || step === 8 || step === 12) playKick();
+      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playSnare();
+      if (step % 2 === 0) playHat(false);
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1,
+      background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+      borderTop: '1px solid #e2e8f0',
+      borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
+      minHeight: '520px',
+      color: '#1d1d1f',
+      padding: '32px 28px',
+      gap: '24px',
+      width: '100%',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+    }}>
+      
+      <div style={{ display: 'flex', gap: '28px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
+        {/* Left Column: Tempo / Tap / Visual Metronome */}
+        <div style={{
+          flex: '1 1 0%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid #f1f3f5',
+          padding: '24px',
+          justifyContent: 'space-between',
+          gap: '20px'
+        }}>
+          <div style={{ width: '100%', textAlign: 'center' }}>
+            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              ÜBE-METRONOM
+            </span>
+          </div>
+
+          {/* Visual Beat Indicator Dots */}
+          <div style={{ display: 'flex', gap: '14px', margin: '10px 0' }}>
+            {Array.from({ length: 4 }).map((_, idx) => {
+              const isActive = activeBeatIndex === idx;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: isActive 
+                      ? (idx === 0 ? '#ea4335' : '#137333') 
+                      : '#e5e5e7',
+                    boxShadow: isActive 
+                      ? `0 0 10px ${idx === 0 ? 'rgba(234, 67, 53, 0.6)' : 'rgba(19, 115, 51, 0.6)'}` 
+                      : 'none',
+                    transition: 'all 0.08s ease'
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Large Tempo Display */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '3.6rem', fontWeight: 900, color: '#1d1d1f', lineHeight: 1.1, fontFamily: 'SF Mono, monospace' }}>
+              {bpm}
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#86868b', fontWeight: 700 }}>
+              BEATS PER MINUTE
+            </span>
+          </div>
+
+          {/* Plus / Minus Tempo Controls */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setBpm(prev => Math.max(40, prev - 5))}
+              className="tactile-btn"
+              style={{
+                width: '44px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#f5f5f7',
+                border: 'none',
+                color: '#1d1d1f',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              -5
+            </button>
+            <button
+              type="button"
+              onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+              className="tactile-btn"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#f5f5f7',
+                border: 'none',
+                color: '#1d1d1f',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              -1
+            </button>
+            <button
+              type="button"
+              onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+              className="tactile-btn"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#f5f5f7',
+                border: 'none',
+                color: '#1d1d1f',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              onClick={() => setBpm(prev => Math.min(240, prev + 5))}
+              className="tactile-btn"
+              style={{
+                width: '44px',
+                height: '38px',
+                borderRadius: '10px',
+                background: '#f5f5f7',
+                border: 'none',
+                color: '#1d1d1f',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              +5
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTapTempo}
+            className="tactile-btn"
+            style={{
+              width: '100%',
+              background: '#f5f5f7',
+              color: '#1d1d1f',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            TAP TEMPO
+          </button>
+
+          {/* Play/Pause button */}
+          <button
+            type="button"
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="tactile-btn"
+            style={{
+              width: '100%',
+              background: isPlaying ? '#ea4335' : '#137333',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            {isPlaying ? (
+              <>
+                <Square size={12} fill="currentColor" />
+                <span>Stoppen</span>
+              </>
+            ) : (
+              <>
+                <Play size={12} fill="currentColor" />
+                <span>Starten</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Right Column: Drum Beat Generator & Mixer */}
+        <div style={{
+          flex: '1.2 1 0%',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid #f1f3f5',
+          padding: '24px',
+          gap: '20px'
+        }}>
+          <div>
+            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              BEAT GENERATOR
+            </span>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', margin: '4px 0 0 0' }}>Begleit-Rhythmen</h3>
+          </div>
+
+          {/* Rhythms Selector Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '8px'
+          }}>
+            {[
+              { id: 'metronome', label: 'Metronom Klick' },
+              { id: 'rock', label: 'Rock & Pop Groove' },
+              { id: 'hiphop', label: 'Hip-Hop Pocket' },
+              { id: 'swing', label: 'Swing Triplets' },
+              { id: 'latin', label: 'Son Clave Latin' }
+            ].map((styleOpt) => {
+              const isSelected = selectedStyle === styleOpt.id;
+              return (
+                <button
+                  key={styleOpt.id}
+                  type="button"
+                  onClick={() => setSelectedStyle(styleOpt.id as any)}
+                  className="tactile-btn"
+                  style={{
+                    background: isSelected ? '#137333' : '#f5f5f7',
+                    color: isSelected ? '#ffffff' : '#1d1d1f',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  {styleOpt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mixer Channel Strips */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            marginTop: '10px',
+            borderTop: '1px solid #f1f3f5',
+            paddingTop: '16px'
+          }}>
+            <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              INSTRUMENTEN MIXER
+            </span>
+
+            {selectedStyle === 'metronome' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Klick-Lautstärke</span>
+                  <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volMetronome}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volMetronome}
+                  onChange={(e) => setVolMetronome(Number(e.target.value))}
+                  className="groovelab-fader"
+                />
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Bass Drum (Kick)</span>
+                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volKick}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volKick}
+                    onChange={(e) => setVolKick(Number(e.target.value))}
+                    className="groovelab-fader"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Snare Drum</span>
+                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volSnare}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volSnare}
+                    onChange={(e) => setVolSnare(Number(e.target.value))}
+                    className="groovelab-fader"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Hi-Hat</span>
+                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volHat}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volHat}
+                    onChange={(e) => setVolHat(Number(e.target.value))}
+                    className="groovelab-fader"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

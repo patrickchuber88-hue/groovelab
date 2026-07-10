@@ -8062,7 +8062,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </span>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>{hl.studentName}</span>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
+                                {(() => {
+                                  const name = hl.studentName || '';
+                                  const parts = name.trim().split(/\s+/);
+                                  if (parts.length <= 1) return name;
+                                  const first = parts[0];
+                                  const last = parts[parts.length - 1];
+                                  return `${first} ${last.charAt(0)}.`;
+                                })()}
+                              </span>
                               <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {hl.title}
                               </span>
@@ -10224,14 +10233,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       {activeTab === 'profile' && studentUser && (
         <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%' }}>
-          {/* Header Card with Premium Glassmorphism */}
+          {/* Header Card with Premium Campus Green Gradient */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
+            background: 'linear-gradient(135deg, #137333 0%, #0d4d22 100%)',
             backdropFilter: 'blur(24px) saturate(1.8)',
             WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-            border: '1px solid rgba(255, 255, 255, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '32px',
-            boxShadow: '0 12px 40px rgba(52, 168, 83, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            boxShadow: '0 12px 40px rgba(19, 115, 51, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
             display: 'flex',
             overflow: 'visible',
             position: 'relative',
@@ -10247,7 +10256,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               height: '128px',
               borderRadius: '50%',
               border: '5px solid #ffffff',
-              boxShadow: '0 12px 32px rgba(52, 168, 83, 0.12)',
+              boxShadow: '0 12px 32px rgba(19, 115, 51, 0.2)',
               background: '#ffffff',
               flexShrink: 0,
               overflow: 'hidden',
@@ -10273,27 +10282,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <div style={{ flex: 1, minWidth: '280px' }}>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
                 <span style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #1b8035 100%)',
-                  color: 'white', 
+                  background: '#ffffff',
+                  color: '#137333', 
                   padding: '4px 14px', 
                   borderRadius: '10px',
                   fontSize: '0.7rem', 
                   fontWeight: 900, 
                   textTransform: 'uppercase', 
-                  letterSpacing: '0.08em',
-                  boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)'
+                  letterSpacing: '0.08em'
                 }}>
                   Campus Schüler
                 </span>
-                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 750 }}>
+                <span style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: 750 }}>
                   🏢 {studentUser.schools?.name || 'Groovelab Campus'}
                 </span>
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', fontWeight: 500 }}>
                   • Mitglied seit {studentUser.created_at && !isNaN(new Date(studentUser.created_at).getTime()) ? new Date(studentUser.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
                 </span>
               </div>
 
-              <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#0f172a', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
+              <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#ffffff', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
                 Profil
               </h1>
 
@@ -10304,9 +10312,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: 'rgba(52, 168, 83, 0.05)',
-                    border: '1px solid rgba(52, 168, 83, 0.12)',
-                    color: '#34a853',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    color: '#ffffff',
                     padding: '4px 12px',
                     borderRadius: '12px',
                     fontSize: '0.78rem',
@@ -10324,10 +10332,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <button 
                 onClick={() => setShowOwnQr(true)}
                 style={{ 
-                  background: 'linear-gradient(135deg, #34a853 0%, #1b8035 100%)', 
+                  background: '#ffffff', 
                   border: 'none', 
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
-                  color: '#ffffff', 
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                  color: '#137333', 
                   fontSize: '0.85rem', 
                   fontWeight: 800, 
                   cursor: 'pointer', 
@@ -10354,10 +10362,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   setShowEditProfile(true);
                 }} 
                 style={{ 
-                  background: '#ffffff', 
-                  border: '1px solid rgba(0,0,0,0.06)', 
+                  background: 'rgba(255, 255, 255, 0.15)', 
+                  border: '1px solid rgba(255, 255, 255, 0.25)', 
                   boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                  color: '#0f172a', 
+                  color: '#ffffff', 
                   fontSize: '0.85rem', 
                   fontWeight: 800, 
                   cursor: 'pointer', 
@@ -10368,8 +10376,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   borderRadius: '16px',
                   transition: 'all 0.2s'
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = '#f8fafc'; }}
-                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ffffff'; }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
               >
                 <span>Profil bearbeiten</span>
                 <Pencil size={15} />
@@ -10436,89 +10444,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             </div>
           </div>
 
-          {/* Split layout: schedules list & contact info card */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
-            {/* Weekly recurring schedules */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={20} style={{ color: '#34a853' }} />
-                Wöchentlicher Unterrichtsplan
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {studentSchedules.length > 0 ? (
-                  studentSchedules.map((sch) => {
-                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                    return (
-                      <div key={sch.id} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between', 
-                        padding: '16px 20px', 
-                        background: '#f8fafc', 
-                        borderRadius: '16px', 
-                        border: '1px solid #f1f5f9' 
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ height: '42px', width: '42px', borderRadius: '12px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                            {getInstrumentAvatarUrl(sch.instrument).includes('piano') ? '🎹' : getInstrumentAvatarUrl(sch.instrument).includes('drums') ? '🥁' : getInstrumentAvatarUrl(sch.instrument).includes('vocals') ? '🎤' : '🎸'}
+          {/* Weekly recurring schedules */}
+          <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', width: '100%' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={20} style={{ color: '#34a853' }} />
+              Wöchentlicher Unterrichtsplan
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {studentSchedules.length > 0 ? (
+                studentSchedules.map((sch) => {
+                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                  return (
+                    <div key={sch.id} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '16px 20px', 
+                      background: '#f8fafc', 
+                      borderRadius: '16px', 
+                      border: '1px solid #f1f5f9' 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ height: '42px', width: '42px', borderRadius: '12px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.04)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                          {getInstrumentAvatarUrl(sch.instrument).includes('piano') ? '🎹' : getInstrumentAvatarUrl(sch.instrument).includes('drums') ? '🥁' : getInstrumentAvatarUrl(sch.instrument).includes('vocals') ? '🎤' : '🎸'}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.9rem' }}>
+                            {DAYS_DE[sch.day_of_week]}s, {sch.time_slot} Uhr
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.9rem' }}>
-                              {DAYS_DE[sch.day_of_week]}s, {sch.time_slot} Uhr
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                              {sch.teacher ? `Coach: ${sch.teacher.first_name} ${sch.teacher.last_name}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
-                            </div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                            {sch.teacher ? `Coach: ${sch.teacher.first_name} ${sch.teacher.last_name}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
                           </div>
                         </div>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2px dashed #cbd5e1', borderRadius: '24px' }}>
-                    Keine wöchentlichen Termine hinterlegt.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* General details and contacts */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(0,0,0,0.01)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Urbanist', sans-serif" }}>
-                Kontaktdaten
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <Mail size={16} color="#64748b" />
-                  <div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>E-Mail-Adresse</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{maskEmail(studentUser.email)}</div>
-                  </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2px dashed #cbd5e1', borderRadius: '24px' }}>
+                  Keine wöchentlichen Termine hinterlegt.
                 </div>
-
-                {studentUser.parent_email && (
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <Mail size={16} color="#64748b" />
-                    <div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Weitere E-Mail-Adresse</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{maskEmail(studentUser.parent_email)}</div>
-                    </div>
-                  </div>
-                )}
-
-                {(studentUser.street || studentUser.city) && (
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <MapPin size={16} color="#64748b" />
-                    <div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Adresse</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
-                        {studentUser.street ? `${studentUser.street}, ` : ''}{studentUser.zip_code || ''} {studentUser.city || ''}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
 
@@ -10651,84 +10617,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input 
-                        type="email" 
-                        value={editingProfile.email || ''} 
-                        onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, email: e.target.value }))}
-                        placeholder="z.B. schueler@example.com"
-                        style={{ flex: 1, padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                      />
-                      {!showSecondEmail && (
-                        <button
-                          type="button"
-                          onClick={() => setShowSecondEmail(true)}
-                          style={{
-                            background: 'rgba(52, 168, 83, 0.08)',
-                            border: 'none',
-                            color: '#34a853',
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s',
-                            flexShrink: 0
-                          }}
-                          title="Weitere E-Mail hinzufügen"
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {showSecondEmail && (
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Weitere E-Mail-Adresse</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input 
-                          type="email" 
-                          value={editingProfile.parent_email || ''} 
-                          onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, parent_email: e.target.value }))}
-                          placeholder="z.B. eltern@example.com"
-                          style={{ flex: 1, padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowSecondEmail(false);
-                            setEditingProfile((prev: any) => ({ ...prev, parent_email: '' }));
-                          }}
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            border: 'none',
-                            color: '#ef4444',
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s',
-                            flexShrink: 0
-                          }}
-                          title="E-Mail entfernen"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   <div>
                     <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Instrumente</label>

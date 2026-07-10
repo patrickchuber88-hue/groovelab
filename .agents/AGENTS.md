@@ -41,3 +41,10 @@
 
 ## Loopstation Rules
 - **Looping Pause**: Es wird eine zwingende 4-Takte-Pause zwischen den Aufnahme-Spuren verwendet (Variante 1), um eine 100% sample-genaue Synchronität (kein Swallowed Attack) sicherzustellen.
+
+## Datenschutz & Kindersicherheits-Audit Rules
+- **Datenschutz-Standard**: Bei jeder Code-Änderung oder Funktions-Implementierung muss geprüft werden, ob der absolute Datenschutzstandard für Schulsoftware (Minimierung von personenbezogenen Daten von Minderjährigen nach DSGVO/COPPA) gewährleistet wird.
+- **Namens-Anonymisierung**: Schülernamen müssen im Lehrer-Dashboard auf "Vorname + Anfangsbuchstabe Nachname" und im Schüler-Dashboard auf generische Begriffe (z.B. "Hausaufgabenheft") begrenzt werden.
+- **Hardware-Sicherheit**: Alle Audio- und Mikrofonzugriffe müssen beim Verlassen der Oberfläche oder Schließen von Modulen sofort gestoppt werden (kein unbemerktes Weiterleuchten der Aufnahmelampe).
+- **Dateien & Fallbacks**: Zu große Base64-Audio-Daten dürfen nicht in Textspalten der Datenbank abgelegt werden. Alle gelöschten Audio-Einträge müssen physisch und vollständig aus dem Cloud-Speicher (Supabase Storage) entfernt werden.
+
