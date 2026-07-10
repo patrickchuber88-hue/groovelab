@@ -208,6 +208,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
   const [parentUnlocked, setParentUnlocked] = useState(false);
+  const [pinPurpose, setPinPurpose] = useState<'unlock_preview' | 'unlock_app'>('unlock_app');
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [parentPinInput, setParentPinInput] = useState('');
   const [parentPinError, setParentPinError] = useState(false);
@@ -478,7 +479,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         let query = supabase
           .from('users')
-          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals');
+          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals');
 
         if (isUuid) {
           query = query.or(`qr_token.eq.${token},id.eq.${token}`);
@@ -550,6 +551,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           trial_ends_at: userData.trial_ends_at,
           exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false,
           has_parent_pin: userData.has_parent_pin ?? false,
+          pin_enforced_for_preview: userData.pin_enforced_for_preview ?? false,
           parent_allow_chat: userData.parent_allow_chat ?? true,
           parent_allow_timer: userData.parent_allow_timer ?? true,
           parent_allow_leaderboard: userData.parent_allow_leaderboard ?? true,
@@ -557,35 +559,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_proposals: userData.parent_allow_proposals ?? true
         });
 
-        if (isInactive) {
-          sessionStorage.setItem('groovelab_qr_token', token);
-          setPageState('inactive_landing');
+        // 1. Wenn der Benutzer bereits auf diesem Gerät voll eingeloggt ist -> Sofort ins Dashboard weiterleiten
+        const currentUserId = localStorage.getItem('groovelab_user_id') || sessionStorage.getItem('groovelab_user_id');
+        if (currentUserId === userData.id) {
+          await redirectToCampus(userData);
           return;
         }
 
-        // Prüfen ob Gerät bereits bekannt ist
-        const alreadyPaired = isPairedForToken(token);
-
-        if (alreadyPaired) {
-          await redirectToCampus(userData);
-        } else {
-          // Neues Gerät → Device-Pairing prüfen via RPC
-          const deviceKey = getOrCreateDeviceKey();
-          const { data, error } = await supabase.rpc('check_qr_device', {
-            p_qr_token: token,
-            p_device_key: deviceKey,
-          });
-
-          if (error) throw error;
-
-          if (data?.paired === true) {
-            markPairedForToken(token);
-            await redirectToCampus(userData);
-          } else {
-            sessionStorage.removeItem('groovelab_qr_token');
-            setPageState('pin_required');
-          }
+        // Check if parents unlocked preview previously on this device
+        const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
+        if (wasUnlocked) {
+          setParentUnlocked(true);
         }
+
+        // 2. Wenn PIN-Schutz erzwungen wird und das Gerät nicht entsperrt ist -> direkt zur PIN-Eingabe springen
+        if (userData.pin_enforced_for_preview && !wasUnlocked) {
+          setPinPurpose('unlock_preview');
+          setPageState('pin_required');
+          return;
+        }
+
+        // 3. Ansonsten immer auf die öffentliche Landingpage führen (für aktive & inaktive)
+        sessionStorage.setItem('groovelab_qr_token', token);
+        setPageState('inactive_landing');
       } catch (err: any) {
         sessionStorage.removeItem('groovelab_qr_token');
         sessionStorage.removeItem('groovelab_user_id');
@@ -1357,7 +1353,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── PIN-Eingabe: Ziffern-Eingabe-Handler ─────────────────────────────────
   const handlePinDigit = (digit: string) => {
-    if (pinInput.length < 2) {
+    if (pinInput.length < 4) {
       setPinInput(prev => prev + digit);
     }
   };
@@ -1367,7 +1363,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handlePinSubmit = async () => {
-    if (!pinInput || pinLoading) return;
+    if (!pinInput || pinInput.length !== 4 || pinLoading || !profile) return;
     if (pinAttempts >= MAX_ATTEMPTS) {
       setPinError(`Zu viele Fehlversuche. Bitte wende dich an deine Schule.`);
       return;
@@ -1377,44 +1373,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     setPinError(null);
 
     try {
-      const deviceKey = getOrCreateDeviceKey();
-      const { data, error } = await supabase.rpc('verify_qr_device', {
-        p_qr_token: token,
-        p_pin: pinInput,
-        p_device_key: deviceKey,
+      const { data: isCorrect, error } = await supabase.rpc('verify_parent_pin', {
+        student_id: profile.id,
+        input_pin: pinInput,
       });
 
       if (error) throw error;
 
-      if (data?.success === true) {
-        markPairedForToken(token);
-        if (profile) {
+      if (isCorrect === true) {
+        setPinAttempts(0);
+        localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+        setParentUnlocked(true);
+        setPinInput('');
+        
+        if (pinPurpose === 'unlock_preview') {
+          setPageState('inactive_landing');
+        } else {
           await redirectToCampus(profile);
         }
-      } else if (data?.error === 'no_birth_date') {
-        setPinError('Kein Geburtstag hinterlegt. Bitte wende dich an deine Schule.');
-        setPinInput('');
-      } else if (data?.error === 'user_not_found') {
-        setPinError('Dieser QR-Code ist ungültig.');
-        setPinInput('');
       } else {
         const remaining = MAX_ATTEMPTS - (pinAttempts + 1);
         setPinAttempts(prev => prev + 1);
         if (remaining <= 0) {
           setPinError('Zu viele Fehlversuche. Dieses Konto wurde aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Schule.');
-          if (profile?.id) {
-            await supabase
-              .from('users')
-              .update({ is_campus_active: false, is_groovelab_active: false })
-              .eq('id', profile.id);
-          }
+          await supabase
+            .from('users')
+            .update({ is_campus_active: false, is_groovelab_active: false })
+            .eq('id', profile.id);
         } else {
           setPinError(`Falsche PIN. Noch ${remaining} Versuch${remaining === 1 ? '' : 'e'}.`);
         }
         setPinInput('');
       }
     } catch (err: any) {
-      console.error('[QRLanding] verify_qr_device error:', err);
+      console.error('[QRLanding] verify_parent_pin error:', err);
       setPinError('Verbindungsfehler. Bitte versuche es erneut.');
       setPinInput('');
     } finally {
@@ -2050,8 +2042,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <div style={{ ...styles.card, maxWidth: '360px', gap: '28px' }}>
           {/* Header */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-              <Shield size={28} color="#eab308" />
+            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: '#fce8e6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <Lock size={28} color="#ea4335" />
             </div>
             {profile && (
               <h2 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 800, color: '#137333' }}>
@@ -2059,26 +2051,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </h2>
             )}
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Gerät bestätigen
+              Sicherheits-PIN eingeben
             </h1>
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
-              Erstes Mal auf diesem Gerät.<br />
-              Gib den <strong>Tag deines Geburtstags</strong> ein.
-            </p>
-            <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-              Beispiel: Geburtstag am 15. März → <strong>15</strong>
+              Gib deine 4-stellige Eltern- bzw. Sicherheits-PIN ein, um fortzufahren.
             </p>
           </div>
 
           {/* PIN Display */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            {[0, 1].map(i => (
+            {[0, 1, 2, 3].map(i => (
               <div key={i} style={{
                 width: '56px',
                 height: '64px',
                 borderRadius: '16px',
                 background: '#f8fafc',
-                border: `2px solid ${pinInput.length > i ? '#eab308' : '#e2e8f0'}`,
+                border: `2px solid ${pinInput.length > i ? '#ea4335' : '#e2e8f0'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2086,7 +2074,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 fontWeight: 900,
                 color: '#0f172a',
                 transition: 'border-color 0.2s',
-                boxShadow: pinInput.length > i ? '0 0 0 4px rgba(234,179,8,0.12)' : 'none'
+                boxShadow: pinInput.length > i ? '0 0 0 4px rgba(234,67,53,0.12)' : 'none'
               }}>
                 {pinInput[i] ? '●' : ''}
               </div>
@@ -2152,8 +2140,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 padding: '18px',
                 borderRadius: '16px',
                 border: 'none',
-                background: pinInput.length > 0 ? '#eab308' : '#e2e8f0',
-                color: pinInput.length > 0 ? '#0f172a' : '#94a3b8',
+                background: pinInput.length > 0 ? '#10b981' : '#e2e8f0',
+                color: pinInput.length > 0 ? 'white' : '#94a3b8',
                 fontSize: '1rem',
                 fontWeight: 900,
                 cursor: pinInput.length > 0 ? 'pointer' : 'not-allowed',
@@ -2177,8 +2165,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           )}
 
           <div style={styles.brandFooter}>
-            <Music size={14} color="#eab308" />
-            <span>Campus GrooveLab · Dieses Gerät wird einmalig gespeichert</span>
+            <Music size={14} color="#10b981" />
+            <span>Campus-Groovelab</span>
           </div>
         </div>
       </div>
@@ -2484,52 +2472,122 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             )}
 
-            {activationAllowed ? (
-              <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #a7f3d0', background: '#f0fdf4', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                  <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus testen</h3>
-                  <p style={{margin: 0, fontSize: '0.85rem', color: '#047857', lineHeight: 1.5, fontWeight: 550}}>
-                    Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
-                  </p>
+            {profile.is_campus_active ? (
+              // ACTIVE STUDENT WIDGETS
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                {/* Fokus-Timer Card */}
+                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #d1fae5', background: '#f0fdf4', textAlign: 'center'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+                      <Timer size={20} color="#137333" /> Fokus-Timer
+                    </h3>
+                    <p style={{margin: 0, fontSize: '0.82rem', color: '#15803d', lineHeight: 1.5, fontWeight: 550}}>
+                      Starte deine tägliche Übe-Session direkt hier, um deine Streaks fortzusetzen und Abzeichen zu sammeln!
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleStartTimer}
+                    style={{
+                      width: '100%',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: '#137333',
+                      color: 'white',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(19, 115, 51, 0.25)',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Play size={18} fill="white" /> Übesitzung starten
+                  </button>
                 </div>
+
+                {/* Vollständige App öffnen Button */}
                 <button
-                  onClick={handleStartTrial}
-                  disabled={activationLoading}
+                  onClick={async () => {
+                    if (!profile.has_parent_pin) {
+                      setIsInitialPinSetup(true);
+                    } else {
+                      setPinPurpose('unlock_app');
+                      setPageState('pin_required');
+                    }
+                  }}
                   style={{
                     width: '100%',
-                    padding: '16px 20px',
+                    padding: '18px 20px',
                     borderRadius: '16px',
                     background: '#10b981',
                     color: 'white',
                     border: 'none',
                     fontWeight: 800,
-                    fontSize: '0.95rem',
+                    fontSize: '1rem',
                     cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                    transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    opacity: activationLoading ? 0.7 : 1
+                    gap: '10px'
                   }}
                 >
-                  <Sparkles size={18} /> {activationLoading ? 'Wird gestartet...' : 'Jetzt 7 Tage kostenlos testen'}
+                  <Lock size={18} /> Vollständige App öffnen
                 </button>
               </div>
             ) : (
-              <div style={{...styles.card, padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                <Lock size={20} color="#64748b" style={{margin: '0 auto'}} />
-                <span style={{fontSize: '0.875rem', color: '#475569', fontWeight: 650}}>Campus wird durch Schule verwaltet</span>
-                <span style={{fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4}}>
-                  Dein Campus-Profil wird in Kürze von deiner Musikschule freigeschaltet. Wende dich bei Fragen bitte an das Sekretariat.
-                </span>
-              </div>
+              // INACTIVE STUDENT WIDGETS
+              activationAllowed ? (
+                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #a7f3d0', background: '#f0fdf4', textAlign: 'center'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus testen</h3>
+                    <p style={{margin: 0, fontSize: '0.85rem', color: '#047857', lineHeight: 1.5, fontWeight: 550}}>
+                      Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleStartTrial}
+                    disabled={activationLoading}
+                    style={{
+                      width: '100%',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      opacity: activationLoading ? 0.7 : 1
+                    }}
+                  >
+                    <Sparkles size={18} /> {activationLoading ? 'Wird gestartet...' : 'Jetzt 7 Tage kostenlos testen'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{...styles.card, padding: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                  <Lock size={20} color="#64748b" style={{margin: '0 auto'}} />
+                  <span style={{fontSize: '0.875rem', color: '#475569', fontWeight: 650}}>Campus wird durch Schule verwaltet</span>
+                  <span style={{fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4}}>
+                    Dein Campus-Profil wird in Kürze von deiner Musikschule freigeschaltet. Wende dich bei Fragen bitte an das Sekretariat.
+                  </span>
+                </div>
+              )
             )}
 
             <div style={styles.brandFooter}>
               <Music size={14} color="#10b981" />
-              <span>Campus GrooveLab</span>
+              <span>Campus-Groovelab</span>
             </div>
           </div>
         )}

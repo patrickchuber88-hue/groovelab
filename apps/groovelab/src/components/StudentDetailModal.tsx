@@ -2256,29 +2256,55 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Schützt den Elternbereich vor unbefugtem Zugriff</span>
                     </div>
                     {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                      <input
-                        type="text"
-                        maxLength={4}
-                        placeholder="Ziffern"
-                        value={parentPin}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          setParentPin(val);
-                          if (val.length === 4 || val.length === 0) {
-                            handleUpdateParentPin(val);
-                          }
-                        }}
-                        style={{
-                          width: '80px',
-                          padding: '6px 10px',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '10px',
-                          fontSize: '0.85rem',
-                          textAlign: 'center',
-                          fontWeight: 700,
-                          color: '#1e293b'
-                        }}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="Ziffern"
+                          value={parentPin}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            setParentPin(val);
+                            if (val.length === 4 || val.length === 0) {
+                              handleUpdateParentPin(val);
+                            }
+                          }}
+                          style={{
+                            width: '80px',
+                            padding: '6px 10px',
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '10px',
+                            fontSize: '0.85rem',
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            color: '#1e293b'
+                          }}
+                        />
+                        {parentPin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Möchtest du die Eltern-PIN wirklich zurücksetzen? Der Schüler/Elternteil muss beim nächsten Scan eine neue PIN vergeben.')) {
+                                setParentPin('');
+                                handleUpdateParentPin('');
+                              }
+                            }}
+                            style={{
+                              padding: '6px 10px',
+                              background: '#fee2e2',
+                              border: 'none',
+                              borderRadius: '8px',
+                              color: '#dc2626',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'background 0.2s'
+                            }}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>
                         {parentPin ? '••••' : 'Nicht festgelegt'}

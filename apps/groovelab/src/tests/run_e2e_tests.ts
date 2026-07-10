@@ -36,6 +36,9 @@ interface User {
   first_name: string;
   last_name: string;
   is_master_admin?: boolean;
+  parent_pin?: string;
+  pin_enforced_for_preview?: boolean;
+  has_parent_pin?: boolean;
 }
 
 interface School {
@@ -114,8 +117,8 @@ class MockDatabase {
     this.users = [
       { id: 'teacher-1', role: 'teacher', school_id: 'school-1', first_name: 'John', last_name: 'Doe' },
       { id: 'teacher-2', role: 'teacher', school_id: 'school-1', first_name: 'Alice', last_name: 'Smith' },
-      { id: 'student-1', role: 'student', school_id: 'school-1', first_name: 'Jane', last_name: 'Smith' },
-      { id: 'student-2', role: 'student', school_id: 'school-1', first_name: 'Bob', last_name: 'Jones' },
+      { id: 'student-1', role: 'student', school_id: 'school-1', first_name: 'Jane', last_name: 'Smith', parent_pin: '1234', has_parent_pin: true, pin_enforced_for_preview: false },
+      { id: 'student-2', role: 'student', school_id: 'school-1', first_name: 'Bob', last_name: 'Jones', has_parent_pin: false, pin_enforced_for_preview: false },
       { id: 'admin-1', role: 'admin', school_id: 'school-1', first_name: 'Admin', last_name: 'User' },
       { id: 'secretary-1', role: 'secretary', school_id: 'school-1', first_name: 'Sec', last_name: 'Retary' },
       { id: 'master-1', role: 'admin', school_id: 'school-1', first_name: 'Master', last_name: 'Admin', is_master_admin: true }
@@ -576,6 +579,22 @@ class MockSupabaseClient {
   from(tableName: string) {
     return new MockSupabaseQueryBuilder(tableName, this.db);
   }
+
+  rpc(fnName: string, args: any) {
+    return {
+      then: (onfulfilled?: (value: any) => any) => {
+        let data: any = null;
+        if (fnName === 'verify_parent_pin') {
+          const student = this.db.users.find(u => u.id === args.student_id) as any;
+          data = (student && student.parent_pin === args.input_pin);
+        }
+        if (onfulfilled) {
+          onfulfilled({ data, error: null });
+        }
+        return Promise.resolve({ data, error: null });
+      }
+    };
+  }
 }
 
 // Instantiate database
@@ -802,6 +821,11 @@ async function main() {
           const userId = sessionStorage.getItem('groovelab_user_id');
           if (userId) {
             headers.set('x-user-id', idMap[userId] || userId);
+          }
+
+          const qrToken = sessionStorage.getItem('groovelab_qr_token');
+          if (qrToken) {
+            headers.set('x-client-info', `supabase-js/2.39.3;qr_token=${idMap[qrToken] || qrToken}`);
           }
 
           // Adjust Prefer header to return representation instead of minimal

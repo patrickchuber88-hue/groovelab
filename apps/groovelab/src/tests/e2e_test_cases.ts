@@ -3269,6 +3269,97 @@ export const testCases: TestCase[] = [
       if (!hasLessonConflict) throw new Error('Expected lesson conflict to be detected');
       if (!hasStageConflict) throw new Error('Expected double-stage conflict to be detected');
     }
+  },
+  {
+    id: 'T3_M7_QRLANDING',
+    name: 'T3: QR Landing Page and PIN Protection security controls',
+    tier: 3,
+    description: 'Ensure student last_name is masked in users select when not logged in, and verify_parent_pin returns correct validation.',
+    run: async (client) => {
+      const studentId = '33333333-3333-3333-3333-333333333331';
+      const adminId = '44444444-4444-4444-4444-444444444441';
+
+      // 1. Initialisieren der studentischen Einstellungen als Admin
+      sessionStorage.setItem('groovelab_user_id', adminId);
+      const { error: prepErr } = await client
+        .from('users')
+        .update({
+          parent_pin: '1234',
+          pin_enforced_for_preview: false
+        })
+        .eq('id', studentId);
+      if (prepErr) throw new Error('Admin failed to initialize parent_pin: ' + prepErr.message);
+
+      // 2. Simulieren des öffentlichen QR-Scans (keine User-Session, nur qr_token im Header)
+      sessionStorage.setItem('groovelab_qr_token', studentId);
+      sessionStorage.removeItem('groovelab_user_id');
+
+      // Fetch profile as public scanner
+      const { data: publicUser, error: publicErr } = await client
+        .from('users')
+        .select('id, first_name, last_name, has_parent_pin, pin_enforced_for_preview')
+        .eq('id', studentId)
+        .single();
+
+      if (publicErr) throw new Error('Failed to fetch user as public scanner: ' + publicErr.message);
+      
+      // In Real-Mode muss der Nachname maskiert zurückgeliefert werden (z. B. "Smith" -> "S.")
+      const expectedLastName = publicUser.last_name;
+      if (process.env.USE_MOCK !== 'true') {
+        if (expectedLastName !== 'S.') {
+          throw new Error(`Expected masked last name "S.", got "${expectedLastName}"`);
+        }
+      }
+
+      // 3. Testen der Eltern-PIN-Verifizierung via RPC
+      const { data: verifyFalse, error: errFalse } = await client.rpc('verify_parent_pin', {
+        student_id: studentId,
+        input_pin: '9999' // falsche PIN
+      });
+      if (errFalse) throw new Error('RPC verify_parent_pin failed: ' + errFalse.message);
+      if (verifyFalse !== false) throw new Error('Expected verify_parent_pin to fail for incorrect PIN');
+
+      const { data: verifyTrue, error: errTrue } = await client.rpc('verify_parent_pin', {
+        student_id: studentId,
+        input_pin: '1234' // korrekte PIN
+      });
+      if (errTrue) throw new Error('RPC verify_parent_pin failed: ' + errTrue.message);
+      if (verifyTrue !== true) throw new Error('Expected verify_parent_pin to pass for correct PIN');
+
+      // 4. Testen der Änderung von Einstellungen durch Admin/Lehrer
+      sessionStorage.setItem('groovelab_user_id', adminId);
+      const { error: updErr } = await client
+        .from('users')
+        .update({
+          pin_enforced_for_preview: true,
+          parent_pin: '5678'
+        })
+        .eq('id', studentId);
+      
+      if (updErr) throw new Error('Failed to update student settings: ' + updErr.message);
+
+      // Verifizieren, ob die Einstellungen korrekt gespeichert wurden
+      const { data: updatedUser, error: getErr } = await client
+        .from('users')
+        .select('pin_enforced_for_preview')
+        .eq('id', studentId)
+        .single();
+      
+      if (getErr) throw new Error(getErr.message);
+      if (updatedUser.pin_enforced_for_preview !== true) {
+        throw new Error('pin_enforced_for_preview was not updated correctly');
+      }
+
+      // 5. Aufräumen und Zurücksetzen in den Standardzustand
+      const { error: restoreErr } = await client
+        .from('users')
+        .update({
+          pin_enforced_for_preview: false,
+          parent_pin: null
+        })
+        .eq('id', studentId);
+      if (restoreErr) throw new Error('Failed to restore student settings: ' + restoreErr.message);
+    }
   }
 ];
 
