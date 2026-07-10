@@ -1841,7 +1841,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
 
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 1024 : false);
 
   const campusSettings = useMemo(() => {
     return studentUser?.schools?.opening_hours?.campus_settings || {};
@@ -1855,7 +1855,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 800);
+      setIsMobile(window.innerWidth <= 1024);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -8297,7 +8297,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* MAIN 2-COLUMN LAYOUT */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '32px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '32px', alignItems: 'start' }}>
             
             {/* LEFT COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>

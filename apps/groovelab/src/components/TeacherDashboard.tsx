@@ -5664,7 +5664,7 @@ export function TeacherDashboard({
                     <>
                       {/* Gamified KPI Cards row */}
                       {(!teacher?.sick_until || bypassSickView) && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
                       <div style={{

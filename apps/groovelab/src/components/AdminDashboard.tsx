@@ -583,7 +583,7 @@ export function AdminDashboard({
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 800);
+      setIsMobile(window.innerWidth <= 1024);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -1432,7 +1432,7 @@ export function AdminDashboard({
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 1024 : false);
   
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
@@ -11062,7 +11062,7 @@ export function AdminDashboard({
         </div>
 
         {/* Middle: Challenges & Wochentage Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr', gap: '32px' }}>
           
           {/* Left: Challenges per Instrument */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
@@ -11139,7 +11139,7 @@ export function AdminDashboard({
         </div>
 
         {/* Bottom: Leaderboard & Popular Songs */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '32px' }}>
           
           {/* XP Leaderboard */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
@@ -16175,6 +16175,7 @@ function DeviceSetupScreen({
   const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
 
   // Academy Setup state
   const [name, setName] = useState(effectiveSchool?.name || '');
@@ -16767,7 +16768,7 @@ function DeviceSetupScreen({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px', alignItems: 'stretch' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr', gap: '32px', alignItems: 'stretch' }}>
               {/* Left Column: Öffnungszeiten */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Öffnungszeiten</label>

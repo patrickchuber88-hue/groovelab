@@ -5618,16 +5618,22 @@ function App() {
     // GrooveLab students start on the 'live' tab.
     const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
     localStorage.setItem('campus_active_tab', 'briefing');
+    
+    // Check if the user selected 'groovelab' on the login screen
+    const selectedPlat = localStorage.getItem('groovelab_active_platform') || 'campus';
+    
     if (userToLogin?.role === 'student') {
-      localStorage.setItem('groovelab_active_tab', 'live');
-      if (mode === 'lab') {
-        localStorage.setItem('groovelab_active_platform', 'groovelab');
+      if (selectedPlat === 'groovelab') {
+        localStorage.setItem('groovelab_active_tab', 'live');
+      } else {
+        localStorage.setItem('groovelab_active_tab', 'briefing');
+        localStorage.setItem('campus_active_tab', 'briefing');
       }
     } else {
       localStorage.setItem('groovelab_active_tab', 'live');
     }
     
-    const resolvedPlatform = mode === 'lab' && userToLogin?.role === 'student' ? 'groovelab' : (localStorage.getItem('groovelab_active_platform') || 'groovelab');
+    const resolvedPlatform = selectedPlat;
     const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'briefing';
     setActiveStudentTab(startTab);
 
@@ -5693,7 +5699,7 @@ function App() {
   useEffect(() => {
     if (user && user.role === 'student' && locationMode === 'lab') {
       const activePlat = localStorage.getItem('groovelab_active_platform');
-      if (activePlat === 'campus') {
+      if (activePlat !== 'campus' && activePlat !== 'groovelab') {
         console.log('[Lab Lock] Resetting platform to groovelab on page load for student security');
         setActivePlatformRaw('groovelab');
         localStorage.setItem('groovelab_active_platform', 'groovelab');
@@ -7066,7 +7072,7 @@ function App() {
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
-      <aside className="sidebar-nav" style={{ display: windowWidth > 800 ? 'flex' : 'none' }}>
+      <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {activePlatform === 'campus' ? (
             <>
@@ -7483,12 +7489,12 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 800 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
-            gap: windowWidth <= 800 ? '4px' : '6px', 
+            gap: windowWidth <= 1024 ? '4px' : '6px', 
             height: '100%',
             paddingTop: '20px',
             boxSizing: 'border-box'
@@ -7507,7 +7513,7 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.05)',
                   color: activePlatform === 'campus' ? '#ffffff' : '#34a853',
@@ -7544,7 +7550,7 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.05)',
                   color: activePlatform === 'groovelab' ? '#09090b' : '#eab308',
@@ -7579,7 +7585,7 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 800 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
                   color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
@@ -7608,8 +7614,8 @@ function App() {
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: windowWidth <= 800 ? '16px' : '28px',
-            marginLeft: windowWidth <= 800 ? '24px' : '48px'
+            gap: windowWidth <= 1024 ? '16px' : '28px',
+            marginLeft: windowWidth <= 1024 ? '24px' : '48px'
           }}>
             {/* Status Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
@@ -7831,7 +7837,7 @@ function App() {
             </div>
 
             {/* Ausweis Button (Desktop only) */}
-            {windowWidth > 800 && (
+            {windowWidth > 1024 && (
               <button 
                 onClick={() => setShowQR(true)} 
                 style={{ 
@@ -7852,8 +7858,8 @@ function App() {
             )}
 
             {/* User Info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 800 ? '8px' : '16px', paddingLeft: windowWidth <= 800 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
-              {windowWidth > 800 && activePlatform !== 'campus' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '8px' : '16px', paddingLeft: windowWidth <= 1024 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
+              {windowWidth > 1024 && activePlatform !== 'campus' && (
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
@@ -12649,7 +12655,7 @@ function App() {
           <nav 
             className="mobile-nav" 
             style={{ 
-              display: windowWidth <= 800 ? 'flex' : 'none',
+              display: windowWidth <= 1024 ? 'flex' : 'none',
               justifyContent: isCompact ? 'space-around' : 'flex-start',
               gap: isCompact ? '4px' : '12px',
               padding: isCompact ? '8px 12px 24px 12px' : '12px 16px 28px 16px'

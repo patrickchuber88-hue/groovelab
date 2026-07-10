@@ -93,6 +93,12 @@ export function ScheduleCalendarView({
   };
 
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showWeekend, setShowWeekend] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth > 1024;
+    }
+    return true;
+  });
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
@@ -3105,6 +3111,28 @@ export function ScheduleCalendarView({
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowWeekend(prev => !prev)}
+              style={{
+                background: showWeekend ? '#ffffff' : 'rgba(0,0,0,0.03)',
+                color: '#475569',
+                border: '1px solid rgba(0,0,0,0.08)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                minHeight: '36px',
+                boxShadow: showWeekend ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              }}
+            >
+              <span>📅</span> {showWeekend ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
+            </button>
             {Object.keys(pendingChanges).length > 0 && (
               <button 
                 onClick={savePendingChanges}
@@ -3379,7 +3407,7 @@ export function ScheduleCalendarView({
 
         <div ref={gridRef} style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', 
+          gridTemplateColumns: showWeekend ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', 
           gap: '0px',
           background: '#ffffff',
           borderRadius: '24px',
@@ -3388,7 +3416,7 @@ export function ScheduleCalendarView({
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
           overflow: 'hidden'
         }}>
-        {[0, 1, 2, 3, 4, 5, 6].map(offset => {
+        {[0, 1, 2, 3, 4, 5, 6].filter(offset => showWeekend || offset < 5).map(offset => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);

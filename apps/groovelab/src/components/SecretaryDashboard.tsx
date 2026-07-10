@@ -10283,7 +10283,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             </div>
 
             {/* Ausweis Button (Desktop only) */}
-            {window.innerWidth > 800 && (
+            {window.innerWidth > 1024 && (
               <button 
                 onClick={() => setShowOwnQrModal(true)} 
                 style={{ 
@@ -10533,7 +10533,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             })();
 
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}>
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -23204,7 +23204,7 @@ status: status,
           const selectedRoom = rooms.find(r => r.id === selectedEquipmentRoomId);
           
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? '1fr' : '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
               
               {/* LEFT COLUMN: WIDGET */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -3,7 +3,7 @@ import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, Ch
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
-import lamejs from 'lamejs';
+import * as lamejs from '@breezystack/lamejs';
 
 export const ALL_STICKERS = [
   // Meilensteine / Üben
@@ -10519,7 +10519,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
     const mp3encoder = new Mp3EncoderClass(channels, sampleRate, 128);
     
-    const mp3Data: Int8Array[] = [];
+    const mp3Data: any[] = [];
     const samples = buffer.getChannelData(0);
     
     const sampleBlockSize = 1152;
