@@ -2819,7 +2819,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   if (onProfileClick) e.currentTarget.style.opacity = '1';
                 }}
               >
-                {student.first_name}
+                {readOnly 
+                  ? 'Hausaufgabenheft' 
+                  : `${student.first_name}${student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : ''}`
+                }
               </h2>
               <span style={{
                 fontSize: '0.68rem',
@@ -8723,6 +8726,157 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
   const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
+  const [isCalibratingLatency, setIsCalibratingLatency] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
+  const runAutoLatencyCalibration = async () => {
+    if (isCalibratingLatency) return;
+    setIsCalibratingLatency(true);
+    
+    let stream: MediaStream | null = null;
+    let ctx: AudioContext | null = null;
+    let timeoutId: any;
+    
+    try {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+      
+      const sourceNode = ctx.createMediaStreamSource(stream);
+      
+      // Apply High-pass Filter at 1000Hz to ignore low frequency room hums/noises
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(1000, ctx.currentTime);
+      
+      const processor = ctx.createScriptProcessor(2048, 1, 1);
+      
+      sourceNode.connect(filter);
+      filter.connect(processor);
+      processor.connect(ctx.destination);
+      
+      let ambientNoisePeak = 0.01;
+      let samplesChecked = 0;
+      let calibrationPhase: 'ambient' | 'waiting' | 'done' = 'ambient';
+      
+      const measurements: number[] = [];
+      let currentClickIndex = 0;
+      const totalClicksNeeded = 3;
+      let playTime = 0;
+      let detectionTime = 0;
+      
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        try {
+          processor.disconnect();
+          filter.disconnect();
+          sourceNode.disconnect();
+        } catch (e) {}
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+        if (ctx && ctx.state !== 'closed') {
+          ctx.close().catch(e => console.warn(e));
+        }
+        setIsCalibratingLatency(false);
+      };
+      
+      // 5.5-second safety timeout
+      timeoutId = setTimeout(() => {
+        cleanup();
+        alert("Kalibrierung fehlgeschlagen: Kein akustisches Signal am Mikrofon erkannt. Bitte stelle sicher, dass deine Lautsprecher laut genug eingestellt sind und kein Kopfhörer angeschlossen ist.");
+      }, 5500);
+      
+      const playNextClick = () => {
+        if (!ctx || ctx.state === 'closed') return;
+        calibrationPhase = 'waiting';
+        
+        // 1500Hz sine burst, 0ms attack
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1500, ctx.currentTime);
+        
+        gain.gain.setValueAtTime(1.0, ctx.currentTime); // Instant 0ms attack
+        gain.gain.setValueAtTime(1.0, ctx.currentTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.015);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        playTime = ctx.currentTime;
+        osc.start(playTime);
+        osc.stop(playTime + 0.03);
+      };
+      
+      processor.onaudioprocess = (e) => {
+        if (calibrationPhase === 'done') return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        
+        if (calibrationPhase === 'ambient') {
+          for (let i = 0; i < inputData.length; i++) {
+            const absVal = Math.abs(inputData[i]);
+            if (absVal > ambientNoisePeak) {
+              ambientNoisePeak = absVal;
+            }
+          }
+          samplesChecked += inputData.length;
+          
+          if (samplesChecked > 16384) { // ~370ms ambient measurement
+            playNextClick();
+          }
+        } else if (calibrationPhase === 'waiting') {
+          const threshold = Math.max(0.15, ambientNoisePeak * 4);
+          for (let i = 0; i < inputData.length; i++) {
+            if (Math.abs(inputData[i]) > threshold) {
+              detectionTime = ctx!.currentTime + (i / ctx!.sampleRate);
+              const latencyMs = Math.round((detectionTime - playTime) * 1000);
+              
+              // Standard compensation block correction
+              const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
+              measurements.push(estimatedLatency);
+              
+              currentClickIndex++;
+              if (currentClickIndex < totalClicksNeeded) {
+                // Pause 700ms before playing the next click to let echoes die out
+                calibrationPhase = 'ambient'; // Reset to wait state
+                samplesChecked = 0; // Quick reset
+                setTimeout(playNextClick, 700);
+              } else {
+                calibrationPhase = 'done';
+                // Average of the 3 measurements
+                const avgLatency = Math.round(measurements.reduce((sum, val) => sum + val, 0) / measurements.length);
+                
+                setSyncOffsetMs(avgLatency);
+                isManualLatencyAdjustmentRef.current = true;
+                
+                cleanup();
+                alert(`Auto-Kalibrierung erfolgreich!\nGemittelte Latenz aus 3 Klicks: ${avgLatency}ms`);
+              }
+              break;
+            }
+          }
+        }
+      };
+      
+    } catch (err: any) {
+      console.error("Auto latency calibration failed:", err);
+      alert(`Fehler bei der Latenz-Kalibrierung: ${err.message || err}`);
+      setIsCalibratingLatency(false);
+      if (ctx && ctx.state !== 'closed') {
+        ctx.close().catch(e => console.warn(e));
+      }
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    }
+  };
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const syncOffsetMsRef = useRef<number>(0);
@@ -9629,7 +9783,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               }
               
               // Latency Calibration on LOW click (beat 1 of count-in)
-              if (!isHigh) {
+              if (!isHigh && !isManualLatencyAdjustmentRef.current) {
                 const peakTime = recordStartTime + (peakIndex / sampleRate);
                 const rawLatencySec = peakTime - expectedClickTime;
                 if (rawLatencySec > 0 && rawLatencySec < 0.5) {
@@ -10499,8 +10653,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, [isPlaying, tracks]);
 
   const isPause = isAutoSequenceActive && autoSequenceStatus.startsWith("PAUSE");
-  const ringColor = isAutoSequenceActive 
-    ? '#ea4335' // Red during the entire auto-sequence (including count-in, pauses, and recording)
+  const isAnyTrackRecording = tracks.some(t => t.isRecording);
+  const ringColor = (isAutoSequenceActive || isAnyTrackRecording)
+    ? '#ea4335' // Red during the entire auto-sequence or individual track recording
     : isPlaying 
       ? '#137333' // Green during playback
       : '#e5e5e7'; // default/ready
@@ -10509,7 +10664,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     <div style={{
       display: 'flex',
       flex: 1,
-      background: 'linear-gradient(135deg, #f5f6f8 0%, #eef0f3 100%)',
+      background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
       minHeight: '520px',
@@ -10519,6 +10674,77 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     }} className="flex-col lg:flex-row">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes pulse-recording-card {
+          0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.25); border-color: #ea4335; }
+          70% { box-shadow: 0 0 0 8px rgba(234, 67, 53, 0); border-color: rgba(234, 67, 53, 0.4); }
+          100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); border-color: #ea4335; }
+        }
+        .recording-card-pulse {
+          animation: pulse-recording-card 2s infinite ease-in-out;
+        }
+        @keyframes glow-record {
+          0% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); }
+          50% { filter: drop-shadow(0 0 12px rgba(234, 67, 53, 0.8)); }
+          100% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); }
+        }
+        @keyframes glow-play {
+          0% { filter: drop-shadow(0 0 3px rgba(19, 115, 51, 0.25)); }
+          50% { filter: drop-shadow(0 0 10px rgba(19, 115, 51, 0.65)); }
+          100% { filter: drop-shadow(0 0 3px rgba(19, 115, 51, 0.25)); }
+        }
+        .glow-record {
+          animation: glow-record 2s infinite ease-in-out;
+        }
+        .glow-play {
+          animation: glow-play 2s infinite ease-in-out;
+        }
+        .tactile-btn {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .tactile-btn:hover:not(:disabled) {
+          transform: translateY(-1.5px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+        }
+        .tactile-btn:active:not(:disabled) {
+          transform: translateY(0.5px);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04) !important;
+        }
+        .groovelab-fader {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 6px;
+          border-radius: 3px;
+          background: #edf2f7;
+          outline: none;
+          transition: background 0.15s ease;
+        }
+        .groovelab-fader::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #137333;
+          border: 2.5px solid #ffffff;
+          cursor: pointer;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+          transition: transform 0.15s ease, background 0.15s ease;
+        }
+        .groovelab-fader::-webkit-slider-thumb:hover {
+          transform: scale(1.15);
+          background: #0f5c29;
+        }
+        .daw-console-strip {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .daw-console-strip:hover {
+          transform: translateY(-1.5px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03) !important;
+          border-color: rgba(0, 0, 0, 0.08) !important;
+        }
+      `}} />
       
       {/* Left Column: Loop Progress, Metronom & Controls */}
       <div style={{
@@ -10527,12 +10753,12 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        gap: '20px',
-        padding: '28px',
+        gap: '16px',
+        padding: '24px 20px',
         background: '#ffffff',
-        border: '1px solid #e2e8f0',
+        border: '1px solid #f1f3f5',
         borderRadius: '20px',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01)',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -10551,30 +10777,32 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         {/* Central Jog Wheel / Status Ring */}
         <div style={{
           position: 'relative',
-          width: '180px',
-          height: '180px',
+          width: '160px',
+          height: '160px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           background: 'transparent',
-          margin: '4px 0'
+          margin: '2px 0'
         }}>
           {/* Animated SVG Progress Sweep */}
           <svg 
             viewBox="0 0 200 200"
+            className={isAnyTrackRecording || isAutoSequenceActive ? 'glow-record' : isPlaying ? 'glow-play' : ''}
             style={{
               position: 'absolute',
               width: '100%',
               height: '100%',
               transform: 'rotate(-90deg) translate3d(0,0,0)',
-              willChange: 'transform'
+              willChange: 'transform',
+              transition: 'filter 0.3s ease'
             }}
           >
             <circle
               cx="100"
               cy="100"
               r="84"
-              stroke="#f1f3f5"
+              stroke="#edf2f7"
               strokeWidth="6"
               fill="none"
             />
@@ -10590,8 +10818,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               strokeLinecap="round"
               style={{
                 transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
-                willChange: 'stroke-dashoffset',
-                filter: isPlaying || isAutoSequenceActive ? `drop-shadow(0 0 6px ${ringColor}80)` : 'none'
+                willChange: 'stroke-dashoffset'
               }}
             />
           </svg>
@@ -10599,32 +10826,33 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           {/* Central Plate */}
           <div style={{
             position: 'absolute',
-            width: '138px',
-            height: '138px',
+            width: '124px',
+            height: '124px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, #ffffff 60%, #f8f9fa 100%)',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(16px)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.06), 0 10px 20px rgba(0,0,0,0.04)'
+            boxShadow: 'inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03)'
           }}>
             <span style={{ 
-              fontSize: '2.2rem', 
+              fontSize: '2.0rem', 
               fontWeight: 800, 
-              fontFamily: 'SF Mono, Monaco, Consolas, monospace', 
+              fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif', 
               letterSpacing: '-0.05em', 
-              color: ringColor === '#e5e5e7' ? '#2d3748' : ringColor,
+              color: ringColor === '#e5e5e7' ? '#1d1d1f' : ringColor,
               transition: 'color 0.3s ease'
             }}>
               {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
             </span>
             <span style={{ 
-              fontSize: '0.58rem', 
-              color: '#718096', 
-              fontWeight: 800, 
-              letterSpacing: '0.15em', 
-              marginTop: '4px', 
+              fontSize: '0.54rem', 
+              color: '#86868b', 
+              fontWeight: 700, 
+              letterSpacing: '0.12em', 
+              marginTop: '2px', 
               textTransform: 'uppercase' 
             }}>
               {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
@@ -10633,48 +10861,37 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         </div>
 
         {/* Auto-Sequence Action Center */}
-        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
             onClick={startAutoSequence}
             disabled={isAutoSequenceActive}
+            className="tactile-btn"
             style={{
               width: '100%',
-              background: isAutoSequenceActive 
-                ? 'linear-gradient(135deg, #d93025 0%, #b31412 100%)' 
-                : 'linear-gradient(135deg, #137333 0%, #0f5c29 100%)',
+              background: isAutoSequenceActive ? '#ea4335' : '#137333',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '14px',
-              height: '50px',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              letterSpacing: '0.06em',
+              borderRadius: '12px',
+              height: '46px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              letterSpacing: '0.02em',
               cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
-              boxShadow: isAutoSequenceActive 
-                ? '0 6px 20px rgba(217, 48, 37, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)' 
-                : '0 6px 20px rgba(19, 115, 51, 0.25), inset 0 1px 0 rgba(255,255,255,0.2)',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              textTransform: 'uppercase',
-              transform: 'translateY(0px)'
-            }}
-            onMouseDown={(e) => {
-              if (!isAutoSequenceActive) e.currentTarget.style.transform = 'translateY(1px)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'translateY(0px)';
+              gap: '10px',
+              transition: 'all 0.2s ease',
+              textTransform: 'uppercase'
             }}
           >
             <div style={{
-              width: '10px',
-              height: '10px',
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
               background: '#ffffff',
-              boxShadow: '0 0 10px #ffffff',
+              boxShadow: '0 0 8px #ffffff',
               animation: isAutoSequenceActive ? 'pulse 1s infinite alternate' : 'none',
               opacity: isAutoSequenceActive ? 1 : 0.8
             }} />
@@ -10682,13 +10899,12 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           </button>
           {isAutoSequenceActive && (
             <span style={{ 
-              fontSize: '0.58rem', 
+              fontSize: '0.54rem', 
               color: '#ea4335', 
-              letterSpacing: '0.08em', 
-              fontWeight: 800, 
+              letterSpacing: '0.04em', 
+              fontWeight: 700, 
               textAlign: 'center', 
-              textTransform: 'uppercase',
-              animation: 'pulse 1.5s infinite'
+              textTransform: 'uppercase'
             }}>
               Aufnahme läuft - bitte weiterspielen!
             </span>
@@ -10704,66 +10920,63 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             }}
             style={{
               width: '100%',
-              background: useHeadphones ? '#e6f4ea' : '#f8f9fa',
-              border: useHeadphones ? '1.5px solid #137333' : '1.5px solid #e2e8f0',
-              borderRadius: '14px',
-              padding: '12px 14px',
+              background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',
+              border: useHeadphones ? '1px solid rgba(19, 115, 51, 0.15)' : '1px solid #f1f3f5',
+              borderRadius: '12px',
+              padding: '10px 12px',
               cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
-              transition: 'all 0.25s ease',
-              marginTop: '2px',
+              gap: '10px',
+              transition: 'all 0.2s ease',
               opacity: isAutoSequenceActive ? 0.6 : 1,
-              boxShadow: useHeadphones ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
+              boxShadow: useHeadphones ? '0 4px 12px rgba(19, 115, 51, 0.03)' : 'none'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
-                width: '38px',
-                height: '38px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
-                background: useHeadphones ? '#137333' : '#e2e8f0',
-                color: useHeadphones ? '#ffffff' : '#718096',
+                background: useHeadphones ? '#137333' : '#f5f5f7',
+                color: useHeadphones ? '#ffffff' : '#86868b',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 0.2s ease',
-                boxShadow: useHeadphones ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none'
+                transition: 'all 0.2s ease'
               }}>
-                <Headphones size={18} />
+                <Headphones size={15} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: useHeadphones ? '#137333' : '#2d3748', letterSpacing: '0.02em' }}>
-                  KOPFHÖRER-MODUS
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: useHeadphones ? '#137333' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                  Kopfhörer-Modus
                 </span>
-                <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 500 }}>
-                  Studio-Qualität & Mehrspur
+                <span style={{ fontSize: '0.54rem', color: '#86868b', fontWeight: 500 }}>
+                  Studio & Mehrspur aktiv
                 </span>
               </div>
             </div>
             
             <div style={{
-              width: '38px',
-              height: '22px',
-              borderRadius: '11px',
-              background: useHeadphones ? '#137333' : '#cbd5e0',
+              width: '34px',
+              height: '20px',
+              borderRadius: '10px',
+              background: useHeadphones ? '#137333' : '#e5e5ea',
               position: 'relative',
               transition: 'all 0.2s ease',
-              padding: '2px',
-              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+              padding: '2px'
             }}>
               <div style={{
-                width: '18px',
-                height: '18px',
+                width: '16px',
+                height: '16px',
                 borderRadius: '50%',
                 background: '#ffffff',
                 position: 'absolute',
-                left: useHeadphones ? '18px' : '2px',
+                left: useHeadphones ? '16px' : '2px',
                 top: '2px',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
               }} />
             </div>
           </div>
@@ -10773,11 +10986,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             alignItems: 'center', 
             justifyContent: 'space-between',
             width: '100%',
-            marginTop: '2px',
-            padding: '4px 0'
+            padding: '2px 0'
           }}>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#4a5568', letterSpacing: '0.03em' }}>
-              SPUR-ANZAHL:
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>
+              Spur-Anzahl:
             </span>
             <select
               value={desiredTrackCount}
@@ -10785,16 +10997,14 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               disabled={isAutoSequenceActive || !useHeadphones}
               style={{
                 background: '#ffffff',
-                border: '1.5px solid #cbd5e0',
-                borderRadius: '10px',
-                padding: '5px 10px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: useHeadphones ? '#2d3748' : '#a0aec0',
+                border: '1px solid #e5e5ea',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                color: useHeadphones ? '#1d1d1f' : '#86868b',
                 cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.2s ease'
+                outline: 'none'
               }}
             >
               <option value={2}>2 Spuren (Boxen-Limit)</option>
@@ -10803,169 +11013,214 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               <option value={5}>5 Spuren (Max)</option>
             </select>
           </div>
-          <span style={{ fontSize: '0.54rem', color: '#718096', lineHeight: 1.4, textAlign: 'center', marginTop: '2px', maxWidth: '260px' }}>
-            Tipp: Bei Rückkopplungen oder Pfeifen verwende bitte Kopfhörer oder reduziere die Mikrofon-Eingangslautstärke in deinen macOS-Systemeinstellungen.
-          </span>
         </div>
 
         {/* Global Controls */}
-        <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+        <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '2px' }}>
           <button
             type="button"
             onClick={handlePlayToggle}
             disabled={!masterLoopDuration}
+            className="tactile-btn"
             style={{
               flex: 2,
-              background: isPlaying ? 'linear-gradient(135deg, #d93025 0%, #b31412 100%)' : '#ffffff',
+              background: isPlaying ? '#ea4335' : '#ffffff',
               color: isPlaying ? '#ffffff' : '#137333',
-              border: isPlaying ? 'none' : '1.5px solid #137333',
+              border: isPlaying ? 'none' : '1px solid #137333',
               borderRadius: '12px',
-              height: '44px',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              letterSpacing: '0.06em',
+              height: '42px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
               cursor: masterLoopDuration ? 'pointer' : 'not-allowed',
               opacity: masterLoopDuration ? 1 : 0.45,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              boxShadow: isPlaying ? '0 4px 12px rgba(217,48,37,0.2)' : '0 2px 4px rgba(0,0,0,0.02)',
+              gap: '6px',
               transition: 'all 0.2s ease'
             }}
           >
-            {isPlaying ? <Square size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" />}
+            {isPlaying ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
             <span>{isPlaying ? 'STOP' : 'PLAY'}</span>
           </button>
 
           <button
             type="button"
             onClick={handleReset}
+            className="tactile-btn"
             style={{
               flex: 1,
-              background: '#ffffff',
-              color: '#718096',
-              border: '1.5px solid #cbd5e0',
+              background: '#f5f5f7',
+              color: '#1d1d1f',
+              border: 'none',
               borderRadius: '12px',
-              height: '44px',
+              height: '42px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+              gap: '4px',
               transition: 'all 0.2s ease'
             }}
           >
-            <RotateCcw size={13} />
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em' }}>RESET</span>
+            <RotateCcw size={11} />
+            <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>RESET</span>
           </button>
         </div>
 
-        {/* Metronome Panel */}
-        <div style={{
-          background: '#f8f9fa',
-          border: '1px solid #e9ecef',
-          borderRadius: '16px',
-          padding: '14px 18px',
-          width: '100%',
-          maxWidth: '280px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          marginTop: '2px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 800, letterSpacing: '0.08em' }}>TEMPO / UTILITY</span>
-            <button
-              type="button"
-              onClick={() => setIsMetronomeActive(!isMetronomeActive)}
-              style={{
-                background: isMetronomeActive ? '#137333' : '#edf2f7',
-                border: 'none',
-                color: isMetronomeActive ? '#ffffff' : '#4a5568',
-                fontSize: '0.55rem',
-                fontWeight: 800,
-                borderRadius: '6px',
-                padding: '4px 10px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                letterSpacing: '0.06em',
-                boxShadow: isMetronomeActive ? '0 2px 5px rgba(19, 115, 51, 0.2)' : 'none'
-              }}
-            >
-              {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
-            </button>
-          </div>
+        {/* Collapsible Advanced Settings (Tempo, Metronom, Latenz) */}
+        <button
+          type="button"
+          onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+          className="tactile-btn"
+          style={{
+            background: 'transparent',
+            color: '#86868b',
+            border: 'none',
+            fontSize: '0.64rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            padding: '4px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginTop: '4px',
+            textDecoration: 'none'
+          }}
+        >
+          <span>{showAdvancedSettings ? '↑ Einstellungen ausblenden' : '↓ Tempo & Metronom anpassen...'}</span>
+        </button>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={handleTapTempo}
-              style={{
-                flex: 1.2,
-                background: '#ffffff',
-                color: '#137333',
-                border: '1px solid #d1e7dd',
-                borderRadius: '10px',
-                height: '34px',
-                fontSize: '0.64rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                letterSpacing: '0.02em',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              TAP TEMPO
-            </button>
-            
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                style={{ width: '30px', height: '34px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#2d3748', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
-              >
-                -
-              </button>
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, fontFamily: 'SF Mono, monospace', minWidth: '38px', textAlign: 'center', color: '#2d3748' }}>
-                {bpm}
-              </span>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                style={{ width: '30px', height: '34px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#2d3748', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          
-          {/* Hardware Latency Calibration Slider */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e9ecef', paddingTop: '10px' }}>
+        {showAdvancedSettings && (
+          /* Metronome Panel */
+          <div style={{
+            border: '1px solid #f1f3f5',
+            borderRadius: '16px',
+            padding: '14px',
+            width: '100%',
+            maxWidth: '280px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            marginTop: '2px',
+            background: '#ffffff'
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.58rem', color: '#718096', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                SYNC LATENCY
-              </span>
-              <span style={{ fontSize: '0.62rem', color: '#137333', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>
-                {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
-              </span>
+              <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em' }}>TEMPO / UTILITY</span>
+              <button
+                type="button"
+                onClick={() => setIsMetronomeActive(!isMetronomeActive)}
+                className="tactile-btn"
+                style={{
+                  background: isMetronomeActive ? '#137333' : '#f5f5f7',
+                  border: 'none',
+                  color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
+                  fontSize: '0.55rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  letterSpacing: '0.04em'
+                }}
+              >
+                {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
+              </button>
             </div>
+
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input 
-                type="range" 
-                min="-150" 
-                max="350" 
-                value={syncOffsetMs} 
-                onChange={(e) => {
-                  setSyncOffsetMs(parseInt(e.target.value));
-                  isManualLatencyAdjustmentRef.current = true;
-                }} 
-                style={{ flex: 1, accentColor: '#137333', height: '4px', cursor: 'pointer' }}
-              />
+              <button
+                type="button"
+                onClick={handleTapTempo}
+                className="tactile-btn"
+                style={{
+                  flex: 1.2,
+                  background: '#f5f5f7',
+                  color: '#1d1d1f',
+                  border: 'none',
+                  borderRadius: '8px',
+                  height: '34px',
+                  fontSize: '0.66rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                TAP TEMPO
+              </button>
+              
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                  className="tactile-btn"
+                  style={{ width: '30px', height: '34px', background: '#f5f5f7', border: 'none', color: '#1d1d1f', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
+                >
+                  -
+                </button>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: 'SF Mono, monospace', minWidth: '34px', textAlign: 'center', color: '#1d1d1f' }}>
+                  {bpm}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                  className="tactile-btn"
+                  style={{ width: '30px', height: '34px', background: '#f5f5f7', border: 'none', color: '#1d1d1f', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            
+            {/* Hardware Latency Calibration Slider */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f3f5', paddingTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  SYNC LATENCY
+                </span>
+                <span style={{ fontSize: '0.62rem', color: '#137333', fontWeight: 700, fontFamily: 'SF Mono, monospace' }}>
+                  {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input 
+                  type="range" 
+                  min="-150" 
+                  max="350" 
+                  value={syncOffsetMs} 
+                  onChange={(e) => {
+                    setSyncOffsetMs(parseInt(e.target.value));
+                    isManualLatencyAdjustmentRef.current = true;
+                  }} 
+                  style={{ flex: 1, accentColor: '#137333', height: '4px', cursor: 'pointer' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={runAutoLatencyCalibration}
+                disabled={isCalibratingLatency}
+                className="tactile-btn"
+                style={{
+                  background: isCalibratingLatency ? '#e5e5ea' : 'rgba(19, 115, 51, 0.08)',
+                  color: isCalibratingLatency ? '#86868b' : '#137333',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  cursor: isCalibratingLatency ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease',
+                  width: '100%',
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  marginTop: '2px'
+                }}
+              >
+                {isCalibratingLatency ? 'Kalibriere...' : 'Auto-Kalibrierung'}
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Master Mixdown Export Buttons */}
         {masterLoopDuration && (
@@ -10974,21 +11229,21 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               type="button"
               onClick={handleExportMix}
               disabled={isExporting}
+              className="tactile-btn"
               style={{
-                background: 'linear-gradient(180deg, #137333 0%, #0f5c29 100%)',
+                background: '#137333',
                 color: '#ffffff',
                 border: 'none',
-                borderRadius: '14px',
-                padding: '14px 20px',
-                fontSize: '0.76rem',
-                fontWeight: 800,
+                borderRadius: '12px',
+                padding: '12px 20px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
                 cursor: 'pointer',
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)'
+                gap: '8px'
               }}
             >
               <span>{isExporting ? 'SPEICHERE...' : 'IM HAUSAUFGABENHEFT SPEICHERN'}</span>
@@ -10997,21 +11252,21 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               type="button"
               onClick={handleDownloadMix}
               disabled={isExporting}
+              className="tactile-btn"
               style={{
-                background: '#f8f9fa',
-                color: '#2d3748',
-                border: '1px solid #cbd5e0',
-                borderRadius: '14px',
+                background: '#f5f5f7',
+                color: '#1d1d1f',
+                border: 'none',
+                borderRadius: '12px',
                 padding: '12px 20px',
-                fontSize: '0.76rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
+                gap: '8px'
               }}
             >
               <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
@@ -11025,7 +11280,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         flex: '1.2 1 0%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '10px',
         padding: '2px 0',
         justifyContent: 'flex-start'
       }}>
@@ -11033,58 +11288,36 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           const hasAudio = !!track.url;
           const hasAnySolo = tracks.some(t => t.isSoloed);
           const isImplicitlyMuted = hasAnySolo && !track.isSoloed && !track.isMuted;
+          
           return (
             <div
               key={track.id}
+              className={`daw-console-strip ${track.isRecording ? 'recording-card-pulse' : ''}`}
               style={{
                 background: '#ffffff',
                 border: track.isRecording 
                   ? '1.5px solid #ea4335' 
                   : track.isWaiting 
                     ? '1.5px solid #d97706'
-                    : '1px solid #e2e8f0',
+                    : '1px solid #f1f3f5',
                 borderRadius: '16px',
-                padding: '16px 20px',
+                padding: '14px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '20px',
+                gap: '16px',
                 position: 'relative',
                 opacity: isImplicitlyMuted ? 0.45 : 1,
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: track.isRecording 
-                  ? '0 6px 18px rgba(234, 67, 53, 0.08)' 
-                  : track.isWaiting
-                    ? '0 6px 18px rgba(217, 119, 6, 0.06)'
-                    : '0 4px 12px rgba(0, 0, 0, 0.015)',
                 overflow: 'hidden'
               }}
             >
-              {/* Left-side DAW status color strip */}
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: '6px',
-                borderTopLeftRadius: '16px',
-                borderBottomLeftRadius: '16px',
-                background: track.isRecording 
-                  ? '#ea4335' 
-                  : track.isWaiting 
-                    ? '#d97706' 
-                    : hasAudio 
-                      ? '#137333' 
-                      : '#e2e8f0',
-                transition: 'background 0.3s ease'
-              }} />
-
               {/* Playback progress bar */}
               {isPlaying && hasAudio && !track.isMuted && (
                 <div style={{
                   position: 'absolute',
                   bottom: 0,
-                  left: '6px',
+                  left: 0,
                   right: 0,
                   height: '3px',
                   background: '#137333',
@@ -11098,93 +11331,97 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   <button
                     type="button"
                     onClick={() => stopRecording(track.id)}
+                    className="tactile-btn"
                     style={{
                       background: '#fce8e6',
                       color: '#ea4335',
                       border: 'none',
-                      borderRadius: '10px',
-                      width: '44px',
-                      height: '44px',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 8px rgba(234, 67, 53, 0.15)',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <Square size={12} fill="currentColor" />
+                    <Square size={10} fill="currentColor" />
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => startRecording(track.id)}
                     disabled={track.isWaiting || (track.id > 1 && !masterLoopDuration) || countInBeats !== null}
+                    className="tactile-btn"
                     style={{
                       background: track.isWaiting 
                         ? '#fef3c7' 
                         : hasAudio 
-                          ? '#f7fafc' 
-                          : '#e6f4ea',
+                          ? '#f5f5f7' 
+                          : 'rgba(19, 115, 51, 0.06)',
                       color: track.isWaiting 
                         ? '#d97706' 
                         : hasAudio 
-                          ? '#718096' 
+                          ? '#86868b' 
                           : '#137333',
                       border: 'none',
-                      borderRadius: '10px',
-                      width: '44px',
-                      height: '44px',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
                       cursor: (track.isWaiting || (track.id > 1 && !masterLoopDuration)) ? 'not-allowed' : 'pointer',
                       opacity: (track.id > 1 && !masterLoopDuration) ? 0.35 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <Mic size={16} />
+                    <Mic size={14} />
                   </button>
                 )}
               </div>
 
               {/* Volume Slider & Label */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, fontFamily: 'SF Mono, Monaco, Consolas, monospace', color: '#4a5568', letterSpacing: '0.05em' }}>
-                    CH.0{track.id}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#1d1d1f' }}>
+                    Spur {track.id}
                   </span>
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: track.isRecording 
+                      ? '#ea4335' 
+                      : track.isWaiting 
+                        ? '#d97706' 
+                        : hasAudio 
+                          ? '#137333' 
+                          : '#cbd5e0',
+                    transition: 'background 0.2s ease'
+                  }} />
                   <span style={{ 
                     fontSize: '0.52rem', 
-                    color: track.isRecording ? '#ea4335' : track.isWaiting ? '#d97706' : hasAudio ? '#137333' : '#a0aec0', 
-                    fontWeight: 800, 
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase'
+                    color: '#86868b', 
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    marginLeft: 'auto'
                   }}>
-                    {track.isRecording ? 'RECORDING' : track.isWaiting ? 'PENDING' : hasAudio ? 'ONLINE' : 'EMPTY'}
+                    {track.isRecording ? 'Aufnahme' : track.isWaiting ? 'Wartet' : hasAudio ? 'Bereit' : 'Leer'}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: hasAudio ? 1 : 0.3 }}>
-                  <span style={{ fontSize: '0.52rem', color: '#a0aec0', fontFamily: 'monospace', width: '22px' }}>-inf</span>
                   <input
                     type="range"
                     min="0"
                     max="100"
                     value={track.volume}
                     onChange={(e) => handleVolumeChange(track.id, Number(e.target.value))}
-                    style={{
-                      flex: 1,
-                      height: '4px',
-                      borderRadius: '2px',
-                      background: '#edf2f7',
-                      outline: 'none',
-                      accentColor: '#137333',
-                      cursor: 'pointer'
-                    }}
+                    className="groovelab-fader"
                   />
-                  <span style={{ fontSize: '0.52rem', color: '#718096', fontFamily: 'monospace', width: '28px', textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.54rem', color: '#86868b', fontFamily: 'SF Mono, monospace', width: '28px', textAlign: 'right' }}>
                     {track.volume === 0 ? 'Mute' : `${Math.round(track.volume / 100 * 6)}dB`}
                   </span>
                 </div>
@@ -11193,31 +11430,27 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               {/* Clean LED Level Meter */}
               <div style={{
                 display: 'flex',
+                flexDirection: 'column-reverse',
                 gap: '2px',
-                padding: '4px 6px',
-                background: '#edf2f7',
-                borderRadius: '6px',
-                minWidth: '32px',
+                padding: '4px',
+                background: '#f5f5f7',
+                borderRadius: '4px',
+                minWidth: '14px',
                 justifyContent: 'center',
-                alignItems: 'flex-end',
-                height: '26px',
-                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+                alignItems: 'center',
+                height: '34px'
               }}>
                 {Array.from({ length: 8 }).map((_, idx) => {
                   const isActive = meterHeights[track.id] >= (8 - idx);
-                  let color = '#137333'; // Campus green
-                  if (idx <= 2) color = '#ea4335'; // Red
-                  else if (idx <= 4) color = '#f59e0b'; // Orange
-                  
+                  const color = '#137333'; // Monochrome green
                   return (
                     <div
                       key={idx}
                       style={{
-                        width: '3px',
-                        height: '3px',
-                        borderRadius: '50%',
-                        background: isActive ? color : '#e5e5e7',
-                        boxShadow: isActive ? `0 0 5px ${color}` : 'none',
+                        width: '6px',
+                        height: '2px',
+                        borderRadius: '0.5px',
+                        background: isActive ? color : '#e5e5ea',
                         transition: 'background 0.05s ease'
                       }}
                     />
@@ -11230,19 +11463,17 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSoloToggle(track.id)}
+                  className="tactile-btn"
                   style={{
-                    background: track.isSoloed ? '#fef3c7' : 'transparent',
-                    color: track.isSoloed ? '#d97706' : '#a0aec0',
-                    borderRadius: '8px',
-                    padding: '5px 8px',
+                    background: track.isSoloed ? 'rgba(217, 119, 6, 0.1)' : '#f5f5f7',
+                    color: track.isSoloed ? '#d97706' : '#1d1d1f',
+                    borderRadius: '16px',
+                    padding: '4px 10px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    fontWeight: 800,
-                    fontSize: '0.6rem',
-                    minWidth: '24px',
-                    textAlign: 'center',
-                    border: '1px solid ' + (track.isSoloed ? '#fef3c7' : '#e2e8f0'),
-                    boxShadow: track.isSoloed ? '0 1px 3px rgba(217, 119, 6, 0.15)' : 'none'
+                    fontWeight: 700,
+                    fontSize: '0.58rem',
+                    border: 'none'
                   }}
                 >
                   SOLO
@@ -11251,19 +11482,17 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <button
                   type="button"
                   onClick={() => handleMuteToggle(track.id)}
+                  className="tactile-btn"
                   style={{
-                    background: track.isMuted ? '#fce8e6' : 'transparent',
-                    color: track.isMuted ? '#ea4335' : '#a0aec0',
-                    borderRadius: '8px',
-                    padding: '5px 8px',
+                    background: track.isMuted ? 'rgba(234, 67, 53, 0.1)' : '#f5f5f7',
+                    color: track.isMuted ? '#ea4335' : '#1d1d1f',
+                    borderRadius: '16px',
+                    padding: '4px 10px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    fontWeight: 800,
-                    fontSize: '0.6rem',
-                    minWidth: '24px',
-                    textAlign: 'center',
-                    border: '1px solid ' + (track.isMuted ? '#fce8e6' : '#e2e8f0'),
-                    boxShadow: track.isMuted ? '0 1px 3px rgba(234, 67, 53, 0.1)' : 'none'
+                    fontWeight: 700,
+                    fontSize: '0.58rem',
+                    border: 'none'
                   }}
                 >
                   MUTE
@@ -11272,12 +11501,14 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <button
                   type="button"
                   onClick={() => handleDeleteTrack(track.id)}
+                  className="tactile-btn"
                   style={{
                     background: 'transparent',
-                    color: '#7f8c8d',
+                    color: '#86868b',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '6px',
+                    borderRadius: '50%',
+                    width: '28px',
+                    height: '28px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     display: 'flex',
@@ -11285,9 +11516,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     justifyContent: 'center'
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#ea4335'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#7f8c8d'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b'; }}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>

@@ -2695,7 +2695,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <div>
                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
                       <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.1' }}>
-                        {student.first_name} {maskLastName(student.last_name)}
+                        {student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}
                       </div>
                     </div>
                     <div>
@@ -2823,7 +2823,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                   {/* Identity */}
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.first_name} {maskLastName(student.last_name)}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}</div>
                   </div>
 
 

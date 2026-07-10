@@ -3276,8 +3276,8 @@ export const testCases: TestCase[] = [
     tier: 3,
     description: 'Ensure student last_name is masked in users select when not logged in, and verify_parent_pin returns correct validation.',
     run: async (client) => {
-      const studentId = '33333333-3333-3333-3333-333333333331';
-      const adminId = '44444444-4444-4444-4444-444444444441';
+      const studentId = process.env.USE_MOCK === 'true' ? 'student-1' : '33333333-3333-3333-3333-333333333331';
+      const adminId = process.env.USE_MOCK === 'true' ? 'admin-1' : '44444444-4444-4444-4444-444444444441';
 
       // 1. Initialisieren der studentischen Einstellungen als Admin
       sessionStorage.setItem('groovelab_user_id', adminId);

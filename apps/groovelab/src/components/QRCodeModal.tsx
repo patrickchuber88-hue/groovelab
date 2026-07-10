@@ -352,7 +352,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
       labelColor: "rgb(167, 243, 208)",
-      studentName: `${user.first_name} ${user.last_name || ''}`,
+      studentName: `${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`,
       instrument: user.instrument || (user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
       qrToken: user.qr_token || user.teacher_qr_token
     }, null, 2);
@@ -392,7 +392,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       header: {
         defaultValue: {
           language: "de-DE",
-          value: `${user.first_name} ${user.last_name || ''}`
+          value: `${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`
         }
       }
     }, null, 2);
@@ -517,7 +517,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                  <div>
                    <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
                    <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                     {user.first_name} {user.last_name}
+                      {user.first_name} {user.last_name ? user.last_name.charAt(0) + '.' : ''}
                    </div>
                  </div>
  
@@ -611,7 +611,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               {/* Identity */}
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{user.first_name}</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{user.last_name || 'Member'}</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{user.last_name ? user.last_name.charAt(0) + '.' : 'Member'}</div>
               </div>
 
               {/* QR Code Container */}

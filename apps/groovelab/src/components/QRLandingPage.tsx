@@ -74,6 +74,7 @@ interface ProfileData {
   trial_ends_at?: string | null;
   exempt_from_direct_billing?: boolean;
   has_parent_pin?: boolean | null;
+  pin_enforced_for_preview?: boolean;
   parent_allow_chat?: boolean;
   parent_allow_timer?: boolean;
   parent_allow_leaderboard?: boolean;

@@ -12313,7 +12313,7 @@ export function AdminDashboard({
                      <div>
                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                         {selectedQRUser.first_name} {selectedQRUser.last_name}
+                         {selectedQRUser.first_name} {selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}
                        </div>
                      </div>
  
@@ -12397,7 +12397,7 @@ export function AdminDashboard({
                   {/* Identity */}
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{selectedQRUser.first_name}</div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : 'Member'}</div>
                   </div>
 
                   {/* QR Code Container */}
