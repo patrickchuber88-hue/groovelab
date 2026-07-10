@@ -29,6 +29,7 @@ export const GrooveLoopstation: React.FC = () => {
   const progressIntervalRef = useRef<any>(null);
   const startTimeRef = useRef<number>(0);
   const loopTimeoutRef = useRef<any>(null);
+  const activeStreamsRef = useRef<MediaStream[]>([]);
 
   const initAudio = () => {
     if (!audioContextRef.current) {
@@ -125,6 +126,7 @@ export const GrooveLoopstation: React.FC = () => {
     initAudio();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      activeStreamsRef.current.push(stream);
       const mediaRecorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
 
@@ -135,6 +137,10 @@ export const GrooveLoopstation: React.FC = () => {
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
+
+        // Stop stream tracks to turn off recording light
+        stream.getTracks().forEach(track => track.stop());
+        activeStreamsRef.current = activeStreamsRef.current.filter(s => s !== stream);
 
         const audio = new Audio(url);
         audio.loop = false;
@@ -193,6 +199,9 @@ export const GrooveLoopstation: React.FC = () => {
           ? masterLoopDuration - ((Date.now() - startTimeRef.current) % masterLoopDuration)
           : 0;
 
+        // Enforce a mandatory 4-measure loop pause (4 * masterLoopDuration) to guarantee sample-accurate synchrony (no swallowed attack)
+        const totalDelay = msToNextCycle + (masterLoopDuration ? 4 * masterLoopDuration : 0);
+
         setTimeout(() => {
           recordStartTimesRef.current[trackId] = Date.now();
           mediaRecorder.start();
@@ -206,7 +215,7 @@ export const GrooveLoopstation: React.FC = () => {
             }
           }, masterLoopDuration || 5000);
 
-        }, msToNextCycle);
+        }, totalDelay);
       }
     } catch (err) {
       console.error('Mic error:', err);
@@ -275,6 +284,9 @@ export const GrooveLoopstation: React.FC = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       Object.values(audioElementsRef.current).forEach((audio) => {
         audio.pause();
+      });
+      activeStreamsRef.current.forEach((stream) => {
+        stream.getTracks().forEach((track) => track.stop());
       });
     };
   }, []);

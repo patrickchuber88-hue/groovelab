@@ -1698,8 +1698,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     };
 
     const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
-    // Proportional calculation based on standard full-year prices (4.80 standard)
-    const basePrice = 4.80;
+    // Proportional calculation based on standard full-year prices (5.39 standard, 0.49 * 11)
+    const basePrice = 5.39;
     const fullPrice = (monthsRemaining / 12) * basePrice;
     
     let discountPercent = 0;
@@ -1817,7 +1817,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
-  const baseB2B_global = moduleCost_global + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+  const baseB2B_global = moduleCost_global + (allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
@@ -2651,7 +2651,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           .single(),
         supabase
           .from('users')
-          .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at')
+          .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing')
           .eq('school_id', schoolId),
         supabase
           .from('students')
@@ -18964,7 +18964,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
                 const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
 
-                const baseB2B = moduleCost + (allTeachers.length + employees.length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+                const baseB2B = moduleCost + (allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
                 const studentSharePreview = 0;
                 const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial';
                 
@@ -19199,7 +19199,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.74rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{employees.length} Verwalter</strong> und <strong>{allTeachers.length} Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.length + employees.length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
+                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{employees.filter((e: any) => e.isActive ?? true).length} aktive Verwalter</strong> und <strong>{allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
                                 </span>
                               </div>
 
@@ -19791,8 +19791,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             const passiveStudents = Math.max(0, students.length - activeStudents);
 
                             // Invoice A: Fixkosten
-                            const adminCost = employees.length * 0.49;
-                            const teacherCost = allTeachers.length * 0.49;
+                            const adminCost = employees.filter((e: any) => e.isActive ?? true).length * 0.49;
+                            const teacherCost = allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49;
                             const passiveStudentCost = (billingPayer === 'student' && studentBillingOption === 'student_partial')
                               ? (students.length * 0.09)
                               : (passiveStudents * 0.09);
@@ -20182,13 +20182,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(employees.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                <span>Cloud-Datenbank &amp; Support Verwaltung (0,49 € x {employees.filter((e: any) => e.isActive ?? true).length} aktive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(employees.filter((e: any) => e.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                <span>Cloud-Datenbank &amp; Support Lehrer (0,49 € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
@@ -20734,13 +20734,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Verwaltung (0,49 € x {employees.length} aktive Profile):</span>
-                                              <strong>{(employees.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Verwaltung (0,49 € x {employees.filter((e: any) => e.isActive ?? true).length} aktive Profile):</span>
+                                              <strong>{(employees.filter((e: any) => e.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} aktive Profile):</span>
-                                              <strong>{(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
+                                              <strong>{(allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>

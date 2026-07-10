@@ -342,7 +342,7 @@ export function BillingDashboard() {
       // 4. Fetch users to compute actual student & teacher counts
       const { data: users, error: usersErr } = await supabase
         .from('users')
-        .select('id, school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, first_name, last_name');
+        .select('id, school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, first_name, last_name, exempt_from_direct_billing');
 
       if (usersErr) throw usersErr;
       setAllUsers(users || []);
@@ -363,6 +363,7 @@ export function BillingDashboard() {
         totalStudents: number; 
         activeStudents: number; 
         premiumStudents: number;
+        exemptActiveStudents: number;
         totalTeachers: number;
         activeTeachers: number;
         totalEmployees: number;
@@ -375,6 +376,7 @@ export function BillingDashboard() {
             totalStudents: 0, 
             activeStudents: 0, 
             premiumStudents: 0,
+            exemptActiveStudents: 0,
             totalTeachers: 0,
             activeTeachers: 0,
             totalEmployees: 0,
@@ -387,6 +389,9 @@ export function BillingDashboard() {
           if (u.is_campus_active) {
             userStatsMap[u.school_id].activeStudents++;
             userStatsMap[u.school_id].premiumStudents++;
+            if (u.exempt_from_direct_billing) {
+              userStatsMap[u.school_id].exemptActiveStudents++;
+            }
           }
         }
         
@@ -417,6 +422,7 @@ export function BillingDashboard() {
           totalStudents: 0, 
           activeStudents: 0, 
           premiumStudents: 0, 
+          exemptActiveStudents: 0,
           totalTeachers: 0, 
           activeTeachers: 0,
           totalEmployees: 0,
@@ -427,6 +433,7 @@ export function BillingDashboard() {
         const totalStudents = stats.totalStudents + pendingStudentsCount;
         const activeStudents = stats.activeStudents;
         const premiumStudents = stats.premiumStudents;
+        const exemptActiveStudents = stats.exemptActiveStudents || 0;
         
         const teachersCount = stats.activeTeachers; // Fix: use active count
         const employeesCount = stats.activeEmployees; // Fix: use active count

@@ -1655,7 +1655,7 @@ export function TeacherDashboard({
                 const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
                 if (!existingNotifsSet.has(notifKey)) {
                   const student = sched.student || allStudents.find(s => s.id === sched.student_id);
-                  const studentName = student ? `${student.first_name} ${student.last_name}` : null;
+                  const studentName = student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : null;
                   notificationsToInsert.push({
                     teacher_id: userId,
                     student_id: sched.student_id,
@@ -1692,7 +1692,7 @@ export function TeacherDashboard({
               const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
               if (!existingNotifsSet.has(notifKey)) {
                 const student = occ.student || allStudents.find(s => s.id === occ.student_id);
-                const studentName = student ? `${student.first_name} ${student.last_name}` : null;
+                const studentName = student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : null;
                 const matchingSched = (schedules || []).find(s => s.id === occ.schedule_id);
                 const durationVal = occ.duration || matchingSched?.duration || 30;
                 notificationsToInsert.push({
@@ -2398,11 +2398,11 @@ export function TeacherDashboard({
             date: occ.date,
             startTime: startTimeStr,
             endTime: endTimeStr,
-            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim() : 'Unterricht',
             teacherId: userId,
             status: occ.status,
             isSchedule: true,
-            studentName: occ.student ? `${occ.student.first_name} ${occ.student.last_name}` : null
+            studentName: occ.student ? `${occ.student.first_name} ${occ.student.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim() : null
           };
         });
 
@@ -3092,7 +3092,7 @@ export function TeacherDashboard({
               original_date: null,
               student: student ? {
                 id: student.id,
-                name: `${student.first_name} ${student.last_name}`,
+                name: `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim(),
                 isAppUser: student.is_app_user ?? false,
                 isAnalogStickerUser,
                 birthDate: student.birth_date,
@@ -3130,7 +3130,7 @@ export function TeacherDashboard({
                   original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
-                    name: `${student.first_name} ${student.last_name}`,
+                    name: `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim(),
                     isAppUser: student.is_app_user ?? false,
                     isAnalogStickerUser,
                     birthDate: student.birth_date,
@@ -3332,7 +3332,7 @@ export function TeacherDashboard({
 
                 return {
                   id: occ.id,
-                  studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
+                  studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim(),
                   originalWeekday: originalWeekdayStr,
                   weekday: weekdayStr,
                   weekdayShort,

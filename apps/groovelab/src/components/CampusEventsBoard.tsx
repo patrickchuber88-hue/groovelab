@@ -1506,7 +1506,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setNewPpRemarks('');
       setAddedSongs([]);
       setNewPpSelectedStudentIds([]);
-      alert('Programmpunkt erfolgreich eingereicht! 🎉');
+      alert('Programmpunkt erfolgreich eingereicht!');
     } catch (err: any) {
       alert('Fehler beim Einreichen: ' + err.message);
     } finally {
@@ -1923,7 +1923,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           await supabase.functions.invoke('send-push', {
             body: {
               userId: recipientId,
-              title: `Termin-Shoutbox 💬`,
+              title: `Termin-Shoutbox`,
               body: `${senderName}: ${messageContent}`,
               url: '/'
             }
@@ -2092,7 +2092,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         if (error) throw error;
         if (data) {
           setCustomEvents(prev => prev.map(x => x.id === data.id ? data : x));
-          alert('Termin wurde für die Event-Planung aktiviert! 🎉');
+          alert('Termin wurde für die Event-Planung aktiviert!');
         }
       } catch (err: any) {
         alert('Aktivieren für Event-Planung fehlgeschlagen: ' + err.message);
@@ -2120,7 +2120,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         if (error) throw error;
         if (data) {
           setCustomEvents(prev => [...prev, data]);
-          alert('Termin wurde für die Event-Planung dupliziert und aktiviert! 🎉');
+          alert('Termin wurde für die Event-Planung dupliziert und aktiviert!');
         }
       } catch (err: any) {
         alert('Aktivieren für Event-Planung fehlgeschlagen: ' + err.message);
@@ -2885,7 +2885,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       setFormRoomId('');
       setFormLocationExtern('');
 
-      alert('Termin erfolgreich angelegt! 🎉');
+      alert('Termin erfolgreich angelegt!');
     } catch (err: any) {
       alert('Fehler beim Anlegen: ' + err.message);
     } finally {
@@ -3368,7 +3368,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <td class="tabular-time">${timeInfo.start} &ndash; ${timeInfo.end}</td>
                 <td>
                   <span class="vertical-accent"></span>
-                  <div class="program-title">${pp.is_pause ? '☕ ' : ''}${pp.name}</div>
+                  <div class="program-title">${pp.is_pause ? 'Pause: ' : ''}${pp.name}</div>
                   ${!pp.is_pause ? `<div class="program-sub">${pp.ensemble_band || 'Einzelbeitrag'}</div>` : ''}
                 </td>
                 <td>${songsHTML}</td>
@@ -3703,8 +3703,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       let changeoverHTML = '';
       if (deltaChairs !== 0 || deltaStands !== 0) {
-        if (deltaChairs !== 0) changeoverHTML += `<span class="delta-pill ${deltaChairs > 0 ? 'pos' : 'neg'}">${deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} 🪑</span> `;
-        if (deltaStands !== 0) changeoverHTML += `<span class="delta-pill ${deltaStands > 0 ? 'pos' : 'neg'}">${deltaStands > 0 ? `+${deltaStands}` : deltaStands} 🎼</span> `;
+        if (deltaChairs !== 0) changeoverHTML += `<span class="delta-pill ${deltaChairs > 0 ? 'pos' : 'neg'}">${deltaChairs > 0 ? `+${deltaChairs}` : deltaChairs} Stühle</span> `;
+        if (deltaStands !== 0) changeoverHTML += `<span class="delta-pill ${deltaStands > 0 ? 'pos' : 'neg'}">${deltaStands > 0 ? `+${deltaStands}` : deltaStands} Notenständer</span> `;
       } else {
         changeoverHTML = '<span style="color:#86868b; font-size:0.75rem;">-</span>';
       }
@@ -3714,12 +3714,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <td class="tabular-time">${timeInfo.start}<br/><span style="font-size:0.68rem; color:#86868b; font-weight:400;">${timeInfo.end}</span></td>
         <td>
           <span class="vertical-accent"></span>
-          <strong>${pp.is_pause ? '☕ ' : ''}${pp.name}</strong><br/>
+          <strong>${pp.is_pause ? 'Pause: ' : ''}${pp.name}</strong><br/>
           <span style="font-size: 0.72rem; color: #86868b;">${pp.is_pause ? '-' : (pp.ensemble_band || 'Einzelbeitrag')}</span>
         </td>
         <td>${signalHTML}</td>
         <td>
-          <div style="font-weight: 600;">🪑 ${pp.chairs_needed || 0} &nbsp; 🎼 ${pp.music_stands_needed || 0}</div>
+          <div style="font-weight: 600;">Stühle ${pp.chairs_needed || 0} &nbsp; Notenständer ${pp.music_stands_needed || 0}</div>
           <div style="margin-top: 4px;">${pp.is_pause ? '-' : changeoverHTML}</div>
         </td>
         <td style="font-size:0.75rem; color:#475569; font-weight:500;">${pp.remarks || '-'}</td>
@@ -3729,7 +3729,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     // Generate Audio Patch list HTML (pill style)
     const audioPatchHTML = Object.entries(audioSetup).map(([name, count]) => `
-      <span class="tech-patch-badge">🎙️ ${count}x ${name}</span>
+      <span class="tech-patch-badge">${count}x ${name}</span>
     `).join('') || '<span style="color:#86868b; font-style:italic;">Keine Audiobelegungen</span>';
 
     printWindow.document.write(`
@@ -3914,8 +3914,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           <div class="stats-card">
             <div class="stats-card-title">Bühnen-Logistik (Maximalbedarf)</div>
             <div style="display: flex; gap: 20px; align-items: center; margin-top: 6px;">
-              <div><span style="font-size:1.3rem;">🪑</span> <strong style="font-size:1.15rem;">${peakChairs}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Stühle Peak (Gesamt: ${totalChairs})</span></div>
-              <div><span style="font-size:1.3rem;">🎼</span> <strong style="font-size:1.15rem;">${peakStands}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Ständer Peak (Gesamt: ${totalStands})</span></div>
+              <div><span style="font-size:1.3rem;">Stühle</span> <strong style="font-size:1.15rem;">${peakChairs}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Stühle Peak (Gesamt: ${totalChairs})</span></div>
+              <div><span style="font-size:1.3rem;">Notenständer</span> <strong style="font-size:1.15rem;">${peakStands}</strong> <span style="font-size:0.75rem; color:#86868b; font-weight:500;">Ständer Peak (Gesamt: ${totalStands})</span></div>
             </div>
           </div>
           <div class="stats-card">
@@ -4465,7 +4465,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        {ev.visibility === 'teachers' ? '🎓 Nur Lehrer' : ev.visibility === 'students' ? '🎵 Nur Schüler' : '👥 Alle'}
+                        {ev.visibility === 'teachers' ? 'Nur Lehrer' : ev.visibility === 'students' ? 'Nur Schüler' : 'Alle'}
                       </span>
                     </div>
 
@@ -4863,7 +4863,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             {/* Student's contributions */}
             <div>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                🎸 Deine Auftrittsdetails
+                Instrument Deine Auftrittsdetails
               </h4>
               
               {loadingSelectedStudentEventPoints ? (
@@ -5366,8 +5366,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </h4>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600, borderTop: '1px solid #f1f5f9', paddingTop: '8px', marginTop: '2px' }}>
-                    <span>📅 {dateStr}</span>
-                    <span>🎭 {ev.stage_count || 1} Bühnen</span>
+                    <span>Datum {dateStr}</span>
+                    <span>Bühne {ev.stage_count || 1} Bühnen</span>
                     <span>⏱️ {ev.total_duration || 0} Min. gesamt</span>
                   </div>
                 </div>
@@ -5385,7 +5385,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              <span>Bearbeiten Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
               {renderSaveStatus()}
             </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
@@ -5653,7 +5653,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              <span>Bearbeiten Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
               {renderSaveStatus()}
             </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
@@ -5675,11 +5675,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               {techRiderItems.map((item) => {
                 let emoji = '🎵';
                 if (item.type.toLowerCase().includes('gesang')) emoji = '🎤';
-                else if (item.type.toLowerCase().includes('gitarre')) emoji = '🎸';
-                else if (item.type.toLowerCase().includes('bass')) emoji = '🎸';
+                else if (item.type.toLowerCase().includes('gitarre')) emoji = 'Instrument';
+                else if (item.type.toLowerCase().includes('bass')) emoji = 'Instrument';
                 else if (item.type.toLowerCase().includes('piano') || item.type.toLowerCase().includes('keyboard')) emoji = '🎹';
                 else if (item.type.toLowerCase().includes('schlagzeug') || item.type.toLowerCase().includes('drum')) emoji = '🥁';
-                else if (item.type.toLowerCase().includes('di-box') || item.type.toLowerCase().includes('di box')) emoji = '🔌';
+                else if (item.type.toLowerCase().includes('di-box') || item.type.toLowerCase().includes('di box')) emoji = 'Anschluss';
 
                 return (
                   <div
@@ -5748,12 +5748,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 {[
                   { label: '🎺 Blasmusik', value: 'Blasmusik', conn: 'Mikrofon', src: 'own' },
                   { label: '🎤 Gesang', value: 'Gesang', conn: 'Mikrofon', src: 'venue' },
-                  { label: '🎸 E-Gitarre', value: 'E-Gitarre', conn: 'Mikrofon', src: 'own' },
-                  { label: '🎸 A-Gitarre', value: 'A-Gitarre', conn: 'DI-Box', src: 'own' },
-                  { label: '🎸 E-Bass', value: 'E-Bass', conn: 'DI-Box', src: 'own' },
+                  { label: 'Instrument E-Gitarre', value: 'E-Gitarre', conn: 'Mikrofon', src: 'own' },
+                  { label: 'Instrument A-Gitarre', value: 'A-Gitarre', conn: 'DI-Box', src: 'own' },
+                  { label: 'Instrument E-Bass', value: 'E-Bass', conn: 'DI-Box', src: 'own' },
                   { label: '🎹 Keyboard', value: 'E-Piano / Keyboard', conn: 'Line-In', src: 'venue' },
                   { label: '🥁 Drums', value: 'Schlagzeug / E-Drum', conn: 'Mikrofon', src: 'venue' },
-                  { label: '🔌 DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' }
+                  { label: 'Anschluss DI-Box', value: 'DI-Box', conn: 'DI-Box', src: 'venue' }
                 ].map(badge => {
                   const isSelected = badge.value === 'Blasmusik' ? isBlasmusikSelected : (builderType === badge.value && !isBlasmusikSelected);
                   return (
@@ -6061,7 +6061,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         {editingPpId && (
           <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 650, color: '#b45309', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span>📝 Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
+              <span>Bearbeiten Du bearbeitest: <strong>{newPpEnsemble || newPpName}</strong></span>
               {renderSaveStatus()}
             </span>
             <button type="button" onClick={handleCancelEditing} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 800, cursor: 'pointer', fontSize: '0.74rem' }}>
@@ -6450,7 +6450,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
         {ppsWithQueries.length === 0 ? (
           <div style={{ padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>
-            🎉 Aktuell keine offenen Rückfragen zu diesem Event vorhanden.
+            Aktuell keine offenen Rückfragen zu diesem Event vorhanden.
           </div>
         ) : (
           ppsWithQueries.map(pp => {
@@ -6683,7 +6683,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
           <div>
             <span style={{ fontWeight: 800, fontSize: '0.85rem', display: 'block', marginBottom: '8px', color: '#1e293b' }}>
-              🎸 Eigene Instrumente &amp; Zubehör (selbst mitzubringen):
+              Eigene Instrumente &amp; Zubehör (selbst mitzubringen):
             </span>
             {ownTechItems.length === 0 ? (
               <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: '8px 0 0 0' }}>
@@ -6767,10 +6767,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <strong>⏱️ Dauer:</strong> {pp.duration || 0} Minuten
                     </div>
                     <div>
-                      <strong>🎭 Bühne:</strong> {isScheduled ? `Bühne ${pp.stage_number || 1}` : '—'}
+                      <strong>Bühne:</strong> {isScheduled ? `Bühne ${pp.stage_number || 1}` : '—'}
                     </div>
                     <div style={{ gridColumn: 'span 2' }}>
-                      <strong>🕒 Auftrittszeit:</strong> {isScheduled && timeInfo ? (
+                      <strong>Uhrzeit Auftrittszeit:</strong> {isScheduled && timeInfo ? (
                         <span style={{ fontWeight: 800, color: brandColor, background: `${brandColor}08`, padding: '2px 6px', borderRadius: '4px' }}>
                           {timeInfo.start} - {timeInfo.end} Uhr
                         </span>
@@ -6788,9 +6788,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #cbd5e1', marginTop: '10px' }}>
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>Über das Event: {activeEv.title}</h4>
           <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-            📅 Datum: {formatDateGerman(activeEv.event_date)}<br />
-            🕒 Startzeit: {activeEv.start_time?.substring(0, 5) || '18:00'} Uhr<br />
-            🎭 Bühnen gesamt: {activeEv.stage_count || 1}
+            Datum: {formatDateGerman(activeEv.event_date)}<br />
+            Startzeit: {activeEv.start_time?.substring(0, 5) || '18:00'} Uhr<br />
+            Bühnen gesamt: {activeEv.stage_count || 1}
           </p>
 
           <button
@@ -6809,7 +6809,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; }}
             onMouseLeave={e => { e.currentTarget.style.background = '#0f172a'; }}
           >
-            🖨️ Programmübersicht drucken
+            Programmübersicht drucken
           </button>
         </div>
       </div>
@@ -6944,7 +6944,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     e.currentTarget.style.color = '#475569';
                   }}
                 >
-                  🛠️ Verwaltungsansicht
+                  Verwaltungsansicht
                 </button>
               )}
               <button
@@ -7349,7 +7349,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     e.currentTarget.style.color = '#475569';
                   }}
                 >
-                  📝 Einreichungen
+                  Einreichungen
                 </button>
               )}
               <button
@@ -7892,7 +7892,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                   {!activeTeacher ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px' }}>
-                      <span style={{ fontSize: '2rem' }}>👤</span>
+                      <span style={{ fontSize: '2rem' }}>Person</span>
                       <span style={{ fontSize: '0.84rem' }}>Bitte wählen Sie einen Lehrer aus der Liste aus.</span>
                     </div>
                   ) : (() => {
@@ -8022,7 +8022,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         )}
                                       </div>
                                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
-                                        {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
+                                        {pp.ensemble_band && <span>Ensemble: {pp.ensemble_band}</span>}
                                         <span>⏱️ {pp.duration} Min.</span>
                                         {hasPendingFeedback && <span style={{ color: '#b45309', fontWeight: 600 }}>⏳ Rückfrage ausstehend</span>}
                                         {hasRespondedFeedback && <span style={{ color: brandColor, fontWeight: 600 }}>✅ Rückmeldung erhalten</span>}
@@ -8079,7 +8079,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         {/* Section 1: Besetzung & Schüler */}
                                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                           <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            👥 Besetzung & Schüler
+                                            Besetzung & Schüler
                                           </h4>
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                             {pp.performer_count !== undefined && (
@@ -8129,7 +8129,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         {/* Section 2: Repertoire & GEMA */}
                                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                           <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            🎼 Repertoire & GEMA
+                                            Repertoire & GEMA
                                           </h4>
                                           {pp.songs && pp.songs.length > 0 ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -8151,16 +8151,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         {/* Section 3: Bühnenbedarf & Technik */}
                                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                           <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            🎸 Bühnenbedarf & Technik
+                                            Bühnenbedarf & Technik
                                           </h4>
                                           
                                           {/* Seating / Chairs / Stands */}
                                           <div style={{ display: 'flex', gap: '16px' }}>
                                             <div>
-                                              <span style={{ color: '#64748b', fontWeight: 600 }}>🪑 Stühle:</span> {pp.chairs_needed || 0}
+                                              <span style={{ color: '#64748b', fontWeight: 600 }}>Stühle:</span> {pp.chairs_needed || 0}
                                             </div>
                                             <div>
-                                              <span style={{ color: '#64748b', fontWeight: 600 }}>🎼 Notenständer:</span> {pp.music_stands_needed || 0}
+                                              <span style={{ color: '#64748b', fontWeight: 600 }}>Notenständer:</span> {pp.music_stands_needed || 0}
                                             </div>
                                           </div>
 
@@ -8367,7 +8367,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                   {!activeTeacher ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px' }}>
-                      <span style={{ fontSize: '2rem' }}>💬</span>
+                      <span style={{ fontSize: '2rem' }}>Rückfragen</span>
                       <span style={{ fontSize: '0.84rem' }}>Bitte wählen Sie einen Lehrer aus der Liste aus.</span>
                     </div>
                   ) : (() => {
@@ -8405,10 +8405,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                                     <div>
                                       <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>{pp.name}</strong>
-                                      {pp.ensemble_band && <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>👥 {pp.ensemble_band}</span>}
+                                      {pp.ensemble_band && <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{pp.ensemble_band}</span>}
                                     </div>
                                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: hasPending ? '#ea580c' : brandColor }}>
-                                      {hasPending ? '⏳ Warten auf Antwort' : questions.length > 0 ? '✅ Geklärt' : '💬 Keine Rückfragen'}
+                                      {hasPending ? '⏳ Warten auf Antwort' : questions.length > 0 ? '✅ Geklärt' : 'Rückfragen Keine Rückfragen'}
                                     </span>
                                   </div>
 
@@ -8777,9 +8777,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               )}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.72rem', color: '#444746' }}>
-                              {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
-                              {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
-                              {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                              {pp.ensemble_band && <span>Ensemble: {pp.ensemble_band}</span>}
+                              {pp.teacher_id && <span>Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                              {pp.instrument && <span>Instrument: {pp.instrument}</span>}
                             </div>
                             <div style={{ fontSize: '0.74rem', color: brandColor, fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               ⏱️ {pp.duration} Min.
@@ -9115,7 +9115,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           letterSpacing: '0.02em',
                                           textTransform: 'uppercase'
                                         }}>
-                                          ☕ Pause
+                                          Pause
                                         </span>
                                       )}
                                       <strong style={{ fontSize: '0.86rem', color: hasConflict ? '#ff3b30' : (pp.is_pause ? '#6e6e73' : '#1d1d1f'), fontWeight: 600 }}>
@@ -9158,9 +9158,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   
                                     {!pp.is_pause && expandedPoints[pp.id] && (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '6px', fontSize: '0.72rem', color: '#444746' }}>
-                                        {pp.ensemble_band && <span>👥 Ensemble: {pp.ensemble_band}</span>}
-                                        {pp.teacher_id && <span>👨‍🏫 Lehrer: {getTeacherName(pp.teacher_id)}</span>}
-                                        {pp.instrument && <span>🎸 Instrument: {pp.instrument}</span>}
+                                        {pp.ensemble_band && <span>Ensemble: {pp.ensemble_band}</span>}
+                                        {pp.teacher_id && <span>Lehrer: {getTeacherName(pp.teacher_id)}</span>}
+                                        {pp.instrument && <span>Instrument: {pp.instrument}</span>}
                                       </div>
                                     )}
                                   </div>
@@ -9769,7 +9769,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       </span>
                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '6px' }}>
                         <div style={{ textAlign: 'center', flex: 1 }}>
-                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>🪑</span>
+                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>Stühle</span>
                           <strong style={{ fontSize: '1.6rem', color: theme.text, display: 'block', fontWeight: 800, margin: '2px 0' }}>
                             {peakChairs}
                           </strong>
@@ -9779,7 +9779,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         </div>
                         <div style={{ width: '1px', height: '50px', background: isNight ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
                         <div style={{ textAlign: 'center', flex: 1 }}>
-                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>🎼</span>
+                          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>Notenständer</span>
                           <strong style={{ fontSize: '1.6rem', color: theme.text, display: 'block', fontWeight: 800, margin: '2px 0' }}>
                             {peakStands}
                           </strong>
@@ -9827,7 +9827,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 boxShadow: '0 1px 2px rgba(16, 185, 129, 0.02)'
                               }}
                             >
-                              🎙️ {count}x {name}
+                              {count}x {name}
                             </span>
                           ))
                         )}
@@ -9877,12 +9877,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                   <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <strong style={{ fontSize: '0.82rem', color: pp.is_pause ? theme.textMuted : theme.text }}>
-                                        {pp.is_pause ? '☕ ' : ''}{pp.name}
+                                        {pp.is_pause ? 'Pause: ' : ''}{pp.name}
                                       </strong>
                                       {!pp.is_pause && (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.7rem', color: theme.textMuted }}>
-                                          {pp.ensemble_band && <span style={{ fontWeight: 550 }}>👥 {pp.ensemble_band}</span>}
-                                          {pp.performer_count > 0 && <span>👤 {pp.performer_count} Person(en)</span>}
+                                          {pp.ensemble_band && <span style={{ fontWeight: 550 }}>{pp.ensemble_band}</span>}
+                                          {pp.performer_count > 0 && <span>{pp.performer_count} Person(en)</span>}
                                         </div>
                                       )}
                                     </div>
@@ -9902,7 +9902,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             color: theme.text,
                                             marginBottom: '2px'
                                           }}>
-                                            🎸 {pp.instrument}
+                                            {pp.instrument}
                                           </div>
                                         )}
                                         {techItems.length > 0 ? (
@@ -9946,8 +9946,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                   <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                                     {!pp.is_pause && (pp.chairs_needed > 0 || pp.music_stands_needed > 0) ? (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.76rem', color: theme.text, fontWeight: 600 }}>
-                                        {pp.chairs_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>🪑 {pp.chairs_needed} Stuhl/Stühle</div>}
-                                        {pp.music_stands_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>🎼 {pp.music_stands_needed} Notenständer</div>}
+                                        {pp.chairs_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{pp.chairs_needed} Stuhl/Stühle</div>}
+                                        {pp.music_stands_needed > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{pp.music_stands_needed} Notenständer</div>}
                                       </div>
                                     ) : (
                                       <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>-</span>
@@ -9965,7 +9965,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         color: theme.textMuted,
                                         lineHeight: 1.3
                                       }}>
-                                        <span>📝</span>
+                                        <span>Bearbeiten</span>
                                         <span>{pp.remarks}</span>
                                       </div>
                                     ) : (
@@ -10100,7 +10100,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       onMouseEnter={e => e.currentTarget.style.background = '#059669'}
                       onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
                     >
-                      <span>💾</span>
+                      <span>Speichern</span>
                       <span>PDF speichern</span>
                     </button>
                   </div>
@@ -10325,7 +10325,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 {/* Excel Card */}
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '1.5rem' }}>📊</span>
+                    <span style={{ fontSize: '1.5rem' }}>Statistiken</span>
                     <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Excel-Programmliste (.xls)</strong>
                     <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
                       Erstellt eine professionell formatierte Excel-Datei mit Kopfzeilen, Spaltenbreiten und Zebra-Streifen für die einfache Weiterverarbeitung.
@@ -10356,7 +10356,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 {/* PDF Booklet Card */}
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '1.5rem' }}>📄</span>
+                    <span style={{ fontSize: '1.5rem' }}>Dokument</span>
                     <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Besucher-Programm (PDF)</strong>
                     <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
                       Generiert ein übersichtliches, minimalistisches Programmheft für Konzertbesucher, sortiert nach Bühnen und Uhrzeiten. Ideal zum Ausdrucken.
@@ -10387,7 +10387,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 {/* Tech Rider Card */}
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '1.5rem' }}>🔌</span>
+                    <span style={{ fontSize: '1.5rem' }}>Anschluss</span>
                     <strong style={{ fontSize: '0.88rem', color: '#1d1d1f' }}>Bühnen- &amp; Technik-Rider (PDF)</strong>
                     <p style={{ margin: 0, fontSize: '0.74rem', color: '#86868b', lineHeight: 1.4 }}>
                       Erstellt ein detailliertes Übersichtsblatt für Tontechniker und Stagehands für Bühne {activeStage} mit FOH-Patchplan und Umbau-Schritten.
@@ -10513,7 +10513,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       e.currentTarget.style.color = '#475569';
                     }}
                   >
-                    📝 Einreichungsansicht
+                    Einreichungsansicht
                   </button>
                 )}
                 <button 
@@ -10759,9 +10759,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         const currentVisibility = ev.visibility || 'all';
 
         const visibilityLabel: Record<string, string> = {
-          all: '👥 Alle (Schüler & Lehrer)',
-          teachers: '🎓 Nur Lehrer',
-          students: '🎵 Nur Schüler'
+          all: 'Alle (Schüler & Lehrer)',
+          teachers: 'Nur Lehrer',
+          students: 'Nur Schüler'
         };
 
         return (
@@ -10811,7 +10811,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       textTransform: 'uppercase', letterSpacing: '0.04em',
                       display: 'inline-flex', alignItems: 'center', gap: '2px'
                     }}>
-                      🎉 Fest / Event
+                      Fest / Event
                     </span>
                   )}
 
@@ -10900,7 +10900,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                     <Eye size={14} color="#64748b" />
                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-                      Sichtbar für: {visibilityLabel[currentVisibility] || '👥 Alle'}
+                      Sichtbar für: {visibilityLabel[currentVisibility] || 'Alle'}
                     </span>
                   </div>
                 )}
@@ -10913,9 +10913,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     </label>
                     <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', gap: '4px', border: '1px solid #e2e8f0' }}>
                       {([
-                        { value: 'all', label: '👥 Alle' },
-                        { value: 'teachers', label: '🎓 Nur Lehrer' },
-                        { value: 'students', label: '🎵 Nur Schüler' }
+                        { value: 'all', label: 'Alle' },
+                        { value: 'teachers', label: 'Nur Lehrer' },
+                        { value: 'students', label: 'Nur Schüler' }
                       ] as const).map(opt => {
                         const isSel = editVisibility === opt.value;
                         return (
@@ -11211,7 +11211,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     textAlign: 'center',
                     padding: '0 8px'
                   }}>
-                    💡 <strong>Entwickler-Tipp:</strong> Wir empfehlen, das automatische Aktualisierungsintervall in den Einstellungen deines Kalenders auf <strong>1 Std.</strong> einzustellen, um Änderungen zeitnah zu synchronisieren.
+                    <strong>Entwickler-Tipp:</strong> Wir empfehlen, das automatische Aktualisierungsintervall in den Einstellungen deines Kalenders auf <strong>1 Std.</strong> einzustellen, um Änderungen zeitnah zu synchronisieren.
                   </p>
                 </div>
 
@@ -11309,7 +11309,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   gap: '8px',
                   marginTop: '8px'
                 }}>
-                  <span style={{ fontWeight: 650, color: '#1d1d1f' }}>💡 Kurzanleitung:</span>
+                  <span style={{ fontWeight: 650, color: '#1d1d1f' }}>Kurzanleitung:</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span>• <b>iOS / macOS</b>: Auf "Auf diesem Gerät abonnieren" tippen.</span>
                     <span>• <b>Google / Android</b>: Auf "In Google Kalender importieren" tippen.</span>
@@ -11378,7 +11378,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>💬</span> {titleText}
+                    <span>Rückfragen</span> {titleText}
                   </h3>
                   <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
                     Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
@@ -11420,7 +11420,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               }} className="custom-scrollbar">
                 {isFrozen && (
                   <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                    Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                   </div>
                 )}
                 {chatMessages.length === 0 ? (

@@ -725,7 +725,7 @@ function MobileBriefingView({
                             </div>
                           </div>
                         </div>
-                        <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ background: '#dcfce7', color: '#137333', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Check size={12} strokeWidth={3} />
                         </div>
                       </div>
@@ -740,7 +740,7 @@ function MobileBriefingView({
                           <span style={{ fontSize: '0.75rem', color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {item.topic_name} {item.teacher_notes ? ` - ${item.teacher_notes}` : ''}
                           </span>
-                          <div style={{ background: '#dcfce7', color: '#16a34a', borderRadius: '4px', padding: '2px 4px', flexShrink: 0 }}>
+                          <div style={{ background: '#dcfce7', color: '#137333', borderRadius: '4px', padding: '2px 4px', flexShrink: 0 }}>
                             <Check size={10} strokeWidth={3} />
                           </div>
                         </div>
@@ -1525,9 +1525,9 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
             {/* Scrollable invoice content */}
             <div style={{ padding: '28px', overflowY: 'auto', flex: 1 }}>
               {/* Logo / Header block */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #16a34a', paddingBottom: '16px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #137333', paddingBottom: '16px', marginBottom: '24px' }}>
                 <div>
-                  <h4 style={{ margin: 0, color: '#16a34a', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Campus-Groovelab</h4>
+                  <h4 style={{ margin: 0, color: '#137333', fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Campus-Groovelab</h4>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Infrastruktur- &amp; Servicegebühren</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -1546,7 +1546,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                 </div>
                 <div>
                   <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 800, display: 'block', marginBottom: '6px', letterSpacing: '0.05em' }}>Dienstleister / Betreiber</span>
-                  <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.9rem' }}>Campus-Groovelab</strong>
+                  <strong style={{ color: '#137333', display: 'block', fontSize: '0.9rem' }}>Campus-Groovelab</strong>
                   <strong style={{ color: '#0f172a', display: 'block', fontWeight: 700 }}>{operatorDetails.companyName}</strong>
                   <span style={{ color: '#475569' }}>IBAN: {operatorDetails.iban}</span><br />
                   <span style={{ color: '#475569' }}>BIC: {operatorDetails.bic}</span>
@@ -1593,7 +1593,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                     <tr>
                       <td colSpan={2}></td>
                       <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '0.9rem' }}>Gesamtsumme:</td>
-                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 900, color: '#16a34a', fontSize: '1.05rem' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
+                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 900, color: '#137333', fontSize: '1.05rem' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1709,9 +1709,9 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                         </head>
                         <body>
                           <!-- Header -->
-                          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #16a34a; padding-bottom: 20px; margin-bottom: 30px;">
+                          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #137333; padding-bottom: 20px; margin-bottom: 30px;">
                             <div>
-                              <h2 style="margin: 0; color: #16a34a; font-size: 1.8rem; font-weight: 900; letter-spacing: -0.02em;">Campus-Groovelab</h2>
+                              <h2 style="margin: 0; color: #137333; font-size: 1.8rem; font-weight: 900; letter-spacing: -0.02em;">Campus-Groovelab</h2>
                               <span style="font-size: 0.75rem; color: #64748b;">Infrastruktur- &amp; Servicegebühren</span>
                             </div>
                             <div style="text-align: right;">
@@ -1730,7 +1730,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                             </div>
                             <div>
                               <span style="color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; display: block; margin-bottom: 8px;">Dienstleister / Betreiber</span>
-                              <strong style="color: #16a34a; display: block; font-size: 1rem;">Campus-Groovelab</strong>
+                              <strong style="color: #137333; display: block; font-size: 1rem;">Campus-Groovelab</strong>
                               <strong style="color: #0f172a; display: block; font-weight: 600;">${operatorDetails.companyName}</strong>
                               <span>IBAN: ${operatorDetails.iban}</span><br />
                               <span>BIC: ${operatorDetails.bic}</span>
@@ -1768,7 +1768,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                               <tr>
                                 <td colspan="2"></td>
                                 <td style="padding: 20px 0 10px 0; text-align: right; font-weight: bold; font-size: 1rem;">Gesamtsumme:</td>
-                                <td style="padding: 20px 0 10px 0; text-align: right; font-weight: 900; font-size: 1.15rem; color: #16a34a;">${selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
+                                <td style="padding: 20px 0 10px 0; text-align: right; font-weight: 900; font-size: 1.15rem; color: #137333;">${selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
                               </tr>
                             </tbody>
                           </table>
@@ -1813,7 +1813,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                   }
                 }}
                 style={{
-                  background: '#16a34a',
+                  background: '#137333',
                   border: 'none',
                   borderRadius: '12px',
                   padding: '10px 20px',
@@ -1827,7 +1827,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                   transition: 'background 0.2s'
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#15803d'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#16a34a'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#137333'; }}
               >
                 <FileText size={16} /> PDF drucken / speichern
               </button>
@@ -7227,7 +7227,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               >
                 {/* Header Area */}
                 {(() => {
-                  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                  const brandColor = studentUser?.schools?.brand_color || '#137333';
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
@@ -7270,7 +7270,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 {/* Two Columns Layout */}
                 {(() => {
-                  const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                  const brandColor = studentUser?.schools?.brand_color || '#137333';
                   
                   const isMastered = (sng: any) => {
                     const progressItem = progressItems.find(item => 
@@ -7352,7 +7352,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   statusBg = '#d1fae5';
                                   statusText = 'Meisterwerk!';
                                 } else {
-                                  statusColor = '#16a34a';
+                                  statusColor = '#137333';
                                   statusBg = '#f0fdf4';
                                   statusText = 'In Arbeit';
                                 }
@@ -7684,7 +7684,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               
               {/* Top Section: Header & Contribution */}
               {(() => {
-                const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                const brandColor = studentUser?.schools?.brand_color || '#137333';
                 const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
                 const liveClassMins = classMins + activeSessionMins;
                 const liveClassWeeklyFocus = classWeeklyFocus + activeSessionMins;
@@ -7864,7 +7864,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
 
                   {(() => {
-                    const brandColor = studentUser?.schools?.brand_color || '#16a34a';
+                    const brandColor = studentUser?.schools?.brand_color || '#137333';
                     const targets = classGoals || [];
                     const totalGoals = targets.length;
                     const masteredGoals = targets.filter((target: any) => {
@@ -8072,7 +8072,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   return `${first} ${last.charAt(0)}.`;
                                 })()}
                               </span>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#16a34a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#137333', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {hl.title}
                               </span>
                             </div>
@@ -8245,7 +8245,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           role="student"
           schoolId={studentUser?.school_id || ''}
           supabase={supabase}
-          brandColor={studentUser?.schools?.brand_color || '#16a34a'}
+          brandColor={studentUser?.schools?.brand_color || '#137333'}
         />
       )}
 
@@ -8518,7 +8518,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       fontWeight: 950
-                    }}>{studentUser?.first_name || 'Student'}</span>! 👋
+                    }}>Hausaufgabenheft</span>! 👋
                   </h3>
                   
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
@@ -10079,7 +10079,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   width: `${Math.min(100, Math.max(0, (( (studentMissionProgress?.current_level || 1) - 1) / 5) * 100))}%`,
                   top: '50%',
                   height: '4px',
-                  background: '#16a34a',
+                  background: '#137333',
                   zIndex: 2,
                   transform: 'translateY(-50%)',
                   transition: 'width 0.5s ease'
@@ -10097,9 +10097,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         width: '44px',
                         height: '44px',
                         borderRadius: '50%',
-                        background: isCompleted ? '#16a34a' : isCurrent ? '#ffffff' : '#cbd5e1',
-                        border: isCurrent ? '4px solid #16a34a' : '4px solid transparent',
-                        color: isCompleted ? '#ffffff' : isCurrent ? '#16a34a' : '#ffffff',
+                        background: isCompleted ? '#137333' : isCurrent ? '#ffffff' : '#cbd5e1',
+                        border: isCurrent ? '4px solid #137333' : '4px solid transparent',
+                        color: isCompleted ? '#ffffff' : isCurrent ? '#137333' : '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -10110,7 +10110,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       }}>
                         {lvl}
                       </div>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: isCurrent ? '#16a34a' : '#64748b', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: isCurrent ? '#137333' : '#64748b', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {lvl === 1 ? 'Start 1 Song' : lvl === 2 ? 'Upload PIN' : lvl === 3 ? '3 Songs' : `Level ${lvl}`}
                       </span>
                     </div>
@@ -10210,7 +10210,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       type="submit"
                       disabled={isUploadingCustomAvatar}
                       style={{
-                        background: '#16a34a',
+                        background: '#137333',
                         color: 'white',
                         border: 'none',
                         padding: '10px 18px',
@@ -10793,7 +10793,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '20px' }}>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Settings size={20} color="#16a34a" /> Einstellungen
+                  <Settings size={20} color="#137333" /> Einstellungen
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, fontWeight: 600 }}>
                   Hier kannst du deine Benachrichtigungen und App-Einstellungen verwalten.
@@ -10853,14 +10853,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {/* Section 1: Benachrichtigungen */}
                 <div>
                   <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Bell size={18} color="#16a34a" /> 1. System &amp; Benachrichtigungen
+                    <Bell size={18} color="#137333" /> 1. System &amp; Benachrichtigungen
                   </h3>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {/* Push-Benachrichtigungen Haupt-Toggle */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
                       <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                        <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#16a34a15' : '#f1f5f9', color: pushEnabled ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                        <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#13733315' : '#f1f5f9', color: pushEnabled ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                           <Bell size={18} />
                         </div>
                         <div>
@@ -10894,7 +10894,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }
                           }}
                           className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                          style={{ backgroundColor: pushEnabled ? '#16a34a' : undefined }}
+                          style={{ backgroundColor: pushEnabled ? '#137333' : undefined }}
                         >
                           <div className="app-binary-switch-knob" />
                         </button>
@@ -10933,14 +10933,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {pushEnabled && isPremiumUser && (
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
                     <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Settings size={18} color="#16a34a" /> 2. Ich möchte benachrichtigt werden bei:
+                      <Settings size={18} color="#137333" /> 2. Ich möchte benachrichtigt werden bei:
                     </h3>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {/* Terminänderungen */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#16a34a15' : '#f1f5f9', color: pushNotifScheduleChanges ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#13733315' : '#f1f5f9', color: pushNotifScheduleChanges ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                             <Calendar size={18} />
                           </div>
                           <div>
@@ -10956,7 +10956,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);
                           }}
                           className={`app-binary-switch ${pushNotifScheduleChanges ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifScheduleChanges ? '#16a34a' : undefined }}
+                          style={{ backgroundColor: pushNotifScheduleChanges ? '#137333' : undefined }}
                         >
                           <div className="app-binary-switch-knob" />
                         </button>
@@ -10965,7 +10965,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {/* Hausaufgaben */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#16a34a15' : '#f1f5f9', color: pushNotifHomework ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#13733315' : '#f1f5f9', color: pushNotifHomework ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                             <Pencil size={18} />
                           </div>
                           <div>
@@ -10981,7 +10981,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);
                           }}
                           className={`app-binary-switch ${pushNotifHomework ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifHomework ? '#16a34a' : undefined }}
+                          style={{ backgroundColor: pushNotifHomework ? '#137333' : undefined }}
                         >
                           <div className="app-binary-switch-knob" />
                         </button>
@@ -10990,7 +10990,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {/* Neuigkeiten & Aktionen */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#16a34a15' : '#f1f5f9', color: pushNotifAllFeatures ? '#16a34a' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#13733315' : '#f1f5f9', color: pushNotifAllFeatures ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                             <Users size={18} />
                           </div>
                           <div>
@@ -11006,7 +11006,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);
                           }}
                           className={`app-binary-switch ${pushNotifAllFeatures ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifAllFeatures ? '#16a34a' : undefined }}
+                          style={{ backgroundColor: pushNotifAllFeatures ? '#137333' : undefined }}
                         >
                           <div className="app-binary-switch-knob" />
                         </button>
@@ -11264,7 +11264,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {sortedPages.map((page) => {
                         let badgeBg = '#f0fdf4';
-                        let badgeColor = '#16a34a';
+                        let badgeColor = '#137333';
                         let badgeText = 'In Arbeit';
 
                         if (page.status === 'THEORY_DONE') {

@@ -142,7 +142,7 @@ const getInstrumentTypeKey = (instrument: string | null | undefined): string => 
   if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return 'saxophonist';
   return 'guitarist';
 };
-const brandColor = "#16a34a";
+const brandColor = "#ea4335";
 import { TeacherDashboard } from './TeacherDashboard';
 import { ElegantBirthdayPicker } from './ElegantBirthdayPicker';
 import QRCode from 'react-qr-code';
