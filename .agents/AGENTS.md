@@ -26,6 +26,25 @@
     - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
 
+## Module Feature Inclusions (Leistungsumfang der Module)
+- **Verwaltungs- und Sekretariats-Nutzer**: Administrations- und Sekretariats-Benutzer (Rollen `admin` und `secretary`) sind in den Lizenzen für das **Campus-Modul** und das **GrooveLab-Modul** vollständig inklusive und verursachen keine zusätzlichen Lizenzgebühren.
+- **Campus-Modul**: Beinhaltet folgende Leistungen und Funktionen:
+  - Hausaufgabenheft & Schüler-Protokoll (Hausaufgabenheft-Widget)
+  - Meisterwerk-Protokoll / Meisterwerk-Dokumentation
+  - Übe-Timer / Fokus-Timer, Übungs-Streaks und XP-Sammeln für selbstständige Übe-Sessions
+  - Audio-Loopstation & Audio-Aufnahmefunktionen
+  - Zentrale Datenbank & Intelligenter Stundenplan-Designer (Schedule Board)
+  - Raum-Engine & Raumbelegungs-Planung (Raumplaner)
+  - Interne Schulkommunikation & Direktnachrichten (Chat / Shouts)
+- **GrooveLab-Modul**: Beinhaltet folgende Leistungen und Funktionen:
+  - Bandgründung & Band-Ensembles (Bands-Widget, Band-Verwaltung)
+  - Songverwaltung & Song-Bibliotheken (Songs meistern)
+  - Repertoire-Planer (Song-Repertoire)
+  - Band-Kommunikation
+  - Live Lab (Echtzeit-Band-Modul)
+  - XP-Punkte (spezifisch für Songs und Band-Fortschritte)
+  - Skill-Radar (Fortschritts-Visualisierung)
+  - Schüler-Avatare (Musiker-Avatare) & Band-Avatare
 
 ## Platform Modules Design & Styling
 - **Primary Theme Colors**: 
