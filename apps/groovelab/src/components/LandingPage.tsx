@@ -445,7 +445,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           lineHeight: 1.6,
           marginBottom: '40px'
         }}>
-          Als intelligentes Add-on schließt Campus-Groovelab die Lücke zwischen Verwaltung, Lehrkräften und Schülern für einen reibungslosen, effizienten und unbürokratischen Schulalltag.
+          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. Campus-Groovelab schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
         </p>
 
         {/* Form and CTA */}
@@ -659,15 +659,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 color: '#000000',
                 marginBottom: '8px'
               }}>
-                Schulleitung &amp; Sekretariat
+                Sekretariat &amp; Verwaltung
               </h3>
               
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  Die ruhigste Musikschule Deutschlands.
+                  Direkte Entlastung &amp; Schnelle Prozesse
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Stell dir vor, der Schulbetrieb läuft einfach. Campus-Groovelab nimmt dir das Planungs-Chaos ab. Die Smart Room Engine weiß genau, welches Instrument in welchen Raum gehört – und durch das digitale Eltern-Onboarding fließen alle Wunschzeiten direkt ins System. Die Verwaltung muss nur noch überwachen, dass es keine Konflikte gibt. Den Rest erledigt unsere App.
+                  Weniger Kommunikation über drei Ecken (Schüler, Lehrer, Verwaltung) und ein reibungsloser Ablauf. Wir liefern ein blitzschnelles Krankheitsabwicklungssystem, unkompliziertes Onboarding beim Einrichten der Schule sowie eine effiziente Raumvergabe und Raumbuchung. So bleibt der Fokus auf dem Wesentlichen bei deutlich weniger aktivem Eingreifen durch die Verwaltung.
                 </p>
               </div>
 
@@ -676,19 +676,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Smart Room Engine:</strong> Automatische Eignungs-Klassifizierung für Räume.</span>
+                    <span><strong>Schnelles Krankheits-System:</strong> Die meisten Nutzer direkt über die App erreichen und aufwendige Telefonketten minimieren.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Digitales Onboarding:</strong> Wunschzeiten der Eltern fließen direkt ins Planungssystem ein.</span>
+                    <span><strong>Raumvergabe &amp; Buchung:</strong> Schnelle Zuweisung von Räumen und Dienstaufgaben im System.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Schulweite Briefings:</strong> Ankündigungen mit einem Klick an alle Lehrkräfte senden.</span>
+                    <span><strong>Direkter Info-Fluss:</strong> Keine Umwege mehr bei der Kommunikation zwischen allen Beteiligten.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>100% DSGVO &amp; Schrems II-konform:</strong> Ausschließlich deutsches Cloud-Hosting (Hetzner in Sachsen). Kein US-Haftungsrisiko.</span>
+                    <span><strong>Einfaches Onboarding:</strong> In wenigen Schritten eingerichtet und sofort startklar.</span>
                   </li>
                 </ul>
               </div>
@@ -730,10 +730,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
 
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  Unterrichten mit Superkräften.
+                  Einfache Organisation &amp; Dokumentation
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Lass Stundenpläne in Sekundenschnelle generieren und koordiniere Schüler-Ensembles automatisch mit dem Probenplaner. Verschiebst du eine Stunde, bekommen Schüler und Eltern den neuen Termin sofort zur Bestätigung. Dazu reichst du den Übungspfad mit dem digitalen Hausaufgabenheft direkt weiter.
+                  Für Lehrer liefern wir eine effiziente Organisation und einfache Kommunikation mit den Schülern. Dokumentiere den Fortschritt spielend leicht im Alltag, melde dich im Krankheitsfall ohne Zusatzaufwand ab und erstelle den Stundenplan mit nur wenigen Klicks. Minimiert Missverständnisse und Ausfälle im Handumdrehen.
                 </p>
               </div>
 
@@ -742,15 +742,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Digitales Hausaufgabenheft:</strong> Wochenziele und Übungspfade direkt digital übermitteln.</span>
+                    <span><strong>Klick-Stundenplan:</strong> In wenigen Klicks erstellt mit schnellem Onboarding.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Stundenplan &amp; Röntgen-Matrix:</strong> Wunsch- und Sperrzeiten beim Verschieben von Schülern sofort visualisieren.</span>
+                    <span><strong>iCal-Kalenderabo:</strong> Termine abonnieren und bei Verschiebungen direkt benachrichtigt werden.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Ensembles &amp; Probenplaner:</strong> Schüler-Bands anlegen und Probenzeiten automatisch abstimmen lassen.</span>
+                    <span><strong>Einfache Dokumentation:</strong> Unterrichtsdetails festhalten, bevor sie im Alltag untergehen.</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
+                    <span><strong>Schnelle Krankmeldung:</strong> Statusmeldung senden, ohne administrativen Zusatzaufwand.</span>
                   </li>
                 </ul>
               </div>
@@ -792,10 +796,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
 
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  Der Grund, warum Kinder plötzlich freiwillig üben.
+                  Der perfekte Übebegleiter
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Wir verwandeln Pflicht in Spielfreude. Im Campus sammeln Schüler XP und Sticker für gemeisterte Challenges beim Üben. Eltern tragen ihre Wunschzeiten stressfrei per Direktlink am Handy ein. Ein Handy-Detox-Modus per smarter Sensorentechnik schirmt die Schüler beim Üben vor Ablenkung ab.
+                  Aus Sicht des Schülers der perfekte Übebegleiter: Wir liefern zeitgemäße Gamification, um das Üben als Gewohnheit statt als Pflicht zu etablieren. Wir liefern nicht einfach nur Noten, sondern die Gewohnheit, diese spielerisch zu meistern. Termine lassen sich bequem per iCal abonnieren, und schnelle Benachrichtigungen bei Verschiebungen verhindern Missverständnisse.
                 </p>
               </div>
 
@@ -804,15 +808,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Fähigkeiten-Radar:</strong> Interaktive Visualisierung des Übungsfortschritts pro Instrument im Schülerprofil.</span>
+                    <span><strong>Gewohnheit statt Pflicht:</strong> Spielerische Routinen etablieren das Üben im Alltag.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Eltern-Direktlink:</strong> Wunschzeiten-Eingabe einfach per QR-Scan auf dem Smartphone der Eltern (ohne App).</span>
+                    <span><strong>Moderne Gamification:</strong> Zeitgeistentsprechende Motivation, die Kinder begeistert.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Handy-Detox-Modus:</strong> Smarte Sensorentechnik sperrt Ablenkungen während des Übens.</span>
+                    <span><strong>Noten meistern:</strong> Wir vermitteln die Gewohnheit zum Meistern der Musiknoten.</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
+                    <span><strong>iCal-Integration:</strong> Alle Unterrichtstermine abonnieren und immer auf dem Laufenden bleiben.</span>
                   </li>
                 </ul>
               </div>
@@ -1357,7 +1365,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
-                    Bereitstellung der zentralen Datenbank, des intelligenten Stundenplan-Designers, der Raum-Engine sowie der internen Schulkommunikation.
+                    Bereitstellung der gamifizierten Übeplattform, der zentralen Datenbank, des intelligenten Stundenplan-Designers, der Raum-Engine, der Audio-Loopstation, der Aufnahmefunktion sowie der internen Schulkommunikation.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
@@ -1388,7 +1396,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
-                    Bereitstellung der gamifizierten Übeplattform, der Audio-Loopstation mit Taktsynchronisation, Aufnahmefunktion und Songverwaltung.
+                    Bereitstellung der gamifizierten Übeplattform mit Fokus auf Bandgründung, dem Meistern von Songs und der Songverwaltung.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>

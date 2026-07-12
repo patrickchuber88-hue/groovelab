@@ -856,6 +856,9 @@ export function TeacherDashboard({
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
   const [docStudent, setDocStudent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings'>(initialTab || (hideHeader ? 'live' : 'briefing'));
+  const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
+  const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -3628,7 +3631,10 @@ export function TeacherDashboard({
 
       if (tData?.school_id) {
         supabase.from('schools').select('*').eq('id', tData.school_id).single().then(({ data: sd }) => {
-          if (sd) setSchoolData(sd);
+          if (sd) {
+            setSchoolData(sd);
+            setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+          }
         });
         // Prepare Student Query depending on platform
         // For student viewMode: fetch all students in school (userId is the student's own ID, NOT a teacher_id)
@@ -12096,269 +12102,271 @@ export function TeacherDashboard({
           </aside>
         </div>
       ) : activeTab === 'settings' ? (
-        <div style={{ width: '100%', maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-              ⚙️ Schuleinstellungen
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+              ⚙️ Einstellungen
             </h2>
-            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
-              Passe die Fokus-Minuten pro Level und Flamme für deine Schüler an.
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+              Passe deine persönlichen Einstellungen und die Fokus-Stufen für deine Schüler an.
             </p>
           </div>
 
-          {/* Settings Card */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '28px',
-            padding: '32px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+          <div style={{ 
             display: 'flex',
-            flexDirection: 'column',
-            gap: '28px'
+            background: '#ffffff',
+            borderRadius: '24px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
+            minHeight: '520px',
+            overflow: 'hidden',
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
           }}>
-            {(() => {
-              const currentConfig = schoolData?.opening_hours?.fokus_levels || {
-                level1: { kleine: 3, mittlere: 5, helden: 10 },
-                level2: { kleine: 5, mittlere: 10, helden: 15 },
-                level3: { kleine: 10, mittlere: 15, helden: 20 }
-              };
+            {/* LEFT SIDEBAR */}
+            <div style={{
+              width: '240px',
+              background: '#f8fafc',
+              borderRight: '1px solid #e2e8f0',
+              padding: '24px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              flexShrink: 0
+            }}>
+              <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Bereiche</h3>
+              {[
+                { id: 'fokus', label: 'Fokus-Stufen' },
+                { id: 'profile', label: 'Mein Profil' }
+              ].map((item) => {
+                const isSelected = teacherSettingsTab === item.id;
+                const brandColor = '#137333';
+                const activeColor = isSelected ? brandColor : '#64748b';
+                
+                const renderIcon = () => {
+                  switch (item.id) {
+                    case 'fokus': return <Activity size={14} color={activeColor} />;
+                    case 'profile': return <User size={14} color={activeColor} />;
+                    default: return null;
+                  }
+                };
 
-              return (
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setTeacherSettingsTab(item.id as any)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: isSelected ? '0 12px 12px 0' : '12px',
+                      border: 'none',
+                      borderLeft: isSelected ? `3px solid ${brandColor}` : '3px solid transparent',
+                      background: isSelected ? '#e6f4ea' : 'transparent',
+                      color: isSelected ? brandColor : '#475569',
+                      fontSize: '0.84rem',
+                      fontWeight: isSelected ? 700 : 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <span style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: isSelected ? '#ffffff' : '#f1f5f9',
+                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
+                    }}>{renderIcon()}</span>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* RIGHT PANEL */}
+            <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', textAlign: 'left' }}>
+              {teacherSettingsTab === 'fokus' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
-                    {/* Level 1 Card */}
-                    <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '20px', padding: '20px', background: '#f8fafc' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🥚 Level 1 (Stufe 1)
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kleine Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level1?.kleine ?? 3} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level1) updated.level1 = {};
-                              updated.level1.kleine = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mittlere Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level1?.mittlere ?? 5} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level1) updated.level1 = {};
-                              updated.level1.mittlere = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Helden-Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level1?.helden ?? 10} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level1) updated.level1 = {};
-                              updated.level1.helden = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Level 2 Card */}
-                    <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '20px', padding: '20px', background: '#f8fafc' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🐥 Level 2 (Stufe 2)
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kleine Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level2?.kleine ?? 5} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level2) updated.level2 = {};
-                              updated.level2.kleine = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mittlere Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level2?.mittlere ?? 10} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level2) updated.level2 = {};
-                              updated.level2.mittlere = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Helden-Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level2?.helden ?? 15} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level2) updated.level2 = {};
-                              updated.level2.helden = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Level 3 Card */}
-                    <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '20px', padding: '20px', background: '#f8fafc' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🦅 Level 3 (Stufe 3)
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kleine Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level3?.kleine ?? 10} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level3) updated.level3 = {};
-                              updated.level3.kleine = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Mittlere Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level3?.mittlere ?? 15} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level3) updated.level3 = {};
-                              updated.level3.mittlere = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Helden-Flamme (Minuten)</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            value={currentConfig.level3?.helden ?? 20} 
-                            onChange={e => {
-                              const val = Math.max(1, parseInt(e.target.value) || 0);
-                              const updated = JSON.parse(JSON.stringify(currentConfig));
-                              if (!updated.level3) updated.level3 = {};
-                              updated.level3.helden = val;
-                              setSchoolData((prev: any) => ({
-                                ...prev,
-                                opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                              }));
-                            }}
-                            style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', fontWeight: 700 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Fokus-Stufen konfigurieren</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Definiere die Zeiten in Minuten, die für Flammen in den jeweiligen Leveln benötigt werden.</p>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-                    <button
-                      onClick={async () => {
-                        if (!teacher?.school_id || !schoolData) return;
-                        const { error } = await supabase
-                          .from('schools')
-                          .update({ opening_hours: schoolData.opening_hours })
-                          .eq('id', teacher.school_id);
-                        if (error) {
-                          alert("Fehler beim Speichern der Einstellungen: " + error.message);
-                        } else {
-                          alert("Einstellungen erfolgreich gespeichert! 🎉");
-                        }
-                      }}
-                      style={{
-                        background: 'linear-gradient(135deg, #0b57d0 0%, #0056b3 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '16px 36px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
-                        fontSize: '0.95rem',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
-                      }}
-                    >
-                      Einstellungen speichern
-                    </button>
+                  {(() => {
+                    const currentConfig = schoolData?.opening_hours?.fokus_levels || {
+                      level1: { kleine: 3, mittlere: 5, helden: 10 },
+                      level2: { kleine: 5, mittlere: 10, helden: 15 },
+                      level3: { kleine: 10, mittlere: 15, helden: 20 }
+                    };
+
+                    const levels = [
+                      { key: 'level1', label: '🥚 Level 1 (Stufe 1)', defaults: { kleine: 3, mittlere: 5, helden: 10 } },
+                      { key: 'level2', label: '🐥 Level 2 (Stufe 2)', defaults: { kleine: 5, mittlere: 10, helden: 15 } },
+                      { key: 'level3', label: '🦅 Level 3 (Stufe 3)', defaults: { kleine: 10, mittlere: 15, helden: 20 } }
+                    ];
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                        {levels.map((lvl) => {
+                          const conf = currentConfig[lvl.key] || lvl.defaults;
+                          return (
+                            <div key={lvl.key} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 20px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>{lvl.label}</strong>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {[
+                                  { k: 'kleine', label: 'Kleine Flamme' },
+                                  { k: 'mittlere', label: 'Mittlere Flamme' },
+                                  { k: 'helden', label: 'Helden-Flamme' }
+                                ].map((type) => (
+                                  <div key={type.k} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{type.label} (Minuten)</label>
+                                    <input 
+                                      type="number"
+                                      min="1"
+                                      value={conf[type.k] || 1}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        const updated = JSON.parse(JSON.stringify(currentConfig));
+                                        if (!updated[lvl.key]) updated[lvl.key] = {};
+                                        updated[lvl.key][type.k] = val;
+                                        setSchoolData((prev: any) => ({
+                                          ...prev,
+                                          opening_hours: { ...prev.opening_hours, fokus_levels: updated }
+                                        }));
+                                      }}
+                                      style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontWeight: 700 }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {teacherSettingsTab === 'profile' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Mein Profil</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Deine hinterlegten Daten im Campus-Groovelab.</p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={teacher?.first_name || ''} 
+                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={teacher?.last_name || ''} 
+                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={teacher?.email || ''} 
+                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value="Campus-Lehrkraft" 
+                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none' }}
+                      />
+                    </div>
                   </div>
                 </div>
-              );
-            })()}
+              )}
+            </div>
           </div>
+
+          {/* PERSISTENT BOTTOM SAVE BAR */}
+          {(() => {
+            const isSettingsDirty = initialSchoolData && schoolData && 
+              JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
+            const brandColor = '#137333';
+
+            return (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 40px',
+                border: '1px solid #e2e8f0',
+                background: isSettingsDirty ? '#fef2f2' : '#f8fafc',
+                borderRadius: '20px',
+                transition: 'background-color 0.3s ease'
+              }}>
+                {isSettingsDirty ? (
+                  <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    ⚠️ Ungespeicherte Änderungen vorhanden.
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    ✓ Alle Änderungen gespeichert.
+                  </span>
+                )}
+                <button
+                  onClick={async () => {
+                    if (!teacher?.school_id || !schoolData) return;
+                    setIsSaving(true);
+                    const { error } = await supabase
+                      .from('schools')
+                      .update({ opening_hours: schoolData.opening_hours })
+                      .eq('id', teacher.school_id);
+                    setIsSaving(false);
+                    if (error) {
+                      alert("Fehler beim Speichern der Einstellungen: " + error.message);
+                    } else {
+                      setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
+                      alert("Einstellungen erfolgreich gespeichert! 🎉");
+                    }
+                  }}
+                  disabled={!isSettingsDirty || isSaving}
+                  style={{
+                    padding: '10px 24px',
+                    background: isSettingsDirty ? brandColor : '#cbd5e1',
+                    color: isSettingsDirty ? 'white' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.84rem',
+                    cursor: isSettingsDirty ? 'pointer' : 'default',
+                    boxShadow: isSettingsDirty ? `0 4px 12px ${brandColor}40` : 'none',
+                    transition: 'all 0.2s',
+                    opacity: isSaving ? 0.7 : 1
+                  }}
+                  className={isSettingsDirty ? "hover-scale" : ""}
+                >
+                  {isSaving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
+                </button>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>

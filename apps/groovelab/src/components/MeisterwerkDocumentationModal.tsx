@@ -2883,9 +2883,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Header - Apple-style compact redesign */}
         <div style={{
           padding: '16px 20px',
-          background: '#34a853',
+          background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
           backdropFilter: 'none',
-          borderBottom: '1px solid rgba(19, 115, 51, 0.8)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
           borderRadius: '0',
           display: 'flex',
           flexDirection: 'column',
@@ -2990,7 +2990,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setActiveViewMode('recordings')}
                   style={{
-                    background: activeViewMode === 'recordings' ? '#137333' : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -3012,7 +3012,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setActiveViewMode('loopstation')}
                   style={{
-                    background: activeViewMode === 'loopstation' ? '#137333' : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -3034,7 +3034,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setActiveViewMode('practice')}
                   style={{
-                    background: activeViewMode === 'practice' ? '#137333' : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -3100,7 +3100,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 type="button"
                 onClick={() => setActiveViewMode('recordings')}
                 style={{
-                  background: activeViewMode === 'recordings' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: '#ffffff',
                   padding: '6px 12px',
@@ -3120,7 +3120,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 type="button"
                 onClick={() => setActiveViewMode('loopstation')}
                 style={{
-                  background: activeViewMode === 'loopstation' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: '#ffffff',
                   padding: '6px 12px',
@@ -3140,7 +3140,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 type="button"
                 onClick={() => setActiveViewMode('practice')}
                 style={{
-                  background: activeViewMode === 'practice' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: '#ffffff',
                   padding: '6px 12px',
@@ -3232,7 +3232,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#34a853',
+                  color: '#4f46e5',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3337,7 +3337,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#34a853',
+                  color: '#4f46e5',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3401,7 +3401,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   onClick={startRecordingAudio}
                                   disabled={isUploadingAudio || isLimitReached}
                                   style={{
-                                    background: isLimitReached ? '#94a3b8' : '#34a853',
+                                    background: isLimitReached ? '#94a3b8' : '#4f46e5',
                                     color: '#fff',
                                     border: 'none',
                                     padding: '6px 12px',
@@ -5096,8 +5096,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     onClick={() => setActiveModalTab('logbook')}
                     style={{
                       flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                      background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
                       transition: 'all 0.15s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                     }}
@@ -6897,14 +6897,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
 
-                  {/* Submit Button */}
                   <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
                     <button
                       type="submit"
                       disabled={saving}
                       style={{
                         flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
                         boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                         transition: 'all 0.15s ease'
                       }}

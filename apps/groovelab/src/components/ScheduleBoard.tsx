@@ -132,6 +132,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
 
+  // Teacher onboarding state variables
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState<boolean>(true);
+  const [teacherAvailability, setTeacherAvailability] = useState<any>({});
+  const [onboardingAvailability, setOnboardingAvailability] = useState<{
+    [day: number]: { checked: boolean; start: string; end: string }
+  }>({
+    1: { checked: false, start: '', end: '' },
+    2: { checked: false, start: '', end: '' },
+    3: { checked: false, start: '', end: '' },
+    4: { checked: false, start: '', end: '' },
+    5: { checked: false, start: '', end: '' },
+    6: { checked: false, start: '', end: '' },
+    7: { checked: false, start: '', end: '' }
+  });
+  const [onboardingSubmitting, setOnboardingSubmitting] = useState<boolean>(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+
   interface CustomDialogConfig {
     type: 'confirm' | 'alert';
     message: string;
@@ -703,12 +720,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }))
       ];
 
-      // 3. Fetch teacher profile for planned boards (checking new platform-specific column and fallback planned_boards)
       const { data: teacherProfile } = await supabase
         .from('users')
         .select('*')
         .eq('id', selectedTeacherId)
         .maybeSingle();
+
+      setIsOnboardingCompleted(teacherProfile?.teacher_onboarding_completed ?? false);
+      setTeacherAvailability(teacherProfile?.teacher_availability ?? {});
 
       const rawPlanned = (teacherProfile as any)?.[columnName] || teacherProfile?.planned_boards;
       const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
@@ -989,17 +1008,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         });
       });
 
-      // Ensure Monday to Friday (1 to 5) are always present in the designer
-      for (let i = 1; i <= 5; i++) {
-        const hasDay = reconstructedBoards.some(b => b.dayOfWeek === i);
-        if (!hasDay) {
-          reconstructedBoards.push({
-            id: `board-${crypto.randomUUID()}`,
-            dayOfWeek: i,
-            startAnchor: '14:00',
-            roomId: loadedRooms.length > 0 ? loadedRooms[0].id : '',
-            students: []
-          });
+      // Ensure only teacher's configured Wunschtage are present in the designer if onboarding is completed
+      const activeDays = Object.keys(teacherProfile?.teacher_availability || {}).map(Number);
+      if (teacherProfile?.teacher_onboarding_completed && activeDays.length > 0) {
+        reconstructedBoards = reconstructedBoards.filter(b => activeDays.includes(b.dayOfWeek));
+        activeDays.forEach(i => {
+          const hasDay = reconstructedBoards.some(b => b.dayOfWeek === i);
+          if (!hasDay) {
+            const dayConfig = (teacherProfile.teacher_availability as any)[i];
+            reconstructedBoards.push({
+              id: `board-${crypto.randomUUID()}`,
+              dayOfWeek: i,
+              startAnchor: dayConfig?.start || '14:00',
+              roomId: loadedRooms.length > 0 ? loadedRooms[0].id : '',
+              students: []
+            });
+          }
+        });
+      } else {
+        // Fallback for missing/uncompleted onboarding
+        for (let i = 1; i <= 5; i++) {
+          const hasDay = reconstructedBoards.some(b => b.dayOfWeek === i);
+          if (!hasDay) {
+            reconstructedBoards.push({
+              id: `board-${crypto.randomUUID()}`,
+              dayOfWeek: i,
+              startAnchor: '14:00',
+              roomId: loadedRooms.length > 0 ? loadedRooms[0].id : '',
+              students: []
+            });
+          }
         }
       }
 
@@ -1011,11 +1049,70 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       setBoards(reconstructedBoards);
       setStudents(finalGroupedStudents);
+      
+      // Force activeTab to designer if not submitted and role is teacher
+      if (currentUserRole === 'teacher' && !(schedData && schedData.length > 0)) {
+        setActiveTab('designer');
+      }
+      
       setIsInitialLoadDone(true);
     } catch (err) {
       console.error('Error loading schedule board data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTeacherOnboardingSubmit = async () => {
+    setOnboardingError(null);
+    const activeDays = Object.entries(onboardingAvailability).filter(([_, cfg]) => cfg.checked);
+    if (activeDays.length === 0) {
+      setOnboardingError('Bitte wähle mindestens einen Wunschtag aus.');
+      return;
+    }
+    
+    // Check that start and end times are set and valid
+    for (const [dayNum, cfg] of activeDays) {
+      if (!cfg.start || !cfg.end) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === Number(dayNum))?.name || 'Wochentag';
+        setOnboardingError(`Bitte wähle Start- und Endzeit für ${dayName} aus.`);
+        return;
+      }
+      const [sh, sm] = cfg.start.split(':').map(Number);
+      const [eh, em] = cfg.end.split(':').map(Number);
+      if (sh * 60 + sm >= eh * 60 + em) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === Number(dayNum))?.name || 'Wochentag';
+        setOnboardingError(`Die Endzeit an ${dayName} muss nach der Startzeit liegen.`);
+        return;
+      }
+    }
+    
+    try {
+      setOnboardingSubmitting(true);
+      const availabilityJson: any = {};
+      activeDays.forEach(([dayNum, cfg]) => {
+        availabilityJson[Number(dayNum)] = { start: cfg.start, end: cfg.end };
+      });
+      
+      const { error } = await supabase
+        .from('users')
+        .update({
+          teacher_onboarding_completed: true,
+          teacher_availability: availabilityJson
+        })
+        .eq('id', selectedTeacherId);
+        
+      if (error) throw error;
+      
+      // Auto-initialize standard draft boards for the selected days
+      await loadInitialData();
+      setIsOnboardingCompleted(true);
+      setTeacherAvailability(availabilityJson);
+    } catch (err: any) {
+      console.error('Error submitting teacher onboarding:', err);
+      setOnboardingError(err.message || 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+    } finally {
+      setOnboardingSubmitting(false);
     }
   };
 
@@ -2756,6 +2853,177 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const assignedCount = students.filter(s => !!s.assignedDay).length;
   const allCount = students.length;
 
+  const showOnboardingOverlay = !isOnboardingCompleted && (currentUserRole === 'teacher') && (selectedTeacherId === userId);
+
+  if (showOnboardingOverlay) {
+    const timeOptions = [
+      '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+      '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30',
+      '22:00'
+    ];
+
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+        borderRadius: '24px',
+        padding: '40px',
+        maxWidth: '750px',
+        margin: '40px auto',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.05)',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ height: '64px', width: '64px', background: '#e6f4ea', color: '#137333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+            <Calendar size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
+            Persönliches Onboarding
+          </h2>
+          <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: '1.5', maxWidth: '580px', margin: '0 auto' }}>
+            Bevor du den Stundenplan-Designer nutzen kannst, richte bitte deine Wunschtage und Unterrichtszeiten ein. Deine Schüler sehen beim Onboarding nur die hier ausgewählten Wochentage und können Wunschzeiten nur innerhalb der von dir festgelegten Zeitfenster angeben.
+          </p>
+        </div>
+
+        {onboardingError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} />
+            <span>{onboardingError}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+          {DAYS_OF_WEEK.map(day => {
+            const cfg = onboardingAvailability[day.value];
+            return (
+              <div key={day.value} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderRadius: '16px',
+                background: cfg.checked ? '#ffffff' : '#f8fafc',
+                border: cfg.checked ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
+                transition: 'all 0.2s',
+                boxShadow: cfg.checked ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={cfg.checked}
+                    onChange={(e) => {
+                      setOnboardingAvailability(prev => ({
+                        ...prev,
+                        [day.value]: { ...prev[day.value], checked: e.target.checked }
+                      }));
+                    }}
+                    style={{
+                      accentColor: '#34a853',
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <span>{day.name}</span>
+                </label>
+
+                {cfg.checked && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
+                      <select
+                        value={cfg.start}
+                        onChange={(e) => {
+                          setOnboardingAvailability(prev => ({
+                            ...prev,
+                            [day.value]: { ...prev[day.value], start: e.target.value }
+                          }));
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          background: '#ffffff',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="">Startzeit</option>
+                        {timeOptions.map(t => (
+                          <option key={t} value={t}>{t} Uhr</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
+                      <select
+                        value={cfg.end}
+                        onChange={(e) => {
+                          setOnboardingAvailability(prev => ({
+                            ...prev,
+                            [day.value]: { ...prev[day.value], end: e.target.value }
+                          }));
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          background: '#ffffff',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="">Endzeit</option>
+                        {timeOptions.map(t => (
+                          <option key={t} value={t}>{t} Uhr</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleTeacherOnboardingSubmit}
+          disabled={onboardingSubmitting}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '16px',
+            border: 'none',
+            background: '#34a853',
+            color: '#ffffff',
+            fontWeight: 800,
+            fontSize: '1rem',
+            cursor: onboardingSubmitting ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 8px 24px rgba(52, 168, 83, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+          onMouseOver={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#137333'; }}
+          onMouseOut={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#34a853'; }}
+        >
+          {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       
@@ -2814,7 +3082,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             gap: '16px'
           }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} />
               </div>
               <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -2850,24 +3118,53 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
 
-            <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
-              <button 
-                onClick={() => setActiveTab('calendar')}
-                className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-              >
-                Stundenplan
-              </button>
-              <button 
-                onClick={() => setActiveTab('designer')}
-                className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-              >
-                Stundenplan-Designer
-              </button>
-            </div>
+            {!(currentUserRole === 'teacher' && !hasSubmittedSchedule) ? (
+              <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+                <button 
+                  onClick={() => setActiveTab('calendar')}
+                  className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                >
+                  Stundenplan
+                </button>
+                <button 
+                  onClick={() => setActiveTab('designer')}
+                  className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                >
+                  Stundenplan-Designer
+                </button>
+              </div>
+            ) : (
+              <div />
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const inviteLink = window.location.origin + "?onboarding=parent";
+                  await navigator.clipboard.writeText(inviteLink);
+                  await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
+                }}
+                style={{
+                  background: '#e6f4ea',
+                  color: '#137333',
+                  border: '1px solid rgba(52, 168, 83, 0.2)',
+                  fontWeight: 700,
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                }}
+              >
+                <Send size={14} /> Onboarding-Link kopieren
+              </button>
               {hasSubmittedSchedule && scheduleStatus === 'approved' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#137333', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
                   <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span> 

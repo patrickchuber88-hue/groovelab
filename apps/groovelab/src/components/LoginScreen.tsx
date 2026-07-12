@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
@@ -458,6 +458,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   };
 
   const [selectedSlots, setSelectedSlots] = useState<{[key: string]: 'wunsch' | 'gesperrt'}>({});
+  const [teacherAvailabilityState, setTeacherAvailabilityState] = useState<any>(null);
   const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt'>('wunsch');
   const [showSaturday, setShowSaturday] = useState(false);
   const [verifiedStudentId, setVerifiedStudentId] = useState<string | null>(null);
@@ -553,6 +554,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     };
     checkInviteToken();
   }, []);
+
+  useEffect(() => {
+    if (verifiedStudentId) {
+      const fetchTeacherAvailability = async () => {
+        try {
+          const { data: studentUser } = await supabase
+            .from('users')
+            .select('teacher_id')
+            .eq('id', verifiedStudentId)
+            .single();
+
+          if (studentUser?.teacher_id) {
+            const { data: teacherUser } = await supabase
+              .from('users')
+              .select('teacher_onboarding_completed, teacher_availability')
+              .eq('id', studentUser.teacher_id)
+              .single();
+
+            if (teacherUser?.teacher_onboarding_completed) {
+              setTeacherAvailabilityState(teacherUser.teacher_availability);
+            } else {
+              setTeacherAvailabilityState(null);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching teacher availability:', err);
+        }
+      };
+      fetchTeacherAvailability();
+    }
+  }, [verifiedStudentId]);
 
   // Geschwister-Zustände im Onboarding
   interface SiblingChild {
@@ -4815,114 +4847,218 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
 
                 {/* Visual Calendar Grid Weekspective */}
-                <div style={{
-                  background: '#f8fafc',
-                  borderRadius: '20px',
-                  border: '1px solid #e2e8f0',
-                  padding: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  maxHeight: window.innerHeight > 850 ? '480px' : '320px',
-                  overflowY: 'auto'
-                }}>
-                  {/* Header Row */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
-                    gap: '3px',
-                    textAlign: 'center',
-                    fontWeight: 800,
-                    fontSize: '10px',
-                    color: '#64748b',
-                    paddingBottom: '6px',
-                    borderBottom: '1px solid #e2e8f0',
-                    position: 'sticky',
-                    top: 0,
-                    background: '#f8fafc',
-                    zIndex: 2
-                  }}>
-                    <div>Zeit</div>
-                    <div>Mo</div>
-                    <div>Di</div>
-                    <div>Mi</div>
-                    <div>Do</div>
-                    <div>Fr</div>
-                    {showSaturday && <div>Sa</div>}
-                  </div>
+                {(() => {
+                  const teacherDays = teacherAvailabilityState 
+                    ? Object.keys(teacherAvailabilityState).map(Number)
+                    : [];
+                  
+                  const activeDays = [1, 2, 3, 4, 5];
+                  if (teacherDays.includes(6)) activeDays.push(6);
+                  if (teacherDays.includes(7)) activeDays.push(7);
+                    
+                  const dayNames: { [key: number]: string } = { 1: 'Mo', 2: 'Di', 3: 'Mi', 4: 'Do', 5: 'Fr', 6: 'Sa', 7: 'So' };
+                  
+                  const isSlotAvailable = (dayNum: number, timeStr: string) => {
+                    if (!teacherAvailabilityState) return true;
+                    const dayConfig = teacherAvailabilityState[dayNum];
+                    if (!dayConfig) return false;
+                    
+                    const [sh, sm] = dayConfig.start.split(':').map(Number);
+                    const [eh, em] = dayConfig.end.split(':').map(Number);
+                    const [th, tm] = timeStr.split(':').map(Number);
+                    
+                    const startMins = sh * 60 + sm;
+                    const endMins = eh * 60 + em;
+                    const slotMins = th * 60 + tm;
+                    
+                    return slotMins >= startMins && slotMins < endMins;
+                  };
 
-                  {/* Rows */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'].map(time => (
-                      <div key={time} style={{
-                        display: 'grid',
-                        gridTemplateColumns: `45px repeat(${showSaturday ? 6 : 5}, 1fr)`,
-                        gap: '3px',
-                        alignItems: 'center'
+                  let minMinutes = 10 * 60; // Default start 10:00
+                  let maxMinutes = 19 * 60; // Default end 19:00
+                  if (teacherAvailabilityState) {
+                    Object.values(teacherAvailabilityState).forEach((cfg: any) => {
+                      if (cfg.start) {
+                        const [h, m] = cfg.start.split(':').map(Number);
+                        minMinutes = Math.min(minMinutes, h * 60 + m);
+                      }
+                      if (cfg.end) {
+                        const [h, m] = cfg.end.split(':').map(Number);
+                        maxMinutes = Math.max(maxMinutes, h * 60 + m);
+                      }
+                    });
+                  }
+                  
+                  const timeSlots = Array.from({ length: Math.ceil((maxMinutes - minMinutes) / 30) }, (_, i) => {
+                    const mins = minMinutes + i * 30;
+                    const h = Math.floor(mins / 60);
+                    const m = mins % 60;
+                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                  });
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {/* Grid Legend */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        border: '1.5px dashed #cbd5e1',
+                        padding: '10px 14px',
+                        borderRadius: '16px',
+                        fontSize: '11px',
+                        color: '#475569',
+                        gap: '12px'
                       }}>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
-                          {time}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                          <div style={{ width: '12px', height: '12px', background: '#f4fbf7', border: '1px solid #a7f3d0', borderRadius: '4px', flexShrink: 0 }} />
+                          <span style={{ fontWeight: 700, color: '#137333' }}>Regulärer Unterricht</span>
                         </div>
-                        {[1, 2, 3, 4, 5, 6].slice(0, showSaturday ? 6 : 5).map(dayNum => {
-                          const cellKey = `${dayNum}-${time}`;
-                          const selection = parentChildren[activeParentChildIndex].selectedSlots[cellKey];
-                          let bg = '#ffffff';
-                          let border = '1px solid #e2e8f0';
-                          let labelColor = 'transparent';
-                          
-                          if (selection === 'wunsch') {
-                            bg = '#34a853';
-                            border = '1px solid #137333';
-                            labelColor = '#ffffff';
-                          } else if (selection === 'gesperrt') {
-                            bg = '#ef4444';
-                            border = '1px solid #dc2626';
-                            labelColor = '#ffffff';
-                          }
-                          
-                          return (
-                            <div
-                              key={cellKey}
-                              onClick={() => {
-                                const updated = [...parentChildren];
-                                const activeChild = updated[activeParentChildIndex];
-                                const copy = { ...activeChild.selectedSlots };
-                                if (copy[cellKey] === preferenceMode) {
-                                  delete copy[cellKey];
-                                } else {
-                                  copy[cellKey] = preferenceMode;
-                                }
-                                updated[activeParentChildIndex] = {
-                                  ...activeChild,
-                                  selectedSlots: copy
-                                };
-                                setParentChildren(updated);
-                              }}
-                              style={{
-                                background: bg,
-                                border: border,
-                                borderRadius: '6px',
-                                height: '24px',
-                                cursor: 'pointer',
-                                transition: 'all 0.1s ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '9px',
-                                color: labelColor,
-                                fontWeight: 900
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              {selection === 'wunsch' && '✓'}
-                              {selection === 'gesperrt' && '✗'}
-                            </div>
-                          );
-                        })}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                          <div style={{ width: '12px', height: '12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', flexShrink: 0 }} />
+                          <span style={{ fontWeight: 700, color: '#64748b' }}>Ausweichzeit (flexible Verlegung)</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      {/* Scrollable Grid */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        maxHeight: window.innerHeight > 850 ? '480px' : '320px',
+                        overflowY: 'auto'
+                      }}>
+                        {/* Header Row */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
+                          gap: '3px',
+                          textAlign: 'center',
+                          fontWeight: 800,
+                          fontSize: '10px',
+                          color: '#64748b',
+                          paddingBottom: '6px',
+                          borderBottom: '1px solid #e2e8f0',
+                          position: 'sticky',
+                          top: 0,
+                          background: '#f8fafc',
+                          zIndex: 2
+                        }}>
+                          <div>Zeit</div>
+                          {activeDays.map(dayNum => {
+                            const isTeacherDay = teacherDays.includes(dayNum);
+                            return (
+                              <div 
+                                key={dayNum}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  color: isTeacherDay ? '#137333' : '#64748b'
+                                }}
+                              >
+                                <span>{dayNames[dayNum]}</span>
+                                {isTeacherDay && (
+                                  <span style={{ 
+                                    fontSize: '7px', 
+                                    background: '#e6f4ea', 
+                                    color: '#137333', 
+                                    padding: '1px 3px', 
+                                    borderRadius: '4px',
+                                    fontWeight: 800,
+                                    border: '1px solid rgba(52, 168, 83, 0.2)'
+                                  }}>
+                                    Unterricht
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Rows */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {timeSlots.map(time => (
+                            <div key={time} style={{
+                              display: 'grid',
+                              gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
+                              gap: '3px',
+                              alignItems: 'center'
+                            }}>
+                              <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
+                                {time}
+                              </div>
+                              {activeDays.map(dayNum => {
+                                const cellKey = `${dayNum}-${time}`;
+                                const available = isSlotAvailable(dayNum, time);
+                                const selection = parentChildren[activeParentChildIndex].selectedSlots[cellKey];
+                                
+                                let bg = available ? '#f4fbf7' : '#f1f5f9';
+                                let border = available ? '1px solid #a7f3d0' : '1px solid #cbd5e1';
+                                let labelColor = 'transparent';
+                                let cursor = 'pointer';
+                                
+                                if (selection === 'wunsch') {
+                                  bg = '#34a853';
+                                  border = '1px solid #137333';
+                                  labelColor = '#ffffff';
+                                } else if (selection === 'gesperrt') {
+                                  bg = '#ef4444';
+                                  border = '1px solid #dc2626';
+                                  labelColor = '#ffffff';
+                                }
+                                
+                                return (
+                                  <div
+                                    key={cellKey}
+                                    onClick={() => {
+                                      const updated = [...parentChildren];
+                                      const activeChild = updated[activeParentChildIndex];
+                                      const copy = { ...activeChild.selectedSlots };
+                                      if (copy[cellKey] === preferenceMode) {
+                                        delete copy[cellKey];
+                                      } else {
+                                        copy[cellKey] = preferenceMode;
+                                      }
+                                      updated[activeParentChildIndex] = {
+                                        ...activeChild,
+                                        selectedSlots: copy
+                                      };
+                                      setParentChildren(updated);
+                                    }}
+                                    style={{
+                                      background: bg,
+                                      border: border,
+                                      borderRadius: '6px',
+                                      height: '24px',
+                                      cursor: cursor,
+                                      transition: 'all 0.1s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '9px',
+                                      color: labelColor,
+                                      fontWeight: 900
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    {selection === 'wunsch' && '✓'}
+                                    {selection === 'gesperrt' && '✗'}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Live Progress Info */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#137333', textAlign: 'left' }}>
@@ -4968,72 +5104,72 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', boxShadow: '0 8px 16px rgba(52, 168, 83, 0.15)' }}>
-              <Check size={36} strokeWidth={3} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', boxShadow: '0 8px 16px rgba(52, 168, 83, 0.1)' }}>
+              <Check size={28} strokeWidth={3} />
             </div>
 
-            <div style={{ textAlign: 'center' }}>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
+            <div style={{ textTransform: 'none', textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
                 Stundenplan eingerichtet!
               </h3>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem', lineHeight: '1.45' }}>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem', lineHeight: '1.4' }}>
                 Deine Terminwünsche wurden erfolgreich gespeichert. Die Musikschule meldet sich in Kürze mit dem finalen Stundenplan bei dir!
               </p>
             </div>
 
             {/* QR CODE DISPLAY CARD */}
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
-              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Dein persönlicher Login-Code</span>
-              <div style={{ background: '#ffffff', padding: '14px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
+            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+              <span style={{ fontSize: '9px', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Dein persönlicher Login-Code</span>
+              <div style={{ background: '#ffffff', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(`${window.location.origin}/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`)}`}
                   alt="Student Login QR Code"
-                  style={{ width: '180px', height: '180px', display: 'block' }}
+                  style={{ width: '130px', height: '130px', display: 'block' }}
                 />
               </div>
-              <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: '#64748b', lineHeight: '1.3' }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '10.5px', color: '#64748b', lineHeight: '1.3' }}>
                 💡 Mach einen Screenshot von diesem Code. Er dient als Schülerausweis zum schnellen Einloggen in die App.
               </p>
             </div>
 
-            <div style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+            <div style={{ width: '100%', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
                 <span style={{ color: '#64748b', fontWeight: 700 }}>Schüler:</span>
                 <strong style={{ color: '#0f172a', fontWeight: 800 }}>{verifiedStudentDetails.first_name} {verifiedStudentDetails.last_name}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
                 <span style={{ color: '#64748b', fontWeight: 700 }}>Instrument:</span>
                 <strong style={{ color: '#0f172a', fontWeight: 800 }}>{verifiedStudentDetails.instrument}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
                 <span style={{ color: '#64748b', fontWeight: 700 }}>Ausweis-Nr:</span>
                 <strong style={{ color: '#137333', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
               </div>
             </div>
 
             {/* ACTION OPTIONS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', width: '100%' }}>
               <button
                 onClick={downloadWalletPass}
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
-                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '13px',
-                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  flex: 1, padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '12px',
+                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
-                💳 In Apple/Google Wallet speichern
+                💳 Wallet
               </button>
               
               <button
                 onClick={downloadParentQrCode}
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
-                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '13px',
-                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  flex: 1, padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff', color: '#475569', fontWeight: 850, fontSize: '12px',
+                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
-                💾 Als Bild speichern
+                💾 Speichern
               </button>
             </div>
 
@@ -5044,70 +5180,72 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: '20px',
-                padding: '16px',
+                padding: '12px',
                 boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
+                gap: '8px',
                 textAlign: 'left'
               }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px' }}>
-                    <Fingerprint size={20} />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ background: '#e6f4ea', color: '#137333', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Fingerprint size={18} />
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>
+                    <h4 style={{ margin: '0 0 2px 0', fontSize: '12.5px', fontWeight: 800, color: '#1e293b' }}>
                       Schneller Login per Fingerabdruck
                     </h4>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#64748b', lineHeight: '1.4' }}>
+                    <p style={{ margin: 0, fontSize: '10.5px', color: '#64748b', lineHeight: '1.3' }}>
                       Entsperre die App beim nächsten Mal sofort per TouchID/FaceID auf diesem Gerät.
                     </p>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '10px', color: '#64748b', background: '#f1f5f9', padding: '8px 12px', borderRadius: '10px', lineHeight: '1.4' }}>
-                  <strong>🔒 100% Sicher:</strong> Dein Fingerabdruck wird niemals auf unseren Servern gespeichert. Dein Gerät verifiziert dich lokal und sendet uns nur eine verschlüsselte Bestätigung.
+                <div style={{ fontSize: '9.5px', color: '#64748b', background: '#f1f5f9', padding: '6px 10px', borderRadius: '8px', lineHeight: '1.3' }}>
+                  <strong>🔒 100% Sicher:</strong> Dein Fingerabdruck wird niemals auf unseren Servern gespeichert. Dein Gerät verifiziert dich lokal.
                 </div>
 
                 {biometricsStatus === 'idle' && (
                   <button
                     onClick={handleRegisterBiometrics}
                     style={{
-                      width: '100%', padding: '10px 14px', borderRadius: '10px', border: 'none',
-                      background: '#3b82f6', color: '#ffffff', fontWeight: 800, fontSize: '12px',
+                      width: '100%', padding: '8px 12px', borderRadius: '10px', border: 'none',
+                      background: '#34a853', color: '#ffffff', fontWeight: 800, fontSize: '11.5px',
                       cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                     }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#137333'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
                   >
                     Fingerabdruck-Login aktivieren
                   </button>
                 )}
 
                 {biometricsStatus === 'registering' && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#3b82f6', fontWeight: 700, padding: '8px' }}>
-                    <RotateCw size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '11px', color: '#137333', fontWeight: 700, padding: '6px' }}>
+                    <RotateCw size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
                     Warte auf Bestätigung des Geräts...
                   </div>
                 )}
 
                 {biometricsStatus === 'success' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#34a853', fontWeight: 800, padding: '8px 0 0 0' }}>
-                    <Check size={16} strokeWidth={3} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#34a853', fontWeight: 800, padding: '4px 0 0 0' }}>
+                    <Check size={14} strokeWidth={3} />
                     Erfolgreich aktiviert!
                   </div>
                 )}
 
                 {biometricsStatus === 'error' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 800 }}>
-                      <AlertCircle size={16} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#ef4444', fontWeight: 800 }}>
+                      <AlertCircle size={14} />
                       Einrichtung fehlgeschlagen
                     </div>
-                    <span style={{ fontSize: '10px', color: '#ef4444' }}>{biometricsErrorMessage}</span>
+                    <span style={{ fontSize: '9.5px', color: '#ef4444' }}>{biometricsErrorMessage}</span>
                     <button
                       onClick={handleRegisterBiometrics}
                       style={{
-                        width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ef4444',
-                        background: 'transparent', color: '#ef4444', fontWeight: 800, fontSize: '11px',
+                        width: '100%', padding: '6px 10px', borderRadius: '8px', border: '1px solid #ef4444',
+                        background: 'transparent', color: '#ef4444', fontWeight: 800, fontSize: '10.5px',
                         cursor: 'pointer', transition: 'all 0.2s'
                       }}
                     >
@@ -5118,14 +5256,65 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             )}
 
+            {/* PWA INSTALLATION BANNER */}
+            <div style={{
+              width: '100%',
+              background: '#f0f9f1',
+              border: '1px solid rgba(52, 168, 83, 0.25)',
+              borderRadius: '20px',
+              padding: '12px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ background: '#e6f4ea', color: '#137333', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Smartphone size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 2px 0', fontSize: '12.5px', fontWeight: 800, color: '#1e293b' }}>
+                    Als App auf dem Startbildschirm
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '10.5px', color: '#64748b', lineHeight: '1.3' }}>
+                    Installiere Campus-Groovelab für blitzschnellen Zugriff ohne Browser.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const deferredPrompt = (window as any).deferredPrompt;
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                  } else {
+                    alert("Tippe in deinem Browser-Menü auf 'Zum Startbildschirm hinzufügen' / 'Installieren', um die App auf deinem Gerät zu sichern.");
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: '10px', border: 'none',
+                  background: '#34a853', color: '#ffffff', fontWeight: 800, fontSize: '11px',
+                  cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#137333'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
+              >
+                App jetzt installieren
+              </button>
+            </div>
+
             <button
               onClick={() => onLogin(verifiedStudentDetails.id, false)}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#3b82f6',
+                background: '#137333',
                 color: '#ffffff',
-                fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+                fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', 
+                boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)'
               }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#137333'}
             >
               Direkt zum Profil einloggen
             </button>

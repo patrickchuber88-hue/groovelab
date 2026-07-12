@@ -10457,6 +10457,19 @@ export function AdminDashboard({
       return `${h} Std. ${m} Min.`;
     };
 
+    const formatMinsToMMSS = (mins: number) => {
+      const totalSeconds = Math.round(mins * 60);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const sStr = s < 10 ? `0${s}` : `${s}`;
+      if (h > 0) {
+        const mStr = m < 10 ? `0${m}` : `${m}`;
+        return `${h}:${mStr}:${sStr} Min.`;
+      }
+      return `${m}:${sStr} Min.`;
+    };
+
     // Formatted reset date
     const resetFormatted = stats.resetDateStr 
       ? new Date(stats.resetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -10563,8 +10576,8 @@ export function AdminDashboard({
                   { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
                   { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#e6f4ea' : '#fef2f2' },
                   { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
-                  { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                  { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
+                  { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                  { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                 ].map((stat, idx) => (
                   <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

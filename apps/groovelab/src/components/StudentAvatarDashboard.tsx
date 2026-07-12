@@ -3528,6 +3528,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
   const [isExtraTime, setIsExtraTime] = useState(false);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointSecondsLeft, setCheckpointSecondsLeft] = useState(20);
+  const nextCheckpointSecondsRef = useRef<number>(0);
+  const currentLogIdRef = useRef<string | null>(null);
+  const currentExtraLogIdRef = useRef<string | null>(null);
   const isExtraTimeRef = useRef(isExtraTime);
   const isFinishingSessionRef = useRef(false);
 
@@ -4063,6 +4068,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return rem > 0 ? `${hrs} Std. ${rem} Min.` : `${hrs} Std.`;
   };
 
+  const formatMinsToMMSS = (mins: number) => {
+    const totalSeconds = Math.round(mins * 60);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const sStr = s < 10 ? `0${s}` : `${s}`;
+    if (h > 0) {
+      const mStr = m < 10 ? `0${m}` : `${m}`;
+      return `${h}:${mStr}:${sStr} Min.`;
+    }
+    return `${m}:${sStr} Min.`;
+  };
+
   // DIGITAL DETOX TIMER STATE
   const [showDetox, setShowDetox] = useState(false);
   const [detoxMinutes, setDetoxMinutes] = useState(15);
@@ -4526,6 +4544,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         return;
       }
 
+      // Checkpoint check
+      if (showCheckpoint) {
+        setCheckpointSecondsLeft(prev => {
+          if (prev <= 1) {
+            // Failed checkpoint! Pause session.
+            setSessionActive(false);
+            setShowCheckpoint(false);
+            playBeep(330, 600);
+            return 20;
+          }
+          return prev - 1;
+        });
+        return; // Pause practice increment while checkpoint is active!
+      }
+
       // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
         ? (isOrientedFlat && !isMoving && !document.hidden && (isMobile ? true : document.hasFocus()))
@@ -4546,6 +4579,74 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             setIsExtraTime(true);
             playSuccessChime();
           }
+
+          // Trigger checkpoint popup every 5-8 minutes
+          if (nextCheckpointSecondsRef.current > 0 && nextVal >= nextCheckpointSecondsRef.current) {
+            setShowCheckpoint(true);
+            setCheckpointSecondsLeft(20);
+            nextCheckpointSecondsRef.current = nextVal + Math.floor(Math.random() * 180) + 300;
+          }
+
+          // Heartbeat update every 10 seconds
+          if (nextVal % 10 === 0) {
+            // Update heartbeat in DB
+            const updateHeartbeat = async () => {
+              try {
+                if (currentLogIdRef.current) {
+                  if (nextVal <= targetSeconds) {
+                    const mins = Math.round(nextVal / 60);
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: nextVal, duration_minutes: mins })
+                      .eq('id', currentLogIdRef.current);
+                  } else {
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: targetSeconds, duration_minutes: Math.round(targetSeconds / 60) })
+                      .eq('id', currentLogIdRef.current);
+                    currentLogIdRef.current = null;
+                  }
+                }
+
+                if (nextVal > targetSeconds) {
+                  const extraSecs = nextVal - targetSeconds;
+                  const extraMins = Math.round(extraSecs / 60);
+
+                  if (!currentExtraLogIdRef.current) {
+                    const { data } = await supabase
+                      .from('fokus_logs')
+                      .insert({
+                        user_id: studentId,
+                        duration_minutes: extraMins,
+                        duration_seconds: extraSecs,
+                        is_extra: true,
+                        flame_level: getFlameLevelName(streak)
+                      })
+                      .select('id')
+                      .single();
+                    if (data) {
+                      currentExtraLogIdRef.current = data.id;
+                    }
+                  } else {
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: extraSecs, duration_minutes: extraMins })
+                      .eq('id', currentExtraLogIdRef.current);
+                  }
+                } else if (!currentLogIdRef.current && currentExtraLogIdRef.current) {
+                  const extraMins = Math.round(nextVal / 60);
+                  await supabase
+                    .from('fokus_logs')
+                    .update({ duration_seconds: nextVal, duration_minutes: extraMins })
+                    .eq('id', currentExtraLogIdRef.current);
+                }
+              } catch (err) {
+                console.error('Heartbeat update failed:', err);
+              }
+            };
+            updateHeartbeat();
+          }
+
           return nextVal;
         });
       } else {
@@ -4755,13 +4856,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       // Convert to minutes (at least 1 if we have seconds, or rounded)
       const focusMinutes = focusSeconds > 0 ? Math.max(1, Math.round(focusSeconds / 60)) : 0;
       const extraMinutes = extraSeconds > 0 ? Math.round(extraSeconds / 60) : 0;
-      const totalMinutes = Math.max(1, Math.round(secondsElapsed / 60));
+
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      // Check if focus time was already logged today
+      const { data: existingFocusLogs } = await supabase
+        .from('fokus_logs')
+        .select('id')
+        .eq('user_id', studentId)
+        .eq('is_extra', false)
+        .gte('created_at', startOfDay.toISOString());
+
+      const hasFocusLoggedToday = existingFocusLogs && existingFocusLogs.length > 0;
+
+      const effectiveFocusSeconds = hasFocusLoggedToday ? 0 : focusSeconds;
+      const effectiveFocusMinutes = hasFocusLoggedToday ? 0 : focusMinutes;
+      const totalMinutes = effectiveFocusMinutes + extraMinutes;
 
       // Query today's already logged extra minutes to enforce the 60-minute daily cap on XP for extra time
       let todayExtraMinsLogged = 0;
       try {
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
         const { data: todayLogs } = await supabase
           .from('fokus_logs')
           .select('duration_minutes')
@@ -4777,7 +4892,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       const remainingXpEligibleExtraMins = Math.max(0, 60 - todayExtraMinsLogged);
       const xpEligibleExtraMins = Math.min(extraMinutes, remainingXpEligibleExtraMins);
-      const xpGained = focusMinutes + xpEligibleExtraMins;
+      const xpGained = effectiveFocusMinutes + xpEligibleExtraMins;
 
       let totalFocus = totalMinutes;
       let monthlyFocus = totalMinutes;
@@ -4840,31 +4955,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         ? getFlameLevelName(streakFlame)
         : getFlameLevelName(streak);
 
-      // 1. Save focus log for focus time
-      if (focusSeconds > 0) {
-        await supabase.from('fokus_logs').insert({
-          user_id: studentId,
-          duration_minutes: focusMinutes,
-          duration_seconds: focusSeconds,
-          is_extra: false,
-          flame_level: activeFlameLevel,
-          created_at: new Date().toISOString()
-        });
-      }
-
-      // 2. Save focus log for extra time
-      if (extraSeconds > 0) {
-        await supabase.from('fokus_logs').insert({
-          user_id: studentId,
-          duration_minutes: extraMinutes,
-          duration_seconds: extraSeconds,
-          is_extra: true,
-          flame_level: activeFlameLevel,
-          created_at: new Date().toISOString()
-        });
-      }
-
-      // 3. Upsert stats
+          // 3. Upsert stats
       await supabase.from('student_stats').upsert({
         student_id: studentId,
         total_focus_minutes: totalFocus,
@@ -4920,6 +5011,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       setSecondsElapsed(0);
       setIsExtraTime(false);
+      setShowCheckpoint(false);
+      currentLogIdRef.current = null;
+      currentExtraLogIdRef.current = null;
       fetchStudentAndAvatar(true);
       fetchStudentProgress(true);
       fetchFokusLogs();
@@ -6608,13 +6702,53 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               return;
                             }
                           }
-                          setSelectedTopic('Allgemeines Üben');
-                          setSecondsElapsed(0);
-                          setIsPhoneFlat(true);
-                          setIsExtraTime(false);
-                          setPreStartCountdown(3);
-                          setSessionActive(true);
-                        }}
+                           setSelectedTopic('Allgemeines Üben');
+                           setSecondsElapsed(0);
+                           setIsPhoneFlat(true);
+                           setIsExtraTime(false);
+                           setPreStartCountdown(3);
+                           setSessionActive(true);
+                           setShowCheckpoint(false);
+                           nextCheckpointSecondsRef.current = Math.floor(Math.random() * 180) + 300; // 5-8 minutes
+
+                           // Query focus log today and insert initial heartbeat log
+                           const startOfDay = new Date();
+                           startOfDay.setHours(0, 0, 0, 0);
+
+                           supabase
+                             .from('fokus_logs')
+                             .select('id')
+                             .eq('user_id', studentId)
+                             .eq('is_extra', false)
+                             .gte('created_at', startOfDay.toISOString())
+                             .then(({ data }) => {
+                               const hasFocusLoggedToday = data && data.length > 0;
+                               const isExtra = !!hasFocusLoggedToday;
+
+                               supabase
+                                 .from('fokus_logs')
+                                 .insert({
+                                   user_id: studentId,
+                                   duration_minutes: 0,
+                                   duration_seconds: 0,
+                                   is_extra: isExtra,
+                                   flame_level: getFlameLevelName(avatar?.streak_flame || 0)
+                                 })
+                                 .select('id')
+                                 .single()
+                                 .then(({ data: logData }) => {
+                                   if (logData) {
+                                     if (isExtra) {
+                                       currentExtraLogIdRef.current = logData.id;
+                                       currentLogIdRef.current = null;
+                                     } else {
+                                       currentLogIdRef.current = logData.id;
+                                       currentExtraLogIdRef.current = null;
+                                     }
+                                   }
+                                 });
+                             });
+                         }}
                         style={{
                           width: '100%',
                           background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
@@ -7126,6 +7260,73 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>,
                         document.body
                       )}
+
+                      {/* 3. Anti-Cheat Checkpoint Overlay */}
+                      {showCheckpoint && createPortal(
+                        <div 
+                          style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 10002, // Topmost layer
+                            background: 'rgba(9, 9, 11, 0.95)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '24px',
+                            color: '#ffffff',
+                            userSelect: 'none',
+                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '24px',
+                            maxWidth: '320px',
+                            width: '100%'
+                          }}>
+                            <div style={{
+                              width: '72px',
+                              height: '72px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 0 24px rgba(52, 168, 83, 0.4)',
+                              cursor: 'pointer',
+                              animation: 'pulse 1.5s infinite'
+                            }}
+                            onClick={() => setShowCheckpoint(false)}
+                            >
+                              <span style={{ fontSize: '2.5rem' }}>🔥</span>
+                            </div>
+                            
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                                Bist du noch fokussiert?
+                              </h3>
+                              <p style={{ margin: '10px 0 0 0', fontSize: '0.875rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                                Tippe schnell auf das Flammen-Symbol, um deine Session fortzusetzen!
+                              </p>
+                            </div>
+
+                            <div style={{
+                              fontSize: '1.75rem',
+                              fontWeight: 900,
+                              color: '#34a853',
+                              fontVariantNumeric: 'tabular-nums'
+                            }}>
+                              {checkpointSecondsLeft}s
+                            </div>
+                          </div>
+                        </div>
+                      , document.body)}
                     </>
                   )}
 
@@ -8778,8 +8979,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
                           { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#e6f4ea' : '#fef2f2' },
                           { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
-                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
+                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
+                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
                         ].map((stat, idx) => (
                           <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -12291,280 +12492,268 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       {/* Settings Tab */}
       <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '24px', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
-          
-          {activeTab === 'settings' && studentUser && (
-          <div style={{ background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,0.02)', padding: '36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Title and General Settings */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '20px' }}>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Settings size={20} color="#34a853" /> Einstellungen
-                </h2>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, fontWeight: 600 }}>
-                  Hier kannst du deine Benachrichtigungen und App-Einstellungen verwalten.
-                </p>
-              </div>
-              
-              {/* Inner Sub-tab Navigation */}
-              <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSettingsSubTab('notifications')}
-                  style={{
-                    background: settingsSubTab === 'notifications' ? 'white' : 'transparent',
-                    color: settingsSubTab === 'notifications' ? '#0f172a' : '#64748b',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: settingsSubTab === 'notifications' ? '0 4px 10px rgba(0,0,0,0.04)' : 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Bell size={14} /> System &amp; Benachrichtigungen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSettingsSubTab('billing')}
-                  style={{
-                    background: settingsSubTab === 'billing' ? 'white' : 'transparent',
-                    color: settingsSubTab === 'billing' ? '#0f172a' : '#64748b',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: settingsSubTab === 'billing' ? '0 4px 10px rgba(0,0,0,0.04)' : 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <FileText size={14} /> Abrechnung &amp; Rechnungen
-                </button>
-              </div>
-            </div>
-
-            {/* Conditionally Render Sections based on subTab */}
-            {settingsSubTab === 'notifications' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                {/* Section 1: Benachrichtigungen */}
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Bell size={18} color="#34a853" /> 1. System &amp; Benachrichtigungen
-                  </h3>
+        {activeTab === 'settings' && studentUser && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ 
+              display: 'flex',
+              background: '#ffffff',
+              borderRadius: '24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
+              minHeight: '520px',
+              overflow: 'hidden',
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+            }}>
+              {/* LEFT SIDEBAR */}
+              <div style={{
+                width: '250px',
+                background: '#f8fafc',
+                borderRight: '1px solid #e2e8f0',
+                padding: '24px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                flexShrink: 0,
+                textAlign: 'left'
+              }}>
+                <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einstellungen</h3>
+                {[
+                  { id: 'notifications', label: 'System & Push-Benachrichtigungen' },
+                  { id: 'billing', label: 'Abrechnung & Rechnungen' }
+                ].map((item) => {
+                  const isSelected = settingsSubTab === item.id;
+                  const brandColor = '#137333';
+                  const activeColor = isSelected ? brandColor : '#64748b';
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {/* Push-Benachrichtigungen Haupt-Toggle */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
-                      <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                        <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                          <Bell size={18} />
+                  const renderIcon = () => {
+                    switch (item.id) {
+                      case 'notifications': return <Bell size={14} color={activeColor} />;
+                      case 'billing': return <FileText size={14} color={activeColor} />;
+                      default: return null;
+                    }
+                  };
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSettingsSubTab(item.id as any)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: isSelected ? '0 12px 12px 0' : '12px',
+                        border: 'none',
+                        borderLeft: isSelected ? `3px solid ${brandColor}` : '3px solid transparent',
+                        background: isSelected ? '#e6f4ea' : 'transparent',
+                        color: isSelected ? brandColor : '#475569',
+                        fontSize: '0.82rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        background: isSelected ? '#ffffff' : '#f1f5f9',
+                        boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
+                      }}>{renderIcon()}</span>
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* RIGHT PANEL */}
+              <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', textAlign: 'left' }}>
+                {settingsSubTab === 'notifications' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Benachrichtigungen</h3>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Passe an, worüber und wie wir dich informieren.</p>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Push-Benachrichtigungen Haupt-Toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#13733315' : '#f1f5f9', color: pushEnabled ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                            <Bell size={18} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
-                        </div>
+                        
+                        {isPremiumUser ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const nextVal = !pushEnabled;
+                              setPushEnabled(nextVal);
+                              if (nextVal) {
+                                const success = await subscribeUserToPush(studentId);
+                                if (!success) {
+                                  setPushEnabled(false);
+                                  alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                                } else {
+                                  alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                                }
+                              } else {
+                                const success = await unsubscribeUserFromPush(studentId);
+                                if (!success) {
+                                  setPushEnabled(true);
+                                  alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                                } else {
+                                  alert('Push-Benachrichtigungen deaktiviert.');
+                                }
+                              }
+                            }}
+                            className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
+                            style={{ backgroundColor: pushEnabled ? '#137333' : undefined }}
+                          >
+                            <div className="app-binary-switch-knob" />
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                            <span>🔒 Nur für aktive Schüler</span>
+                          </div>
+                        )}
                       </div>
-                      
-                      {isPremiumUser ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextVal = !pushEnabled;
-                            setPushEnabled(nextVal);
-                            if (nextVal) {
-                              const success = await subscribeUserToPush(studentId);
-                              if (!success) {
-                                setPushEnabled(false);
-                                alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
-                              } else {
-                                alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
-                              }
-                            } else {
-                              const success = await unsubscribeUserFromPush(studentId);
-                              if (!success) {
-                                setPushEnabled(true);
-                                alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                              } else {
-                                alert('Push-Benachrichtigungen deaktiviert.');
-                              }
-                            }
-                          }}
-                          className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                          style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
-                        >
-                          <div className="app-binary-switch-knob" />
-                        </button>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                          <span>🔒 Nur für aktive Schüler</span>
+
+                      {!isPremiumUser && (
+                        <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
+                          * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
+                        </p>
+                      )}
+
+                      {/* iOS Helper Alert */}
+                      {isIOS && !isStandalone && (
+                        <div style={{
+                          padding: '12px 16px',
+                          background: '#fffbeb',
+                          border: '1px solid #fef3c7',
+                          borderRadius: '16px',
+                          fontSize: '0.75rem',
+                          color: '#b45309',
+                          lineHeight: '1.4',
+                          fontWeight: 600
+                        }}>
+                          <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
+                        </div>
+                      )}
+
+                      {/* Detail-Toggles */}
+                      {pushEnabled && isPremiumUser && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                          {[
+                            { k: 'changes', label: 'Terminänderungen 📅', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
+                            { k: 'homework', label: 'Hausaufgaben 📝', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
+                            { k: 'news', label: 'Neuigkeiten & Aktionen 🚀', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
+                          ].map((row) => (
+                            <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                                <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#13733315' : '#f1f5f9', color: row.val ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                                  {row.icon}
+                                </div>
+                                <div>
+                                  <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{row.label}</h4>
+                                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{row.desc}</p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const nextVal = !row.val;
+                                  row.setter(nextVal);
+                                  await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
+                                }}
+                                className={`app-binary-switch ${row.val ? 'active' : ''}`}
+                                style={{ backgroundColor: row.val ? '#137333' : undefined }}
+                              >
+                                <div className="app-binary-switch-knob" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
 
-                    {!isPremiumUser && (
-                      <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
-                        * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
+                    {/* System zurücksetzen */}
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
+                      </h3>
+                      <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
+                        Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten zurücksetzen.
                       </p>
-                    )}
-
-                    {/* iOS Helper Alert */}
-                    {isIOS && !isStandalone && (
-                      <div style={{
-                        padding: '12px 16px',
-                        background: '#fffbeb',
-                        border: '1px solid #fef3c7',
-                        borderRadius: '16px',
-                        fontSize: '0.75rem',
-                        color: '#b45309',
-                        lineHeight: '1.4',
-                        fontWeight: 600
-                      }}>
-                        <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section 2: Detaillierte Einstellungen */}
-                {pushEnabled && isPremiumUser && (
-                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Settings size={18} color="#34a853" /> 2. Ich möchte benachrichtigt werden bei:
-                    </h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {/* Terminänderungen */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifScheduleChanges ? '#34a85315' : '#f1f5f9', color: pushNotifScheduleChanges ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                            <Calendar size={18} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Terminänderungen 📅</h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Verschiebungen, Ausfälle oder Lehrerwechsel</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextVal = !pushNotifScheduleChanges;
-                            setPushNotifScheduleChanges(nextVal);
-                            await supabase.from('users').update({ push_notif_schedule_changes: nextVal }).eq('id', studentId);
-                          }}
-                          className={`app-binary-switch ${pushNotifScheduleChanges ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifScheduleChanges ? '#34a853' : undefined }}
-                        >
-                          <div className="app-binary-switch-knob" />
-                        </button>
-                      </div>
-
-                      {/* Hausaufgaben */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifHomework ? '#34a85315' : '#f1f5f9', color: pushNotifHomework ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                            <Pencil size={18} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Hausaufgaben 📝</h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Neue Übe-Aufgaben oder Feedback deiner Lehrkraft</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextVal = !pushNotifHomework;
-                            setPushNotifHomework(nextVal);
-                            await supabase.from('users').update({ push_notif_homework: nextVal }).eq('id', studentId);
-                          }}
-                          className={`app-binary-switch ${pushNotifHomework ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifHomework ? '#34a853' : undefined }}
-                        >
-                          <div className="app-binary-switch-knob" />
-                        </button>
-                      </div>
-
-                      {/* Neuigkeiten & Aktionen */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushNotifAllFeatures ? '#34a85315' : '#f1f5f9', color: pushNotifAllFeatures ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                            <Users size={18} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Neuigkeiten & Aktionen 🚀</h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Mitteilungen der Musikschule und interessante Aktionen</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextVal = !pushNotifAllFeatures;
-                            setPushNotifAllFeatures(nextVal);
-                            await supabase.from('users').update({ push_notif_all_features: nextVal }).eq('id', studentId);
-                          }}
-                          className={`app-binary-switch ${pushNotifAllFeatures ? 'active' : ''}`}
-                          style={{ backgroundColor: pushNotifAllFeatures ? '#34a853' : undefined }}
-                        >
-                          <div className="app-binary-switch-knob" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
+                            localStorage.removeItem('groovelab_active_practice_session');
+                            localStorage.removeItem('student_lehrwerke_progress');
+                            window.location.reload();
+                          }
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          color: '#ef4444',
+                          border: '1px solid #fca5a5',
+                          padding: '12px 20px',
+                          borderRadius: '14px',
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <RotateCcw size={14} /> Lokalen Cache leeren
+                      </button>
                     </div>
                   </div>
-                )}
-                
-                {/* Section 3: System zurücksetzen / Cache löschen */}
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
-                  </h3>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-                    Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten und gespeicherten Sessions zurücksetzen. Deine Spieldaten in der Datenbank bleiben erhalten.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
-                        localStorage.removeItem('groovelab_active_practice_session');
-                        localStorage.removeItem('student_lehrwerke_progress');
-                        window.location.reload();
-                      }
-                    }}
-                    style={{
-                      background: '#fee2e2',
-                      color: '#ef4444',
-                      border: '1px solid #fca5a5',
-                      padding: '12px 20px',
-                      borderRadius: '14px',
-                      fontWeight: 800,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <RotateCcw size={14} /> Lokalen Cache leeren
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {/* Section 4: Abrechnung & Infrastrukturgebühren */}
-                {studentUser?.role?.toLowerCase() === 'student' && (
-                  <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
+                ) : (
+                  <div>
+                    {/* Abrechnung */}
+                    {studentUser?.role?.toLowerCase() === 'student' && (
+                      <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
+
+            {/* PERSISTENT STATUS BAR */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 40px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              borderRadius: '20px',
+              marginTop: '8px'
+            }}>
+              <span style={{ fontSize: '0.82rem', color: '#137333', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ✓ Alle Änderungen gespeichert.
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                Änderungen werden sofort wirksam und gesichert.
+              </span>
+            </div>
           </div>
         )}
       </div>

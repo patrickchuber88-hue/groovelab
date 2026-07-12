@@ -63,6 +63,8 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, onOpenTageskompass, activePlatform, onSwitchPlatform }) => {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+  const [firstName, setFirstName] = useState<string>(student.first_name || '');
+  const [lastName, setLastName] = useState<string>(student.last_name || '');
   const [showQrOverlay, setShowQrOverlay] = useState<boolean>(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -760,12 +762,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // 1. Fetch latest user details (including group_id and school_id)
       const { data: latestUser } = await supabase
         .from('users')
-        .select('is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id, parent_pin')
+        .select('first_name, last_name, is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id, parent_pin')
         .eq('id', student.id)
         .single();
 
       let groupStudentIds = [student.id];
       if (latestUser) {
+        setFirstName(latestUser.first_name || '');
+        setLastName(latestUser.last_name || '');
         setIsCampusActive(latestUser.is_campus_active ?? false);
         setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
         setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
@@ -1174,7 +1178,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
                 <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>{student.first_name} {maskLastName(student.last_name)}</span>
+                  <span>{firstName} {maskLastName(lastName)}</span>
                   <button
                     type="button"
                     onClick={() => toggleRealNames()}
@@ -2118,7 +2122,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                         <button
                           onClick={() => handleToggleGroovelab(true)}
                           style={{
-                            background: isGroovelabActive ? '#007aff' : 'transparent', // Apple Blue
+                            background: isGroovelabActive ? '#eab308' : 'transparent', // Yellow/Gold
                             color: isGroovelabActive ? '#ffffff' : '#64748b',
                             border: 'none',
                             borderRadius: '10px',
@@ -2127,7 +2131,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             fontWeight: isGroovelabActive ? 800 : 600,
                             cursor: 'pointer',
                             transition: 'all 0.2s',
-                            boxShadow: isGroovelabActive ? '0 1px 4px rgba(0, 122, 255, 0.3)' : 'none'
+                            boxShadow: isGroovelabActive ? '0 1px 4px rgba(234, 179, 8, 0.3)' : 'none'
                           }}
                         >
                           Aktiv
@@ -2135,8 +2139,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       </div>
                     ) : (
                       <span style={{ 
-                        background: isGroovelabActive ? '#eff6ff' : '#f1f5f9', 
-                        color: isGroovelabActive ? '#1d4ed8' : '#64748b', 
+                        background: isGroovelabActive ? '#fef3c7' : '#f1f5f9', 
+                        color: isGroovelabActive ? '#b45309' : '#64748b', 
                         padding: '4px 10px', 
                         borderRadius: '10px', 
                         fontSize: '0.75rem', 

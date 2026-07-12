@@ -182,6 +182,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
   const [isDesktopFallback, setIsDesktopFallback] = useState(true);
   const [isExtraTime, setIsExtraTime] = useState(false);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointSecondsLeft, setCheckpointSecondsLeft] = useState(20);
+  const nextCheckpointSecondsRef = useRef<number>(0);
+  const currentLogIdRef = useRef<string | null>(null);
+  const currentExtraLogIdRef = useRef<string | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const isExtraTimeRef = useRef(false);
@@ -321,6 +326,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (preStartCountdownRef.current !== null) {
         return;
       }
+
+      // Checkpoint check
+      if (showCheckpoint) {
+        setCheckpointSecondsLeft(prev => {
+          if (prev <= 1) {
+            // Failed checkpoint! Pause session.
+            setTimerRunning(false);
+            setShowCheckpoint(false);
+            playBeep(330, 600);
+            return 20;
+          }
+          return prev - 1;
+        });
+        return; // Pause practice increment while checkpoint is active!
+      }
+
       // In desktop mode, page visibility and active window focus matter.
       const isNowFlat = usesSensors 
         ? (isOrientedFlat && !isMoving && !document.hidden && (isMobile ? true : document.hasFocus()))
@@ -341,6 +362,74 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             setIsExtraTime(true);
             playSuccessChime();
           }
+
+          // Trigger checkpoint popup every 5-8 minutes
+          if (nextCheckpointSecondsRef.current > 0 && nextVal >= nextCheckpointSecondsRef.current) {
+            setShowCheckpoint(true);
+            setCheckpointSecondsLeft(20);
+            nextCheckpointSecondsRef.current = nextVal + Math.floor(Math.random() * 180) + 300;
+          }
+
+          // Heartbeat update every 10 seconds
+          if (nextVal % 10 === 0) {
+            // Update heartbeat in DB
+            const updateHeartbeat = async () => {
+              try {
+                if (currentLogIdRef.current) {
+                  if (nextVal <= targetSeconds) {
+                    const mins = Math.round(nextVal / 60);
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: nextVal, duration_minutes: mins })
+                      .eq('id', currentLogIdRef.current);
+                  } else {
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: targetSeconds, duration_minutes: Math.round(targetSeconds / 60) })
+                      .eq('id', currentLogIdRef.current);
+                    currentLogIdRef.current = null;
+                  }
+                }
+
+                if (nextVal > targetSeconds) {
+                  const extraSecs = nextVal - targetSeconds;
+                  const extraMins = Math.round(extraSecs / 60);
+
+                  if (!currentExtraLogIdRef.current) {
+                    const { data } = await supabase
+                      .from('fokus_logs')
+                      .insert({
+                        user_id: profile.id,
+                        duration_minutes: extraMins,
+                        duration_seconds: extraSecs,
+                        is_extra: true,
+                        flame_level: 'Kleine Flamme'
+                      })
+                      .select('id')
+                      .single();
+                    if (data) {
+                      currentExtraLogIdRef.current = data.id;
+                    }
+                  } else {
+                    await supabase
+                      .from('fokus_logs')
+                      .update({ duration_seconds: extraSecs, duration_minutes: extraMins })
+                      .eq('id', currentExtraLogIdRef.current);
+                  }
+                } else if (!currentLogIdRef.current && currentExtraLogIdRef.current) {
+                  const extraMins = Math.round(nextVal / 60);
+                  await supabase
+                    .from('fokus_logs')
+                    .update({ duration_seconds: nextVal, duration_minutes: extraMins })
+                    .eq('id', currentExtraLogIdRef.current);
+                }
+              } catch (err) {
+                console.error('Heartbeat update failed:', err);
+              }
+            };
+            updateHeartbeat();
+          }
+
           return nextVal;
         });
       } else {
@@ -1122,8 +1211,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   // Blitz-Übung loggen
-  const handleQuickLogPractice = async (focusMinutes: number, extraMinutes: number = 0) => {
-    if (practiceLoggedToday || !profile || loadingDashboard) return;
+  const handleQuickLogPractice = async (focusMinutes: number, extraMinutes: number = 0, skipDbLogsInsert = false) => {
+    if (!profile || loadingDashboard) return;
     setLoadingDashboard(true);
 
     try {
@@ -1131,7 +1220,43 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toLocaleDateString('en-CA');
-      const minutes = focusMinutes + extraMinutes;
+
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      // Check if focus time was already logged today
+      const { data: existingFocusLogs } = await supabase
+        .from('fokus_logs')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('is_extra', false)
+        .gte('created_at', startOfDay.toISOString());
+
+      const hasFocusLoggedToday = existingFocusLogs && existingFocusLogs.length > 0;
+
+      // If already logged today, focusMinutes for this session becomes 0 (only extra counts)
+      const effectiveFocusMinutes = hasFocusLoggedToday ? 0 : focusMinutes;
+      const minutes = effectiveFocusMinutes + extraMinutes;
+
+      // Query today's already logged extra minutes to enforce the 60-minute daily cap on XP for extra time
+      let todayExtraMinsLogged = 0;
+      try {
+        const { data: todayLogs } = await supabase
+          .from('fokus_logs')
+          .select('duration_minutes')
+          .eq('user_id', profile.id)
+          .eq('is_extra', true)
+          .gte('created_at', startOfDay.toISOString());
+        if (todayLogs) {
+          todayExtraMinsLogged = todayLogs.reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+        }
+      } catch (err) {
+        console.error('Error fetching today logs for cap:', err);
+      }
+
+      const remainingXpEligibleExtraMins = Math.max(0, 60 - todayExtraMinsLogged);
+      const xpEligibleExtraMins = Math.min(extraMinutes, remainingXpEligibleExtraMins);
+      const xpGained = effectiveFocusMinutes + xpEligibleExtraMins;
 
       // Aktuelle Stats abrufen
       const { data: currentStats } = await supabase
@@ -1200,30 +1325,32 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       const totalMins = (currentStats?.total_focus_minutes || 0) + minutes;
       const monthlyMins = (currentStats?.monthly_focus_minutes || 0) + minutes;
-      const newXp = (currentStats?.current_xp || 0) + minutes;
+      const newXp = (currentStats?.current_xp || 0) + xpGained;
       const flameLevelName = newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 4 ? 'Mittlere Flamme' : 'Kleine Flamme');
 
       // 1. Fokus-Protokoll schreiben (aufgeteilt in Fokus und Extra)
-      if (focusMinutes > 0) {
-        await supabase.from('fokus_logs').insert({
-          user_id: profile.id,
-          duration_minutes: focusMinutes,
-          duration_seconds: focusMinutes * 60,
-          is_extra: false,
-          flame_level: flameLevelName,
-          created_at: new Date().toISOString()
-        });
-      }
+      if (!skipDbLogsInsert) {
+        if (effectiveFocusMinutes > 0) {
+          await supabase.from('fokus_logs').insert({
+            user_id: profile.id,
+            duration_minutes: effectiveFocusMinutes,
+            duration_seconds: effectiveFocusMinutes * 60,
+            is_extra: false,
+            flame_level: flameLevelName,
+            created_at: new Date().toISOString()
+          });
+        }
 
-      if (extraMinutes > 0) {
-        await supabase.from('fokus_logs').insert({
-          user_id: profile.id,
-          duration_minutes: extraMinutes,
-          duration_seconds: extraMinutes * 60,
-          is_extra: true,
-          flame_level: flameLevelName,
-          created_at: new Date().toISOString()
-        });
+        if (extraMinutes > 0) {
+          await supabase.from('fokus_logs').insert({
+            user_id: profile.id,
+            duration_minutes: extraMinutes,
+            duration_seconds: extraMinutes * 60,
+            is_extra: true,
+            flame_level: flameLevelName,
+            created_at: new Date().toISOString()
+          });
+        }
       }
 
       // 2. Statistiken aktualisieren (student_stats)
@@ -1277,7 +1404,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           last_focus_date: todayStr
         });
       }
-      setLoggedMinutesToday(minutes);
+      setLoggedMinutesToday(prev => prev + minutes); // accumulate minutes logged today in state
       setHasExploded(false);
       setPracticeLoggedToday(true);
 
@@ -1309,13 +1436,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       extraMinutes = 0;
     }
 
-    await handleQuickLogPractice(focusMinutes, extraMinutes);
+    // Since logs are written in real-time, skip inserts but update stats and avatar.
+    await handleQuickLogPractice(focusMinutes, extraMinutes, true);
     setElapsedSeconds(0);
     setTimerRunning(false);
     setIsExtraTime(false);
+    setShowCheckpoint(false);
+    currentLogIdRef.current = null;
+    currentExtraLogIdRef.current = null;
   };
 
   const handleStartTimer = async () => {
+    if (!profile) return;
     // Unlock or initialize AudioContext
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -1350,6 +1482,47 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (permission === 'granted') {
       setPreStartCountdown(3);
       setTimerRunning(true);
+      setShowCheckpoint(false);
+      nextCheckpointSecondsRef.current = Math.floor(Math.random() * 180) + 300; // 5-8 minutes
+
+      // Query if student has logged a focus session today and insert initial heartbeat log
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      supabase
+        .from('fokus_logs')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('is_extra', false)
+        .gte('created_at', startOfDay.toISOString())
+        .then(({ data }) => {
+          const hasFocusLoggedToday = data && data.length > 0;
+          const isExtra = !!hasFocusLoggedToday;
+
+          supabase
+            .from('fokus_logs')
+            .insert({
+              user_id: profile.id,
+              duration_minutes: 0,
+              duration_seconds: 0,
+              is_extra: isExtra,
+              flame_level: 'Kleine Flamme'
+            })
+            .select('id')
+            .single()
+            .then(({ data: logData }) => {
+              if (logData) {
+                if (isExtra) {
+                  currentExtraLogIdRef.current = logData.id;
+                  currentLogIdRef.current = null;
+                } else {
+                  currentLogIdRef.current = logData.id;
+                  currentExtraLogIdRef.current = null;
+                }
+              }
+            });
+        });
+
     } else {
       alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff!");
     }
@@ -3166,7 +3339,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Header Banner */}
           {!timerRunning && (
             <div style={{
-              background: 'linear-gradient(135deg, #34a853 0%, #0d4d22 100%)',
+              background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
               padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 20px 24px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -3175,7 +3348,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             }}>
               <div>
                 <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
-                  Groovelab Campus
+                  Campus-Groovelab
                 </span>
                 <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
                   Mein Übe-Profil
@@ -4072,7 +4245,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 padding: '16px',
                                 borderRadius: '18px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #34a853 0%, #0d4d22 100%)',
+                                background: '#137333',
                                 color: '#ffffff',
                                 fontSize: '0.95rem',
                                 fontWeight: 800,
@@ -4403,6 +4576,73 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   >
                     Fokus beenden & Sichern
                   </button>
+                </div>
+              </div>
+            , document.body)}
+
+            {/* 3. Anti-Cheat Checkpoint Overlay */}
+            {showCheckpoint && createPortal(
+              <div 
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 10002, // Topmost layer
+                  background: 'rgba(9, 9, 11, 0.95)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                  color: '#ffffff',
+                  userSelect: 'none',
+                  fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '24px',
+                  maxWidth: '320px',
+                  width: '100%'
+                }}>
+                  <div style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 24px rgba(52, 168, 83, 0.4)',
+                    cursor: 'pointer',
+                    animation: 'pulse 1.5s infinite'
+                  }}
+                  onClick={() => setShowCheckpoint(false)}
+                  >
+                    <span style={{ fontSize: '2.5rem' }}>🔥</span>
+                  </div>
+                  
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                      Bist du noch fokussiert?
+                    </h3>
+                    <p style={{ margin: '10px 0 0 0', fontSize: '0.875rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                      Tippe schnell auf das Flammen-Symbol, um deine Session fortzusetzen!
+                    </p>
+                  </div>
+
+                  <div style={{
+                    fontSize: '1.75rem',
+                    fontWeight: 900,
+                    color: '#34a853',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {checkpointSecondsLeft}s
+                  </div>
                 </div>
               </div>
             , document.body)}

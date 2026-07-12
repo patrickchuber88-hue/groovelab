@@ -308,7 +308,7 @@ export const GrooveLoopstation: React.FC = () => {
     }}>
       {/* Mobile Header */}
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#34a853', letterSpacing: '-0.03em', textTransform: 'uppercase' }}>
+        <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#ef4444', letterSpacing: '-0.03em', textTransform: 'uppercase' }}>
           Groove-Loopstation
         </h2>
         <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'block', letterSpacing: '0.02em' }}>
@@ -324,7 +324,7 @@ export const GrooveLoopstation: React.FC = () => {
             cx="50"
             cy="50"
             r="42"
-            stroke="#34a853"
+            stroke="#ef4444"
             strokeWidth="6"
             fill="none"
             strokeDasharray="264"
@@ -334,7 +334,7 @@ export const GrooveLoopstation: React.FC = () => {
               transition: isPlaying ? 'none' : 'stroke-dashoffset 0.15s ease-out', 
               transform: 'rotate(-90deg)', 
               transformOrigin: '50% 50%',
-              filter: isPlaying ? 'drop-shadow(0 0 5px rgba(52, 168, 83, 0.5))' : 'none'
+              filter: isPlaying ? 'drop-shadow(0 0 5px rgba(239, 68, 68, 0.5))' : 'none'
             }}
           />
         </svg>
@@ -342,7 +342,7 @@ export const GrooveLoopstation: React.FC = () => {
           <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: 'SF Mono, monospace', letterSpacing: '-0.02em' }}>
             {masterLoopDuration ? `${(masterLoopDuration / 1000).toFixed(1)}s` : '0.0s'}
           </span>
-          <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 900, letterSpacing: '0.12em', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.58rem', color: '#ef4444', fontWeight: 900, letterSpacing: '0.12em', marginTop: '4px' }}>
             {isPlaying ? 'PLAYING' : 'READY'}
           </span>
         </div>
@@ -356,7 +356,7 @@ export const GrooveLoopstation: React.FC = () => {
           disabled={!masterLoopDuration}
           style={{
             flex: 2,
-            background: isPlaying ? '#ef4444' : '#34a853',
+            background: isPlaying ? '#ef4444' : '#4f46e5',
             color: '#fff',
             border: 'none',
             borderRadius: '16px',
@@ -435,7 +435,7 @@ export const GrooveLoopstation: React.FC = () => {
                   left: 0,
                   right: 0,
                   height: '3px',
-                  background: '#34a853',
+                  background: '#ef4444',
                   opacity: 0.8
                 }} />
               )}
@@ -473,7 +473,7 @@ export const GrooveLoopstation: React.FC = () => {
                         ? '#eab308' 
                         : hasAudio 
                           ? 'rgba(255,255,255,0.05)' 
-                          : '#34a853',
+                          : '#ef4444',
                       color: '#fff',
                       border: 'none',
                       borderRadius: '50%',
@@ -484,7 +484,7 @@ export const GrooveLoopstation: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: !hasAudio && (track.id === 1 || masterLoopDuration) ? '0 4px 10px rgba(52, 168, 83, 0.2)' : 'none',
+                      boxShadow: !hasAudio && (track.id === 1 || masterLoopDuration) ? '0 4px 10px rgba(239, 68, 68, 0.2)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -499,7 +499,7 @@ export const GrooveLoopstation: React.FC = () => {
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>SPUR 0{track.id}</span>
                   <span style={{ 
                     fontSize: '0.55rem', 
-                    color: track.isRecording ? '#ef4444' : track.isWaiting ? '#eab308' : hasAudio ? '#34a853' : '#475569', 
+                    color: track.isRecording ? '#ef4444' : track.isWaiting ? '#eab308' : hasAudio ? '#ef4444' : '#475569', 
                     fontWeight: 800, 
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
@@ -521,7 +521,7 @@ export const GrooveLoopstation: React.FC = () => {
                       borderRadius: '2px',
                       background: 'rgba(255,255,255,0.08)',
                       outline: 'none',
-                      accentColor: '#34a853',
+                      accentColor: '#ef4444',
                       cursor: 'pointer'
                     }}
                   />
