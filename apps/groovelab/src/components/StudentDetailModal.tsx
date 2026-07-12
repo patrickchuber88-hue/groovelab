@@ -73,7 +73,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
 
   let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
-  if (isPlatformCampus) {
+  if (student.role === 'admin' || student.role === 'secretary') {
+    displayAvatarSrc = '/campus_login_hero.png';
+  } else if (isPlatformCampus) {
     displayAvatarSrc = getInstrumentAvatarUrl(student.instrument);
   } else {
     const isStudentAvatar = student.photo_url && (

@@ -746,51 +746,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     return timeMap;
   };
 
-  const getConflictsMap = (points: any[], lessonsList: any[], activeEventStartTime: string) => {
-    const timeMap = calculateTimelineTimes(points, activeEventStartTime);
-    const conflicts: Record<string, string> = {};
 
-    points.forEach(pp => {
-      if ((!pp.is_scheduled && !pp.is_pause) || pp.is_pause || !pp.teacher_id) return;
-      const ppTime = timeMap[pp.id];
-      if (!ppTime) return;
-
-      for (const lesson of lessonsList) {
-        if (
-          lesson.teacher_id === pp.teacher_id && 
-          !lesson.status?.startsWith('cancel') && 
-          lesson.status !== 'teacher_sick'
-        ) {
-          const lessonStart = parseTimeToMinutes(lesson.start_time);
-          const lessonEnd = lessonStart + (lesson.duration || 0);
-          if (ppTime.startMin < lessonEnd && ppTime.endMin > lessonStart) {
-            conflicts[pp.id] = `Kollision mit Unterricht (${lesson.start_time} - ${formatMinutesToTime(lessonEnd)})`;
-            return;
-          }
-        }
-      }
-
-      for (const otherPp of points) {
-        if (
-          otherPp.id !== pp.id &&
-          (otherPp.is_scheduled || otherPp.is_pause) &&
-          !otherPp.is_pause &&
-          otherPp.teacher_id === pp.teacher_id &&
-          otherPp.stage_number !== pp.stage_number
-        ) {
-          const otherTime = timeMap[otherPp.id];
-          if (otherTime) {
-            if (ppTime.startMin < otherTime.endMin && ppTime.endMin > otherTime.startMin) {
-              conflicts[pp.id] = `Kollision mit Beitrag auf Bühne ${otherPp.stage_number} (${otherTime.start} - ${otherTime.end})`;
-              return;
-            }
-          }
-        }
-      }
-    });
-
-    return conflicts;
-  };
 
   const handleDropOnUnscheduledPool = async (e: React.DragEvent) => {
     e.preventDefault();

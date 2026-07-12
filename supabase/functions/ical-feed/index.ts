@@ -170,6 +170,14 @@ Deno.serve(async (req) => {
 
     const { id: userId, role, first_name, last_name, school_id: schoolId } = user
 
+    // Boundaries: Sync exactly one school year (Sept 1st to July 31st)
+    const now = new Date()
+    const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
+    const schoolYearStart = new Date(`${schoolStartYear}-09-01`)
+    const schoolYearEnd = new Date(`${schoolStartYear + 1}-07-31`)
+    const pastBoundaryStr = schoolYearStart.toISOString().substring(0, 10)
+    const futureBoundaryStr = schoolYearEnd.toISOString().substring(0, 10)
+
     // 2. Load standard recurring schedules for the user (Unterrichtstermine)
     let scheduleQuery = supabase
       .from('schedules')
@@ -189,7 +197,7 @@ Deno.serve(async (req) => {
     const { data: schedules, error: schErr } = await scheduleQuery
     if (schErr) throw schErr
 
-    // 3. Load overrides/occurrences (Unterrichtstermine Abweichungen)
+    // 3. Load overrides/occurrences (Unterrichtstermine Abweichungen) in date range
     let occurrenceQuery = supabase
       .from('schedule_occurrences')
       .select(`
@@ -197,6 +205,8 @@ Deno.serve(async (req) => {
         teacher:teacher_id(first_name, last_name),
         student:student_id(first_name, last_name, instrument)
       `)
+      .gte('date', pastBoundaryStr)
+      .lte('date', futureBoundaryStr)
 
     if (role === 'student') {
       occurrenceQuery = occurrenceQuery.eq('student_id', userId)
@@ -208,11 +218,6 @@ Deno.serve(async (req) => {
     if (occErr) throw occErr
 
     // 4. Merge regular weekly schedules and occurrences into actual calendar dates
-    const now = new Date()
-    const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
-    const schoolYearStart = new Date(`${schoolStartYear}-09-01`)
-    const schoolYearEnd = new Date(`${schoolStartYear + 1}-07-31`)
-
     const allMergedOccurrences = []
     const usedActualIds = new Set<string>()
 
@@ -226,7 +231,7 @@ Deno.serve(async (req) => {
           targetDate.setDate(current.getDate() + diff)
 
           if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd && targetDate.getMonth() !== 7) {
-            const dateStr = targetDate.toISOString().substring(0, 10)
+            const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`
 
             const actual = occurrences?.find((occ: any) => 
               (occ.schedule_id === sch.id) && 
@@ -279,7 +284,7 @@ Deno.serve(async (req) => {
       return (a.start_time || '').localeCompare(b.start_time || '')
     })
 
-    // 5. Query and load Campus-Termine for the user's school
+    // 5. Query and load Campus-Termine for the user's school in date range
     let campusEvents: any[] = [];
     let allSchoolCampusEvents: any[] = [];
     if (schoolId) {
@@ -292,7 +297,12 @@ Deno.serve(async (req) => {
             .select('*, event:event_id(*)')
             .eq('teacher_id', userId)
             .eq('status', 'approved');
-          if (!error && data) progPoints = data;
+          if (!error && data) {
+            progPoints = data.filter((pp: any) => {
+              const eventDate = pp.event?.event_date;
+              return eventDate && eventDate >= pastBoundaryStr && eventDate <= futureBoundaryStr;
+            });
+          }
         } else {
           // For students, fetch approved program points
           const { data, error } = await supabase
@@ -300,10 +310,12 @@ Deno.serve(async (req) => {
             .select('*, event:event_id(*)')
             .eq('status', 'approved');
           if (!error && data) {
-            // Filter locally where user is in assigned_students
+            // Filter locally where user is in assigned_students & within date range
             progPoints = data.filter((pp: any) => {
               const assigned = pp.additional_feedback_responses?.assigned_students || [];
-              return assigned.includes(userId);
+              const eventDate = pp.event?.event_date;
+              const inRange = eventDate && eventDate >= pastBoundaryStr && eventDate <= futureBoundaryStr;
+              return inRange && assigned.includes(userId);
             });
           }
         }
@@ -312,7 +324,9 @@ Deno.serve(async (req) => {
         const { data: directEvents, error: deErr } = await supabase
           .from('campus_events')
           .select('*, room:room_id(name)')
-          .eq('school_id', schoolId);
+          .eq('school_id', schoolId)
+          .gte('event_date', pastBoundaryStr)
+          .lte('event_date', futureBoundaryStr);
 
         let directAssignedEventIds: string[] = [];
         if (!deErr && directEvents) {
@@ -413,7 +427,9 @@ Deno.serve(async (req) => {
         const { data: campusData, error: campusErr } = await supabase
           .from('campus_events')
           .select('*, room:room_id(name)')
-          .eq('school_id', schoolId);
+          .eq('school_id', schoolId)
+          .gte('event_date', pastBoundaryStr)
+          .lte('event_date', futureBoundaryStr);
 
         if (!campusErr && campusData) {
           allSchoolCampusEvents = campusData;
@@ -438,7 +454,7 @@ Deno.serve(async (req) => {
             const icsText = await res.text();
             const rawSubscribed = parseICS(icsText);
 
-            subscribedEvents = rawSubscribed.map((ev: any, index: number) => {
+            const mappedEvents = rawSubscribed.map((ev: any, index: number) => {
               const title = ev.summary || 'Abonnierter Termin';
               const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
               
@@ -469,8 +485,11 @@ Deno.serve(async (req) => {
               };
             });
 
-            // Filter out external events that have customized overrides in the database
-            subscribedEvents = subscribedEvents.filter((sub: any) => {
+            // Filter out external events that are outside our school year date range, or have customized overrides
+            subscribedEvents = mappedEvents.filter((sub: any) => {
+              if (!sub.event_date || sub.event_date < pastBoundaryStr || sub.event_date > futureBoundaryStr) {
+                return false;
+              }
               const hasCustomCopy = allSchoolCampusEvents.some((c: any) => 
                 c.visibility !== 'private' &&
                 normalizeTitle(c.title) === normalizeTitle(sub.title) && 
@@ -534,43 +553,97 @@ Deno.serve(async (req) => {
       return dateStr.replace(/-/g, '');
     }
 
+    // Helper to format timezone-safe local dates
+    const getLocalIcalDate = (dateStr: string, timeStr: string) => {
+      const cleanDate = dateStr.replace(/-/g, '')
+      const cleanTime = timeStr.substring(0, 5).replace(/:/g, '') + '00'
+      return `${cleanDate}T${cleanTime}`
+    }
+
+    const getEndLocalIcalDate = (dateStr: string, timeStr: string, duration: number) => {
+      const [yr, mon, dy] = dateStr.split('-').map(Number)
+      const [hr, min] = timeStr.split(':').map(Number)
+      const dt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0))
+      const endDt = new Date(dt.getTime() + duration * 60 * 1000)
+      const y = endDt.getUTCFullYear()
+      const m = String(endDt.getUTCMonth() + 1).padStart(2, '0')
+      const r = String(endDt.getUTCDate()).padStart(2, '0')
+      const h = String(endDt.getUTCHours()).padStart(2, '0')
+      const n = String(endDt.getUTCMinutes()).padStart(2, '0')
+      const s = String(endDt.getUTCSeconds()).padStart(2, '0')
+      return `${y}${m}${r}T${h}${n}${s}`
+    }
+
     // 7a. Write Unterrichtstermine (Lessons)
     for (const occ of allMergedOccurrences) {
-      const [yr, mon, dy] = occ.date.split('-').map(Number)
-      const [hr, min] = occ.start_time.split(':').map(Number)
-      
-      const startDt = new Date(Date.UTC(yr, mon - 1, dy, hr, min, 0))
-      const endDt = new Date(startDt.getTime() + (occ.duration || 45) * 60 * 1000)
-
-      const dtStartStr = formatIcalDate(startDt)
-      const dtEndStr = formatIcalDate(endDt)
+      const dtStartStr = getLocalIcalDate(occ.date, occ.start_time)
+      const dtEndStr = getEndLocalIcalDate(occ.date, occ.start_time, occ.duration || 45)
 
       const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)
       const statusText = isCanceled ? 'CANCELLED' : 'CONFIRMED'
 
       const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
-      const studentName = occ.student ? occ.student.first_name : 'Schüler'
+      
+      // Privacy-safe student name: Vorname + Initiale des Nachnamens
+      const studentFirstName = occ.student?.first_name || 'Schüler'
+      const studentLastName = occ.student?.last_name || ''
+      const studentInitial = studentLastName ? ` ${studentLastName[0].toUpperCase()}.` : ''
+      const studentName = `${studentFirstName}${studentInitial}`
+
       const instrumentSuffix = (occ.student && occ.student.instrument) ? ` (${occ.student.instrument})` : ''
+
+      // Build summary title according to status and role
+      const prefix = occ.status === 'pending_reschedule'
+        ? '🔄 ÄNDERUNG ANGEFRAGT: '
+        : occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick'
+        ? '🤒 AUSFALL: '
+        : isCanceled
+        ? '❌ ABGESAGT: '
+        : '🎵 '
 
       let summary = ''
       if (role === 'student') {
-        summary = isCanceled 
-          ? `❌ ABSAGE: ${studentName}${instrumentSuffix} bei ${teacherName}`
-          : `🎵 ${studentName}${instrumentSuffix} bei ${teacherName}`
+        summary = `${prefix}Unterricht bei ${teacherName}`
       } else {
-        summary = isCanceled
-          ? `❌ ABSAGE: ${studentName}${instrumentSuffix} bei ${teacherName}`
-          : `🎵 ${studentName}${instrumentSuffix} bei ${teacherName}`
+        summary = `${prefix}Unterricht: ${studentName}${instrumentSuffix}`
+      }
+
+      // Build structured DESCRIPTION
+      let statusDesc = 'Bestätigt 📅'
+      if (occ.status === 'pending_reschedule') {
+        statusDesc = 'Verschiebung angefragt 🔄'
+      } else if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+        statusDesc = 'Ausfall (Lehrer krank) 🤒'
+      } else if (isCanceled) {
+        statusDesc = 'Abgesagt ❌'
       }
 
       let descriptionLines = []
-      descriptionLines.push(`Status: ${isCanceled ? 'Abgesagt ❌' : 'Bestätigt 📅'}`)
-      descriptionLines.push(`Schüler: ${studentName}${instrumentSuffix}`)
-      descriptionLines.push(`Lehrer: ${teacherName}`)
+      descriptionLines.push(`Status: ${statusDesc}`)
+      descriptionLines.push(`Partner: ${role === 'student' ? teacherName : studentName}`)
+      if (occ.student && occ.student.instrument) {
+        descriptionLines.push(`Instrument: ${occ.student.instrument}`)
+      }
       descriptionLines.push(`Raum: ${occ.room_name}`)
-      if (occ.duration) descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
+      if (occ.duration) {
+        descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
+      }
+      descriptionLines.push('Plattform: Campus-Groovelab')
+      descriptionLines.push('Direktlink: https://app.campus-groovelab.de/campus/homework')
       
       const description = descriptionLines.join('\n')
+
+      // Check color (Ensembles / Bands = Blue, regular Unterricht = Green)
+      const isBandOrEnsemble = 
+        studentName.toLowerCase().includes('band') || 
+        studentName.toLowerCase().includes('ensemble') || 
+        instrumentSuffix.toLowerCase().includes('band') || 
+        instrumentSuffix.toLowerCase().includes('ensemble') || 
+        occ.room_name.toLowerCase().includes('band') || 
+        occ.room_name.toLowerCase().includes('ensemble') || 
+        occ.room_name.toLowerCase().includes('groovelab');
+
+      const color = isBandOrEnsemble ? '#1a73e8' : '#137333';
 
       icsContent.push('BEGIN:VEVENT')
       icsContent.push(`UID:${occ.id}@groovelab.de`)
@@ -581,6 +654,7 @@ Deno.serve(async (req) => {
       icsContent.push(`DESCRIPTION:${escapeText(description)}`)
       icsContent.push(`LOCATION:${escapeText(occ.room_name)}`)
       icsContent.push(`STATUS:${statusText}`)
+      icsContent.push(`COLOR:${color}`)
 
       if (!isCanceled) {
         const valarmDateStr = occ.date.replace(/-/g, '')
@@ -627,6 +701,19 @@ Deno.serve(async (req) => {
       icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
       icsContent.push(`LOCATION:${escapeText(locName)}`);
       icsContent.push('STATUS:CONFIRMED');
+
+      // Colors for campus events
+      let color = '#e37400'; // Default orange
+      const catLower = (ev.category || '').toLowerCase();
+      if (catLower.includes('ferien') || catLower.includes('feiertag')) {
+        color = '#8f9099';
+      } else if (catLower.includes('planung')) {
+        color = '#a062ff';
+      } else if (catLower.includes('band') || catLower.includes('ensemble')) {
+        color = '#1a73e8';
+      }
+      icsContent.push(`COLOR:${color}`);
+
       icsContent.push('END:VEVENT');
     }
 
@@ -655,6 +742,15 @@ Deno.serve(async (req) => {
       icsContent.push(`DESCRIPTION:${escapeText(ev.description || '')}`);
       icsContent.push(`LOCATION:${escapeText(ev.location || 'Musikschule')}`);
       icsContent.push('STATUS:CONFIRMED');
+
+      // Subscribed external event colors
+      let color = '#e37400';
+      const catLower = (ev.category || '').toLowerCase();
+      if (catLower.includes('ferien') || catLower.includes('feiertag')) {
+        color = '#8f9099';
+      }
+      icsContent.push(`COLOR:${color}`);
+
       icsContent.push('END:VEVENT');
     }
 

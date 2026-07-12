@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
@@ -1436,6 +1436,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
       const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
 
+      // Annual billing grace period check: If deactivating campus/groovelab for pre-paid annual students
+      const isDeactivatingCampus = moduleType === 'campus' && isCampus;
+      const isDeactivatingGroove = moduleType === 'groovelab' && isGroove;
+      const hasAnnualBilling = studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3';
+
+      if ((isDeactivatingCampus || isDeactivatingGroove) && hasAnnualBilling) {
+        alert("Da für diesen Schüler der Jahresbeitrag bereits vorab entrichtet wurde, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv. Die Deaktivierung wird zum Schuljahreswechsel wirksam.");
+        return;
+      }
+
       const { error } = await supabase
         .from('users')
         .update({
@@ -1603,6 +1613,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
   // School Data & Subscription
   const [schoolName, setSchoolName] = useState<string>('');
+  const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
+  const [schoolYearStartDay, setSchoolYearStartDay] = useState<number>(1);
+  const [autoDeleteExpiredUsers, setAutoDeleteExpiredUsers] = useState<boolean>(false);
   const [frozenStudents, setFrozenStudents] = useState<any[]>([]);
   const [schoolSubdomain, setSchoolSubdomain] = useState<string>('');
   const [openingHours, setOpeningHours] = useState<any>(null);
@@ -1867,12 +1880,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       kioskPinLength !== initialSettings.kioskPinLength ||
       bypassPin !== initialSettings.bypassPin ||
       logRetention !== initialSettings.logRetention ||
-      syncInterval !== initialSettings.syncInterval
+      syncInterval !== initialSettings.syncInterval ||
+      schoolYearStartMonth !== initialSettings.schoolYearStartMonth ||
+      schoolYearStartDay !== initialSettings.schoolYearStartDay ||
+      autoDeleteExpiredUsers !== initialSettings.autoDeleteExpiredUsers
     );
   }, [
     initialSettings,
     schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail,
-    logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval
+    logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval,
+    schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers
   ]);
 
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
@@ -2699,7 +2716,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       ] = await Promise.all([
         supabase
           .from('schools')
-          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass')
+          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users')
           .eq('id', schoolId)
           .single(),
         supabase
@@ -2765,6 +2782,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setLogRetention(loadedLogRetention);
         setSyncInterval(loadedSyncInterval);
 
+        const loadedStartMonth = schoolData.school_year_start_month || 9;
+        const loadedStartDay = schoolData.school_year_start_day || 1;
+        const loadedAutoDelete = schoolData.auto_delete_expired_users || false;
+
+        setSchoolYearStartMonth(loadedStartMonth);
+        setSchoolYearStartDay(loadedStartDay);
+        setAutoDeleteExpiredUsers(loadedAutoDelete);
+
         setInitialSettings({
           schoolName: schoolData.name || '',
           schoolSubdomain: schoolData.subdomain || '',
@@ -2779,7 +2804,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           kioskPinLength: loadedKioskPinLength,
           bypassPin: loadedBypassPin,
           logRetention: loadedLogRetention,
-          syncInterval: loadedSyncInterval
+          syncInterval: loadedSyncInterval,
+          schoolYearStartMonth: loadedStartMonth,
+          schoolYearStartDay: loadedStartDay,
+          autoDeleteExpiredUsers: loadedAutoDelete
         });
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
@@ -3445,6 +3473,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setSchoolEvents(annData);
       } else {
         setSchoolEvents([]);
+      }
+
+      // Auto-delete expired users if enabled
+      if (schoolData.auto_delete_expired_users) {
+        const expired = studentsList.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now());
+        if (expired.length > 0) {
+          handleDeleteExpiredStudents(true, studentsList);
+        }
       }
 
       await fetchDuties();
@@ -4154,9 +4190,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           city: schoolCity || null,
           phone_number: schoolPhoneNumber || null,
           email: schoolEmail || null,
-          logo_url: logoUrl || null,
+           logo_url: logoUrl || null,
           calendar_url: serializedUrls || null,
-          opening_hours: updatedOp
+          opening_hours: updatedOp,
+          school_year_start_month: schoolYearStartMonth,
+          school_year_start_day: schoolYearStartDay,
+          auto_delete_expired_users: autoDeleteExpiredUsers
         })
         .eq('id', schoolId);
 
@@ -4169,6 +4208,76 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       alert('Fehler beim Speichern: ' + err.message);
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  const handleDeleteExpiredStudents = async (silent = false, customStudentsList?: any[]) => {
+    const listToFilter = customStudentsList || students;
+    const expired = listToFilter.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now());
+    if (expired.length === 0) {
+      if (!silent) {
+        alert("Keine abgelaufenen Schülerkonten zum Löschen vorhanden.");
+      }
+      return;
+    }
+
+    if (!silent) {
+      const confirmMsg = `Möchtest du wirklich ${expired.length} Schülerkonto/Schülerkonten mit abgelaufenen Verträgen unwiderruflich löschen? Alle zugehörigen Fortschritte und Audio-Dateien im Cloud-Speicher (Supabase Storage) werden physisch und datenschutzkonform entfernt.`;
+      if (!window.confirm(confirmMsg)) return;
+    }
+
+    try {
+      let deletedAudioCount = 0;
+      let deletedDbCount = 0;
+
+      for (const student of expired) {
+        try {
+          const { data: files, error: listError } = await supabase.storage
+            .from('campus-assets')
+            .list('avatars');
+          
+          if (!listError && files) {
+            const filesToDelete = files
+              .filter(f => f.name.includes(`${student.id}_loopmix_`))
+              .map(f => `avatars/${f.name}`);
+            
+            if (filesToDelete.length > 0) {
+              const { error: removeError } = await supabase.storage
+                .from('campus-assets')
+                .remove(filesToDelete);
+              if (!removeError) {
+                deletedAudioCount += filesToDelete.length;
+              }
+            }
+          }
+        } catch (storageErr) {
+          console.error(`[GDPR Cleanup] Error clearing storage for ${student.id}:`, storageErr);
+        }
+
+        const { error: dbError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', student.id);
+        
+        if (!dbError) {
+          deletedDbCount++;
+        } else {
+          console.error(`[GDPR Cleanup] Error deleting student ${student.id} from DB:`, dbError);
+        }
+      }
+
+      if (!silent) {
+        alert(`Datenschutzkonforme Löschung erfolgreich durchgeführt!\n- ${deletedDbCount} Schülerprofile gelöscht\n- ${deletedAudioCount} Audio-Dateien physisch aus dem Cloud-Speicher entfernt`);
+      } else {
+        console.log(`[GDPR Auto-Cleanup] Auto-deleted ${deletedDbCount} expired students and cleared ${deletedAudioCount} storage files.`);
+      }
+      fetchDashboardData();
+    } catch (err: any) {
+      if (!silent) {
+        alert("Fehler bei der datenschutzkonformen Löschung: " + err.message);
+      } else {
+        console.error("[GDPR Auto-Cleanup] Deletion failed:", err);
+      }
     }
   };
 
@@ -4877,15 +4986,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
       try {
         const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
+        const studentId = crypto.randomUUID();
         const qrToken = crypto.randomUUID();
         const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
-        
-        const uniqueSuffix = Math.floor(100 + Math.random() * 900);
-        const finalEmail = email || `${firstName.toLowerCase().trim().replace(/\s+/g, '')}.${lastName.toLowerCase().trim().replace(/\s+/g, '')}${uniqueSuffix}@campus.groovelab.de`;
+        const finalEmail = `student.${studentId}@campus-groovelab.local`;
 
         const { data: insertedStudent, error: insertError } = await supabase
           .from('users')
           .insert({
+            id: studentId,
             school_id: schoolId,
             teacher_id: teacherId,
             role: 'student',
@@ -7528,8 +7637,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_campus_active ? '#e6f4ea' : '#f5f5f7',
-                            color: student.is_campus_active ? '#34a853' : '#86868b',
+                            background: student.is_campus_active ? '#fce8e6' : '#f5f5f7',
+                            color: student.is_campus_active ? '#ea4335' : '#86868b',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
@@ -8085,6 +8194,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         .eq('id', selectedGroovelabStudentId);
       if (deleteOldErr) throw deleteOldErr;
 
+      // Physically purge assets from Supabase Storage
+      await deleteUserStorageAssets([selectedGroovelabStudentId]);
+
       alert('Die Profile wurden erfolgreich verknüpft! Die GrooveLab-Daten wurden auf das Campus-Profil übertragen.');
       setSelectedCampusStudentId('');
       setSelectedGroovelabStudentId('');
@@ -8099,6 +8211,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Diesen Account wirklich entfernen?')) return;
     try {
+      // Physically purge assets from Supabase Storage
+      await deleteUserStorageAssets([id]);
+
       const { error } = await supabase
         .from('users')
         .delete()
@@ -25292,6 +25407,95 @@ status: status,
                       </div>
                       <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em' }}>
                         RECHNUNG (14 TAGE)
+                      </div>
+                    </div>
+
+                    {/* Schuljahr & DSGVO Datenschutz-Bereinigung */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Schuljahr & DSGVO Datenschutz-Bereinigung</strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
+                          Konfiguriere den offiziellen Schuljahresbeginn für deine Verträge und lege fest, ob abgelaufene Konten vollkommen automatisch und datenschutzkonform (inkl. physischer Löschung verknüpfter Audio-Dateien im Supabase Storage) gelöscht werden sollen.
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Tag) *</label>
+                          <select
+                            value={schoolYearStartDay}
+                            onChange={(e) => setSchoolYearStartDay(parseInt(e.target.value))}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                          >
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                              <option key={day} value={day}>{day}.</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Monat) *</label>
+                          <select
+                            value={schoolYearStartMonth}
+                            onChange={(e) => setSchoolYearStartMonth(parseInt(e.target.value))}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                          >
+                            <option value={1}>Januar</option>
+                            <option value={2}>Februar</option>
+                            <option value={3}>März</option>
+                            <option value={4}>April</option>
+                            <option value={5}>Mai</option>
+                            <option value={6}>Juni</option>
+                            <option value={7}>Juli</option>
+                            <option value={8}>August</option>
+                            <option value={9}>September</option>
+                            <option value={10}>Oktober</option>
+                            <option value={11}>November</option>
+                            <option value={12}>Dezember</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={autoDeleteExpiredUsers}
+                            onChange={(e) => setAutoDeleteExpiredUsers(e.target.checked)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
+                          />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                            Abgelaufene Schüler-Zugänge automatisch löschen (Auto-Clean)
+                          </span>
+                        </label>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '24px', display: 'block', marginTop: '-6px' }}>
+                          Inaktiviert bzw. löscht abgelaufene Profile und zugeordnete Spuren/Bands/Songs vollautomatisch nach Ablauf des Buchungszeitraums.
+                        </span>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: '12px', borderRadius: '12px', border: '1px dashed #fca5a5' }}>
+                        <div style={{ textAlign: 'left' }}>
+                          <strong style={{ fontSize: '0.8rem', display: 'block', color: '#991b1b' }}>Manuelle DSGVO-Löschung</strong>
+                          <span style={{ fontSize: '0.7rem', color: '#7f1d1d', display: 'block', marginTop: '2px' }}>
+                            {students.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now()).length} abgelaufene Konten gefunden.
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteExpiredStudents(false)}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            borderRadius: '10px',
+                            background: '#ea4335',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(234, 67, 53, 0.15)'
+                          }}
+                        >
+                          Jetzt bereinigen
+                        </button>
                       </div>
                     </div>
                   </div>

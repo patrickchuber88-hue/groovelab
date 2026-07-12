@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2 } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
@@ -3838,7 +3838,17 @@ export function TeacherDashboard({
         setAllBands(bData || []);
 
         // 7. Students
-        setAllStudents(studData || []);
+        let filteredStudData = studData || [];
+        if (new Date().getMonth() === 7) { // 7 is August
+          const currentYear = new Date().getFullYear();
+          const limitDate = new Date(currentYear, 7, 31, 23, 59, 59).getTime();
+          filteredStudData = filteredStudData.filter((student: any) => {
+            if (!student.contract_ends_at) return true;
+            const endDate = new Date(student.contract_ends_at).getTime();
+            return endDate > limitDate;
+          });
+        }
+        setAllStudents(filteredStudData);
 
         // 8. Help
         setHelpRequests(helpData || []);
@@ -4842,16 +4852,18 @@ export function TeacherDashboard({
       }
     }
     
+    const studentId = crypto.randomUUID();
     const qrToken = crypto.randomUUID();
     const lName = newStudent.lastName;
     const formattedLastName = lName.length > 1 ? lName.charAt(0) + '.' : lName;
     
     const { data, error } = await supabase.from('users').insert({
+      id: studentId,
       school_id: teacher.school_id, 
       role: 'student', 
       first_name: newStudent.firstName, 
       last_name: formattedLastName,
-      email: newStudent.email || null,
+      email: `student.${studentId}@campus-groovelab.local`,
       birth_date: newStudent.birthDate ? newStudent.birthDate : null,
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       qr_token: qrToken,
@@ -4892,9 +4904,11 @@ export function TeacherDashboard({
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
+    const lName = editingStudent.last_name || '';
+    const formattedLast = lName.length > 1 ? lName.charAt(0) + '.' : lName;
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
-      last_name: editingStudent.last_name,
+      last_name: formattedLast,
       birth_date: editingStudent.birth_date || null,
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
@@ -4935,6 +4949,9 @@ export function TeacherDashboard({
           const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
           if (error) throw error;
         } else {
+          // Physically purge assets from Supabase Storage
+          await deleteUserStorageAssets([id]);
+
           await supabase.from('user_song_skills').delete().eq('user_id', id);
           await supabase.from('band_members').delete().eq('user_id', id);
           await supabase.from('sessions').delete().eq('user_id', id);
@@ -4968,15 +4985,17 @@ export function TeacherDashboard({
           return;
         }
       }
+      const studentId = crypto.randomUUID();
       const qrToken = crypto.randomUUID();
       const lName = inviteLastName.trim();
       const formattedLast = lName.length > 1 ? lName.charAt(0) + '.' : lName;
       const { data, error } = await supabase.from('users').insert({
+        id: studentId,
         school_id: teacher.school_id,
         role: 'student',
         first_name: inviteFirstName.trim(),
         last_name: formattedLast,
-        email: inviteEmail.trim() || null,
+        email: `student.${studentId}@campus-groovelab.local`,
         photo_url: '/avatar_ghost.jpg',
         qr_token: qrToken,
         instrument: 'Musiker',

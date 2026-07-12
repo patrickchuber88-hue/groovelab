@@ -457,7 +457,11 @@ function MobileBriefingView({
       <div className="welcome-card-container">
         <div className="welcome-card-image-wrapper">
           <img 
-            src={getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)} 
+            src={
+              studentUser?.role === 'admin' || studentUser?.role === 'secretary'
+                ? '/campus_login_hero.png'
+                : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+            } 
             alt="Instrument Avatar"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
             onError={(e) => {
@@ -5773,21 +5777,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
     setIsUploadingCustomAvatar(true);
     try {
-      const { data: matchedPins, error: pinErr } = await supabase
-        .from('one_time_upload_pins')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('pin_code', pinInput.trim())
-        .eq('is_used', false);
-      
-      if (pinErr || !matchedPins || matchedPins.length === 0) {
-        alert('Ungültige oder bereits verwendete PIN!');
-        setIsUploadingCustomAvatar(false);
-        return;
-      }
-
-      const activePin = matchedPins[0];
-
       const fileExt = customAvatarFile.name.split('.').pop();
       const fileName = `${studentId}_avatar_${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
@@ -5811,15 +5800,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         finalPublicUrl = publicUrlData.publicUrl;
       }
 
-      await supabase
-        .from('users')
-        .update({ photo_url: finalPublicUrl })
-        .eq('id', studentId);
+      // Call secure RPC to verify pin code and update users/one-time-pins tables
+      const { data: verifyResult, error: verifyErr } = await supabase.rpc('verify_photo_upload_pin', {
+        p_student_id: studentId,
+        p_pin_code: pinInput.trim(),
+        p_photo_url: finalPublicUrl
+      });
       
-      await supabase
-        .from('one_time_upload_pins')
-        .update({ is_used: true, used_at: new Date().toISOString() })
-        .eq('id', activePin.id);
+      if (verifyErr || !verifyResult) {
+        alert(verifyErr?.message || 'Ungültige oder bereits verwendete PIN!');
+        setIsUploadingCustomAvatar(false);
+        return;
+      }
 
       if (studentMissionProgress && studentMissionProgress.current_level === 2) {
         await supabase
@@ -6047,7 +6039,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               className="p-5 bg-slate-950/60 hover:bg-indigo-950/30 border border-slate-800 hover:border-indigo-500 rounded-2xl text-left transition-all duration-200 group cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <span className="text-3xl bg-slate-900 p-2.5 rounded-xl group-hover:scale-110 transition-transform">{hc.icon}</span>
+                <span className="text-3xl bg-slate-900 p-2.5 rounded-xl group-hover:scale-110 transition-transform" style={{ filter: 'grayscale(100%)' }}>{hc.icon}</span>
                 <div>
                   <span className="block font-extrabold text-white text-base group-hover:text-indigo-400 transition-all">{hc.name}</span>
                   <span className="block text-xs text-slate-400 font-semibold mt-1 leading-relaxed">{hc.desc}</span>
@@ -9672,7 +9664,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }} />
                   <img 
                     src={
-                      studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
+                      studentUser?.role === 'admin' || studentUser?.role === 'secretary'
+                        ? '/campus_login_hero.png'
+                        : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
                         ? studentUser.photo_url
                         : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
                     } 
@@ -11782,7 +11776,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             }}>
               <img 
                 src={
-                  studentUser.photo_url && studentUser.photo_url.includes('_avatar')
+                  studentUser?.role === 'admin' || studentUser?.role === 'secretary'
+                    ? '/campus_login_hero.png'
+                    : studentUser.photo_url && studentUser.photo_url.includes('_avatar')
                     ? studentUser.photo_url
                     : getInstrumentAvatarUrl(studentUser.resolved_instrument || studentUser.instrument)
                 } 
@@ -12253,7 +12249,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }}>
                     <img 
                       src={
-                        editingProfile.photo_url && editingProfile.photo_url.includes('_avatar')
+                        editingProfile?.role === 'admin' || editingProfile?.role === 'secretary'
+                          ? '/campus_login_hero.png'
+                          : editingProfile.photo_url && editingProfile.photo_url.includes('_avatar')
                           ? editingProfile.photo_url
                           : getInstrumentAvatarUrl(editingProfile.resolved_instrument || editingProfile.instrument)
                       } 
@@ -13094,7 +13092,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               alignItems: 'center'
             }}>
               <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                GrooveLab Wrapped
+                Campus-Groovelab Wrapped
               </span>
               <button 
                 onClick={() => setShowWrapped(false)}
@@ -13115,7 +13113,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     Dein musikalischer Flashback!
                   </h2>
                   <p style={{ color: '#a1a1aa', fontSize: '1rem', fontWeight: 500 }}>
-                    Schauen wir uns an, was du diesen Monat im GrooveLab geleistet hast! Bist du bereit für deine Story?
+                    Schauen wir uns an, was du diesen Monat im Campus-Groovelab geleistet hast! Bist du bereit für deine Story?
                   </p>
                 </div>
               )}

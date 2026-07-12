@@ -395,22 +395,22 @@ export function BillingDashboard() {
           }
         }
         
-        // Count teachers matching Secretary logic
-        const isTeacher = u.role === 'teacher' || (u.roles && u.roles.includes('teacher'));
-        if (isTeacher) {
-          userStatsMap[u.school_id].totalTeachers++;
-          if (u.is_active) {
-            userStatsMap[u.school_id].activeTeachers++;
-          }
-        }
-        
-        // Count employees matching Secretary logic
+        // Count employees matching Secretary logic (admins & secretaries are free)
         const isEmployee = u.role === 'admin' || u.role === 'secretary' ||
           (u.roles && (u.roles.includes('admin') || u.roles.includes('secretary')));
         if (isEmployee) {
           userStatsMap[u.school_id].totalEmployees++;
           if (u.is_active) {
             userStatsMap[u.school_id].activeEmployees++;
+          }
+        }
+        
+        // Count teachers (exclude those who are also employees/admins)
+        const isTeacher = (u.role === 'teacher' || (u.roles && u.roles.includes('teacher'))) && !isEmployee;
+        if (isTeacher) {
+          userStatsMap[u.school_id].totalTeachers++;
+          if (u.is_active) {
+            userStatsMap[u.school_id].activeTeachers++;
           }
         }
       });
@@ -448,7 +448,7 @@ export function BillingDashboard() {
         const kombiDiscountAmount = hasKombi ? 2.99 : 0.00;
 
         // STAFF FEE (teachers & employees)
-        const staffFee = (teachersCount + employeesCount) * 0.49;
+        const staffFee = teachersCount * 0.49;
         
         // PASSIVE STUDENTS FEE (0.09 € per passive student profile)
         const isPartial = school.student_billing_option === 'student_partial';
@@ -674,12 +674,12 @@ export function BillingDashboard() {
         .billing-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
-          border-color: rgba(79, 70, 229, 0.2);
+          border-color: rgba(234, 67, 53, 0.2);
           background: rgba(255, 255, 255, 0.95);
         }
         .billing-card:hover .bc-icon-wrapper {
-          background: rgba(79, 70, 229, 0.08) !important;
-          color: #4f46e5 !important;
+          background: rgba(234, 67, 53, 0.08) !important;
+          color: #ea4335 !important;
         }
  
         .filter-btn {
@@ -702,10 +702,10 @@ export function BillingDashboard() {
           border-color: rgba(0, 0, 0, 0.1);
         }
         .filter-btn-active {
-          background: #4f46e5 !important;
+          background: #ea4335 !important;
           color: #ffffff !important;
-          border-color: #4f46e5 !important;
-          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+          border-color: #ea4335 !important;
+          box-shadow: 0 4px 12px rgba(234, 67, 53, 0.2);
         }
  
         .billing-table {
@@ -750,7 +750,7 @@ export function BillingDashboard() {
         }
         .billing-row:hover td {
           background: rgba(255, 255, 255, 0.95);
-          border-color: rgba(79, 70, 229, 0.1);
+          border-color: rgba(234, 67, 53, 0.1);
         }
         .billing-row-expanded td {
           border-bottom: none !important;
@@ -802,8 +802,8 @@ export function BillingDashboard() {
           transition: all 0.15s;
         }
         .action-icon-btn:hover {
-          color: #4f46e5;
-          background: rgba(79, 70, 229, 0.08);
+          color: #ea4335;
+          background: rgba(234, 67, 53, 0.08);
         }   }
 
         .invoice-card {
@@ -827,7 +827,7 @@ export function BillingDashboard() {
       }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CreditCard style={{ color: '#4f46e5' }} size={32} /> Abrechnungen &amp; Abonnements
+            <CreditCard style={{ color: '#ea4335' }} size={32} /> Abrechnungen &amp; Abonnements
           </h2>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 500 }}>
             Globale Übersicht über alle Schul-Lizenzgebühren und privaten App-Upgrades von Campus-Groovelab.
@@ -853,7 +853,7 @@ export function BillingDashboard() {
             transition: 'all 0.2s',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e0e7ff'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.borderColor = 'rgba(79, 70, 229, 0.2)'; }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.2)'; }}
           onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
@@ -866,9 +866,9 @@ export function BillingDashboard() {
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: '#4f46e5',
-          backgroundColor: '#e0e7ff',
-          border: '1px solid rgba(79, 70, 229, 0.2)',
+          color: '#ea4335',
+          backgroundColor: '#fce8e6',
+          border: '1px solid rgba(234, 67, 53, 0.2)',
           padding: '16px',
           borderRadius: '16px',
           fontSize: '0.88rem',
@@ -1045,8 +1045,8 @@ export function BillingDashboard() {
               color: '#0f172a'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#4f46e5';
-              e.target.style.boxShadow = '0 0 0 3px rgba(79, 70, 229, 0.1)';
+              e.target.style.borderColor = '#ea4335';
+              e.target.style.boxShadow = '0 0 0 3px rgba(234, 67, 53, 0.1)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)';
@@ -1075,7 +1075,7 @@ export function BillingDashboard() {
           <button
             onClick={handleExportCSV}
             style={{
-              background: '#4f46e5',
+              background: '#ea4335',
               border: 'none',
               borderRadius: '12px',
               padding: '10px 18px',
@@ -1086,12 +1086,12 @@ export function BillingDashboard() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.15)',
+              boxShadow: '0 4px 12px rgba(234, 67, 53, 0.15)',
               transition: 'all 0.2s',
               marginLeft: '12px'
             }}
-            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#4338ca'; }}
-            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#4f46e5'; }}
+            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#b32418'; }}
+            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#ea4335'; }}
           >
             Exportieren (CSV) 📥
           </button>
@@ -1118,8 +1118,8 @@ export function BillingDashboard() {
                       width: '32px',
                       height: '32px',
                       borderRadius: '50%',
-                      border: '3px solid rgba(79, 70, 229, 0.1)',
-                      borderTopColor: '#4f46e5',
+                      border: '3px solid rgba(234, 67, 53, 0.1)',
+                      borderTopColor: '#ea4335',
                       animation: 'spin 1s linear infinite'
                     }} />
                     <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -1150,7 +1150,7 @@ export function BillingDashboard() {
                       <td style={{ fontWeight: 550, color: '#0f172a' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <span style={{ 
-                            color: isExpanded ? '#4f46e5' : '#64748b', 
+                            color: isExpanded ? '#ea4335' : '#64748b', 
                             transform: isExpanded ? 'rotate(180deg)' : 'none', 
                             transition: 'transform 0.2s',
                             display: 'inline-flex',
@@ -1202,8 +1202,8 @@ export function BillingDashboard() {
                             gap: '4px', 
                             fontSize: '0.72rem', 
                             fontWeight: 700, 
-                            color: '#4f46e5', 
-                            backgroundColor: '#e0e7ff', 
+                            color: '#ea4335', 
+                            backgroundColor: '#fce8e6', 
                             padding: '2px 8px', 
                             borderRadius: '6px'
                           }}>
@@ -1211,10 +1211,10 @@ export function BillingDashboard() {
                           </span>
                         </div>
                       </td>
-
+ 
                       {/* Total Billed & Breakdown merged */}
                       <td style={{ textAlign: 'right', fontSize: '0.85rem' }}>
-                        <div style={{ color: '#4f46e5', fontWeight: 800, fontSize: '1rem' }}>
+                        <div style={{ color: '#ea4335', fontWeight: 800, fontSize: '1rem' }}>
                           {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                         </div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 400, marginTop: '2px', lineHeight: 1.3 }}>
@@ -1248,9 +1248,9 @@ export function BillingDashboard() {
                         <tr>
                           <td colSpan={3} style={{ 
                             padding: '0 24px 24px 24px', 
-                            background: 'rgba(255, 255, 255, 0.95)',
-                            borderBottomLeftRadius: '24px',
-                            borderBottomRightRadius: '24px',
+                            background: '#ffffff',
+                            borderBottomLeftRadius: '16px',
+                            borderBottomRightRadius: '16px',
                             borderLeft: '1px solid rgba(0, 0, 0, 0.03)',
                             borderRight: '1px solid rgba(0, 0, 0, 0.03)',
                             borderBottom: '1px solid rgba(0, 0, 0, 0.03)'
@@ -1260,9 +1260,9 @@ export function BillingDashboard() {
                               style={{ 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: '28px',
+                                gap: '24px',
                                 paddingTop: '20px',
-                                borderTop: '1px solid rgba(0, 0, 0, 0.05)'
+                                borderTop: '1px solid rgba(0, 0, 0, 0.04)'
                               }}
                             >
                               
@@ -1270,124 +1270,125 @@ export function BillingDashboard() {
                               <div style={{
                                 display: 'grid',
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                gap: '24px'
+                                gap: '32px',
+                                padding: '8px 0'
                               }}>
                                 {/* Left: Subscription details */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abonnement Details</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.02)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#64748b' }}>Vertragstyp:</span>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{inv.subscriptionType === 'solo' ? 'Solo' : 'Standard'}</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abonnement Details</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Vertragstyp:</span>
+                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>{inv.subscriptionType === 'solo' ? 'Solo' : 'Standard'}</span>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#64748b' }}>Module:</span>
-                                      <div style={{ display: 'flex', gap: '8px' }}>
-                                        {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 700, fontSize: '0.78rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '6px' }}>Campus</span>}
-                                        {inv.hasGroovelab && <span style={{ color: '#d97706', fontWeight: 700, fontSize: '0.78rem', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Module:</span>
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        {inv.hasCampus && <span style={{ color: '#137333', fontWeight: 600, fontSize: '0.75rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '4px' }}>Campus</span>}
+                                        {inv.hasGroovelab && <span style={{ color: '#b45309', fontWeight: 600, fontSize: '0.75rem', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>GrooveLab</span>}
                                       </div>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#64748b' }}>Kombi-Rabatt (Schule):</span>
-                                      <strong style={{ color: inv.hasKombiDiscount ? '#34a853' : '#64748b', fontWeight: 700 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Kombi-Rabatt (Schule):</span>
+                                      <strong style={{ color: inv.hasKombiDiscount ? '#137333' : '#86868b', fontWeight: 600 }}>
                                         {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Nein'}
                                       </strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
-                                      <span style={{ color: '#64748b' }}>Kostenträger:</span>
-                                      <strong style={{ color: isSelbstzahler ? '#4f46e5' : '#475569', fontWeight: 700 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Kostenträger:</span>
+                                      <strong style={{ color: isSelbstzahler ? '#ea4335' : '#1d1d1f', fontWeight: 600 }}>
                                         {isSelbstzahler ? 'Schüler / Eltern (Direktabrechnung)' : 'Musikschule (Sammelzahler)'}
                                       </strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderTop: '1px dashed rgba(0,0,0,0.08)', paddingTop: '8px', marginTop: '2px' }}>
-                                      <span style={{ color: '#64748b' }}>Private App-Upgrades:</span>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Private App-Upgrades:</span>
+                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>
                                         {inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
+                                        <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 400, marginLeft: '6px' }}>
                                           ({inv.premiumStudents} x 9,99 €)
                                         </span>
                                       </span>
                                     </div>
                                   </div>
                                 </div>
-
+  
                                 {/* Right: Billing numbers */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatsgebühren Übersicht</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.02)' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatsgebühren Übersicht</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                        <span style={{ color: '#64748b' }}>Grundgebühr Module:</span>
-                                        <span style={{ color: '#0f172a', fontWeight: 700 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                        <span style={{ color: '#86868b' }}>Grundgebühr Module:</span>
+                                        <span style={{ color: '#1d1d1f', fontWeight: 600 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                       </div>
-                                      <div style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'right', marginTop: '-2px' }}>
+                                      <div style={{ fontSize: '0.7rem', color: '#86868b', textAlign: 'right', marginTop: '-2px' }}>
                                         ({inv.hasCampus && 'Campus: 7,99 €'}{inv.hasCampus && inv.hasGroovelab && ' + '}{inv.hasGroovelab && 'GrooveLab: 4,99 €'})
                                       </div>
                                     </div>
                                     {inv.hasKombiDiscount && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34a853' }}>
-                                        <span style={{ fontWeight: 700 }}>Kombi-Rabatt:</span>
-                                        <span style={{ fontWeight: 700 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#137333', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                        <span style={{ fontWeight: 600 }}>Kombi-Rabatt:</span>
+                                        <span style={{ fontWeight: 600 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                       </div>
                                     )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                      <span style={{ color: '#64748b' }}>Servicegebühr Profile:</span>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                      <span style={{ color: '#86868b' }}>Servicegebühr Profile:</span>
+                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>
                                         {inv.userFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: '6px' }}>
-                                          ({inv.totalTeachersCount + inv.totalEmployeesCount} aktive Profile à 0,49 €)
+                                        <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 400, marginLeft: '6px' }}>
+                                          ({inv.totalTeachersCount} active profiles)
                                         </span>
                                       </span>
                                     </div>
                                     {inv.activeStudentFee > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#4f46e5' }}>
-                                        <span style={{ fontWeight: 700 }}>Schüler-Aktivierung:</span>
-                                        <span style={{ fontWeight: 700 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#ea4335', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
+                                        <span style={{ fontWeight: 600 }}>Schüler-Aktivierung:</span>
+                                        <span style={{ fontWeight: 600 }}>
                                           {inv.activeStudentFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         </span>
                                       </div>
                                     )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '10px', marginTop: '2px' }}>
-                                      <span style={{ color: '#0f172a', fontWeight: 700 }}>Monats-Soll Schule:</span>
-                                      <strong style={{ color: '#4f46e5', fontWeight: 800 }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', paddingTop: '8px' }}>
+                                      <span style={{ color: '#1d1d1f', fontWeight: 700 }}>Monats-Soll Schule:</span>
+                                      <strong style={{ color: '#ea4335', fontWeight: 700, fontSize: '1.15rem' }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-
+ 
                               {/* Row 2: Schüler Direct Billing Lists (Selbstzahler only) */}
                               {isSelbstzahler && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Freischaltungsstatus</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(0, 0, 0, 0.04)', paddingTop: '16px' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Freischaltungsstatus</span>
                                   <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
                                     gap: '24px',
                                   }}>
                                     {/* Column 1: Aktiv freigeschaltet */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>
-                                        <strong style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700 }}>Aktiv freigeschaltet</strong>
-                                        <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Aktiv freigeschaltet</span>
+                                        <span style={{ background: '#f5f5f7', color: '#86868b', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
                                           {activePaidStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
                                         {activePaidStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine aktiven Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine aktiven Schüler</span>
                                         ) : (
                                           activePaidStudents.map(s => (
                                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#f8fafc', border: '1px solid rgba(0, 0, 0, 0.05)', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.65rem' }}>
+                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f5f5f7', border: '1px solid rgba(0, 0, 0, 0.03)', color: '#86868b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
-                                                <span style={{ color: '#1e293b', fontWeight: 600 }}>{s.first_name} {s.last_name}</span>
+                                                <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, true)}
-                                                style={{ border: 'none', background: 'none', color: '#4f46e5', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '6px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#e0e7ff'}
+                                                style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
                                                 onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                               >
                                                 Sperren
@@ -1397,37 +1398,37 @@ export function BillingDashboard() {
                                         )}
                                       </div>
                                     </div>
-
+ 
                                     {/* Column 2: Probezeit / Zahlung ausstehend */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>
-                                        <strong style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700 }}>Ausstehend / Probezeit</strong>
-                                        <span style={{ background: '#fef7e0', color: '#b06000', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Ausstehend / Probezeit</span>
+                                        <span style={{ background: '#fff8e1', color: '#b06000', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
                                           {pendingStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
                                         {pendingStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine ausstehenden Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine ausstehenden Schüler</span>
                                         ) : (
                                           pendingStudents.map(s => (
                                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#fff8e1', border: '1px solid rgba(176, 96, 0, 0.1)', color: '#b06000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.65rem' }}>
+                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff8e1', border: '1px solid rgba(176, 96, 0, 0.08)', color: '#b06000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                  <span style={{ color: '#1e293b', fontWeight: 600 }}>{s.first_name} {s.last_name}</span>
-                                                  <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
+                                                  <span style={{ fontSize: '0.65rem', color: '#86868b' }}>
                                                     {s.is_trial ? 'Probezeit' : 'Zahlung offen'}
                                                   </span>
                                                 </div>
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: '#e0e7ff', color: '#4f46e5', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '6px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#c7d2fe'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#e0e7ff'}
+                                                style={{ border: 'none', background: '#fce8e6', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fcdcd9'}
+                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#fce8e6'}
                                               >
                                                 Freischalten
                                               </button>
@@ -1436,31 +1437,31 @@ export function BillingDashboard() {
                                         )}
                                       </div>
                                     </div>
-
+ 
                                     {/* Column 3: Kostenloser User */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>
-                                        <strong style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700 }}>Basic User (Kostenlos)</strong>
-                                        <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Basic User (Kostenlos)</span>
+                                        <span style={{ background: '#f5f5f7', color: '#86868b', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
                                           {freeStudents.length}
                                         </span>
                                       </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
                                         {freeStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '8px 0' }}>Keine kostenlosen Schüler</span>
+                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine kostenlosen Schüler</span>
                                         ) : (
                                           freeStudents.map(s => (
                                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.65rem' }}>
+                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f5f5f7', color: '#86868b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
                                                   {getInitials(s.first_name, s.last_name)}
                                                 </div>
-                                                <span style={{ color: '#1e293b', fontWeight: 600 }}>{s.first_name} {s.last_name}</span>
+                                                <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
                                               </div>
                                               <button 
                                                 onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: 'none', color: '#64748b', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '6px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#f1f5f9'}
+                                                style={{ border: 'none', background: 'none', color: '#86868b', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px' }}
+                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#f5f5f7'}
                                                 onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                               >
                                                 Aktivieren
@@ -1473,61 +1474,63 @@ export function BillingDashboard() {
                                   </div>
                                 </div>
                               )}
-
+ 
                               {/* Row 3: Invoices History */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(0, 0, 0, 0.04)', paddingTop: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap', gap: '12px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <BookOpen size={16} style={{ color: '#64748b' }} />
-                                    <h4 style={{ margin: 0, fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                      Abrechnungs- und Rechnungsverlauf
-                                    </h4>
-                                  </div>
+                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Abrechnungs- und Rechnungsverlauf
+                                  </span>
                                   <button
                                     onClick={() => createManualInvoice(inv.schoolId)}
                                     style={{
-                                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                      color: '#334155',
-                                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                                      padding: '6px 14px',
-                                      borderRadius: '8px',
+                                      backgroundColor: 'transparent',
+                                      color: '#ea4335',
+                                      border: '1px solid rgba(234, 67, 53, 0.2)',
+                                      padding: '4px 10px',
+                                      borderRadius: '6px',
                                       fontWeight: 600,
-                                      fontSize: '0.8rem',
+                                      fontSize: '0.78rem',
                                       cursor: 'pointer',
-                                      transition: 'all 0.2s'
+                                      transition: 'all 0.15s'
                                     }}
-                                    onMouseOver={(e: any) => { e.currentTarget.style.background = '#e0e7ff'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.borderColor = 'rgba(79, 70, 229, 0.1)'; }}
-                                    onMouseOut={(e: any) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                                    onMouseOver={(e: any) => { e.currentTarget.style.background = '#fce8e6'; }}
+                                    onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
                                   >
                                     + Manuelle Rechnung erstellen
                                   </button>
                                 </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+ 
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   {(() => {
                                     const generated = getSchoolInvoices(inv.schoolId, inv.total);
                                     const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
-                                    
                                     const allCombined = [
                                       ...dbInvs.map(i => ({
                                         id: i.id,
                                         billing_date: formatDateDisplay(i.billing_date),
                                         amount: i.amount,
                                         status: i.status,
-                                        isDb: true
+                                        type: i.type,
+                                        isDb: true,
+                                        isCurrentMonth: false,
+                                        isTrialMonth: false
                                       })),
                                       ...generated.map(g => ({
                                         id: g.id,
                                         billing_date: g.date,
                                         amount: g.amount,
                                         status: g.status === 'Bezahlt' ? 'paid' : 'open',
-                                        isDb: false
+                                        type: 'INF',
+                                        isDb: false,
+                                        isCurrentMonth: g.isCurrentMonth,
+                                        isTrialMonth: g.status === 'Probemonat'
                                       }))
                                     ];
 
                                     if (allCombined.length === 0) {
                                       return (
-                                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.8rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.08)', borderRadius: '8px' }}>
+                                        <div style={{ textAlign: 'center', color: '#86868b', fontSize: '0.8rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.04)', borderRadius: '8px' }}>
                                           Keine Rechnungen vorhanden.
                                         </div>
                                       );
@@ -1541,23 +1544,22 @@ export function BillingDashboard() {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             justifyContent: 'space-between', 
-                                            padding: '12px 16px', 
-                                            backgroundColor: '#ffffff', 
-                                            borderRadius: '12px',
-                                            border: '1px solid rgba(0, 0, 0, 0.04)',
+                                            padding: '10px 0', 
+                                            backgroundColor: 'transparent', 
+                                            borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
                                             flexWrap: 'wrap',
                                             gap: '12px',
-                                            opacity: invoice.status === 'cancelled' ? 0.6 : 1
+                                            opacity: invoice.status === 'cancelled' ? 0.5 : 1
                                           }}
                                         >
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-                                            <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                            <span style={{ fontWeight: 600, color: '#1d1d1f', fontSize: '0.82rem' }}>
                                               {invoice.amount < 0 
                                                 ? invoice.id.replace('INV-', 'GS-') 
                                                 : invoice.id.replace('INV-', 'RE-')}
                                             </span>
-                                            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>{invoice.billing_date}</span>
-                                            <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                            <span style={{ fontSize: '0.8rem', color: '#86868b', fontWeight: 500 }}>{invoice.billing_date}</span>
+                                            <span style={{ fontWeight: 600, color: '#1d1d1f', fontSize: '0.82rem' }}>
                                               {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                             </span>
                                           </div>
@@ -1576,6 +1578,8 @@ export function BillingDashboard() {
                                                   date: invoice.billing_date,
                                                   amount: invoice.amount,
                                                   status: invoice.status,
+                                                  type: invoice.type,
+                                                  isCurrentMonth: invoice.isCurrentMonth,
                                                   hasCampus: inv.hasCampus,
                                                   hasGroovelab: inv.hasGroovelab,
                                                   baseFee: inv.baseFee,
@@ -1587,35 +1591,39 @@ export function BillingDashboard() {
                                                   passiveStudentsCount: inv.passiveStudentsCount,
                                                   activeStudents: inv.activeStudents,
                                                   subscriptionBypass: inv.subscriptionBypass,
-                                                  subtotal: inv.subtotal
+                                                  subtotal: inv.subtotal,
+                                                  studentBillingOption: inv.studentBillingOption,
+                                                  isTrialMonth: invoice.isTrialMonth
                                                 });
                                               }}
                                               style={{
-                                                background: '#f8fafc',
+                                                background: 'transparent',
                                                 border: '1px solid rgba(0, 0, 0, 0.08)',
-                                                borderRadius: '8px',
-                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                padding: '4px 10px',
                                                 fontSize: '0.78rem',
-                                                fontWeight: 700,
-                                                color: '#4f46e5',
+                                                fontWeight: 600,
+                                                color: '#1d1d1f',
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '6px'
                                               }}
+                                              onMouseOver={(e: any) => { e.currentTarget.style.background = '#f5f5f7'; }}
+                                              onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
                                             >
-                                              Ansehen 📄
+                                              Ansehen
                                             </button>
                                             {invoice.isDb ? (
                                               <select
                                                 value={invoice.status}
                                                 onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
                                                 style={{
-                                                  padding: '6px 12px',
-                                                  borderRadius: '8px',
+                                                  padding: '4px 10px',
+                                                  borderRadius: '6px',
                                                   border: '1px solid rgba(0, 0, 0, 0.08)',
                                                   fontSize: '0.78rem',
-                                                  fontWeight: 600,
+                                                  fontWeight: 500,
                                                   background: '#ffffff',
                                                   cursor: 'pointer',
                                                   outline: 'none',
@@ -1632,11 +1640,11 @@ export function BillingDashboard() {
                                                 value={invoice.status}
                                                 onChange={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
                                                 style={{
-                                                  padding: '6px 12px',
-                                                  borderRadius: '8px',
+                                                  padding: '4px 10px',
+                                                  borderRadius: '6px',
                                                   border: '1px solid rgba(0, 0, 0, 0.08)',
                                                   fontSize: '0.78rem',
-                                                  fontWeight: 600,
+                                                  fontWeight: 500,
                                                   background: '#ffffff',
                                                   cursor: 'pointer',
                                                   outline: 'none',
@@ -1654,7 +1662,6 @@ export function BillingDashboard() {
                                   })()}
                                 </div>
                               </div>
-
                             </div>
                           </td>
                         </tr>
@@ -1675,11 +1682,15 @@ export function BillingDashboard() {
             date: viewingInvoice.date,
             amount: viewingInvoice.amount,
             status: viewingInvoice.status,
+            type: viewingInvoice.type,
+            isCurrentMonth: viewingInvoice.isCurrentMonth,
             hasCampus: viewingInvoice.hasCampus,
             hasGroovelab: viewingInvoice.hasGroovelab,
-            totalTeachersCount: viewingInvoice.totalTeachersCount + viewingInvoice.totalEmployeesCount,
+            totalTeachersCount: viewingInvoice.totalTeachersCount,
             passiveStudentsCount: viewingInvoice.passiveStudentsCount,
-            activeStudentFee: viewingInvoice.activeStudentFee
+            activeStudentFee: viewingInvoice.activeStudentFee,
+            subscriptionBypass: viewingInvoice.subscriptionBypass,
+            isTrialMonth: viewingInvoice.isTrialMonth
           }}
           schoolName={viewingInvoice.schoolName}
           schoolStreet={viewingInvoice.schoolStreet}
@@ -1692,6 +1703,8 @@ export function BillingDashboard() {
           operatorCity={operatorCity}
           operatorIban={operatorIban}
           operatorBic={operatorBic}
+          billingPayer={['both', 'debit', 'cash', 'option1'].includes(viewingInvoice.studentBillingOption) ? 'student' : 'school'}
+          studentBillingOption={viewingInvoice.studentBillingOption}
           onClose={() => setViewingInvoice(null)}
         />
       )}

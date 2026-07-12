@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS public.focus_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-    student_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES public.users_raw(id) ON DELETE CASCADE,
     
     -- Dynamic Habit Scaling Parameters
     goal_level INTEGER NOT NULL CHECK (goal_level IN (1, 2, 3, 0)), -- 0 represents custom goal

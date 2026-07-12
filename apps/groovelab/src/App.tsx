@@ -1205,7 +1205,7 @@ if (typeof window !== 'undefined') {
         isCampus = true;
       }
     }
-    let titleText = isCampus ? 'Campus' : 'GrooveLab';
+    let titleText = isCampus ? 'Campus' : 'Campus-Groovelab';
     let btnBackground = 'linear-gradient(135deg, #34a853, #137333)';
     let btnShadow = '0 4px 12px rgba(52, 168, 83, 0.2)';
     
@@ -7254,7 +7254,7 @@ function App() {
               }}>
                 {activePlatform === 'campus'
                   ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Verwaltung' : 'Campus Schüler')
-                  : (user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler')}
+                  : (user.role === 'admin' ? 'Campus-Groovelab Admin' : user.role === 'teacher' ? 'Campus-Groovelab Lehrer' : user.role === 'secretary' ? 'Campus-Groovelab Verwaltung' : 'Campus-Groovelab Schüler')}
               </div>
             </div>
           </button>
@@ -7697,7 +7697,7 @@ function App() {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    {user.role === 'admin' ? 'GrooveLab Admin' : user.role === 'teacher' ? 'GrooveLab Lehrer' : user.role === 'secretary' ? 'GrooveLab Verwaltung' : 'GrooveLab Schüler'}
+                    {user.role === 'admin' ? 'Campus-Groovelab Admin' : user.role === 'teacher' ? 'Campus-Groovelab Lehrer' : user.role === 'secretary' ? 'Campus-Groovelab Verwaltung' : 'Campus-Groovelab Schüler'}
                   </div>
                 </div>
               )}
@@ -7913,7 +7913,7 @@ function App() {
                         Campus Lehrkraft
                       </span>
                       <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        🏢 {user.schools?.name || 'Groovelab Campus'}
+                        🏢 {user.schools?.name || 'Campus-Groovelab'}
                       </span>
                       <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 500 }}>
                         • Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}
@@ -9180,6 +9180,7 @@ function App() {
               forceTab={activeStudentTab}
               activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
+              onSwitchPlatform={(platform) => setActivePlatform(platform)}
               onOpenBandProfile={(band: any) => {
                 setSelectedBandForProfile(band);
                 setShowBandProfile(true);
@@ -10031,7 +10032,7 @@ function App() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
-                                {user.role === 'student' ? 'Hausaufgabenheft' : `${user.first_name} ${user.last_name || ''}`}
+                                {user.role === 'student' ? 'Hausaufgabenheft' : `${user.first_name} ${user.last_name?.[0]}.`}
                               </div>
                               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                                 {dateFormatted}
@@ -12127,17 +12128,17 @@ function App() {
             }}>
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
-                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. GrooveLab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
+                <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. Campus-Groovelab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
               </div>
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>2. Kamera & QR-Scanner</h4>
-                <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen GrooveLab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+                <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen Campus-Groovelab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
               </div>
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
-                <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>GrooveLab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+                <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>Campus-Groovelab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
               </div>
 
               <div>

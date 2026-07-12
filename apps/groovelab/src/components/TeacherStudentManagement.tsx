@@ -47,13 +47,25 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
       setError(null);
       const { data, error } = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status, created_at, lesson_duration')
+        .select('id, first_name, last_name, instrument, is_app_user, qr_token, status, created_at, lesson_duration, contract_ends_at')
         .eq('role', 'student')
         .eq('teacher_id', teacherId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setStudents(data || []);
+      
+      let filteredData = data || [];
+      if (new Date().getMonth() === 7) { // 7 is August
+        const currentYear = new Date().getFullYear();
+        const limitDate = new Date(currentYear, 7, 31, 23, 59, 59).getTime();
+        filteredData = filteredData.filter((student: any) => {
+          if (!student.contract_ends_at) return true;
+          const endDate = new Date(student.contract_ends_at).getTime();
+          return endDate > limitDate;
+        });
+      }
+      
+      setStudents(filteredData);
     } catch (err: any) {
       console.error('Error fetching students:', err);
       setError('Fehler beim Laden der Schülerliste.');

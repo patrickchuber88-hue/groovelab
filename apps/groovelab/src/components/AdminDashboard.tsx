@@ -215,6 +215,7 @@ interface AdminDashboardProps {
   locationMode?: 'lab' | 'home';
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
   hideHeader?: boolean;
+  onSwitchPlatform?: (platform: 'campus' | 'groovelab') => void;
 }
 
 export function AdminDashboard({ 
@@ -228,7 +229,8 @@ export function AdminDashboard({
   onSessionChange,
   locationMode,
   onLocationModeChange,
-  hideHeader = false
+  hideHeader = false,
+  onSwitchPlatform
 }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -10384,8 +10386,8 @@ export function AdminDashboard({
                     }}
                     className="hover-scale-mini"
                   >
-                    <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s' }}>
-                      {isCopied ? '✅' : emoji}
+                    <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s', filter: 'grayscale(100%)' }}>
+                      {isCopied ? '✓' : emoji}
                     </span>
                     
                     <span style={{ 
@@ -12144,7 +12146,7 @@ export function AdminDashboard({
           setSelectedStudent(null);
         }}
         activePlatform={activePlatform === "campus" ? "campus" : "groovelab"}
-        onSwitchPlatform={(p) => {}}
+        onSwitchPlatform={onSwitchPlatform}
       />
     );
   };
@@ -12233,7 +12235,7 @@ export function AdminDashboard({
           pixelRatio: 2,
         });
         const link = document.createElement('a');
-        link.download = (selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? `Campus_Pass_${selectedQRUser.first_name}.jpg` : `Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+        link.download = (selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? `Campus-Groovelab_Pass_${selectedQRUser.first_name}.jpg` : `Campus-Groovelab_ID_${selectedQRUser.first_name}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -15611,7 +15613,7 @@ export function AdminDashboard({
                           className="hover-scale-mini"
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', filter: 'grayscale(100%)' }}>
                               {tb.label}
                             </span>
                             <span style={{ fontSize: '0.65rem', fontWeight: 800, background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}`, padding: '3px 8px', borderRadius: '8px' }}>
@@ -15645,7 +15647,7 @@ export function AdminDashboard({
                                 transition: 'all 0.15s'
                               }}
                             >
-                              {tb.active ? '🟢 Aktiv' : '⚪ Inaktiv'}
+                              {tb.active ? '● Aktiv' : '○ Inaktiv'}
                             </button>
 
                             <div style={{ display: 'flex', gap: '8px' }}>

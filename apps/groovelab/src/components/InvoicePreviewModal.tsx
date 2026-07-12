@@ -19,6 +19,8 @@ export interface InvoiceData {
   activationsCount?: number;
   studentFee?: number;
   restmonate?: number;
+  subscriptionBypass?: boolean;
+  isTrialMonth?: boolean;
 }
 
 interface InvoicePreviewModalProps {
@@ -58,7 +60,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 }) => {
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
-  const isBypass = invoice.status === 'bypass';
+  const isTrial = invoice.isTrialMonth || invoice.status === 'Probemonat' || invoice.status === 'trial';
+  const isBypass = invoice.subscriptionBypass || invoice.status === 'bypass';
+  const isFree = isBypass || isTrial;
+  const freeLabel = isBypass ? ' (Bypass aktiv)' : (isTrial ? ' (Probemonat)' : '');
   const isGutschrift = invoice.amount < 0;
   const displayInvoiceId = isGutschrift 
     ? invoice.id.replace('INV-', 'GS-') 
@@ -218,8 +223,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 {isGutschrift
                   ? (invoice.status === 'Vorschau' ? 'VORSCHAU: GUTSCHRIFT' : 'GUTSCHRIFT')
                   : (invoice.status === 'Vorschau'
-                    ? (isInf ? 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))
-                    : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')))}
+                    ? (isInf ? (isTrial ? 'VORSCHAU: PROBEMONAT' : 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN') : (billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))
+                    : (isInf ? (isTrial ? 'PROBEMONAT' : 'INFRASTRUKTUR- & SERVICEGEBÜHREN') : (billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')))}
               </strong>
               <span style={{ color: '#64748b', fontWeight: 700 }}>
                 {isGutschrift ? 'Gutschrift-Nr.' : 'Nr.'} {displayInvoiceId}
@@ -308,16 +313,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              Bereitstellung, Betrieb &amp; Hosting (Campus){freeLabel}
+                            </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                            {campusCost.toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${campusCost.toFixed(2).replace('.', ',')} €`}
                           </td>
                           <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                            {((invoice.isCurrentMonth ? 1 : 12) * campusCost).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${((invoice.isCurrentMonth ? 1 : 12) * campusCost).toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
                       )}
@@ -327,16 +334,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              Bereitstellung, Betrieb &amp; Hosting (GrooveLab){freeLabel}
+                            </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                            {groovelabCost.toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${groovelabCost.toFixed(2).replace('.', ',')} €`}
                           </td>
                           <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                            {((invoice.isCurrentMonth ? 1 : 12) * groovelabCost).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${((invoice.isCurrentMonth ? 1 : 12) * groovelabCost).toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
                       )}
@@ -346,16 +355,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{invoice.totalTeachersCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User)</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>{invoice.totalTeachersCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User){freeLabel}</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                            {(invoice.totalTeachersCount * 0.49).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${(invoice.totalTeachersCount * 0.49).toFixed(2).replace('.', ',')} €`}
                           </td>
                           <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                            {((invoice.totalTeachersCount * 0.49) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${((invoice.totalTeachersCount * 0.49) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
                       )}
@@ -365,16 +374,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Infrastrukturpauschale für {invoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User)</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Infrastrukturpauschale für {invoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User){freeLabel}</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                            {(invoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${(invoice.passiveStudentsCount * 0.09).toFixed(2).replace('.', ',')} €`}
                           </td>
                           <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                            {((invoice.passiveStudentsCount * 0.09) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${((invoice.passiveStudentsCount * 0.09) * (invoice.isCurrentMonth ? 1 : 12)).toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
                       )}
@@ -384,14 +393,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler-Aktivierungen</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule)</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule){freeLabel}</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                            {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${invoice.activeStudentFee.toFixed(2).replace('.', ',')} €`}
                           </td>
                           <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                            {invoice.activeStudentFee.toFixed(2).replace('.', ',')} €
+                            {isFree ? '0,00 €' : `${invoice.activeStudentFee.toFixed(2).replace('.', ',')} €`}
                           </td>
                         </tr>
                       )}
@@ -404,20 +413,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                             Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate)
                             {studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                             {studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
+                            {isFree && <strong style={{ color: '#ea4335', marginLeft: '6px' }}>{freeLabel}</strong>}
                           </span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                           {invoice.activationsCount || 0} Schüler
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                          {(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €
+                          {isFree ? '0,00 €' : `${(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €`}
                         </td>
                         <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                          {invoice.amount.toFixed(2).replace('.', ',')} €
+                          {isFree ? '0,00 €' : `${invoice.amount.toFixed(2).replace('.', ',')} €`}
                         </td>
                       </tr>
                     </>
@@ -435,7 +445,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                     <span>• Träger Musikschule (Betrieb &amp; Infrastruktur):</span>
                     <span style={{ fontWeight: 650, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                      {isBypass ? '0,00 €' : schoolShareTotal.toFixed(2).replace('.', ',')} €
+                      {isFree ? '0,00 €' : schoolShareTotal.toFixed(2).replace('.', ',')} €
                     </span>
                   </div>
                 )}
@@ -453,7 +463,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     {isGutschrift ? 'Gesamtbetrag dieser Gutschrift:' : 'Gesamtbetrag dieser Rechnung:'}
                   </span>
                   <strong style={{ fontWeight: 900, color: isGutschrift ? '#34a853' : (isInf ? '#0369a1' : '#34a853'), whiteSpace: 'nowrap' }}>
-                    {isBypass ? '0,00 €' : (isGutschrift ? `${Math.abs(invoice.amount).toFixed(2).replace('.', ',')} €` : `${invoice.amount.toFixed(2).replace('.', ',')} €`)}
+                    {isFree ? '0,00 €' : (isGutschrift ? `${Math.abs(invoice.amount).toFixed(2).replace('.', ',')} €` : `${invoice.amount.toFixed(2).replace('.', ',')} €`)}
                   </strong>
                 </div>
               </div>

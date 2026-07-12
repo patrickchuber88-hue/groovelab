@@ -5,7 +5,7 @@ import {
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, QrCode, UserPlus, Key, Eye, EyeOff,
-  Link, Briefcase
+  Link, Briefcase, Mail, Phone
 } from 'lucide-react';
 
 interface ServerMetric {
@@ -43,6 +43,8 @@ interface School {
   groovelab_kiosk_token?: string | null;
   campus_login_token?: string | null;
   secretary_onboarding_token?: string | null;
+  email?: string | null;
+  phone_number?: string | null;
 }
 
 function getSubdomainOrigin(schoolName: string): string {
@@ -186,9 +188,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [editTrialOption, setEditTrialOption] = useState<'14' | '30' | 'custom'>('custom');
   const [editZipCode, setEditZipCode] = useState('');
   const [editCity, setEditCity] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
   const [editHasGroovelab, setEditHasGroovelab] = useState(false);
   const [editHasCampus, setEditHasCampus] = useState(false);
   const [editSubscriptionBypass, setEditSubscriptionBypass] = useState(false);
+
+  // School Admin Creation State
+  const [showAddSchoolAdminForm, setShowAddSchoolAdminForm] = useState(false);
+  const [newSchoolAdminFirstName, setNewSchoolAdminFirstName] = useState('');
+  const [newSchoolAdminLastName, setNewSchoolAdminLastName] = useState('');
+  const [newSchoolAdminEmail, setNewSchoolAdminEmail] = useState('');
 
   // Server Telemetry State
   const [serverMetrics, setServerMetrics] = useState<ServerMetric[]>([]);
@@ -548,6 +558,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         limits_enabled: editLimitsEnabled,
         zip_code: editZipCode.trim() || null,
         city: editCity.trim() || null,
+        email: editEmail.trim() || null,
+        phone_number: editPhoneNumber.trim() || null,
         has_groovelab_subscription: editHasGroovelab,
         has_campus_subscription: editHasCampus,
         subscription_bypass: editSubscriptionBypass
@@ -688,6 +700,94 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     }
   };
 
+  const handleCreateSchoolAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSchool) return;
+    if (!newSchoolAdminFirstName.trim() || !newSchoolAdminLastName.trim()) {
+      alert('Bitte Vorname und Nachname ausfüllen.');
+      return;
+    }
+
+    try {
+      let generatedAdminPin = '';
+      let pinIsUnique = false;
+      let attempts = 0;
+      while (!pinIsUnique && attempts < 5) {
+        const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
+        const { data: duplicateUser, error: checkErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('ausweis_nummer', candidatePin)
+          .maybeSingle();
+
+        if (!checkErr && !duplicateUser) {
+          generatedAdminPin = candidatePin;
+          pinIsUnique = true;
+        }
+        attempts++;
+      }
+
+      if (!generatedAdminPin) {
+        generatedAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+
+      const adminId = crypto.randomUUID();
+      const qrToken = crypto.randomUUID();
+      const subdomain = selectedSchool.name
+        .toLowerCase()
+        .trim()
+        .replace(/[äöüß]/g, (match) => {
+          const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+          return mapping[match] || match;
+        })
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      const defaultEmail = newSchoolAdminEmail.trim() || `${subdomain}@campus-groovelab.de`;
+
+      const { error: userErr } = await supabase
+        .from('users')
+        .insert({
+          id: adminId,
+          school_id: selectedSchool.id,
+          role: 'admin',
+          first_name: newSchoolAdminFirstName.trim(),
+          last_name: newSchoolAdminLastName.trim(),
+          email: defaultEmail,
+          password_hash: generatedAdminPin,
+          qr_token: qrToken,
+          ausweis_nummer: generatedAdminPin,
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_active: true,
+          roles: ['admin']
+        });
+
+      if (userErr) throw userErr;
+
+      // Add activation days for device PIN configuration
+      const birthDay = 15;
+      await supabase
+        .from('activation_days')
+        .insert({
+          student_id: adminId,
+          day_of_birth: birthDay
+        });
+
+      alert(`Hauptbenutzer (Admin) erfolgreich angelegt!\nLogin-Ausweis-ID / PIN: ${generatedAdminPin}`);
+      
+      setNewSchoolAdminFirstName('');
+      setNewSchoolAdminLastName('');
+      setNewSchoolAdminEmail('');
+      setShowAddSchoolAdminForm(false);
+      
+      fetchSchoolsAndStats();
+    } catch (err: any) {
+      console.error('Fehler beim Anlegen des Admins:', err.message);
+      alert('Fehler beim Anlegen: ' + err.message);
+    }
+  };
+
   const handleDeleteSchool = async (id: string, name: string) => {
     if (!confirm(`Möchtest du die Schule "${name}" wirklich löschen? Dadurch werden alle verknüpften Räume, iPads und Benutzer unwiderruflich gelöscht!`)) {
       return;
@@ -726,7 +826,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
 
   const copyInviteLink = (schoolId: string, schoolName: string, token?: string | null) => {
-    const inviteUrl = `${getSubdomainOrigin(schoolName)}&invite_school_id=${schoolId}&role=secretary&token=${token || ''}`;
+    const inviteUrl = getSecretaryInviteUrl(schoolId, schoolName, token || null);
     navigator.clipboard.writeText(inviteUrl);
     setCopiedId(schoolId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -3150,6 +3250,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               setEditTrialOption('custom');
                               setEditZipCode(school.zip_code || '');
                               setEditCity(school.city || '');
+                              setEditEmail(school.email || '');
+                              setEditPhoneNumber(school.phone_number || '');
                               setEditHasGroovelab(school.has_groovelab_subscription ?? false);
                               setEditHasCampus(school.has_campus_subscription ?? false);
                               setEditSubscriptionBypass(school.subscription_bypass ?? false);
@@ -3201,6 +3303,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
                                     <MapPin size={11} color="#64748b" />
                                     <span>{school.zip_code || ''} {school.city || ''}</span>
+                                  </div>
+                                )}
+
+                                {(school.email || school.phone_number) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.73rem', color: '#64748b', marginTop: '2px', fontWeight: 550, flexWrap: 'wrap' }}>
+                                    {school.email && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                        <Mail size={11} color="#64748b" />
+                                        <span>{school.email}</span>
+                                      </span>
+                                    )}
+                                    {school.phone_number && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                        <Phone size={11} color="#64748b" />
+                                        <span>{school.phone_number}</span>
+                                      </span>
+                                    )}
                                   </div>
                                 )}
 
@@ -3920,7 +4039,50 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
-
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Telefonnummer</label>
+                        <input 
+                          type="text" 
+                          value={editPhoneNumber} 
+                          onChange={(e) => setEditPhoneNumber(e.target.value)} 
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
+                        <input 
+                          type="email" 
+                          value={editEmail} 
+                          onChange={(e) => setEditEmail(e.target.value)} 
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#f8fafc',
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
 
                     <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Logo Bild-URL</label>
@@ -4212,7 +4374,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input
                           readOnly
-                          value={`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`}
+                          value={getSecretaryInviteUrl(selectedSchool.id, selectedSchool.name, selectedSchool.secretary_onboarding_token || null)}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
@@ -4229,7 +4391,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(`${getSubdomainOrigin(selectedSchool.name)}&invite_school_id=${selectedSchool.id}&role=secretary&token=${selectedSchool.secretary_onboarding_token || ''}`);
+                            navigator.clipboard.writeText(getSecretaryInviteUrl(selectedSchool.id, selectedSchool.name, selectedSchool.secretary_onboarding_token || null));
                             alert('Einladungslink kopiert!');
                           }}
                           style={{
@@ -4300,9 +4462,132 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   borderRadius: '20px',
                   padding: '24px'
                 }}>
-                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    <Briefcase size={16} color="#4f46e5" /> Hauptbenutzer / School Admins
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Briefcase size={16} color="#4f46e5" /> Hauptbenutzer / School Admins
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSchoolAdminForm(!showAddSchoolAdminForm)}
+                      style={{
+                        background: showAddSchoolAdminForm ? '#fce8e6' : '#ea4335',
+                        color: showAddSchoolAdminForm ? '#ea4335' : '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Plus size={12} /> {showAddSchoolAdminForm ? 'Abbrechen' : 'Admin hinzufügen'}
+                    </button>
                   </h4>
+
+                  {showAddSchoolAdminForm && (
+                    <form onSubmit={handleCreateSchoolAdmin} style={{
+                      background: '#f8fafc',
+                      border: '1px solid rgba(15, 23, 42, 0.05)',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      marginBottom: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      animation: 'fadeIn 0.2s'
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a', marginBottom: '4px' }}>
+                        Neuen Schul-Administrator anlegen
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Vorname *</label>
+                          <input
+                            type="text"
+                            required
+                            value={newSchoolAdminFirstName}
+                            onChange={(e) => setNewSchoolAdminFirstName(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(15,23,42,0.08)',
+                              background: '#ffffff',
+                              fontSize: '0.8rem',
+                              color: '#0f172a',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Nachname *</label>
+                          <input
+                            type="text"
+                            required
+                            value={newSchoolAdminLastName}
+                            onChange={(e) => setNewSchoolAdminLastName(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(15,23,42,0.08)',
+                              background: '#ffffff',
+                              fontSize: '0.8rem',
+                              color: '#0f172a',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>E-Mail-Adresse (Optional)</label>
+                        <input
+                          type="email"
+                          placeholder={`${selectedSchool.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@campus-groovelab.de`}
+                          value={newSchoolAdminEmail}
+                          onChange={(e) => setNewSchoolAdminEmail(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(15,23,42,0.08)',
+                            background: '#ffffff',
+                            fontSize: '0.8rem',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                        <button
+                          type="submit"
+                          style={{
+                            background: '#ea4335',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 16px',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          Administrator anlegen & PIN generieren
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {schoolStats[selectedSchool.id]?.adminUsers && schoolStats[selectedSchool.id]?.adminUsers.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
