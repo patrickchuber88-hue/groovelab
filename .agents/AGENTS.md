@@ -40,7 +40,7 @@
   - Raum-Engine & Raumbelegungs-Planung (Raumplaner)
   - Interne Schulkommunikation & Direktnachrichten (Chat / Shouts)
 - **GrooveLab-Modul**: Beinhaltet folgende Leistungen und Funktionen:
-  - Bandgründung & Band-Ensembles (Bands-Widget, Band-Verwaltung)
+  - Bandgründung & Band-Verwaltung (Bands-Widget, Band-Verwaltung)
   - Songverwaltung & Song-Bibliotheken (Songs meistern)
   - Repertoire-Planer (Song-Repertoire)
   - Band-Kommunikation
