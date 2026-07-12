@@ -4286,10 +4286,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
-                                    setElapsedSeconds(0);
-                                    setTimerRunning(false);
-                                    setIsExtraTime(false);
+                                  if (isExtraTime || elapsedSeconds >= dailyGoal * 60) {
+                                    handleFinishFocusSession();
+                                  } else {
+                                    if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                                      setElapsedSeconds(0);
+                                      setTimerRunning(false);
+                                      setIsExtraTime(false);
+                                    }
                                   }
                                 }}
                                 style={{
@@ -4432,10 +4436,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
-                          setElapsedSeconds(0);
-                          setTimerRunning(false);
-                          setIsExtraTime(false);
+                        if (isExtraTime || elapsedSeconds >= dailyGoal * 60) {
+                          handleFinishFocusSession();
+                        } else {
+                          if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
+                            setElapsedSeconds(0);
+                            setTimerRunning(false);
+                            setIsExtraTime(false);
+                          }
                         }
                       }}
                       style={{
