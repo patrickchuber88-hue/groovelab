@@ -1266,398 +1266,300 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             Wir glauben an die Kraft der Musik. Deshalb ist die Kernanwendung für deine Schule dauerhaft kostenfrei. Ohne Risiko, ohne Bedingungen.
           </p>
 
-          {/* Pricing Card */}
+          {/* Professional Senior Sales Pricing Model */}
           <div style={{
-            maxWidth: '550px',
+            maxWidth: '1100px',
             margin: '0 auto',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e8e8ed',
-            borderRadius: '28px',
-            padding: '48px 32px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.04)',
-            textAlign: 'center',
-            height: 'auto'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '48px'
           }}>
-            <h3 style={{
-              fontSize: '20px',
-              fontWeight: 800,
-              color: '#000000',
-              marginBottom: '16px'
-            }}>
-              Campus-Groovelab Softwarelizenz
-            </h3>
-
+            
+            {/* Prominent Core Value Banner: 100% Free Core License */}
             <div style={{
-              fontSize: '48px',
-              fontWeight: 900,
-              color: '#34a853',
-              marginBottom: '8px',
-              letterSpacing: '-0.04em'
+              background: 'linear-gradient(135deg, #e6f4ea 0%, #f4fbf7 100%)',
+              border: '1.5px solid rgba(52, 168, 83, 0.25)',
+              borderRadius: '32px',
+              padding: '40px 32px',
+              textAlign: 'center',
+              boxShadow: '0 12px 30px rgba(52, 168, 83, 0.04)'
             }}>
-              100% kostenlos
+              <span style={{
+                background: '#34a853',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 900,
+                padding: '6px 16px',
+                borderRadius: '100px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                display: 'inline-block',
+                marginBottom: '16px'
+              }}>
+                Unsere Philosophie
+              </span>
+              <h3 style={{
+                fontFamily: 'Urbanist, sans-serif',
+                fontSize: '32px',
+                fontWeight: 900,
+                color: '#0e381e',
+                margin: '0 0 12px 0',
+                letterSpacing: '-0.02em'
+              }}>
+                Die Core-Softwarelizenz ist dauerhaft 100% kostenlos
+              </h3>
+              <p style={{
+                fontSize: '16px',
+                color: '#2d4d38',
+                maxWidth: '750px',
+                margin: '0 auto',
+                lineHeight: 1.6,
+                fontWeight: 550
+              }}>
+                Keine Einrichtungsgebühr, keine Vertragskosten für die Softwarenutzung und unbegrenzte Admin-, Lehrer- & Schülerkonten in der Basisversion. Du bezahlst ausschließlich das dedizierte Cloud-Hosting oder aktive Service-Funktionen.
+              </p>
             </div>
 
-            <p style={{
-              fontSize: '14px',
-              color: '#7d7d82',
-              marginBottom: '32px'
-            }}>
-              Dauerhafte Nutzung der Kernanwendung.
-            </p>
+            {/* Grid for Hosting Modules & Bundles */}
+            <div>
+              <h4 style={{
+                fontFamily: 'Urbanist, sans-serif',
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0f172a',
+                marginBottom: '24px',
+                textAlign: 'left'
+              }}>
+                1. Dedicated Server-Hosting & Infrastruktur
+              </h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gap: '24px'
+              }}>
+                
+                {/* Campus Module Card */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px 24px',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Basis-Hosting</span>
+                  <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>Campus-Modul</h5>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>7,99 €</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
+                  </div>
+                  <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
+                    Bereitstellung der zentralen Datenbank, des intelligenten Stundenplan-Designers, der Raum-Engine sowie der internen Schulkommunikation.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Unbegrenzte Daten-Kapazität</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>DSGVO- &amp; RLS-Sicherheit</span>
+                    </div>
+                  </div>
+                </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid #e8e8ed', marginBottom: '32px' }} />
+                {/* GrooveLab Module Card */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '32px 24px',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Praxis-Plattform</span>
+                  <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>GrooveLab-Modul</h5>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>4,99 €</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
+                  </div>
+                  <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
+                    Bereitstellung der gamifizierten Übeplattform, der Audio-Loopstation mit Taktsynchronisation, Aufnahmefunktion und Songverwaltung.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Supabase Audio-Cloud-Speicher</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Gamifizierte Übe-Streaks &amp; Emojis</span>
+                    </div>
+                  </div>
+                </div>
 
+                {/* Kombi-Vorteil Bundle Card */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f4fbf7 100%)',
+                  border: '2.5px solid #34a853',
+                  borderRadius: '24px',
+                  padding: '32px 24px',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 10px 30px rgba(52, 168, 83, 0.06)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '-32px',
+                    background: '#34a853',
+                    color: '#ffffff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    padding: '4px 32px',
+                    transform: 'rotate(45deg)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Empfohlen
+                  </div>
+                  <span style={{ fontWeight: 800, fontSize: '12px', color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kombi-Vorteil</span>
+                  <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Komplettpaket</h5>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#34a853' }}>9,99 €</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
+                  </div>
+                  <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
+                    Voller Zugriff auf beide Module auf einem dedizierten Server. Perfekt für moderne Musikschulen, die Organisation und Übe-Spaß vereinen möchten.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(52, 168, 83, 0.05)', padding: '12px', borderRadius: '12px', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#137333', fontWeight: 700 }}>
+                      <span>💡 Du sparst dauerhaft 2,99 € / Monat!</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Split Details Section: Service Fees & Flex billing options */}
             <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+              gap: '40px',
+              textAlign: 'left',
+              borderTop: '1px solid #e2e8f0',
+              paddingTop: '40px'
+            }}>
+              
+              {/* Left Column: User Profile Fees */}
+              <div>
+                <h4 style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>
+                  2. Nutzer-Lizenzen &amp; Profile
+                </h4>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
+                  Um die anfallenden Cloud-Ressourcen fair und nutzungsbasiert zu skalieren, berechnen wir extrem geringe Gebühren pro aktivem Account.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte &amp; Verwaltung</div>
+                    <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
+                      <strong>0,49 € / Monat</strong> je aktives Admin- oder Lehrer-Profil. Du zahlst nur für aktive Teammitglieder im Abrechnungszeitraum.
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen</div>
+                    <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
+                      <strong>0,49 € / Monat</strong> je aktiver Schüler-Zugang. Inaktive Schüler (reine Archivdaten ohne Nutzung) kosten lediglich eine passive Datenbankgebühr von <strong>0,09 € / Monat</strong>.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Billing Options (Senior Sales Pitch) */}
+              <div>
+                <h4 style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>
+                  3. Flexible Abrechnungsmodelle
+                </h4>
+                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
+                  Wir bieten dir zwei strategische Modelle zur Kostenverteilung, um das Budget deiner Musikschule optimal zu entlasten.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ background: 'rgba(52, 168, 83, 0.04)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(52, 168, 83, 0.15)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#137333', marginBottom: '4px' }}>A: Eltern-Direktabrechnung (Zahlungsüberwachung)</div>
+                    <div style={{ fontSize: '13px', color: '#2d4d38', lineHeight: 1.4, marginBottom: '8px' }}>
+                      Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen 0,49 €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
+                      <span>• <strong>Härtefall-Schutz:</strong> Automatisch 5% kostenfreie Freilizenzen bei Elternabrechnung für Geschwisterrabatte oder Sozialtarife.</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>B: Musikschule übernimmt (Sammelzahler)</div>
+                    <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4, marginBottom: '8px' }}>
+                      Die Musikschule zahlt gesammelt für alle Schüler. Hier profitierst du von exzellenten Skalierungsrabatten:
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler).</span>
+                      <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Vorauszahlung je Schüler als planbarer Jahresbeitrag.</span>
+                      <span>• <strong>Schuljahresstart-Flat (20% Rabatt):</strong> Einmalige Komplett-Aktivierung zum Schuljahresstart im August für maximale Ersparnis.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Enterprise Warning & CTA */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '24px',
+              padding: '24px',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
-              textAlign: 'left',
-              maxWidth: '440px',
-              margin: '0 auto 40px auto'
+              textAlign: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Dauerhaft gratis Softwarelizenz:</strong> Die Nutzung von Campus-Groovelab ist und bleibt für alle kostenlos.</span>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#b45309' }}>
+                💡 Großschulen &amp; Vereine: Ab 500 Schülern bieten wir maßgeschneiderte Volumenrabatte und dedizierte Server-Flatrates an.
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Kostenloses Hosting-Basis-Modul:</strong> Nur 7,99 €/Monat für die Bereitstellung des Campus-Moduls für deine gesamte Schule.</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (nur 5,39 €/Jahr dank jährlichem Gratis-Monat). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Laufzeiten:</strong> Keine Einrichtungsgebühr. Nach Ablauf des 1-monatigen Probemonats läuft der Vertrag flexibel bis zum jeweiligen Schuljahresende (August).</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>0,00 € Schul-Budget-Belastung:</strong> Nutze die Direktabrechnung mit den Eltern (0,49 €/Monat). Die Musikschule zahlt dann 0,00 € Schüler-Datenbankgebühren.</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '15px', color: '#232326' }}><strong>Soziales Freikontingent (5%):</strong> Bei Eltern-Direktabrechnung erhält deine Schule automatisch 5 % Freilizenzen für Härtefälle (z. B. Geschwisterrabatte, Sozialtarife) zur freien Zuweisung.</span>
-              </div>
-            </div>
-
-            {/* Interactive Price Calculator */}
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '24px',
-              padding: '24px',
-              textAlign: 'left',
-              marginBottom: '32px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px'
-            }}>
-              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🧮 Interaktiver Preisrechner
-              </h4>
-              <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 550, lineHeight: 1.4 }}>
-                Simuliere deine monatlichen Hosting- & Servicegebühren. Da der erste Monat <strong>kostenlos</strong> ist, reduzieren sich die restlichen Jahreskosten für das laufende Schuljahr auf <strong>{getPaidMonthsUntilAugust()} Abrechnungsmonate</strong> (bis August).
-              </p>
-
-              {/* Module select toggles */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <label style={{
+              <button 
+                onClick={() => onRegister()}
+                style={{
+                  alignSelf: 'center',
+                  padding: '16px 40px',
+                  backgroundColor: '#34a853',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  fontWeight: 800,
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: calcCampus ? '#e6f4ea' : '#ffffff',
-                  border: calcCampus ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
-                  padding: '10px 12px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  transition: 'all 0.2s',
-                  userSelect: 'none'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={calcCampus}
-                    onChange={(e) => setCalcCampus(e.target.checked)}
-                    style={{ accentColor: '#34a853', cursor: 'pointer' }}
-                  />
-                  Campus (7,99 €)
-                </label>
-
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: calcGroovelab ? '#e6f4ea' : '#ffffff',
-                  border: calcGroovelab ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
-                  padding: '10px 12px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  transition: 'all 0.2s',
-                  userSelect: 'none'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={calcGroovelab}
-                    onChange={(e) => setCalcGroovelab(e.target.checked)}
-                    style={{ accentColor: '#34a853', cursor: 'pointer' }}
-                  />
-                  GrooveLab (4,99 €)
-                </label>
-              </div>
-
-              {/* Billing model segmented toggle */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Abrechnung der Schüler-Lizenzen:
-                </span>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '1fr 1fr', 
-                  background: '#f1f5f9', 
-                  borderRadius: '12px', 
-                  padding: '3px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setCalcBillingModel('parent')}
-                    style={{
-                      background: calcBillingModel === 'parent' ? '#ffffff' : 'none',
-                      color: calcBillingModel === 'parent' ? '#34a853' : '#475569',
-                      border: 'none',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      fontSize: '11.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: calcBillingModel === 'parent' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <span>🛡️ Eltern-Direktzahler (Standard)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCalcBillingModel('school')}
-                    style={{
-                      background: calcBillingModel === 'school' ? '#ffffff' : 'none',
-                      color: calcBillingModel === 'school' ? '#34a853' : '#475569',
-                      border: 'none',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      fontSize: '11.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: calcBillingModel === 'school' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <span>🏫 Schule (Sammelzahler)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Slider / Numbers inputs */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
-                    <span>Aktive Schüler:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="9999"
-                        value={calcStudents}
-                        onChange={(e) => {
-                          const val = Math.max(0, Math.min(9999, parseInt(e.target.value) || 0));
-                          setCalcStudents(val);
-                        }}
-                        style={{
-                          width: '64px',
-                          padding: '4px 6px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          textAlign: 'center',
-                          fontWeight: 800,
-                          color: '#34a853',
-                          fontSize: '12px',
-                          outline: 'none'
-                        }}
-                      />
-                      <span>Schüler ({(calcStudents * 0.49).toFixed(2)} €/Mo)</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="2000"
-                    step="5"
-                    value={Math.min(calcStudents, 2000)}
-                    onChange={(e) => setCalcStudents(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#34a853', cursor: 'pointer' }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
-                    <span>Lehrer & Admins:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="999"
-                        value={calcTeachers}
-                        onChange={(e) => {
-                          const val = Math.max(0, Math.min(999, parseInt(e.target.value) || 0));
-                          setCalcTeachers(val);
-                        }}
-                        style={{
-                          width: '54px',
-                          padding: '4px 6px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          textAlign: 'center',
-                          fontWeight: 800,
-                          color: '#34a853',
-                          fontSize: '12px',
-                          outline: 'none'
-                        }}
-                      />
-                      <span>Profile ({(calcTeachers * 0.49).toFixed(2)} €/Mo)</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="150"
-                    step="1"
-                    value={Math.min(calcTeachers, 150)}
-                    onChange={(e) => setCalcTeachers(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#34a853', cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-
-              {/* Enterprise / Large school discount warning */}
-              {calcStudents >= 500 && (
-                <div style={{
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px dashed rgba(245, 158, 11, 0.4)',
-                  borderRadius: '12px',
-                  padding: '10px 14px',
-                  fontSize: '11px',
-                  color: '#b45309',
-                  fontWeight: 700,
-                  lineHeight: 1.4,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span>💡</span>
-                  <span>
-                    <strong>Großschul-Vorteil:</strong> Ab 500 aktiven Schülern bieten wir vergünstigte Flatrates & Volumenrabatte an. Nimm Kontakt mit uns auf!
-                  </span>
-                </div>
-              )}
-
-              {/* Calculations Box */}
-              {(() => {
-                const baseVal = (calcCampus && calcGroovelab) ? 9.99 : (calcCampus ? 7.99 : (calcGroovelab ? 4.99 : 0.00));
-                const studentFee = calcBillingModel === 'parent' ? 0.00 : (calcStudents * 0.49);
-                const teacherFee = calcTeachers * 0.49;
-                const userVal = studentFee + teacherFee;
-                const monthlyTotal = baseVal + userVal;
-                const paidM = getPaidMonthsUntilAugust();
-                const totalYear = monthlyTotal * paidM;
-
-                return (
-                  <div style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '16px',
-                    fontSize: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
-                      <span>Monatliche Basis-Gebühr:</span>
-                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{baseVal.toFixed(2).replace('.', ',')} €/Mo</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
-                      <span>Service-Gebühr Lehrkräfte ({calcTeachers} Profile):</span>
-                      <span style={{ fontWeight: 800, color: '#0f172a' }}>{teacherFee.toFixed(2).replace('.', ',')} €/Mo</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
-                      <span>Service-Gebühr Schüler ({calcStudents} Schüler):</span>
-                      {calcBillingModel === 'parent' ? (
-                        <span style={{ fontWeight: 800, color: '#34a853' }}>0,00 € (Direktabrechnung)</span>
-                      ) : (
-                        <span style={{ fontWeight: 800, color: '#0f172a' }}>{studentFee.toFixed(2).replace('.', ',')} €/Mo</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', fontWeight: 800, color: '#0f172a' }}>
-                      <span>Regulärer Monatspreis für die Schule:</span>
-                      <span style={{ color: '#34a853', fontSize: '14px' }}>{monthlyTotal.toFixed(2).replace('.', ',')} €/Mo</span>
-                    </div>
-
-                    <div style={{
-                      marginTop: '8px',
-                      background: '#e6f4ea',
-                      borderRadius: '10px',
-                      padding: '10px',
-                      borderLeft: '4px solid #34a853',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#34a853', fontWeight: 900, fontSize: '13px' }}>
-                        <span>Kosten im 1. Schuljahr:</span>
-                        <span>{totalYear.toFixed(2).replace('.', ',')} €</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#34a853', fontWeight: 650 }}>
-                        (Bestehend aus 1 Probemonat für 0,00 € + {paidM} Abrechnungsmonaten bis August. Du sparst {monthlyTotal.toFixed(2).replace('.', ',')} € im ersten Jahr gegenüber einem regulären 12-Monatstarif!)
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                Jetzt unverbindlich als Musikschule testen <ArrowRight size={18} />
+              </button>
             </div>
 
-            <button 
-              onClick={() => onRegister()}
-              style={{
-                width: '100%',
-                padding: '16px 32px',
-                backgroundColor: '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '100px',
-                fontWeight: 600,
-                fontSize: '16px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              Jetzt unverbindlich registrieren <ArrowRight size={18} />
-            </button>
           </div>
         </div>
       </section>
