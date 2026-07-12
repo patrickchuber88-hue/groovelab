@@ -1,0 +1,322 @@
+[
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "lineNum": 7830,
+    "type": "rgba",
+    "found": "rgba(142, 142, 147, 0.12)",
+    "replacement": "rgba(52, 168, 83, 0.12)",
+    "content": "let bg = 'rgba(142, 142, 147, 0.12)';"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "lineNum": 8587,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.06)",
+    "replacement": "rgba(19, 115, 51, 0.06)",
+    "content": "background: 'rgba(120, 120, 128, 0.06)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "lineNum": 8647,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.06)",
+    "replacement": "rgba(19, 115, 51, 0.06)",
+    "content": "background: 'rgba(120, 120, 128, 0.06)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "lineNum": 2431,
+    "type": "rgba",
+    "found": "rgb(230, 244, 234)",
+    "replacement": "rgba(52, 168, 83, 1)",
+    "content": "labelColor: \"rgb(230, 244, 234)\","
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "lineNum": 1124,
+    "type": "rgba",
+    "found": "rgba(100, 116, 139, 0.1)",
+    "replacement": "rgba(19, 115, 51, 0.1)",
+    "content": "<div style={{ width: '48px', height: '48px', borderRadius: '16px', background: pendingUsers.length > 0 ? 'rgba(234, 67, 53, 0.15)' : 'rgba(100, 116, 139, 0.1)', color: pendingUsers.length > 0 ? '#ea4335' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "lineNum": 2955,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.85)",
+    "replacement": "rgba(52, 168, 83, 0.85)",
+    "content": "color: 'rgba(230, 244, 234, 0.85)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "lineNum": 11315,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.6)",
+    "replacement": "rgba(52, 168, 83, 0.6)",
+    "content": "background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "lineNum": 357,
+    "type": "rgba",
+    "found": "rgb(230, 244, 234)",
+    "replacement": "rgba(52, 168, 83, 1)",
+    "content": "labelColor: \"rgb(230, 244, 234)\","
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "lineNum": 2872,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.5)",
+    "replacement": "rgba(52, 168, 83, 0.5)",
+    "content": "<div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#137333', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "lineNum": 3698,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.65)",
+    "replacement": "rgba(52, 168, 83, 0.65)",
+    "content": "const campusBg = 'rgba(230, 244, 234, 0.65)';"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "lineNum": 3709,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.5)",
+    "replacement": "rgba(52, 168, 83, 0.5)",
+    "content": "? 'rgba(220, 252, 231, 0.5)'"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "lineNum": 3791,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.95)",
+    "replacement": "rgba(52, 168, 83, 0.95)",
+    "content": "background: isCampusTheme ? 'rgba(230, 244, 234, 0.95)' : 'rgba(219, 234, 254, 0.95)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "lineNum": 4186,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.6)",
+    "replacement": "rgba(52, 168, 83, 0.6)",
+    "content": "<span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#137333', background: 'rgba(220, 252, 231, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 2846,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.45)",
+    "replacement": "rgba(52, 168, 83, 0.45)",
+    "content": "case 'scheduled': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#137333' };"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 2852,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.45)",
+    "replacement": "rgba(52, 168, 83, 0.45)",
+    "content": "case 'rescheduled_confirmed': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#137333' };"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 3259,
+    "type": "rgba",
+    "found": "rgba(8, 145, 178, 0.15)",
+    "replacement": "rgba(52, 168, 83, 0.15)",
+    "content": "border: '1px solid rgba(8, 145, 178, 0.15)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 3271,
+    "type": "rgba",
+    "found": "rgba(8, 145, 178, 0.04)",
+    "replacement": "rgba(52, 168, 83, 0.04)",
+    "content": "onMouseOver={e => e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)'}"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 3284,
+    "type": "rgba",
+    "found": "rgba(8, 145, 178, 0.15)",
+    "replacement": "rgba(52, 168, 83, 0.15)",
+    "content": "border: `1px solid ${localStorage.getItem('groovelab_copied_week_data') ? 'rgba(8, 145, 178, 0.15)' : 'rgba(148, 163, 184, 0.15)'}`,"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "lineNum": 3299,
+    "type": "rgba",
+    "found": "rgba(8, 145, 178, 0.04)",
+    "replacement": "rgba(52, 168, 83, 0.04)",
+    "content": "e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)';"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 709,
+    "type": "rgba",
+    "found": "rgba(100, 116, 139, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: 'rgba(100, 116, 139, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 12633,
+    "type": "rgba",
+    "found": "rgba(230, 244, 234, 0.75)",
+    "replacement": "rgba(52, 168, 83, 0.75)",
+    "content": "GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(230, 244, 234, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 12633,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.45)",
+    "replacement": "rgba(52, 168, 83, 0.45)",
+    "content": "GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(230, 244, 234, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 12829,
+    "type": "rgba",
+    "found": "rgba(100, 116, 139, 0.95)",
+    "replacement": "rgba(19, 115, 51, 0.95)",
+    "content": "background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.95) 0%, rgba(71, 85, 105, 0.95) 100%)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 12832,
+    "type": "rgba",
+    "found": "rgba(100,116,139,0.25)",
+    "replacement": "rgba(19, 115, 51, 0.25)",
+    "content": "boxShadow: '0 12px 30px -5px rgba(100,116,139,0.25)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 16134,
+    "type": "rgba",
+    "found": "rgba(220, 252, 231, 0.45)",
+    "replacement": "rgba(52, 168, 83, 0.45)",
+    "content": "const themeBg = 'rgba(220, 252, 231, 0.45)'; // default green"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 16745,
+    "type": "rgba",
+    "found": "rgba(100, 116, 139, 0.2)",
+    "replacement": "rgba(19, 115, 51, 0.2)",
+    "content": "<div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(100, 116, 139, 0.2)' }}>"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17629,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: 'rgba(120, 120, 128, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17705,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.04)",
+    "replacement": "rgba(19, 115, 51, 0.04)",
+    "content": "background: 'rgba(120, 120, 128, 0.04)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17795,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: selectedFilterTeacherId === null ? '#007aff' : 'rgba(120, 120, 128, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17814,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.12)",
+    "replacement": "rgba(19, 115, 51, 0.12)",
+    "content": "background: selectedFilterTeacherId === null ? 'rgba(255,255,255,0.25)' : 'rgba(120, 120, 128, 0.12)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17906,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: isSelected ? 'rgba(0,122,255,0.1)' : 'rgba(120, 120, 128, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 17919,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.04)",
+    "replacement": "rgba(19, 115, 51, 0.04)",
+    "content": "<div style={{ padding: '6px 8px 8px 8px', background: 'rgba(120, 120, 128, 0.04)', display: 'flex', flexDirection: 'column', gap: '6px' }}>"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 18021,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: 'rgba(120, 120, 128, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 18200,
+    "type": "rgba",
+    "found": "rgba(142, 142, 147, 0.1)",
+    "replacement": "rgba(52, 168, 83, 0.1)",
+    "content": "background: hasConflicts ? 'rgba(255, 59, 48, 0.1)' : 'rgba(142, 142, 147, 0.1)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 18267,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.06)",
+    "replacement": "rgba(19, 115, 51, 0.06)",
+    "content": "background: 'rgba(120, 120, 128, 0.06)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "lineNum": 18282,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.08)",
+    "replacement": "rgba(19, 115, 51, 0.08)",
+    "content": "background: 'rgba(120, 120, 128, 0.08)',"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "lineNum": 347,
+    "type": "rgba",
+    "found": "rgb(230, 244, 234)",
+    "replacement": "rgba(52, 168, 83, 1)",
+    "content": "labelColor: \"rgb(230, 244, 234)\","
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "lineNum": 1310,
+    "type": "rgba",
+    "found": "rgba(16, 181, 129, 0.15)",
+    "replacement": "rgba(52, 168, 83, 0.15)",
+    "content": "style={{ background: isRegularReset ? '#34a853' : '#ef4444', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '70px', boxShadow: isRegularReset ? '0 2px 8px rgba(16, 181, 129, 0.15)' : '0 2px 8px rgba(239, 68, 68, 0.15)' }}"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "lineNum": 13045,
+    "type": "rgba",
+    "found": "rgba(37, 211, 102, 0.2)",
+    "replacement": "rgba(52, 168, 83, 0.2)",
+    "content": "style={{ background: '#25d366', color: 'white', textDecoration: 'none', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)' }}"
+  },
+  {
+    "file": "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "lineNum": 1082,
+    "type": "rgba",
+    "found": "rgba(120, 120, 128, 0.12)",
+    "replacement": "rgba(19, 115, 51, 0.12)",
+    "content": "background: 'rgba(120, 120, 128, 0.12)',"
+  }
+]

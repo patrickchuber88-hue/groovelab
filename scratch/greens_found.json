@@ -1,0 +1,973 @@
+{
+  "#64748b": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.css",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BillingDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusSetupScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ContractEndPrompt.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/DeviceSetupScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/EnsembleDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentRadarChart.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherActivation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/campus/CampusModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLabModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/verwaltung/VerwaltungModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/theme.ts"
+  ],
+  "#9ca3af": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.css",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "#34a853": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.css",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BandProfileContent.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BillingDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudioAvatar.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherActivation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/campus/CampusModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/verwaltung/VerwaltungModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(22,163,74,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.css"
+  ],
+  "rgba(52,168,83,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.css",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#22c55e": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BandProfileContent.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusSetupScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/DeviceSetupScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLabModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/verwaltung/VerwaltungModule.tsx"
+  ],
+  "#f0fdf4": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/DeviceSetupScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#dcfce7": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#16a34a": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#bbf7d0": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#137333": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "#e8f5e9": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "#2e7d32": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "#a1a1aa": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#14b8a6": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#0d9488": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "#15803d": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#e6f4ea": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BillingDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherActivation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/campus/CampusModule.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/verwaltung/VerwaltungModule.tsx"
+  ],
+  "#86868b": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#0369a1": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#ecfdf5": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#d1fae5": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#a7f3d0": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "#065f46": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#047857": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#166534": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#8e8e93": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#4ade80": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherActivation.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.5)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx"
+  ],
+  "rgba(20,184,166,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "rgba(20,184,166,0.5)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "rgba(34,197,94,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "rgba(22,163,74,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.05)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.18)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx"
+  ],
+  "rgba(52,168,83,0.07)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.3)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusDirectMessages.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.8)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "rgba(34,197,94,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(34,197,94,0.3)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/App.tsx"
+  ],
+  "#b27b00": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx"
+  ],
+  "#eafaf1": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx"
+  ],
+  "#1e7a44": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx"
+  ],
+  "#34c759": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#e6fbf0": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#14532d": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#86efac": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#456355": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "#71717a": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(142,142,147,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx"
+  ],
+  "rgba(52,199,89,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,199,89,0.18)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.04)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.07)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.03)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "rgba(34,197,94,0.75)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/AdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx"
+  ],
+  "rgba(52,168,83,0.4)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ArtistGateway.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusTeacherDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "#34d399": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BandProfileContent.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,211,153,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BandProfileContent.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(52,211,153,0.3)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/BandProfileContent.tsx"
+  ],
+  "#e6f6ec": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#097939": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#d1ebd5": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#385c3f": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#f2fdf6": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#d1e2d4": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#74777f": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#f4f9f5": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#b28600": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#e2f8e9": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#f8faf9": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#fafbfa": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#eef3ef": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#7c8b80": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#65a30d": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#6e6e73": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#8c9e90": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#30d158": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#28a745": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#d2ded5": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "#e2eae4": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "rgba(52,199,89,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "rgba(120,120,128,0.06)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.02)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(48,209,88,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/CampusEventsBoard.tsx"
+  ],
+  "rgba(22,163,74,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePDFTemplate.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/InvoicePreviewModal.tsx"
+  ],
+  "#7d7d82": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "#27c93f": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx"
+  ],
+  "#f4fbf7": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx"
+  ],
+  "rgba(52,168,83,0.04)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.06)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#34a85320": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "#11572e": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "rgb(167,243,208)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRCodeModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SignupWizard.tsx"
+  ],
+  "rgba(167,243,208,0)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "rgba(167,243,208,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "rgba(167,243,208,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "rgba(167,243,208,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx"
+  ],
+  "rgba(22,163,74,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/LoginScreen.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(100,116,139,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx"
+  ],
+  "rgba(19,115,51,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx"
+  ],
+  "rgba(19,115,51,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(19,115,51,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx"
+  ],
+  "rgba(19,115,51,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MasterAdminDashboard.tsx"
+  ],
+  "#0f766e": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "#8fa399": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "#0f5c29": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(34,197,94,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(15,118,110,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(52,168,83,0.45)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(52,168,83,0.10)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(15,89,40,0.8)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(197,216,207,0.85)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(69,99,85,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(69,99,85,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(69,99,85,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(52,168,83,0.65)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(230,244,234,0.6)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx"
+  ],
+  "rgba(52,168,83,0.6)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "#4f5e53": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx"
+  ],
+  "#248a3d": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx"
+  ],
+  "rgba(22,163,74,0.06)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx"
+  ],
+  "rgba(52,199,89,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/QRLandingPage.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,211,153,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(209,250,229,0.5)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(230,244,234,0.65)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(220,252,231,0.5)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(52,168,83,0.14)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(230,244,234,0.95)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "rgba(220,252,231,0.6)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleBoard.tsx"
+  ],
+  "#0891b2": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "#118a44": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(220,252,231,0.45)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(8,145,178,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(8,145,178,0.04)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(17,138,68,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(17,138,68,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(17,138,68,0.04)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "rgba(22,163,74,0.3)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.45)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/ScheduleCalendarView.tsx"
+  ],
+  "#e2f6ea": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "#6b7280": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "#f0fdfa": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#d1f2dd": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "#249d3d": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(100,116,139,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(34,197,94,0.03)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(34,197,94,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(240,253,244,0.75)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.95)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(19,115,51,0.95)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(100,116,139,0.95)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(100,116,139,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.015)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(100,116,139,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(34,197,150,0.06)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(120,120,128,0.08)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(120,120,128,0.04)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(120,120,128,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx",
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "rgba(52,199,89,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "rgba(142,142,147,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/SecretaryDashboard.tsx"
+  ],
+  "#34a8530c": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#1b8035": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#34a85315": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "#25d366": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(16,181,129,0.15)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(4,120,87,0.12)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(52,168,83,0.22)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(37,211,102,0.2)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentAvatarDashboard.tsx"
+  ],
+  "rgba(4,120,87,0.1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "rgba(52,199,89,0.3)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "rgba(52,168,83,0.35)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/StudentDetailModal.tsx"
+  ],
+  "rgba(34,197,94,0.25)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(52,199,89,0.05)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.35)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.4)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "rgba(22,163,74,0.05)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/components/TeacherDashboard.tsx"
+  ],
+  "#6ee7b7": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,1)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.7)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,211,153,0.4)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "rgba(52,168,83,0.31)": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/index.css"
+  ],
+  "#66757f": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/utils/instruments.ts"
+  ],
+  "#aa695b": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/utils/instruments.ts"
+  ],
+  "#8899a6": [
+    "/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab/src/utils/instruments.ts"
+  ]
+}
