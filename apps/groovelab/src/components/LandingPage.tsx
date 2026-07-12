@@ -1524,7 +1524,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler).</span>
                       <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Vorauszahlung je Schüler als planbarer Jahresbeitrag.</span>
-                      <span>• <strong>Schuljahresstart-Flat (20% Rabatt):</strong> Einmalige Komplett-Aktivierung zum Schuljahresstart im August für maximale Ersparnis.</span>
+                      <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige Komplett-Aktivierung für das gesamte Schuljahr mit maximaler Ersparnis.</span>
                     </div>
                   </div>
                 </div>
