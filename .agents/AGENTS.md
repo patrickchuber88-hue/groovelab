@@ -19,7 +19,7 @@
 - **Billing Methods for Student Activations (Schüleraktivierungen)**:
   - Only students who consciously activate their profile/access via the platform are subject to billing (inactive/unregistered profiles in the database are not billed).
   - **Musikschule übernimmt alle Kosten (Sammelzahler)** (Music school covers all fees, making it completely free for students/parents):
-    - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student / Mo.
+    - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student / Mo. Wenn ein Schüler länger als 2 Monate nicht eingeloggt war, wird das Profil automatisch wieder inaktiviert, um Kosten nur bei tatsächlicher Nutzung zu gewährleisten.
     - *Jahresbeitrag bei Aktivierung (10% Rabatt)*: Active students billed as an annual fee in a separate monthly bill, offering a 10% discount.
     - *Einmalige Komplett-Aktivierung zum Schuljahresstart (September) (20% Rabatt)*: The school activates all students at the school year start, billed once for the entire school year with a 20% discount.
   - **Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)** (Direct billing with parents/students; only available for the Campus module; GrooveLab activations are always covered by the school):

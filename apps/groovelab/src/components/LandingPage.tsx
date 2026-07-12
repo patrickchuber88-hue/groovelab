@@ -1522,7 +1522,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       Die Musikschule zahlt gesammelt für alle Schüler. Hier profitierst du von exzellenten Skalierungsrabatten:
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler).</span>
+                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
                       <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Vorauszahlung als Jahresbeitrag bei flexibler Aktivierung einzelner Schüler unter dem Jahr.</span>
                       <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr.</span>
                     </div>
