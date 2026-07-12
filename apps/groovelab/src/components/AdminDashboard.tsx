@@ -4691,7 +4691,7 @@ export function AdminDashboard({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ background: 'rgba(52, 168, 83, 0.15)', color: '#34a853', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({students.length})
@@ -4713,13 +4713,14 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
                     background: listType === 'active' ? 'white' : 'transparent',
-                    color: listType === 'active' ? brandColor : '#64748b',
+                    color: listType === 'active' ? '#34a853' : '#64748b',
                     fontWeight: listType === 'active' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'active' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
+                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? brandColor : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? '#34a853' : 'transparent' }} />
                   Aktive Schüler
                 </button>
                 <button
@@ -4727,13 +4728,14 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
                     background: listType === 'archive' ? 'white' : 'transparent',
-                    color: listType === 'archive' ? brandColor : '#64748b',
+                    color: listType === 'archive' ? '#34a853' : '#64748b',
                     fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px'
+                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? brandColor : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? '#34a853' : 'transparent' }} />
                   Archiv
                 </button>
               </div>
@@ -5493,6 +5495,7 @@ export function AdminDashboard({
   };
 
   const renderCampusRoomsTab = () => {
+    const brandColor = '#34a853';
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     
     const handleQuickDuration = (mins: number) => {
@@ -9286,7 +9289,7 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => {
-    const brandColor = '#ea4335';
+    const brandColor = '#34a853';
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -10460,6 +10463,7 @@ export function AdminDashboard({
       : null;
 
     if (activePlatform === 'campus') {
+      const brandColor = '#34a853';
       const myClassMins = stats.myClassMins || 0;
       const otherClassMins = stats.otherClassMins || 0;
       const totalSchoolMins = myClassMins + otherClassMins;

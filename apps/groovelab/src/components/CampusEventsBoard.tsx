@@ -122,7 +122,8 @@ const formatToLocalDatetime = (isoString: string | null | undefined): string => 
   return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
 };
 
-export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor }: CampusEventsBoardProps) {
+export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor: passedBrandColor }: CampusEventsBoardProps) {
+  const brandColor = '#34a853';
   // Tabs for Column 1 (My Lessons)
   const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
 
