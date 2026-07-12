@@ -1365,14 +1365,17 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
-                    Bereitstellung der gamifizierten Übeplattform, der zentralen Datenbank, des intelligenten Stundenplan-Designers, der Raum-Engine, der Audio-Loopstation, der Aufnahmefunktion sowie der internen Schulkommunikation.
+                    Bereitstellung der zentralen Datenbank, des intelligenten Stundenplandesigners, der Raum-Engine sowie des Hausaufgabenhefts, Meisterwerk-Protokolls, Übe-Timers (inkl. Übungs-Streaks &amp; XP) und der Audio-Loopstation.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Unbegrenzte Daten-Kapazität</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Hausaufgabenheft, Übe-Timer &amp; Loopstation</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>DSGVO- &amp; RLS-Sicherheit</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Stundenplan-Designer &amp; Raum-Engine</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Verwaltung &amp; Sekretariat 100% inklusive</span>
                     </div>
                   </div>
                 </div>
@@ -1396,14 +1399,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
-                    Bereitstellung der gamifizierten Übeplattform mit Fokus auf Bandgründung, dem Meistern von Songs und der Songverwaltung.
+                    Bereitstellung des Band- und Ensemblebereichs mit Band-Kommunikation, Repertoire-Planer, Songverwaltung (inkl. Song-Mastering), Live Lab, Skill-Radar und Schüler- &amp; Band-Avataren.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Supabase Audio-Cloud-Speicher</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Bandgründung, Live Lab &amp; Repertoire</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Gamifizierte Übe-Streaks &amp; Emojis</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Musiker- &amp; Band-Avatare + Skill-Radar</span>
                     </div>
                   </div>
                 </div>
@@ -1476,16 +1479,16 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte &amp; Verwaltung</div>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktives Admin- oder Lehrer-Profil. Du zahlst nur für aktive Teammitglieder im Abrechnungszeitraum.
+                      <strong>0,49 € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
                     </div>
                   </div>
 
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen</div>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen &amp; Deaktivierung</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktiver Schüler-Zugang. Inaktive Schüler (reine Archivdaten ohne Nutzung) kosten lediglich eine passive Datenbankgebühr von <strong>0,09 € / Monat</strong>.
+                      <strong>0,49 € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
                     </div>
                   </div>
                 </div>
