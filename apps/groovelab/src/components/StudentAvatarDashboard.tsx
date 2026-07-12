@@ -8889,7 +8889,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               
               {/* Top Section: Header & Contribution */}
               {(() => {
-                const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                const brandColor = studentUser?.schools?.brand_color || '#137333';
                 const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
                 const liveClassMins = classMins + activeSessionMins;
                 const liveClassWeeklyFocus = classWeeklyFocus + activeSessionMins;
@@ -8973,19 +8973,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
                         {[
-                          { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: `${brandColor}08` },
-                          { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(liveClassWeeklyFocus), icon: TrendingUp, color: '#34a853', bg: '#e6f4ea' },
-                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
-                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#e6f4ea' : '#fef2f2' },
-                          { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
-                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
+                          { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(liveClassWeeklyFocus), icon: TrendingUp, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#137333' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
+                          { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
+                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
                         ].map((stat, idx) => (
-                          <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: `1px solid ${stat.color}15`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
+                          <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15` }}>
                                 <stat.icon size={16} />
                               </div>
                             </div>
@@ -9007,24 +9007,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </p>
 
                       <div style={{ width: '100%', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsPieChart>
-                            <Pie
-                              data={pieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={42}
-                              outerRadius={58}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {pieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => formatMins(Number(value))} />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
+                        <RechartsPieChart width={130} height={130}>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={42}
+                            outerRadius={58}
+                            paddingAngle={liveClassMins > 0 && otherClassMins > 0 ? 3 : 0}
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatMins(Number(value))} />
+                        </RechartsPieChart>
                         
                         <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                           <span style={{ fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
